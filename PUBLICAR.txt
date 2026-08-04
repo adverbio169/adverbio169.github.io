@@ -1,0 +1,110 @@
+COMO PUBLICAR NO GITHUB PAGES
+Comissao Mista de Estudo do Subsidio dos Militares Estaduais - Roraima
+Preparado em 04/08/2026
+
+===============================================================================
+ANTES DE COMECAR
+===============================================================================
+Voce vai precisar de uma conta no github.com. A conta e a publicacao sao atos
+seus: material da Comissao indo para fora da infraestrutura do Estado e decisao
+dela, nao de quem opera.
+
+Escolha o nome do repositorio com cuidado: ELE ENTRA NO ENDERECO, e o endereco
+vai impresso no QR Code do relatorio. Sugestao:
+
+    repositorio:  comissao-subsidio
+    endereco:     https://SEU-USUARIO.github.io/comissao-subsidio/
+
+===============================================================================
+PASSO 1 - CRIAR O REPOSITORIO (no navegador)
+===============================================================================
+  1. github.com -> New repository
+  2. Nome: comissao-subsidio
+  3. Visibilidade: Public   (o GitHub Pages gratuito so publica repositorio publico)
+  4. NAO marque "Add a README file" - ja existe um aqui
+  5. Create repository
+
+===============================================================================
+PASSO 2 - SUBIR OS ARQUIVOS (no terminal, dentro DESTA pasta)
+===============================================================================
+Abra o terminal nesta pasta (_publicacao_github) e rode, uma linha por vez,
+trocando SEU-USUARIO pelo seu usuario do GitHub:
+
+    git init -b main
+    git add -A
+    git commit -m "Publicacao do painel, do relatorio e da planilha"
+    git remote add origin https://github.com/SEU-USUARIO/comissao-subsidio.git
+    git push -u origin main
+
+O push vai pedir login. O GitHub nao aceita mais senha: quando pedir a senha,
+cole um TOKEN (github.com -> Settings -> Developer settings -> Personal access
+tokens -> Tokens (classic) -> Generate new token, marcando o escopo "repo").
+
+Sao 27 MB; o push leva um ou dois minutos.
+
+===============================================================================
+PASSO 3 - LIGAR O PAGES (no navegador)
+===============================================================================
+  1. No repositorio: Settings -> Pages
+  2. Source: "Deploy from a branch"
+  3. Branch: main   /   (root)   -> Save
+  4. Espere ~1 minuto e recarregue. O endereco aparece no alto da pagina.
+
+Confira abrindo o endereco: deve aparecer o cartao azul com o botao
+"Abrir o painel interativo".
+
+===============================================================================
+PASSO 4 - O QR CODE (so depois de o endereco estar no ar)
+===============================================================================
+Com o endereco confirmado, gere o QR e o cartao para o relatorio:
+
+    python "..\_qr\gerar_qr.py" "https://SEU-USUARIO.github.io/comissao-subsidio/"
+
+Saem dois arquivos: qr_puro.png e cartao_qr.png. O cartao entra no relatorio
+como figura.
+
+*** NAO GERE O QR ANTES DE O ENDERECO ESTAR NO AR E CONFIRMADO. ***
+QR impresso e irreversivel.
+
+===============================================================================
+COMO ATUALIZAR DEPOIS
+===============================================================================
+Sempre substituindo arquivo, mantendo o nome. Nesta pasta:
+
+    git add -A
+    git commit -m "atualizacao"
+    git push
+
+O Pages republica sozinho em cerca de um minuto.
+
+Para refazer a pasta a partir dos arquivos de trabalho (depois de um rebuild do
+painel ou de um export novo do PDF), rode de novo o monta_publicacao.py, que
+esta no scratchpad da sessao, e repita o add/commit/push.
+
+===============================================================================
+SE UM DIA A TI DO ESTADO LIBERAR O DOMINIO
+===============================================================================
+NAO reimprima nada. Abra o index.html, ache a linha
+
+    var DESTINO = "";
+
+e preencha com o endereco novo:
+
+    var DESTINO = "https://dominio-do-estado/comissao-subsidio/";
+
+commit, push. Todo QR Code ja impresso passa a levar ao endereco novo.
+E para isso que a pagina de entrada existe.
+
+===============================================================================
+DUAS COISAS QUE A COMISSAO PRECISA DECIDIR ANTES
+===============================================================================
+1. A MINUTA AINDA NAO FOI PROTOCOLADA. O texto integral dela esta DENTRO do
+   painel (aba Minuta), alem do arquivo .docx. Publicar em acesso aberto
+   antecipa o texto. Se a Comissao preferir segurar, o painel precisa ser
+   reconstruido sem essa aba - tirar so o .docx nao adianta.
+
+2. O RELATORIO EM .DOCX nao esta nesta pasta, de proposito: sao 94 MB e, sendo
+   editavel, qualquer um baixa, altera e redistribui um documento com o timbre
+   do Governo do Estado. O PDF cumpre a funcao publica. Se a Comissao quiser
+   publicar o editavel assim mesmo, da para reduzir bastante o tamanho
+   recomprimindo as imagens.
