@@ -1163,6 +1163,7 @@
         <button data-page="estrutura" data-grupo="estudo">Estrutura da Carreira</button>
         <button data-page="estadual" data-grupo="estudo">Interiorização</button>
         <button data-page="impacto" data-grupo="estudo" class="active">Impacto Financeiro</button>
+        <button data-page="diarias" data-grupo="estudo">Diárias (DEJEM)</button>
         <button data-page="espacofiscal" data-grupo="estudo">Espaço Fiscal</button>
         <span class="sep" aria-hidden="true"></span>
         <button data-page="cenarios" data-grupo="produto">Cenários</button>
@@ -3608,6 +3609,87 @@
       <div id="estRazaoStrip"></div>
       <div id="estRazaoEstim"></div>
       <div class="chart-caption" id="estRazaoNota"></div>
+    </section>
+
+  </div>
+
+  <div id="page-diarias" class="app-page" style="display:none">
+
+    <div class="masthead">
+      <span class="masthead-mark" role="img" aria-label="Comissão Mista do Subsídio PM/CBM"></span>
+      <div class="masthead-text">
+        <div class="eyebrow">Art. 34 da LC 224/2014 &middot; do SVI para a DEJEM</div>
+        <h1>A diária de quem trabalha na folga</h1>
+        <div class="subtitle">O Serviço Voluntário Indenizado passa a se chamar <b>Diária Especial por Jornada Extraordinária de Trabalho Militar &mdash; DEJEM</b>. Por trás da troca de nome a minuta mexe em números: o <b>percentual da hora</b>, o <b>teto mensal</b> de cada militar, a <b>jornada mínima</b> e a exigência de <b>termo de adesão</b>. Esta aba mostra quanto cada um deles vale em dinheiro, na Ação selecionada.</div>
+      </div>
+    </div>
+
+    <div class="callout" id="djAviso"></div>
+
+    <section class="card">
+      <div class="card-head">
+        <div class="card-title">Quanto vale a hora</div>
+        <div class="card-note" id="djHoraNota"></div>
+      </div>
+      <div class="card-desc" id="djHoraDesc"></div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px">
+        <span class="control-label">Ação</span>
+        <div class="segmented" id="djScenarioSwitch"></div>
+      </div>
+      <div class="kpi-row kpi-row-4" id="djKpis" style="margin-top:16px"></div>
+      <div class="chart-caption" id="djHoraCaption"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div class="card-title">O que a minuta muda, dispositivo a dispositivo</div>
+        <div class="card-note">LC 224/2014 art. 34 &middot; LC 194/2012 arts. 59 e 60-A &middot; LC 305/2022 art. 103</div>
+      </div>
+      <div class="card-desc" id="djMudaDesc"></div>
+      <div style="overflow-x:auto"><table class="data-table" id="djTabMuda"></table></div>
+      <div class="chart-caption" id="djMudaNota"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div class="card-title">A conta de uma escala</div>
+        <div class="card-note" id="djEscalaNota"></div>
+      </div>
+      <div class="card-desc" id="djEscalaDesc"></div>
+      <div style="overflow-x:auto"><table class="data-table" id="djTabEscala"></table></div>
+      <div class="chart-caption" id="djEscalaCaption"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div class="card-title">O limite autorizado, em dinheiro</div>
+        <div class="card-note" id="djLimiteNota"></div>
+      </div>
+      <div class="card-desc" id="djLimiteDesc"></div>
+      <div class="serie-legend" id="djLimiteLegend"></div>
+      <div class="chart-scroll"><svg id="djChartLimite" width="100%" height="300"></svg></div>
+      <div style="overflow-x:auto; margin-top:16px"><table class="data-table" id="djTabLimite"></table></div>
+      <div class="chart-caption" id="djLimiteCaption"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div class="card-title">O mesmo dinheiro, menos gente</div>
+        <div class="card-note">Limite global do decreto &divide; teto individual</div>
+      </div>
+      <div class="card-desc" id="djAlcanceDesc"></div>
+      <div style="overflow-x:auto"><table class="data-table" id="djTabAlcance"></table></div>
+      <div class="chart-caption" id="djAlcanceCaption"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div class="card-title">O regime jurídico da DEJEM</div>
+        <div class="card-note" id="djRegimeNota"></div>
+      </div>
+      <div class="card-desc" id="djRegimeDesc"></div>
+      <div style="overflow-x:auto"><table class="data-table" id="djTabRegime"></table></div>
+      <div class="chart-caption" id="djRegimeCaption"></div>
     </section>
 
   </div>
@@ -29505,11 +29587,572 @@ function renderEscadaCarreiras() {
 })();
 </script>
 <script>
+/* ===========================================================================
+   ABA DIÁRIAS — a DEJEM (art. 34 da LC 224/2014, na redação da minuta)
+
+   Por que uma aba só para esta rubrica: ela é a MAIOR das verbas indenizatórias
+   da tabela de benefícios (R$ 36 mi/ano no limite autorizado, contra R$ 11 mi do
+   fardamento) e é a única em que a minuta mexe em TRÊS variáveis ao mesmo tempo —
+   percentual da hora, teto mensal do militar e jornada mínima. Na Tabela de
+   benefícios da aba Impacto Financeiro ela cabe em duas linhas; o que cada
+   variável vale em dinheiro, não.
+
+   DE ONDE VÊM OS NÚMEROS — nenhum é digitado aqui:
+     · o valor da hora de HOJE sai da própria Tabela de benefícios
+       (DATA.beneficios, linha do Serviço Voluntário) e acompanha a Ação pelo
+       MESMO fator que ela usa: a razão entre o subsídio de SD da Ação e o de
+       hoje. Assim as duas abas não podem divergir de um centavo.
+     · o valor da hora da MINUTA é o de hoje vezes 0,70/0,68 — a única coisa
+       que o § 3º muda é o percentual, e ele incide sobre a mesma base.
+     · as horas/ano e o efetivo de referência saem da mesma linha da tabela.
+     · o texto do art. 34 é lido do __INST__ (a minuta), não copiado.
+
+   O 48 h/mês de hoje é PREMISSA DO PAINEL, registrada na coluna Base da Tabela
+   de benefícios ("teto 48h cada"), e está marcado como tal em toda a aba. O
+   60 h/72 h da minuta, esse sim, tem texto: § 1º do art. 34.
+   =========================================================================== */
+(function(){
+  const DATA = window.__DATA__ || {};
+  const IMP  = DATA.impacto || [];
+  const BEN  = DATA.beneficios || [];
+  if (!IMP.length) return;
+
+  const fmtR    = v => "R$ " + Math.round(v).toLocaleString("pt-BR");
+  const fmtRDec = v => "R$ " + v.toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2});
+  const fmtInt  = v => Math.round(v).toLocaleString("pt-BR");
+  const fmtPct1 = v => (v>=0?"+":"") + (v*100).toLocaleString("pt-BR",{maximumFractionDigits:1}) + "%";
+  // 2 casas FIXAS: o § 3º fala em 0,70%, e "0,7%" não é o número que está escrito na lei
+  const fmtPct2 = v => (v*100).toLocaleString("pt-BR",{minimumFractionDigits:2, maximumFractionDigits:2}) + "%";
+  const fmtPctS2 = v => (v>=0?"+":"") + (v*100).toLocaleString("pt-BR",{minimumFractionDigits:2, maximumFractionDigits:2}) + "%";
+
+  // Os dois percentuais e os tetos. HOJE e MINUTA lado a lado, num lugar só.
+  const P_HOJE = 0.0068, P_MIN = 0.0070;
+  const TETO_HOJE = 48, TETO_MIN = 60, TETO_EXT = 72, JORNADA_MIN = 4, H_AUDIENCIA = 6;
+
+  const switchScenarios = ["Atual","Momento 1","Momento 2 (Momento 1 +10%)","Momento 2.1 (Momento 1 +15%)","Momento 3","Momento 4"];
+  const scenarioShort = {
+    "Atual": "Atual",
+    "Momento 1": "Ação 01",
+    "Momento 2 (Momento 1 +10%)": "Ação 02 (+10%)",
+    "Momento 2.1 (Momento 1 +15%)": "Ação 03 (+15%)",
+    "Momento 3": "Ação 04",
+    "Momento 4": "Proposta"
+  };
+  const ACOES_INTERM = ["Momento 1","Momento 2 (Momento 1 +10%)","Momento 2.1 (Momento 1 +15%)","Momento 3"];
+  // abre na Proposta, como a aba de Impacto: é a Ação em que a minuta inteira vale
+  let cen = "Momento 4";
+  let acoesOcultas = true;   // nasce recolhida: só Atual e Proposta; o ⋮ abre as Ações
+
+  // ---- base de cálculo: o subsídio de Soldado de 1ª Classe -----------------
+  // Mesma leitura da aba Impacto Financeiro: o bruto do SD menos os R$ 2.000 que
+  // não são subsídio (auxílio-alimentação 500 + indenização de risco de vida 1.500).
+  function subsidioSD(c){
+    const r = IMP.find(x => x.Cenario === c && x.Corporacao === "PMRR" && x.PostoGrad === "SD");
+    return r ? (r.BrutoUnit - 2000) : null;
+  }
+  const SD_ATUAL = subsidioSD("Atual");
+
+  const SV    = BEN.filter(b => /Serv\.?\s*Voluntario/i.test(b.Direito));
+  const svPM  = SV.find(b => /PMRR/.test(b.Direito))  || null;
+  const svBM  = SV.find(b => /CBMRR/.test(b.Direito)) || null;
+
+  // o valor de hoje vem gravado na tabela de benefícios; se faltar, deriva do percentual
+  const V_HORA_ATUAL = (svPM && svPM.porCenario && svPM.porCenario["Atual"])
+    ? svPM.porCenario["Atual"].Valor
+    : (SD_ATUAL ? SD_ATUAL * P_HOJE : 0);
+
+  function fator(c){
+    const b = subsidioSD(c);
+    return (SD_ATUAL && b) ? (b / SD_ATUAL) : 1;
+  }
+  function horaHoje(c)   { return V_HORA_ATUAL * fator(c); }
+  function horaMinuta(c) { return horaHoje(c) * (P_MIN / P_HOJE); }
+
+  // horas/ano autorizadas pelos decretos e efetivo de referência de cada corporação
+  const H_PM  = svPM ? svPM.Qtd : 840000;            // 70.000 h/mês × 12
+  const H_BM  = svBM ? svBM.Qtd : 192000;            // 16.000 h/mês × 12
+  const EF_PM = svPM ? svPM.BaseIncidencia : 2471;
+  const EF_BM = svBM ? svBM.BaseIncidencia : 500;
+  const FONTE_PM = (svPM && svPM.fonte) || "Decreto 34.205-E/2023";
+  const FONTE_BM = (svBM && svBM.fonte) || "Decreto 35.506-E/2024 (exerc. 2024)";
+
+  // ---- o texto do art. 34, lido da minuta ---------------------------------
+  function art34(){
+    const m  = window.__INST__ && window.__INST__.minuta;
+    const bl = (m && m.textoIntegral && m.textoIntegral.blocos) || [];
+    const limpa = s => String(s || "").replace(/^[“"]\s*/, "").trim();
+    const ini = bl.findIndex(b => /^Art\.\s*34\./.test(limpa(b.x)));
+    if (ini < 0) return [];
+    const out = [];
+    for (let i = ini; i < bl.length; i++){
+      const t = limpa(bl[i].x);
+      if (i > ini && /^Art\.\s*\d/.test(t)) break;   // chegou no art. 35-B: para
+      if (!t || t === "[...]") continue;
+      const cab = t.match(/^(Art\.\s*34\.|§\s*\d+º?\.?|[IVX]+\s*[–-])\s*/);
+      out.push({
+        rot: cab ? cab[1].replace(/\.$/, "") : "",
+        txt: cab ? t.slice(cab[0].length) : t
+      });
+    }
+    return out;
+  }
+
+  // dispositivos da minuta que citam a DEJEM, com o artigo alterado ao lado
+  function dispositivosDejem(){
+    const m = window.__INST__ && window.__INST__.minuta;
+    const arts = (m && m.artigos) || [];
+    const out = [];
+    arts.forEach(a => (a.dispositivos || []).forEach(d => {
+      if (/DEJEM/i.test(String(d.t || "") + String(d.d || ""))) {
+        out.push({ altera: a.altera || "", disp: d.d || "", t: d.t || "" });
+      }
+    }));
+    return out;
+  }
+
+  // ================= régua de Ações (a mesma das outras abas) ===============
+  function setCen(c, emitir){
+    if (!c) return;
+    cen = c;
+    if (ACOES_INTERM.indexOf(c) >= 0 && acoesOcultas) { acoesOcultas = false; buildSwitch(); }
+    if (emitir !== false && window.__CEN__) window.__CEN__.set(c, "diarias");
+    render();
+  }
+  function buildSwitch(){
+    const el = document.getElementById("djScenarioSwitch");
+    if (!el) return;
+    el.innerHTML = "";
+    const visiveis = acoesOcultas ? switchScenarios.filter(s => ACOES_INTERM.indexOf(s) < 0) : switchScenarios;
+    visiveis.forEach(s => {
+      if (s === "Momento 4") {
+        const more = document.createElement("button");
+        more.className = "seg-more" + (acoesOcultas ? " on" : "");
+        more.textContent = "⋮";
+        more.title = acoesOcultas ? "Mostrar as Ações 01 a 04" : "Ocultar as Ações — deixa Atual e Proposta";
+        more.setAttribute("aria-label", more.title);
+        more.addEventListener("click", () => {
+          acoesOcultas = !acoesOcultas;
+          if (acoesOcultas && ACOES_INTERM.indexOf(cen) >= 0) cen = "Momento 4";
+          buildSwitch();
+          render();
+          if (window.__syncPush) window.__syncPush();
+        });
+        el.appendChild(more);
+      }
+      const btn = document.createElement("button");
+      btn.textContent = scenarioShort[s];
+      btn.dataset.scen = s;
+      btn.className = (s === cen) ? "active" : "";
+      btn.addEventListener("click", () => setCen(s, true));
+      el.appendChild(btn);
+    });
+  }
+  // entra no barramento: outra aba trocou de Ação, esta acompanha (sem reemitir)
+  if (window.__CEN__) window.__CEN__.on("diarias", function(c){ setCen(c, false); });
+
+  // ============================ cartões ====================================
+  function renderAviso(){
+    const el = document.getElementById("djAviso");
+    if (!el) return;
+    el.innerHTML =
+      "<b>Três ressalvas que valem para a aba inteira.</b> " +
+      "<b>(1) Teto autorizado, não execução.</b> Os decretos fixam um <b>limite</b> de horas — " +
+      fmtInt(H_PM/12) + " h/mês na PMRR, pelo " + FONTE_PM + ", e " + fmtInt(H_BM/12) + " h/mês no CBMRR, pelo " + FONTE_BM + ". " +
+      "O que se paga de fato depende da escala efetivamente cumprida, e a Comissão não recebeu a execução. " +
+      "Tudo o que esta aba mostra é o <b>teto</b>. " +
+      "<b>(2) O decreto do CBMRR é do exercício de 2024</b> e segue valendo como melhor documento disponível. " +
+      "<b>(3) O teto individual de hoje (" + TETO_HOJE + " h/mês) é premissa deste painel</b>, registrada na coluna Base da " +
+      "Tabela de benefícios da aba Impacto Financeiro, e não texto de lei no acervo — os " + TETO_MIN + " h e " + TETO_EXT + " h " +
+      "da minuta, esses, estão no § 1º do art. 34.";
+  }
+
+  function renderHora(){
+    const vH = horaHoje(cen), vM = horaMinuta(cen), sd = subsidioSD(cen) || 0;
+    const nota = document.getElementById("djHoraNota");
+    if (nota) nota.textContent = "Base: subsídio de SD 1ª Cl · " + fmtRDec(sd) + " · " + (scenarioShort[cen] || cen);
+
+    const desc = document.getElementById("djHoraDesc");
+    if (desc) desc.innerHTML =
+      "A hora da diária não tem valor próprio: é um <b>percentual do subsídio de Soldado de 1ª Classe</b>. " +
+      "Por isso ela sobe junto com o reajuste — o mesmo militar, na mesma escala, custa mais em cada Ação sem que " +
+      "uma linha sequer do art. 34 seja tocada. A minuta soma a isso um segundo movimento: leva o percentual de " +
+      "<b>" + fmtPct2(P_HOJE) + " para " + fmtPct2(P_MIN) + "</b> por hora (§ 3º), o que são <b>" +
+      fmtPctS2(P_MIN/P_HOJE - 1) + "</b> sobre o valor da hora, em qualquer Ação. Os dois efeitos se multiplicam.";
+
+    const kpis = [
+      { label: "Hora hoje · " + fmtPct2(P_HOJE), value: fmtRDec(vH),
+        sub: fmtPct2(P_HOJE) + " de " + fmtRDec(sd) },
+      { label: "Hora na minuta · " + fmtPct2(P_MIN), value: fmtRDec(vM),
+        sub: fmtPctS2(P_MIN/P_HOJE - 1) + " sobre a hora de hoje", delta: true },
+      { label: "Teto do militar · " + TETO_MIN + " h/mês", value: fmtR(vM * TETO_MIN),
+        sub: "hoje, " + TETO_HOJE + " h = " + fmtR(vH * TETO_HOJE) + "/mês" },
+      { label: "Limite autorizado · ano", value: fmtR((H_PM + H_BM) * vM),
+        sub: "PMRR + CBMRR, a " + fmtPct2(P_MIN) },
+    ];
+    const row = document.getElementById("djKpis");
+    if (!row) return;
+    row.innerHTML = "";
+    kpis.forEach(k => {
+      const d = document.createElement("div");
+      d.className = "kpi";
+      d.innerHTML = '<div class="kpi-label">' + k.label + '</div>' +
+        '<div class="kpi-value' + (k.delta ? " delta pos" : "") + '">' +
+        (k.delta ? '<span class="kpi-arrow">▲</span>' : "") + k.value + '</div>' +
+        '<div class="kpi-sub">' + k.sub + '</div>';
+      row.appendChild(d);
+    });
+
+    const cap = document.getElementById("djHoraCaption");
+    if (cap) cap.innerHTML =
+      "<b>Como ler na Ação <i>Atual</i>:</b> ali o subsídio é o de hoje e a única coisa que muda entre as duas " +
+      "primeiras caixas é o percentual — é o jeito de isolar quanto custa a troca de " + fmtPct2(P_HOJE) + " por " +
+      fmtPct2(P_MIN) + ", sem o reajuste por cima. Nas demais Ações as duas caixas já andam com o subsídio. " +
+      "<b>O valor da hora de hoje é o mesmo da Tabela de benefícios</b> da aba Impacto Financeiro, derivado pelo mesmo " +
+      "fator — se os dois números divergirem, um dos dois cartões está errado.";
+  }
+
+  function renderMuda(){
+    const vH = horaHoje(cen), vM = horaMinuta(cen);
+    const desc = document.getElementById("djMudaDesc");
+    if (desc) desc.innerHTML =
+      "O art. 8º da minuta troca a denominação <b>Serviço Voluntário Indenizado — SVI</b> por <b>DEJEM</b> em toda a " +
+      "legislação militar estadual, sem alterar a natureza jurídica da parcela. A troca de nome, porém, vem acompanhada " +
+      "de uma nova redação inteira do art. 34, e é nela que estão as mudanças de conteúdo. Esta tabela põe lado a lado " +
+      "o que vale hoje e o que passaria a valer.";
+
+    const linhas = [
+      ["Denominação", "Serviço Voluntário Indenizado (SVI)",
+       "Diária Especial por Jornada Extraordinária de Trabalho Militar (DEJEM)",
+       "Art. 8º da minuta — troca em toda a legislação militar estadual, sem mudar a natureza da parcela"],
+      ["Valor da hora", fmtPct2(P_HOJE) + " do subsídio de SD 1ª Cl <span class='cell-note'>(" + fmtRDec(vH) + ")</span>",
+       fmtPct2(P_MIN) + " do subsídio de SD 1ª Cl <span class='cell-note'>(" + fmtRDec(vM) + ")</span>",
+       "§ 3º — " + fmtPctS2(P_MIN/P_HOJE - 1) + " por hora, ou " + fmtRDec(vM - vH) + " a mais em cada hora de escala"],
+      ["Teto mensal por militar", TETO_HOJE + " h <span class='cell-note'>(premissa do painel)</span>",
+       TETO_MIN + " h, estendível a " + TETO_EXT + " h em situações especiais ou extraordinárias",
+       "§ 1º — " + fmtPct1(TETO_MIN/TETO_HOJE - 1) + " no teto ordinário e " + fmtPct1(TETO_EXT/TETO_HOJE - 1) + " no estendido"],
+      ["Jornada mínima", "sem previsão expressa", JORNADA_MIN + " h",
+       "§ 8º — a escala passa a ser fixada em blocos de " + JORNADA_MIN + " h pelos Comandantes-Gerais"],
+      ["Termo de adesão", "exigido",
+       "dispensado nas escalas de eventos especiais e de atuações extraordinárias",
+       "§ 2º, I a III — eleições, eventos culturais, feira agropecuária, desportos, manifestações; emergência, calamidade, grandes sinistros, ocorrência em unidade prisional, grave perturbação da ordem"],
+      ["Audiência judicial na folga", "sem previsão", H_AUDIENCIA + " h de DEJEM por audiência",
+       "LC 194/2012, art. 60-A, X — militar convocado como testemunha ou condutor, em razão da atuação profissional"],
+      ["Base de contribuição previdenciária", "inciso V do art. 103 da LC 305/2022",
+       "inciso V revogado; novo inciso VI exclui a DEJEM expressamente",
+       "Arts. 3º e 9º da minuta — a parcela fica fora da base do FUNPROS/Militar, coerente com a natureza indenizatória"],
+      ["Natureza jurídica", "indenizatória",
+       "indenizatória, eventual, transitória e não remuneratória",
+       "§§ 9º a 16 — passa a estar escrita, com todas as exclusões enumeradas (ver o último cartão)"],
+    ];
+
+    const t = document.getElementById("djTabMuda");
+    if (!t) return;
+    let h = "<thead><tr>" +
+      "<th style='text-align:left'>O que</th>" +
+      "<th style='text-align:left'>Hoje</th>" +
+      "<th style='text-align:left'>Na minuta</th>" +
+      "<th style='text-align:left'>Dispositivo e efeito</th></tr></thead><tbody>";
+    linhas.forEach(l => {
+      h += "<tr><td style='text-align:left'><b>" + l[0] + "</b></td>" +
+           "<td style='text-align:left;white-space:normal'>" + l[1] + "</td>" +
+           "<td style='text-align:left;white-space:normal;color:var(--proposto);font-weight:600'>" + l[2] + "</td>" +
+           "<td style='text-align:left' class='cell-note'>" + l[3] + "</td></tr>";
+    });
+    h += "</tbody>";
+    t.innerHTML = h;
+
+    const disp = dispositivosDejem();
+    const nota = document.getElementById("djMudaNota");
+    if (nota) nota.innerHTML =
+      "<b>Lastro:</b> a coluna <i>Na minuta</i> é lida do texto do projeto guardado no acervo — são <b>" + disp.length +
+      "</b> dispositivos que citam a DEJEM, distribuídos por " +
+      "LC 194/2012 (estatuto), LC 224/2014 (remuneração) e LC 305/2022 (previdência). " +
+      "<b>A única linha sem texto de lei no acervo é o teto de " + TETO_HOJE + " h de hoje</b>, que é premissa registrada " +
+      "na Tabela de benefícios e está marcada como tal.";
+  }
+
+  function renderEscala(){
+    const vH = horaHoje(cen), vM = horaMinuta(cen);
+    const nota = document.getElementById("djEscalaNota");
+    if (nota) nota.textContent = "Valor de uma escala, por militar · " + (scenarioShort[cen] || cen);
+
+    const desc = document.getElementById("djEscalaDesc");
+    if (desc) desc.innerHTML =
+      "A diária é paga por <b>hora efetivamente cumprida</b>, e a escala é montada em blocos. Esta tabela traduz os " +
+      "números do art. 34 em dinheiro na mão do militar: da jornada mínima do § 8º ao limite estendido do § 1º. " +
+      "As faixas acima de " + TETO_HOJE + " h não têm coluna <i>Hoje</i> porque hoje elas não existem — é justamente " +
+      "aí que está a mudança de patamar.";
+
+    const faixas = [
+      [JORNADA_MIN, "Jornada mínima (§ 8º)"],
+      [H_AUDIENCIA, "Audiência judicial na folga (art. 60-A, X)"],
+      [12, "Escala de 12 h"],
+      [24, "Duas escalas de 12 h"],
+      [TETO_HOJE, "Teto mensal de hoje"],
+      [TETO_MIN, "Teto mensal da minuta (§ 1º)"],
+      [TETO_EXT, "Limite estendido (§ 1º, parte final)"],
+    ];
+    const t = document.getElementById("djTabEscala");
+    if (!t) return;
+    let h = "<thead><tr><th style='text-align:left'>Horas</th><th style='text-align:left'>O que é</th>" +
+            "<th>Hoje · " + fmtPct2(P_HOJE) + "</th><th>Minuta · " + fmtPct2(P_MIN) + "</th><th>Diferença</th></tr></thead><tbody>";
+    faixas.forEach(f => {
+      const horas = f[0];
+      const passaHoje = horas > TETO_HOJE;                 // acima do teto de hoje: não existe
+      const a = horas * vH, b = horas * vM;
+      const destaque = (horas === TETO_MIN) ? " style=\"background:color-mix(in srgb, var(--proposto) 7%, transparent)\"" : "";
+      h += "<tr" + destaque + "><td style='text-align:left'><b>" + horas + " h</b></td>" +
+           "<td style='text-align:left' class='cell-note'>" + f[1] + "</td>" +
+           "<td>" + (passaHoje ? "&mdash;" : fmtRDec(a)) + "</td>" +
+           "<td>" + fmtRDec(b) + "</td>" +
+           "<td>" + (passaHoje ? "&mdash;" : "<span style='color:var(--proposto);font-weight:700'>" + fmtRDec(b - a) + "</span>") + "</td></tr>";
+    });
+    h += "</tbody>";
+    t.innerHTML = h;
+
+    const cap = document.getElementById("djEscalaCaption");
+    if (cap) cap.innerHTML =
+      "<b>O teto mensal é o número que decide.</b> Um militar no teto de hoje recebe <b>" + fmtR(TETO_HOJE * vH) +
+      "</b> por mês de diária; no teto da minuta, <b>" + fmtR(TETO_MIN * vM) + "</b> — <b>" +
+      fmtPct1((TETO_MIN * vM) / (TETO_HOJE * vH) - 1) + "</b>. No limite estendido do § 1º, <b>" +
+      fmtR(TETO_EXT * vM) + "</b>. " +
+      "Em doze meses no teto ordinário, a diária sozinha soma <b>" + fmtR(TETO_MIN * vM * 12) + "</b> por militar — " +
+      "verba indenizatória, fora do subsídio, fora do 13º e fora do cálculo de reserva e pensão (§§ 9º a 11).";
+  }
+
+  // ---- gráfico do limite autorizado ---------------------------------------
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  function svgEl(tag, attrs){
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+  function renderLimiteChart(){
+    const svg = document.getElementById("djChartLimite");
+    if (!svg) return;
+    const W = (svg.parentElement && svg.parentElement.clientWidth) || 0;
+    if (!W) return;                                  // aba oculta: mede zero, não desenha
+    const H = parseInt(svg.getAttribute("height"), 10) || 300;
+    svg.innerHTML = "";
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+    const vH = horaHoje(cen), vM = horaMinuta(cen);
+    const cats = ["PMRR", "CBMRR"];
+    const serieA = [H_PM * vH, H_BM * vH];
+    const serieB = [H_PM * vM, H_BM * vM];
+
+    const padL = 74, padR = 20, padT = 18, padB = 44;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const maxVal = Math.max.apply(null, serieA.concat(serieB, [1])) * 1.16;
+    const groupW = plotW / cats.length;
+    const barW = Math.min(46, groupW * 0.28);
+    const gap = 8;
+
+    for (let i = 0; i <= 4; i++){
+      const y = padT + plotH - (plotH * i / 4);
+      const val = maxVal * i / 4;
+      svg.appendChild(svgEl("line", {x1:padL, x2:W-padR, y1:y, y2:y, class:"gridline"}));
+      const tx = svgEl("text", {x: padL - 8, y: y + 4, class:"axis-label", "text-anchor":"end"});
+      tx.textContent = (val >= 1e6) ? (val/1e6).toFixed(1) + "M" : (val > 0 ? (val/1e3).toFixed(0) + "k" : "0");
+      svg.appendChild(tx);
+    }
+    svg.appendChild(svgEl("line", {x1:padL, x2:W-padR, y1:padT+plotH, y2:padT+plotH, class:"axis-line"}));
+
+    cats.forEach((cat, i) => {
+      const cx = padL + groupW * i + groupW / 2;
+      const a = serieA[i], b = serieB[i];
+      const ha = (a / maxVal) * plotH, hb = (b / maxVal) * plotH;
+      const xa = cx - barW - gap / 2, xb = cx + gap / 2;
+
+      svg.appendChild(svgEl("rect", {x:xa, y:padT+plotH-ha, width:barW, height:Math.max(ha,0), rx:3, class:"bar-atual"}));
+      svg.appendChild(svgEl("rect", {x:xb, y:padT+plotH-hb, width:barW, height:Math.max(hb,0), rx:3, class:"bar-proposto"}));
+
+      const la = svgEl("text", {x:xa+barW/2, y:padT+plotH-ha-7, class:"bar-label", "text-anchor":"middle"});
+      la.textContent = (a/1e6).toFixed(1) + "M";
+      svg.appendChild(la);
+      const lb = svgEl("text", {x:xb+barW/2, y:padT+plotH-hb-7, class:"bar-label", "text-anchor":"middle"});
+      lb.textContent = (b/1e6).toFixed(1) + "M";
+      svg.appendChild(lb);
+
+      const c = svgEl("text", {x:cx, y:padT+plotH+20, class:"cat-label", "text-anchor":"middle"});
+      c.textContent = cat;
+      svg.appendChild(c);
+      const c2 = svgEl("text", {x:cx, y:padT+plotH+35, class:"axis-label", "text-anchor":"middle"});
+      c2.textContent = fmtInt(i === 0 ? H_PM : H_BM) + " h/ano autorizadas";
+      svg.appendChild(c2);
+    });
+  }
+
+  function renderLimite(){
+    const vH = horaHoje(cen), vM = horaMinuta(cen);
+    const nota = document.getElementById("djLimiteNota");
+    if (nota) nota.textContent = "Teto dos decretos × valor da hora · ano · " + (scenarioShort[cen] || cen);
+
+    const desc = document.getElementById("djLimiteDesc");
+    if (desc) desc.innerHTML =
+      "Quem fixa <b>quantas horas</b> de diária o Estado pode pagar por mês não é a lei, é <b>decreto</b>: " +
+      fmtInt(H_PM/12) + " h/mês na PMRR e " + fmtInt(H_BM/12) + " h/mês no CBMRR. A lei fixa <b>quanto vale cada hora</b>. " +
+      "Multiplicando um pelo outro sai o <b>teto de despesa</b> da rubrica — o número que aparece na Tabela de benefícios " +
+      "da aba Impacto Financeiro, e o mesmo que este cartão abre em duas colunas: como está e como ficaria com o " +
+      fmtPct2(P_MIN) + " do § 3º, <b>sem mexer nos decretos</b>.";
+
+    const leg = document.getElementById("djLimiteLegend");
+    if (leg) leg.innerHTML =
+      '<span class="serie-chip"><span class="dot" style="background:var(--atual)"></span>Hoje · ' + fmtPct2(P_HOJE) + '</span>' +
+      '<span class="serie-chip"><span class="dot" style="background:var(--proposto)"></span>Minuta · ' + fmtPct2(P_MIN) + '</span>';
+
+    renderLimiteChart();
+
+    const linhas = [
+      ["PMRR",  H_PM, FONTE_PM],
+      ["CBMRR", H_BM, FONTE_BM],
+    ];
+    const t = document.getElementById("djTabLimite");
+    if (t) {
+      let h = "<thead><tr><th style='text-align:left'>Corporação</th><th style='text-align:left'>Limite do decreto</th>" +
+              "<th>h/ano</th><th>Hoje · " + fmtPct2(P_HOJE) + "</th><th>Minuta · " + fmtPct2(P_MIN) + "</th><th>Δ anual</th></tr></thead><tbody>";
+      let ta = 0, tb = 0, th = 0;
+      linhas.forEach(l => {
+        const a = l[1] * vH, b = l[1] * vM;
+        ta += a; tb += b; th += l[1];
+        h += "<tr><td style='text-align:left'><b>" + l[0] + "</b>" +
+             " <span style=\"font-size:10px;font-weight:700;color:var(--rr)\">· " + l[2] + "</span></td>" +
+             "<td style='text-align:left' class='cell-note'>" + fmtInt(l[1]/12) + " h/mês</td>" +
+             "<td>" + fmtInt(l[1]) + "</td><td>" + fmtR(a) + "</td>" +
+             "<td>" + fmtR(b) + "</td>" +
+             "<td><span style='color:var(--proposto);font-weight:700'>" + fmtR(b - a) + "</span></td></tr>";
+      });
+      h += "</tbody><tfoot><tr><td colspan='2' style='text-align:right' class='tot-lbl'>Teto da rubrica · " +
+           (scenarioShort[cen] || cen) + "</td><td class='tot-val'>" + fmtInt(th) + "</td>" +
+           "<td class='tot-val'>" + fmtR(ta) + "</td><td class='tot-val'>" + fmtR(tb) + "</td>" +
+           "<td class='tot-val'>" + fmtR(tb - ta) + "</td></tr></tfoot>";
+      t.innerHTML = h;
+    }
+
+    const totalH = (H_PM + H_BM) * vH, totalM = (H_PM + H_BM) * vM;
+    const cap = document.getElementById("djLimiteCaption");
+    if (cap) cap.innerHTML =
+      "<b>O que a troca de percentual custa, sozinha:</b> <b>" + fmtR(totalM - totalH) + " por ano</b> no teto autorizado, " +
+      "na Ação " + (scenarioShort[cen] || cen) + " — dinheiro que não vem do reajuste do subsídio, e sim dos dois " +
+      "centésimos de ponto do § 3º. É a rubrica indenizatória mais cara do estudo: sozinha, o teto de <b>" + fmtR(totalM) +
+      "</b> supera a soma de fardamento, ajuda de custo e auxílio-natalidade. " +
+      "<b>Atenção à leitura:</b> isto é <b>teto</b>, não execução — ver a ressalva no alto da aba. " +
+      "O limite de horas é do decreto e pode ser revisto por ato do Executivo <b>sem passar pela Assembleia</b>; " +
+      "a minuta não o altera, mas o § 1º amplia o teto individual, que é o que determina quanta gente é preciso para consumi-lo.";
+  }
+
+  function renderAlcance(){
+    const desc = document.getElementById("djAlcanceDesc");
+    if (desc) desc.innerHTML =
+      "O limite do decreto é um <b>bolo de horas</b>; o teto individual diz em quantas fatias ele pode ser dividido. " +
+      "Elevar o teto de " + TETO_HOJE + " h para " + TETO_MIN + " h não aumenta o bolo — <b>reduz o número de militares " +
+      "necessários para consumi-lo por inteiro</b>. É a consequência menos visível do § 1º, e a que muda a gestão da escala: " +
+      "o mesmo dinheiro passa a caber em menos gente, trabalhando mais horas cada uma.";
+
+    const linhas = [
+      [TETO_HOJE, "Teto de hoje", "premissa do painel"],
+      [TETO_MIN,  "Teto da minuta (§ 1º)", "regra nova"],
+      [TETO_EXT,  "Limite estendido (§ 1º)", "situações especiais ou extraordinárias"],
+    ];
+    const t = document.getElementById("djTabAlcance");
+    if (!t) return;
+    let h = "<thead><tr><th style='text-align:left'>Teto individual</th><th style='text-align:left'>O que é</th>" +
+            "<th>PMRR · militares</th><th>% do efetivo</th><th>CBMRR · militares</th><th>% do efetivo</th></tr></thead><tbody>";
+    linhas.forEach(l => {
+      // PISO, não teto: 1.458 militares × 48 h cabem em 70.000 h; 1.459 estouram.
+      // É também como a Tabela de benefícios da aba Impacto conta (1.458 PM, 333 BM).
+      const nPM = Math.floor((H_PM/12) / l[0]);
+      const nBM = Math.floor((H_BM/12) / l[0]);
+      const destaque = (l[0] === TETO_MIN) ? " style=\"background:color-mix(in srgb, var(--proposto) 7%, transparent)\"" : "";
+      h += "<tr" + destaque + "><td style='text-align:left'><b>" + l[0] + " h/mês</b></td>" +
+           "<td style='text-align:left' class='cell-note'>" + l[1] + " <span style='color:var(--muted)'>· " + l[2] + "</span></td>" +
+           "<td>" + fmtInt(nPM) + "</td><td>" + fmtPct2(nPM/EF_PM) + "</td>" +
+           "<td>" + fmtInt(nBM) + "</td><td>" + fmtPct2(nBM/EF_BM) + "</td></tr>";
+    });
+    h += "</tbody>";
+    t.innerHTML = h;
+
+    const nPMh = Math.floor((H_PM/12)/TETO_HOJE), nPMm = Math.floor((H_PM/12)/TETO_MIN);
+    const cap = document.getElementById("djAlcanceCaption");
+    if (cap) cap.innerHTML =
+      "<b>Como ler:</b> é <b>quanta gente o limite do decreto comporta</b>, cada um no teto mensal. " +
+      "Na PMRR são <b>" + fmtInt(nPMh) + "</b> hoje e <b>" + fmtInt(nPMm) + "</b> com a minuta — <b>" +
+      fmtInt(nPMh - nPMm) + " a menos</b> para a mesma despesa. O efetivo de referência é o da própria Tabela de " +
+      "benefícios (" + fmtInt(EF_PM) + " na PMRR, " + fmtInt(EF_BM) + " no CBMRR). " +
+      "<b>O sentido inverso também vale</b>, e é o que merece atenção: mantido o mesmo número de aderentes, o teto maior " +
+      "só se converte em despesa se o limite do decreto for elevado — decisão do Executivo, não da lei.";
+  }
+
+  function renderRegime(){
+    const blocos = art34();
+    const nota = document.getElementById("djRegimeNota");
+    if (nota) nota.textContent = blocos.length ? ("Art. 34 e parágrafos · " + blocos.length + " dispositivos") : "Art. 34 e parágrafos";
+
+    const desc = document.getElementById("djRegimeDesc");
+    if (desc) desc.innerHTML =
+      "O texto abaixo é lido <b>do próprio projeto de lei</b> guardado no acervo — não é paráfrase. " +
+      "Os §§ 9º a 16 são a parte que mais importa para o custo: fixam por escrito que a DEJEM <b>não se incorpora</b>, " +
+      "<b>não entra em férias, 13º, contribuição previdenciária nem teto constitucional</b>, <b>não gera direito adquirido</b> " +
+      "e <b>não pode ser cumulada com diárias</b>. É o que mantém a rubrica fora da folha recorrente e fora do cálculo de " +
+      "reserva, reforma e pensão. " +
+      "<b>Os §§ 4º a 7º não aparecem</b> porque o próprio projeto os elide (<i>[...]</i>): pela técnica legislativa, " +
+      "só se reproduz o que muda. O que está fora desta tabela é o que a minuta deixa como está.";
+
+    const t = document.getElementById("djTabRegime");
+    if (t) {
+      if (!blocos.length) {
+        t.innerHTML = "<tbody><tr><td class='cell-note' style='text-align:left'>Texto do art. 34 não localizado no acervo desta versão do painel.</td></tr></tbody>";
+      } else {
+        let h = "<thead><tr><th style='text-align:left'>Dispositivo</th><th style='text-align:left'>Texto</th></tr></thead><tbody>";
+        blocos.forEach(b => {
+          h += "<tr><td style='text-align:left;white-space:nowrap'><b>" + (b.rot || "&mdash;") + "</b></td>" +
+               "<td style='text-align:left;white-space:normal;line-height:1.55'>" + b.txt + "</td></tr>";
+        });
+        h += "</tbody>";
+        t.innerHTML = h;
+      }
+    }
+
+    const cap = document.getElementById("djRegimeCaption");
+    if (cap) cap.innerHTML =
+      "<b>Ponto de atenção &mdash; § 14.</b> A DEJEM não pode ser percebida cumulativamente com as diárias previstas na " +
+      "própria LC 224/2014. São duas coisas com o mesmo nome de família e finalidades distintas: a diária de deslocamento " +
+      "e a diária de jornada extraordinária. A vedação resolve a sobreposição no papel; a conferência do pagamento " +
+      "depende de controle de escala. " +
+      "<b>§ 16 e vigência:</b> a execução fica condicionada à disponibilidade orçamentária e à LRF, mas a minuta entra em " +
+      "vigor na data da publicação &mdash; e a vedação do art. 21 da LRF para os 180 dias anteriores ao fim do mandato " +
+      "está aberta desde 04/07/2026. A ressalva vale para a minuta inteira e está registrada na aba Minuta.";
+  }
+
+  function render(){
+    // marca o botão da Ação corrente sem reconstruir a régua (que perderia o foco)
+    const el = document.getElementById("djScenarioSwitch");
+    if (el) [].forEach.call(el.children, c => {
+      if (c.dataset && c.dataset.scen) c.classList.toggle("active", c.dataset.scen === cen);
+    });
+    try { renderAviso();  } catch(e){}
+    try { renderHora();   } catch(e){}
+    try { renderMuda();   } catch(e){}
+    try { renderEscala(); } catch(e){}
+    try { renderLimite(); } catch(e){}
+    try { renderAlcance();} catch(e){}
+    try { renderRegime(); } catch(e){}
+  }
+
+  // a aba nasce oculta: o SVG mede zero e não desenha. Quem chama de novo na
+  // troca de aba é o __renderDiarias, registrado na lista de redesenho.
+  window.__renderDiarias = function(){ renderLimiteChart(); };
+
+  buildSwitch();
+  render();
+})();
+</script>
+<script>
 (function(){
   // [data-page] de propósito: o ⋮ do fim da régua é um botão dentro do #pageTabs e NÃO é aba
   const tabs = document.querySelectorAll("#pageTabs button[data-page]");
-  const pages = { apresentacao: "page-apresentacao", impacto: "page-impacto", comparativo: "page-comparativo", estudos: "page-estudos", estadual: "page-estadual", estrutura: "page-estrutura", espacofiscal: "page-espacofiscal", cenarios: "page-cenarios", relatorio: "page-relatorio", minuta: "page-minuta" };
-  const renderers = { apresentacao: "__renderApresentacao", impacto: "__renderImpacto", comparativo: "__renderComparativo", estudos: "__renderEstudos", estadual: "__renderEstadual", cenarios: "__renderCenarios", relatorio: "__renderRelatorio", minuta: "__renderMinuta" };
+  const pages = { apresentacao: "page-apresentacao", impacto: "page-impacto", comparativo: "page-comparativo", estudos: "page-estudos", estadual: "page-estadual", estrutura: "page-estrutura", diarias: "page-diarias", espacofiscal: "page-espacofiscal", cenarios: "page-cenarios", relatorio: "page-relatorio", minuta: "page-minuta" };
+  const renderers = { apresentacao: "__renderApresentacao", impacto: "__renderImpacto", comparativo: "__renderComparativo", estudos: "__renderEstudos", estadual: "__renderEstadual", diarias: "__renderDiarias", cenarios: "__renderCenarios", relatorio: "__renderRelatorio", minuta: "__renderMinuta" };
 
   // A aba ativa fica gravada na URL (#estudos). Assim, apertar F5 recarrega na mesma
   // aba em vez de jogar de volta para a primeira — e o link também pode ser compartilhado.
@@ -29593,7 +30236,8 @@ function renderEscadaCarreiras() {
     // para que os gráficos da aba mostrada peguem a largura correta.
     try {
       ["__renderApresentacao","__renderImpacto","__renderComparativo","__renderEstudos",
-       "__renderEstadual","__renderPC","__renderRelatorio","__renderMinuta","__renderCenarios"].forEach(fnNome => {
+       "__renderEstadual","__renderPC","__renderRelatorio","__renderMinuta","__renderCenarios",
+       "__renderDiarias"].forEach(fnNome => {
         const fn = window[fnNome]; if (typeof fn === "function") { try { fn(); } catch(e){} }
       });
     } catch(e){}
