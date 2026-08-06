@@ -40,7 +40,7 @@
   --sombra:0 1px 2px rgba(20,21,24,.04), 0 8px 24px rgba(18,35,63,.06);
 }
 @media (prefers-color-scheme: dark){
-  :root:where(:not([data-tema="claro"])){
+  :root:where(:not([data-theme="light"])){
     color-scheme: dark;
     --navy:#0e1a2e; --ouro:#d1a344;
     --plano:#0e0f12; --superficie:#16181c;
@@ -53,7 +53,7 @@
     --sombra:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
   }
 }
-:root[data-tema="escuro"]{
+:root[data-theme="dark"]{
   color-scheme: dark;
   --navy:#0e1a2e; --ouro:#d1a344;
   --plano:#0e0f12; --superficie:#16181c;
@@ -1225,10 +1225,10 @@ function pintaCatalogo(){
    tema — a escolha do leitor vence o sistema, nos dois sentidos
    ===================================================================== */
 $('#btema').addEventListener('click', ()=>{
-  const escuroAgora = document.documentElement.dataset.tema
-    ? document.documentElement.dataset.tema === 'escuro'
+  const escuroAgora = document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme === 'dark'
     : matchMedia('(prefers-color-scheme: dark)').matches;
-  document.documentElement.dataset.tema = escuroAgora ? 'claro' : 'escuro';
+  document.documentElement.dataset.theme = escuroAgora ? 'light' : 'dark';
   redesenha();
 });
 
@@ -1248,8 +1248,14 @@ pintaCatalogo();
 
 /* o tema do sistema muda enquanto a página está aberta */
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{
-  if(!document.documentElement.dataset.tema) redesenha();
+  if(!document.documentElement.dataset.theme) redesenha();
 });
+
+/* as cores das séries são lidas do CSS no momento do desenho: se o tema for
+   trocado por fora (o seletor da página que hospeda o painel), é preciso
+   redesenhar, senão os gráficos ficam com a paleta do tema anterior */
+new MutationObserver(redesenha).observe(document.documentElement,
+  {attributes:true, attributeFilter:['data-theme']});
 </script>
 </body>
 </html>
