@@ -1,0 +1,1255 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IA no apoio à decisão &middot; Painel de Indicadores &middot; SEFAZ-RR</title>
+<meta name="description" content="Proposta de painel de indicadores para acompanhar o uso de inteligência artificial como ferramenta de apoio à tomada de decisão na gestão pública: alcance da estratégia, redução de riscos e avanço da maturidade.">
+<style>
+/* ===========================================================================
+   PROTÓTIPO — dados ilustrativos.
+   Nenhum número desta página vem de sistema de produção. A camada de dados
+   está isolada no objeto DADOS (procure por "INÍCIO DA CAMADA DE DADOS").
+   Para ligar às fontes reais, veja a seção "Fonte dos dados" ao final e o
+   arquivo README.md desta pasta.
+
+   Autocontido por decisão de projeto: sem CDN, fonte, script ou imagem
+   externa — mesma regra do painel.html na raiz do repositório.
+   =========================================================================== */
+
+:root{
+  color-scheme: light;
+  /* identidade institucional (mesma do material da raiz) */
+  --navy:#12233f; --ouro:#b8892b;
+  /* superfícies e tinta */
+  --plano:#f4f2ed;
+  --superficie:#ffffff;
+  --tinta:#141518;
+  --tinta-2:#4d5158;
+  --tinta-3:#7c828c;
+  --linha:#e4e1d9;
+  --grade:#eceae3;
+  --eixo:#c9c5ba;
+  --anel:rgba(20,21,24,.10);
+  /* categóricas — validadas (adjacente e todos-os-pares) sobre #ffffff */
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s1-lav:#cde2fb; --s1-med:#86b6ef;
+  /* estado — nunca reutilizadas como série */
+  --bom:#0ca30c; --atencao:#fab219; --grave:#ec835a; --critico:#d03b3b;
+  --bom-txt:#006300; --aviso-txt:#8a5d00;
+  --sombra:0 1px 2px rgba(20,21,24,.04), 0 8px 24px rgba(18,35,63,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-tema="claro"])){
+    color-scheme: dark;
+    --navy:#0e1a2e; --ouro:#d1a344;
+    --plano:#0e0f12; --superficie:#16181c;
+    --tinta:#ffffff; --tinta-2:#c3c6cc; --tinta-3:#8b9099;
+    --linha:#282b31; --grade:#22252a; --eixo:#3a3e45;
+    --anel:rgba(255,255,255,.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --s1-lav:#173458; --s1-med:#1c5cab;
+    --bom-txt:#0ca30c; --aviso-txt:#f0c264;
+    --sombra:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  }
+}
+:root[data-tema="escuro"]{
+  color-scheme: dark;
+  --navy:#0e1a2e; --ouro:#d1a344;
+  --plano:#0e0f12; --superficie:#16181c;
+  --tinta:#ffffff; --tinta-2:#c3c6cc; --tinta-3:#8b9099;
+  --linha:#282b31; --grade:#22252a; --eixo:#3a3e45;
+  --anel:rgba(255,255,255,.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --s1-lav:#173458; --s1-med:#1c5cab;
+  --bom-txt:#0ca30c; --aviso-txt:#f0c264;
+  --sombra:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--plano); color:var(--tinta);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+.env{max-width:1180px;margin:0 auto;padding:0 20px}
+
+/* ---------- aviso ---------- */
+.aviso{background:#3a2a05;color:#ffe9b8;font-size:13.5px;padding:10px 0;
+       border-bottom:1px solid rgba(255,255,255,.08)}
+.aviso .env{display:flex;gap:10px;align-items:flex-start}
+.aviso b{color:#ffd479}
+
+/* ---------- cabeçalho ---------- */
+header.topo{background:var(--navy);color:#fff;padding:30px 0 26px}
+.selo{font-size:10.5px;letter-spacing:2.4px;text-transform:uppercase;color:var(--ouro);font-weight:800}
+header.topo h1{font-size:clamp(21px,3.4vw,29px);line-height:1.22;margin-top:9px;font-weight:700;max-width:24ch}
+header.topo .sub{font-size:14.5px;color:#b9c4d6;margin-top:10px;max-width:66ch}
+.linhatopo{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
+.btema{background:transparent;border:1px solid rgba(255,255,255,.28);color:#dfe6f0;
+       border-radius:7px;padding:7px 13px;font:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.btema:hover{border-color:var(--ouro);color:#fff}
+
+/* ---------- filtros ---------- */
+.filtros{background:var(--superficie);border-bottom:1px solid var(--linha);
+         position:sticky;top:0;z-index:30;box-shadow:0 1px 0 var(--linha)}
+.filtros .env{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding-top:11px;padding-bottom:11px}
+.campo{display:flex;flex-direction:column;gap:3px}
+.campo label{font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--tinta-3);font-weight:700}
+.campo select{font:inherit;font-size:13.5px;color:var(--tinta);background:var(--superficie);
+              border:1px solid var(--linha);border-radius:7px;padding:6px 9px;min-width:150px;cursor:pointer}
+.campo select:focus-visible{outline:2px solid var(--s1);outline-offset:1px}
+.filtros .nota{margin-left:auto;font-size:12px;color:var(--tinta-3);text-align:right}
+
+/* ---------- seções ---------- */
+section{padding:34px 0 6px}
+.cabsec{display:flex;gap:13px;align-items:baseline;margin-bottom:4px;flex-wrap:wrap}
+.cabsec .num{font-size:11px;font-weight:800;letter-spacing:1.5px;color:var(--ouro);
+             border:1px solid var(--ouro);border-radius:4px;padding:2px 7px;white-space:nowrap}
+.cabsec h2{font-size:20px;font-weight:700;letter-spacing:-.2px}
+.cabsec p{font-size:14px;color:var(--tinta-2);flex-basis:100%;max-width:82ch;margin-top:2px}
+
+/* ---------- grades ---------- */
+/* o min() impede que a largura mínima da coluna estoure a viewport estreita */
+.grade2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(390px,100%),1fr));gap:18px;margin-top:18px}
+.grade4{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:14px;margin-top:18px}
+.grade3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(268px,100%),1fr));gap:16px;margin-top:18px}
+
+/* ---------- cartões ---------- */
+.cartao{background:var(--superficie);border:1px solid var(--linha);border-radius:11px;
+        padding:19px 20px 17px;box-shadow:var(--sombra)}
+.cartao h3{font-size:15px;font-weight:700;letter-spacing:-.1px}
+.cartao .desc{font-size:12.5px;color:var(--tinta-2);margin-top:3px;max-width:60ch}
+.cabcartao{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.btab{background:transparent;border:1px solid var(--linha);color:var(--tinta-2);border-radius:6px;
+      padding:4px 9px;font:inherit;font-size:11.5px;cursor:pointer;white-space:nowrap}
+.btab:hover{border-color:var(--tinta-3);color:var(--tinta)}
+.btab[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+
+/* ---------- herói ---------- */
+.heroi{background:var(--superficie);border:1px solid var(--linha);border-radius:11px;
+       padding:24px 24px 22px;box-shadow:var(--sombra);
+       display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:26px;align-items:center}
+@media (max-width:720px){.heroi{grid-template-columns:1fr}}
+.heroi .rot{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--tinta-3);font-weight:800}
+.heroi .val{font-size:clamp(46px,8vw,62px);font-weight:650;line-height:1;letter-spacing:-2px;margin-top:9px}
+.heroi .val small{font-size:.36em;font-weight:600;color:var(--tinta-3);letter-spacing:-.4px;margin-left:5px}
+.heroi .delta{font-size:14px;font-weight:650;margin-top:10px}
+.heroi .expl{font-size:12.5px;color:var(--tinta-2);margin-top:12px;padding-top:12px;border-top:1px solid var(--linha)}
+.sobe{color:var(--bom-txt)} .desce{color:var(--critico)}
+
+/* ---------- painel-resumo (stat tiles) ---------- */
+.ladrilho{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;
+          padding:15px 16px 12px;box-shadow:var(--sombra)}
+.ladrilho .rot{font-size:12px;color:var(--tinta-2);font-weight:600;min-height:2.6em;display:block}
+.ladrilho .val{font-size:29px;font-weight:650;line-height:1.05;margin-top:7px;letter-spacing:-.8px}
+.ladrilho .val small{font-size:.44em;font-weight:600;color:var(--tinta-3);letter-spacing:0;margin-left:3px}
+.ladrilho .delta{font-size:12px;font-weight:650;margin-top:3px}
+.ladrilho .spark{margin-top:9px;display:block;width:100%;height:30px}
+
+/* ---------- legenda ---------- */
+.legenda{display:flex;gap:15px;flex-wrap:wrap;margin-top:13px;font-size:12px;color:var(--tinta-2)}
+.legenda span{display:inline-flex;align-items:center;gap:6px}
+.chave{width:13px;height:13px;border-radius:3px;flex:0 0 auto}
+.chave.ln{height:3px;border-radius:2px;width:16px}
+.glifo{font-size:11px;line-height:1;color:var(--tinta-2)}
+
+/* ---------- gráficos ---------- */
+.viz{margin-top:15px;width:100%;overflow-x:auto}
+.viz svg{display:block;width:100%;height:auto;min-width:300px}
+.grade-l{stroke:var(--grade);stroke-width:1;shape-rendering:crispEdges}
+.eixo-l{stroke:var(--eixo);stroke-width:1;shape-rendering:crispEdges}
+.tick{font-size:11px;fill:var(--tinta-3);font-variant-numeric:tabular-nums}
+.rotulo{font-size:12px;fill:var(--tinta-2)}
+.valor{font-size:12px;fill:var(--tinta);font-weight:650}
+.refl{stroke:var(--tinta-3);stroke-width:1.5;shape-rendering:crispEdges}
+.refr{font-size:10.5px;fill:var(--tinta-3);font-weight:700;letter-spacing:.4px}
+
+/* ---------- tabelas ---------- */
+.tabelaenv{margin-top:14px;overflow-x:auto}
+table.dados{border-collapse:collapse;width:100%;font-size:12.5px;min-width:400px}
+table.dados caption{text-align:left;font-size:12px;color:var(--tinta-3);padding-bottom:7px}
+table.dados th,table.dados td{border-bottom:1px solid var(--linha);padding:7px 10px;text-align:left}
+table.dados th{font-weight:700;color:var(--tinta-2);font-size:11px;text-transform:uppercase;letter-spacing:.5px;
+               white-space:nowrap}
+table.dados td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.dados tbody tr:last-child td{border-bottom:0}
+[hidden]{display:none !important}
+
+/* ---------- nota de leitura sob um gráfico ---------- */
+.nota-viz{display:flex;gap:8px;align-items:flex-start;margin-top:13px;padding-top:12px;
+          border-top:1px solid var(--linha);font-size:12.5px;color:var(--tinta-2);line-height:1.45}
+.nota-viz:empty{display:none}
+.nota-viz b{color:var(--tinta);font-weight:700}
+.nota-viz .pt{width:9px;height:9px;border-radius:50%;flex:0 0 auto;margin-top:5px}
+
+/* ---------- selo de estado ---------- */
+.selo-e{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.selo-e .pt{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+
+/* ---------- medidor ---------- */
+.medidor{margin-top:13px}
+.medidor .ln{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;gap:10px}
+.medidor .ln b{font-weight:600;color:var(--tinta-2)}
+.medidor .ln span{font-variant-numeric:tabular-nums;font-weight:650;font-size:13px}
+.trilho{height:8px;border-radius:4px;background:var(--s1-lav);margin-top:5px;margin-bottom:13px;overflow:hidden}
+.trilho i{display:block;height:100%;border-radius:4px}
+
+/* ---------- fonte de dados ---------- */
+.fonte{background:var(--superficie);border:1px solid var(--linha);border-radius:11px;
+       padding:20px;box-shadow:var(--sombra);margin-top:18px}
+.fonte h3{font-size:15px;font-weight:700;margin-bottom:4px}
+.fonte p{font-size:13px;color:var(--tinta-2);margin-bottom:14px;max-width:80ch}
+code{font-family:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,monospace;font-size:11.5px;
+     background:var(--grade);padding:1.5px 5px;border-radius:4px;color:var(--tinta);
+     word-break:break-all}
+.tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+     padding:2px 6px;border-radius:4px;white-space:nowrap}
+.tag.ok{background:rgba(12,163,12,.13);color:var(--bom-txt)}
+.tag.ver{background:rgba(250,178,25,.16);color:var(--aviso-txt,#8a5d00)}
+
+/* ---------- rodapé ---------- */
+footer{margin-top:44px;padding:26px 0 40px;border-top:1px solid var(--linha);
+       font-size:12.5px;color:var(--tinta-3)}
+footer b{color:var(--tinta-2)}
+footer p{max-width:82ch;margin-bottom:8px}
+
+/* ---------- dica (tooltip) ---------- */
+#dica{position:fixed;z-index:60;pointer-events:none;opacity:0;transition:opacity .1s;
+      background:var(--navy);color:#fff;border-radius:7px;padding:8px 11px;font-size:12px;
+      box-shadow:0 6px 22px rgba(0,0,0,.28);max-width:270px;line-height:1.42}
+#dica .t{font-weight:700;margin-bottom:3px;display:block}
+#dica .l{display:flex;justify-content:space-between;gap:14px;font-variant-numeric:tabular-nums}
+#dica .l b{font-weight:650}
+.alvo{cursor:default}
+.alvo:focus-visible{outline:2px solid var(--ouro);outline-offset:2px}
+
+@media print{
+  .filtros,.btab,.btema,#dica{display:none}
+  .cartao,.heroi,.ladrilho,.fonte{box-shadow:none;break-inside:avoid}
+  .tabelaenv{display:block !important}
+}
+</style>
+</head>
+<body>
+
+<div class="aviso">
+  <div class="env">
+    <span aria-hidden="true">⚠️</span>
+    <p><b>Protótipo de proposta — números ilustrativos.</b> Esta página demonstra a
+       <i>forma</i> do painel e o catálogo de indicadores. Nenhum valor foi extraído de
+       sistema de produção da SEFAZ-RR. O mapeamento de cada indicador para a sua fonte
+       real está na seção <a href="#fonte" style="color:#ffd479">Fonte dos dados</a>.</p>
+  </div>
+</div>
+
+<header class="topo">
+  <div class="env linhatopo">
+    <div>
+      <div class="selo">Governo do Estado de Roraima &middot; SEFAZ-RR</div>
+      <h1>Inteligência artificial como ferramenta de apoio à tomada de decisão</h1>
+      <p class="sub">Painel de indicadores em três eixos — <b>alcance da estratégia</b>,
+        <b>redução de riscos</b> e <b>avanço da maturidade</b> — construído sobre os dados
+        abertos já publicados pelo Estado.</p>
+    </div>
+    <button class="btema" id="btema" type="button">Alternar tema</button>
+  </div>
+</header>
+
+<div class="filtros">
+  <div class="env">
+    <div class="campo">
+      <label for="f-exercicio">Exercício</label>
+      <select id="f-exercicio"><option>2026</option><option>2025</option><option>2024</option></select>
+    </div>
+    <div class="campo">
+      <label for="f-periodo">Período</label>
+      <select id="f-periodo">
+        <option>Acumulado do ano</option><option>1º semestre</option>
+        <option>Último trimestre</option><option>Último mês</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="f-unidade">Unidade orçamentária</label>
+      <select id="f-unidade">
+        <option>Todas as unidades</option><option>SEFAZ — Administração direta</option>
+        <option>Fundo Estadual de Fomento</option><option>Demais órgãos do Executivo</option>
+      </select>
+    </div>
+    <p class="nota">Um filtro para toda a página.<br>No protótipo os controles são inertes.</p>
+  </div>
+</div>
+
+<main class="env">
+
+  <!-- ============ HERÓI ============ -->
+  <section aria-labelledby="h-ige" style="padding-top:26px">
+    <div class="heroi">
+      <div>
+        <div class="rot" id="h-ige">Índice de Gestão Orientada por Evidência</div>
+        <div class="val" id="ige-val">—<small>/100</small></div>
+        <div class="delta" id="ige-delta"></div>
+        <p class="expl">Composto auditável dos três eixos:
+          <b>40%</b> alcance da estratégia · <b>30%</b> redução de riscos ·
+          <b>30%</b> avanço da maturidade. A fórmula é publicada junto com o número —
+          um índice cuja composição não é aberta não serve para decidir.</p>
+      </div>
+      <div>
+        <div class="rot" style="margin-bottom:2px">Trajetória — 12 meses</div>
+        <div class="viz" id="viz-ige"></div>
+      </div>
+    </div>
+
+    <div class="grade3" id="ladrilhos-eixos"></div>
+  </section>
+
+  <!-- ============ EIXO 1 ============ -->
+  <section aria-labelledby="s1" id="estrategia">
+    <div class="cabsec">
+      <span class="num">Eixo 1</span>
+      <h2 id="s1">Alcance da estratégia</h2>
+      <p>Chegamos onde dissemos que iríamos chegar? Mede o quanto dos objetivos
+         estratégicos declarados foi efetivamente atingido — e a que distância está o
+         que ficou para trás. Todos os indicadores deste eixo saem de dado orçamentário
+         e tributário já público.</p>
+    </div>
+
+    <div class="cartao">
+      <div class="cabcartao">
+        <div>
+          <h3>Alcance por objetivo estratégico</h3>
+          <p class="desc">Percentual da meta do exercício atingido até o período. A régua
+            vertical marca 100% — a meta pactuada.</p>
+        </div>
+        <button class="btab" type="button" data-tab="tab-obj" aria-pressed="false">Tabela</button>
+      </div>
+      <div class="viz" id="viz-obj"></div>
+      <div class="legenda" id="leg-obj"></div>
+      <div class="tabelaenv" id="tab-obj" hidden></div>
+    </div>
+
+    <div class="grade2">
+      <div class="cartao">
+        <div class="cabcartao">
+          <div>
+            <h3>Arrecadação realizada × meta</h3>
+            <p class="desc">Acumulado mensal, em R$ milhões. A projeção da IA antecipa o
+              desvio antes do fechamento do exercício.</p>
+          </div>
+          <button class="btab" type="button" data-tab="tab-arr" aria-pressed="false">Tabela</button>
+        </div>
+        <div class="viz" id="viz-arr"></div>
+        <div class="legenda" id="leg-arr"></div>
+        <p class="nota-viz" id="nota-arr"></p>
+        <div class="tabelaenv" id="tab-arr" hidden></div>
+      </div>
+
+      <div class="cartao">
+        <div class="cabcartao">
+          <div>
+            <h3>Indicadores de execução</h3>
+            <p class="desc">O que sustenta o alcance: execução da despesa, repasse
+              constitucional e prazo de pagamento.</p>
+          </div>
+        </div>
+        <div class="medidor" id="med-exec"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EIXO 2 ============ -->
+  <section aria-labelledby="s2" id="riscos">
+    <div class="cabsec">
+      <span class="num">Eixo 2</span>
+      <h2 id="s2">Redução de riscos</h2>
+      <p>O uso de IA aqui é de <i>triagem</i>: o modelo ordena o que merece olhar humano,
+         não decide. O que se mede, portanto, é dupla: a exposição a risco caiu — e o
+         alerta que o modelo emite é confiável o bastante para consumir o tempo de um
+         auditor.</p>
+    </div>
+
+    <div class="grade4" id="ladrilhos-risco"></div>
+
+    <div class="grade2">
+      <div class="cartao">
+        <div class="cabcartao">
+          <div>
+            <h3>Índice de exposição a risco</h3>
+            <p class="desc">Escala 0–100; <b>menor é melhor</b>. Faixa sombreada = tolerância
+              definida pelo comitê gestor (≤ 40).</p>
+          </div>
+          <button class="btab" type="button" data-tab="tab-risco" aria-pressed="false">Tabela</button>
+        </div>
+        <div class="viz" id="viz-risco"></div>
+        <div class="tabelaenv" id="tab-risco" hidden></div>
+      </div>
+
+      <div class="cartao">
+        <div class="cabcartao">
+          <div>
+            <h3>Alertas em aberto por tipo de risco</h3>
+            <p class="desc">Gerados por regra ou modelo sobre os dados abertos; cada um
+              vira tarefa de verificação humana.</p>
+          </div>
+          <button class="btab" type="button" data-tab="tab-alertas" aria-pressed="false">Tabela</button>
+        </div>
+        <div class="viz" id="viz-alertas"></div>
+        <div class="legenda" id="leg-alertas"></div>
+        <div class="tabelaenv" id="tab-alertas" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EIXO 3 ============ -->
+  <section aria-labelledby="s3" id="maturidade">
+    <div class="cabsec">
+      <span class="num">Eixo 3</span>
+      <h2 id="s3">Avanço da maturidade</h2>
+      <p>Escala 0–5, em seis dimensões, no espírito do diagnóstico de maturidade em IA
+         aplicado pelo TCU à administração pública federal. Mede se a capacidade ficou
+         <i>instalada na instituição</i> — não se um piloto deu certo. Piloto que depende
+         de uma pessoa não é maturidade.</p>
+    </div>
+
+    <div class="cartao">
+      <div class="cabcartao">
+        <div>
+          <h3>Maturidade por dimensão — linha de base × atual</h3>
+          <p class="desc">Cada haste liga o diagnóstico inicial ao estágio atual; o traço
+            vertical marca a meta do ciclo.</p>
+        </div>
+        <button class="btab" type="button" data-tab="tab-mat" aria-pressed="false">Tabela</button>
+      </div>
+      <div class="viz" id="viz-mat"></div>
+      <div class="legenda" id="leg-mat"></div>
+      <div class="tabelaenv" id="tab-mat" hidden></div>
+    </div>
+
+    <div class="grade2">
+      <div class="cartao">
+        <div class="cabcartao">
+          <div>
+            <h3>Prontidão da base de dados</h3>
+            <p class="desc">Sem dado íntegro e atual não há modelo: esta é a fundação de
+              todo o resto do painel.</p>
+          </div>
+          <button class="btab" type="button" data-tab="tab-qual" aria-pressed="false">Tabela</button>
+        </div>
+        <div class="viz" id="viz-qual"></div>
+        <div class="legenda" id="leg-qual"></div>
+        <div class="tabelaenv" id="tab-qual" hidden></div>
+      </div>
+
+      <div class="cartao">
+        <div class="cabcartao">
+          <div>
+            <h3>Institucionalização</h3>
+            <p class="desc">Os marcos de governança que separam experimento de política
+              pública.</p>
+          </div>
+        </div>
+        <div class="medidor" id="med-gov"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FONTE ============ -->
+  <section aria-labelledby="s4" id="fonte">
+    <div class="cabsec">
+      <span class="num">Fontes</span>
+      <h2 id="s4">Fonte dos dados</h2>
+      <p>Cada indicador nasce de um endpoint público. Os caminhos abaixo foram levantados
+         na documentação publicada do Portal da Transparência de Roraima e da SEFAZ-RR e
+         <b>ainda precisam ser confirmados no Swagger</b> — o ambiente em que este
+         protótipo foi montado não tem acesso de rede à <code>*.rr.gov.br</code>, então
+         nenhuma chamada foi executada.</p>
+    </div>
+
+    <div class="fonte">
+      <h3>Endpoints levantados</h3>
+      <p>Ponto de partida da verificação: o Swagger do portal, em
+         <code>transparencia.rr.gov.br/transparencia/swagger-ui/</code>.</p>
+      <div class="tabelaenv"><table class="dados">
+        <thead><tr><th>Fonte</th><th>Caminho</th><th>Alimenta</th><th>Situação</th></tr></thead>
+        <tbody>
+          <tr><td>Arrecadação e repasse (SEFAZ)</td>
+              <td><code>servicos.sefaz.rr.gov.br/apiarrecadacaorepasse/public/api/getportalarrecadacaobycodmunicipio</code></td>
+              <td>E1, E2, E3, E5</td><td><span class="tag ver">a confirmar</span></td></tr>
+          <tr><td>Contratos — Fiplan-RR</td>
+              <td><code>transparencia.rr.gov.br/api-transparencia/public/dashboard/contratos/api</code></td>
+              <td>R1, R2, R7</td><td><span class="tag ver">a confirmar</span></td></tr>
+          <tr><td>Despesas por credor</td><td><code>/api-transparencia/public/dashboard/despesas/…</code></td>
+              <td>E4, E6, R3, R4</td><td><span class="tag ver">a confirmar</span></td></tr>
+          <tr><td>Diárias</td><td><code>/api-transparencia/public/dashboard/diarias/…</code></td>
+              <td>R5</td><td><span class="tag ver">a confirmar</span></td></tr>
+          <tr><td>Remunerações</td><td><code>/api-transparencia/public/dashboard/remuneracao/…</code></td>
+              <td>M3 (dimensionamento)</td><td><span class="tag ver">a confirmar</span></td></tr>
+          <tr><td>Obras</td><td><code>/api-transparencia/public/dashboard/obras/…</code></td>
+              <td>R6</td><td><span class="tag ver">a confirmar</span></td></tr>
+          <tr><td>Unidades orçamentárias</td><td><code>/api-transparencia/public/dashboard/unidades/…</code></td>
+              <td>filtro global</td><td><span class="tag ver">a confirmar</span></td></tr>
+          <tr><td>Patrimônio</td><td><code>/api-transparencia/public/dashboard/patrimonio/…</code></td>
+              <td>M2 (cobertura)</td><td><span class="tag ver">a confirmar</span></td></tr>
+        </tbody>
+      </table></div>
+      <p style="margin-top:14px;margin-bottom:0">Duas fontes externas fecham o conjunto:
+        <b>IPCA/IBGE</b> para deflacionar a série de receita (E2) e <b>Siconfi/Tesouro
+        Nacional</b> para comparar Roraima às demais unidades da federação — a mesma base
+        de comparação já usada no painel da raiz deste repositório.</p>
+    </div>
+
+    <div class="fonte">
+      <h3>Catálogo de indicadores</h3>
+      <p>Dezoito indicadores, três eixos. Todo indicador tem fórmula explícita, fonte
+         nomeada e periodicidade — sem isso não entra no painel.</p>
+      <div class="tabelaenv"><table class="dados" id="tab-catalogo"></table></div>
+    </div>
+  </section>
+
+  <footer>
+    <p><b>O que este painel não faz.</b> Não decide, não classifica pessoa e não produz
+      ato administrativo. Ele ordena evidência para que a decisão — que continua humana e
+      motivada — seja tomada com o que já se sabe. Todo alerta é hipótese a verificar, e a
+      taxa de acerto do modelo é publicada no próprio painel justamente para que ninguém
+      trate a saída como veredito.</p>
+    <p><b>Proteção de dados.</b> Todas as fontes previstas são de publicidade obrigatória
+      e já divulgadas em dados abertos. Não há tratamento de dado pessoal sensível; a
+      série de remunerações entra apenas de forma agregada, para dimensionamento.</p>
+    <p style="margin-top:14px">Protótipo de proposta · Comissão de trabalho ·
+      dados ilustrativos · página autocontida, sem chamada a servidor externo.</p>
+  </footer>
+</main>
+
+<div id="dica" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* =======================================================================
+   INÍCIO DA CAMADA DE DADOS
+   Substituir este objeto pelo retorno das APIs. Cada chave traz, em
+   comentário, o indicador do catálogo e a fonte prevista.
+   ======================================================================= */
+const DADOS = {
+  ige: { valor:71.4, delta:6.2, serie:[58,59,61,60,63,64,66,65,68,69,70,71.4] },
+
+  eixos:[
+    { id:'estrategia', rot:'Alcance da estratégia', val:78.4, un:'%', delta:4.1, bomSubir:true,
+      serie:[68,69,71,70,72,73,74,74,76,77,78,78.4] },
+    { id:'risco', rot:'Redução de riscos', val:64.9, un:'%', delta:9.3, bomSubir:true,
+      serie:[42,44,47,49,52,54,56,58,60,62,63,64.9] },
+    { id:'maturidade', rot:'Avanço da maturidade', val:2.8, un:'/5', delta:0.6, bomSubir:true,
+      serie:[2.1,2.1,2.2,2.2,2.3,2.4,2.5,2.5,2.6,2.7,2.7,2.8] }
+  ],
+
+  /* E1–E7 · objetivos do plano estratégico, % da meta do exercício */
+  objetivos:[
+    { id:'OE1', nome:'Ampliar a arrecadação própria',            alc:96 },
+    { id:'OE2', nome:'Elevar a recuperação de crédito tributário', alc:91 },
+    { id:'OE3', nome:'Reduzir a inadimplência declarada',        alc:83 },
+    { id:'OE4', nome:'Qualificar o gasto público',               alc:76 },
+    { id:'OE5', nome:'Assegurar o equilíbrio fiscal',            alc:97 },
+    { id:'OE6', nome:'Ampliar transparência e dados abertos',    alc:88 },
+    { id:'OE7', nome:'Desenvolver competências analíticas',      alc:58 }
+  ],
+
+  /* E1 · arrecadação acumulada, R$ milhões.
+     A projeção parte do último ponto apurado — é o que dá ao gestor tempo de
+     reagir antes do fechamento do exercício. */
+  arrecadacao:{
+    meses:['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
+    realizado:[312,631,948,1265,1602,1918,2214,2489,2751,null,null,null],
+    meta:     [305,615,925,1240,1560,1880,2200,2525,2850,3180,3510,3840],
+    projecao: [null,null,null,null,null,null,null,null,2751,3038,3324,3607]
+  },
+
+  /* E4, E5, E6 */
+  execucao:[
+    { rot:'Execução orçamentária (liquidado / dotação)', v:71.2, un:'%', ref:75, inv:false },
+    { rot:'Repasse constitucional aos municípios',       v:100.0, un:'%', ref:100, inv:false },
+    { rot:'Receita própria sobre receita total',         v:38.6, un:'%', ref:40, inv:false },
+    { rot:'Prazo médio de pagamento a fornecedores',     v:34, un:' dias', ref:30, inv:true, max:90 }
+  ],
+
+  /* R1–R8 */
+  ladrilhosRisco:[
+    { rot:'Precisão dos alertas (confirmados / emitidos)', val:'73', un:'%', delta:8, bomSubir:true,
+      serie:[52,55,57,58,61,63,64,66,68,70,72,73] },
+    { rot:'Tempo médio até a detecção', val:'11', un:' dias', delta:-19, bomSubir:false,
+      serie:[38,36,33,31,28,25,22,19,17,14,12,11] },
+    { rot:'Valor sob risco identificado no período', val:'R$ 24,7', un:' mi', delta:15, bomSubir:true,
+      serie:[9,11,12,14,15,17,18,20,21,22,24,24.7] },
+    { rot:'Contratos sob monitoramento automático', val:'86', un:'%', delta:31, bomSubir:true,
+      serie:[41,44,49,53,58,62,67,71,75,80,83,86] }
+  ],
+
+  riscoSerie:{
+    meses:['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
+    valores:[74,71,69,66,64,61,57,54,51,48,45,43],
+    tolerancia:40
+  },
+
+  alertas:[
+    { tipo:'Indício de fracionamento de despesa', n:23, sev:'critico' },
+    { tipo:'Concentração de fornecedor (HHI alto)', n:17, sev:'critico' },
+    { tipo:'Obra com atraso de cronograma',        n:14, sev:'grave' },
+    { tipo:'Contrato a vencer sem renovação (90d)', n:31, sev:'grave' },
+    { tipo:'Despesa fora do padrão histórico',     n:46, sev:'atencao' },
+    { tipo:'Diária em desvio de padrão',           n:28, sev:'atencao' },
+    { tipo:'Inconsistência cadastral de credor',   n:52, sev:'atencao' }
+  ],
+
+  /* M1–M6 · escala 0–5 */
+  maturidade:[
+    { dim:'Governança e estratégia',      base:1.0, atual:3.2, meta:4.0 },
+    { dim:'Dados e infraestrutura',       base:1.5, atual:3.0, meta:4.0 },
+    { dim:'Pessoas e competências',       base:0.5, atual:2.1, meta:3.5 },
+    { dim:'Tecnologia e ferramentas',     base:1.0, atual:2.8, meta:3.5 },
+    { dim:'Ética, risco e conformidade',  base:0.5, atual:2.6, meta:4.0 },
+    { dim:'Geração de valor',             base:0.5, atual:3.1, meta:3.5 }
+  ],
+
+  qualidade:[
+    { base:'Arrecadação e repasse', cob:100, lat:1,  comp:99 },
+    { base:'Despesas (Fiplan)',     cob:100, lat:1,  comp:97 },
+    { base:'Contratos (Fiplan)',    cob:94,  lat:3,  comp:88 },
+    { base:'Diárias',               cob:100, lat:2,  comp:95 },
+    { base:'Obras',                 cob:72,  lat:14, comp:64 },
+    { base:'Patrimônio',            cob:58,  lat:31, comp:51 }
+  ],
+
+  governanca:[
+    { rot:'Política estadual de uso de IA publicada', v:100, est:'bom',     nota:'Concluído' },
+    { rot:'Comitê gestor instituído e em operação',   v:100, est:'bom',     nota:'Concluído' },
+    { rot:'Inventário de algoritmos em uso',          v:70,  est:'atencao', nota:'7 de 10 soluções catalogadas' },
+    { rot:'Avaliação de impacto (LGPD) por solução',  v:50,  est:'atencao', nota:'5 de 10 avaliadas' },
+    { rot:'Trilha de auditoria das recomendações',    v:40,  est:'grave',   nota:'Em implantação' },
+    { rot:'Servidores capacitados em análise de dados', v:62, est:'atencao', nota:'149 de 240 servidores' }
+  ],
+
+  catalogo:[
+    ['E1','Realização da arrecadação','Arrecadado ÷ meta LOA','API Arrecadação e Repasse','Mensal'],
+    ['E2','Crescimento real da receita própria','(Rec.ₜ deflacionada ÷ Rec.ₜ₋₁) − 1','Arrecadação + IPCA/IBGE','Mensal'],
+    ['E3','Participação da receita própria','Receita própria ÷ receita total','Arrecadação + Fiplan','Mensal'],
+    ['E4','Execução orçamentária','Liquidado ÷ dotação atualizada','Despesas — Fiplan','Mensal'],
+    ['E5','Repasse constitucional a municípios','Repassado ÷ devido (25% ICMS)','API Arrecadação e Repasse','Mensal'],
+    ['E6','Prazo médio de pagamento','Média(data pagamento − data liquidação)','Despesas por credor','Mensal'],
+    ['E7','Alcance dos objetivos estratégicos','Média ponderada do alcance por OE','Plano estratégico + apurações','Trimestral'],
+    ['R1','Concentração de fornecedores (HHI)','Σ(participação do credor)²','Contratos + despesas por credor','Mensal'],
+    ['R2','Contratos a vencer sem renovação','Contratos com fim ≤ 90d sem aditivo ÷ total','Contratos — Fiplan','Semanal'],
+    ['R3','Indício de fracionamento','Mesmo credor + objeto, valores logo abaixo do limite','Despesas por credor','Mensal'],
+    ['R4','Despesa fora do padrão histórico','|z| > 3 na série da rubrica × unidade','Despesas — Fiplan','Mensal'],
+    ['R5','Diária em desvio de padrão','Frequência ou valor > p99 da unidade','Diárias','Mensal'],
+    ['R6','Obra com atraso de cronograma','Execução física < prevista em > 20%','Obras','Mensal'],
+    ['R7','Precisão dos alertas','Alertas confirmados ÷ alertas emitidos','Registro de verificação','Mensal'],
+    ['R8','Tempo médio até a detecção','Média(data do alerta − data do fato)','Registro de verificação','Mensal'],
+    ['M1','Nível de maturidade em IA','Média das 6 dimensões (0–5)','Autoavaliação + evidência','Semestral'],
+    ['M2','Prontidão da base de dados','Cobertura × completude × atualidade','Todas as APIs','Mensal'],
+    ['M3','Institucionalização da governança','Marcos concluídos ÷ marcos previstos','Registro do comitê gestor','Trimestral']
+  ]
+};
+/* ======================= FIM DA CAMADA DE DADOS ======================= */
+
+
+/* ---------------------------------------------------------------------
+   utilitários
+   --------------------------------------------------------------------- */
+const $  = (s,r)=> (r||document).querySelector(s);
+const NS = 'http://www.w3.org/2000/svg';
+const cor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const num = (v,d=1) => v.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const int = v => v.toLocaleString('pt-BR');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const ESTADO = {
+  bom:     {c:'--bom',     rot:'No alvo',    glifo:'●'},
+  atencao: {c:'--atencao', rot:'Atenção',    glifo:'◆'},
+  grave:   {c:'--grave',   rot:'Grave',      glifo:'▲'},
+  critico: {c:'--critico', rot:'Crítico',    glifo:'■'}
+};
+/* alcance → estado. Só é "estado" porque significa bom/ruim, não porque é grande. */
+const estadoAlcance = p => p >= 95 ? 'bom' : p >= 85 ? 'atencao' : p >= 70 ? 'grave' : 'critico';
+
+function svg(vb){
+  const s = document.createElementNS(NS,'svg');
+  s.setAttribute('viewBox', vb);
+  s.setAttribute('preserveAspectRatio','xMidYMid meet');
+  s.setAttribute('role','img');
+  return s;
+}
+function el(t, attrs, pai){
+  const e = document.createElementNS(NS,t);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  if(pai) pai.appendChild(e);
+  return e;
+}
+/* barra horizontal com ponta arredondada de 4px na extremidade do dado */
+function caminhoBarraH(x0,y,w,h,r=4){
+  if(w <= r) return `M${x0},${y} h${Math.max(w,.5)} v${h} h${-Math.max(w,.5)} Z`;
+  return `M${x0},${y} H${x0+w-r} A${r},${r} 0 0 1 ${x0+w},${y+r} V${y+h-r} A${r},${r} 0 0 1 ${x0+w-r},${y+h} H${x0} Z`;
+}
+
+/* ---------- dica (tooltip) ---------- */
+const dica = $('#dica');
+function mostraDica(ev, titulo, linhas){
+  dica.innerHTML = `<span class="t">${esc(titulo)}</span>` +
+    linhas.map(l=>`<span class="l"><span>${esc(l[0])}</span><b>${esc(l[1])}</b></span>`).join('');
+  dica.style.opacity = '1';
+  moveDica(ev);
+}
+function moveDica(ev){
+  const r = dica.getBoundingClientRect();
+  let x = (ev.clientX ?? 0) + 14, y = (ev.clientY ?? 0) + 14;
+  if(x + r.width  > innerWidth  - 10) x = (ev.clientX ?? 0) - r.width  - 14;
+  if(y + r.height > innerHeight - 10) y = (ev.clientY ?? 0) - r.height - 14;
+  dica.style.left = Math.max(8,x)+'px';
+  dica.style.top  = Math.max(8,y)+'px';
+}
+function escondeDica(){ dica.style.opacity = '0'; }
+/* liga a dica a uma forma; o alvo já deve ter área de toque >= 24px */
+function alvo(no, titulo, linhas){
+  no.classList.add('alvo');
+  no.setAttribute('tabindex','0');
+  no.addEventListener('mouseenter', e=>mostraDica(e,titulo,linhas));
+  no.addEventListener('mousemove', moveDica);
+  no.addEventListener('mouseleave', escondeDica);
+  no.addEventListener('focus', e=>{
+    const r = no.getBoundingClientRect();
+    mostraDica({clientX:r.left+r.width/2, clientY:r.top}, titulo, linhas);
+  });
+  no.addEventListener('blur', escondeDica);
+}
+
+/* ---------- tabela ---------- */
+function tabela(dest, legenda, cabs, linhas){
+  const alvoEl = typeof dest === 'string' ? $(dest) : dest;
+  alvoEl.innerHTML =
+    `<table class="dados"><caption>${esc(legenda)}</caption><thead><tr>` +
+    cabs.map(c=>`<th${c.n?' style="text-align:right"':''}>${esc(c.t||c)}</th>`).join('') +
+    `</tr></thead><tbody>` +
+    linhas.map(l=>'<tr>'+l.map((c,i)=>`<td${cabs[i]&&cabs[i].n?' class="n"':''}>${c}</td>`).join('')+'</tr>').join('') +
+    `</tbody></table>`;
+}
+document.querySelectorAll('.btab').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    const t = $('#'+b.dataset.tab);
+    const abrindo = t.hidden;
+    t.hidden = !abrindo;
+    b.setAttribute('aria-pressed', String(abrindo));
+    b.textContent = abrindo ? 'Ocultar tabela' : 'Tabela';
+  });
+});
+
+/* ---------- legenda ---------- */
+function legenda(dest, itens){
+  $(dest).innerHTML = itens.map(i=>{
+    const chave = i.linha
+      ? `<i class="chave ln" style="background:${i.cor}"></i>`
+      : `<i class="chave" style="background:${i.cor}"></i>`;
+    const g = i.glifo ? `<i class="glifo" aria-hidden="true">${i.glifo}</i>` : '';
+    return `<span>${chave}${g}${esc(i.rot)}</span>`;
+  }).join('');
+}
+
+/* ---------- sparkline ---------- */
+function sparkline(serie, acento){
+  const W=200,H=44,P=4;
+  const s = svg(`0 0 ${W} ${H}`); s.setAttribute('aria-hidden','true'); s.classList.add('spark');
+  const mn=Math.min(...serie), mx=Math.max(...serie), amp=(mx-mn)||1;
+  const X=i=>P+i*(W-2*P)/(serie.length-1);
+  const Y=v=>H-P-((v-mn)/amp)*(H-2*P);
+  const d = serie.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  el('path',{d, fill:'none', stroke:cor('--tinta-3'), 'stroke-width':2,
+             'stroke-linecap':'round','stroke-linejoin':'round','opacity':.45}, s);
+  const i0 = serie.length-2;
+  el('path',{d:`M${X(i0).toFixed(1)},${Y(serie[i0]).toFixed(1)} L${X(serie.length-1).toFixed(1)},${Y(serie[serie.length-1]).toFixed(1)}`,
+             fill:'none', stroke:acento, 'stroke-width':2.5,'stroke-linecap':'round'}, s);
+  el('circle',{cx:X(serie.length-1).toFixed(1), cy:Y(serie[serie.length-1]).toFixed(1), r:4,
+               fill:acento, stroke:cor('--superficie'), 'stroke-width':2}, s);
+  return s;
+}
+const sinal = (v,d=1)=> (v>0?'+':'−')+num(Math.abs(v),d);
+
+/* =====================================================================
+   HERÓI
+   ===================================================================== */
+function pintaHeroi(){
+  $('#ige-val').innerHTML = num(DADOS.ige.valor,1)+'<small>/100</small>';
+  const d = DADOS.ige.delta;
+  $('#ige-delta').innerHTML =
+    `<span class="${d>=0?'sobe':'desce'}">${d>=0?'▲':'▼'} ${sinal(d,1)} pontos</span>` +
+    `<span style="color:var(--tinta-3);font-weight:500"> · vs. ciclo anterior</span>`;
+
+  /* linha de trajetória — série única, sem legenda (o título já a nomeia) */
+  const W=520,H=190,ML=42,MR=54,MT=16,MB=34;
+  const s = svg(`0 0 ${W} ${H}`);
+  s.setAttribute('aria-label','Trajetória do índice nos últimos 12 meses');
+  const v = DADOS.ige.serie, n=v.length;
+  const y0=50, y1=80;
+  const X=i=>ML+i*(W-ML-MR)/(n-1);
+  const Y=val=>H-MB-((val-y0)/(y1-y0))*(H-MT-MB);
+  for(let t=y0;t<=y1;t+=10){
+    el('line',{x1:ML,x2:W-MR,y1:Y(t),y2:Y(t),class:'grade-l'},s);
+    el('text',{x:ML-9,y:Y(t)+4,class:'tick','text-anchor':'end'},s).textContent=t;
+  }
+  el('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'eixo-l'},s);
+  const d1 = v.map((val,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(val).toFixed(1)}`).join(' ');
+  el('path',{d:`${d1} L${X(n-1).toFixed(1)},${H-MB} L${X(0).toFixed(1)},${H-MB} Z`,
+             fill:cor('--s1'),opacity:.10,stroke:'none'},s);
+  el('path',{d:d1,fill:'none',stroke:cor('--s1'),'stroke-width':2,
+             'stroke-linecap':'round','stroke-linejoin':'round'},s);
+  el('circle',{cx:X(n-1),cy:Y(v[n-1]),r:5,fill:cor('--s1'),
+               stroke:cor('--superficie'),'stroke-width':2},s);
+  el('text',{x:X(n-1)+11,y:Y(v[n-1])+4,class:'valor'},s).textContent=num(v[n-1],1);
+  const rot=['Jan','Mar','Mai','Jul','Set','Nov'];
+  rot.forEach((r,k)=>{
+    const i=k*2;
+    el('text',{x:X(i),y:H-MB+18,class:'tick','text-anchor':'middle'},s).textContent=r;
+  });
+  /* alvos de hover largos — uma faixa por ponto */
+  const passo=(W-ML-MR)/(n-1);
+  v.forEach((val,i)=>{
+    const r = el('rect',{x:X(i)-passo/2,y:MT,width:passo,height:H-MT-MB,
+                         fill:'transparent'},s);
+    alvo(r, `Mês ${i+1} de 12`, [['Índice', num(val,1)+' /100']]);
+  });
+  $('#viz-ige').appendChild(s);
+}
+
+/* =====================================================================
+   LADRILHOS
+   ===================================================================== */
+function ladrilho(o){
+  const d = document.createElement('div');
+  d.className='ladrilho';
+  const bom = o.bomSubir ? o.delta>=0 : o.delta<=0;
+  d.innerHTML =
+    `<span class="rot">${esc(o.rot)}</span>` +
+    `<div class="val">${esc(o.val)}<small>${esc(o.un)}</small></div>` +
+    `<div class="delta ${bom?'sobe':'desce'}">${o.delta>=0?'▲':'▼'} ${sinal(o.delta, Number.isInteger(o.delta)?0:1)}${o.pp||''} <span style="color:var(--tinta-3);font-weight:500">· 12 meses</span></div>`;
+  d.appendChild(sparkline(o.serie, bom ? cor('--s1') : cor('--critico')));
+  return d;
+}
+function pintaLadrilhos(){
+  const a = $('#ladrilhos-eixos');
+  DADOS.eixos.forEach(e=>a.appendChild(ladrilho({
+    rot:e.rot, val:num(e.val, e.un==='/5'?1:1), un:e.un, delta:e.delta,
+    bomSubir:e.bomSubir, serie:e.serie, pp:e.un==='%'?' p.p.':''
+  })));
+  const b = $('#ladrilhos-risco');
+  DADOS.ladrilhosRisco.forEach(o=>b.appendChild(ladrilho({...o, pp:'%'})));
+}
+
+/* =====================================================================
+   EIXO 1 — objetivos estratégicos
+   ===================================================================== */
+function pintaObjetivos(){
+  const D=DADOS.objetivos, n=D.length;
+  const W=880, ML=310, MR=64, MT=26, MB=34, ALT=30, BARRA=20;
+  const H = MT + n*ALT + MB;
+  const s = svg(`0 0 ${W} ${H}`);
+  s.setAttribute('aria-label','Alcance percentual por objetivo estratégico');
+  const MAXX=120;
+  const X = p => ML + (p/MAXX)*(W-ML-MR);
+
+  for(let t=0;t<=MAXX;t+=25){
+    el('line',{x1:X(t),x2:X(t),y1:MT-8,y2:MT+n*ALT,class:'grade-l'},s);
+    el('text',{x:X(t),y:MT+n*ALT+18,class:'tick','text-anchor':'middle'},s).textContent=t+'%';
+  }
+  el('line',{x1:ML,x2:ML,y1:MT-8,y2:MT+n*ALT,class:'eixo-l'},s);
+
+  D.forEach((o,i)=>{
+    const y = MT + i*ALT + (ALT-BARRA)/2;
+    const est = estadoAlcance(o.alc);
+    const c = cor(ESTADO[est].c);
+    el('text',{x:0,y:y+BARRA/2+4,class:'rotulo'},s).textContent = `${o.id} · ${o.nome}`;
+    const p = el('path',{d:caminhoBarraH(ML,y,X(o.alc)-ML,BARRA,4),fill:c},s);
+    el('text',{x:X(o.alc)+9,y:y+BARRA/2+4,class:'valor'},s).textContent = num(o.alc,0)+'%';
+    /* área de toque cobrindo a faixa inteira (>= 24px) */
+    const hit = el('rect',{x:0,y:MT+i*ALT,width:W,height:ALT,fill:'transparent'},s);
+    alvo(hit, `${o.id} · ${o.nome}`, [
+      ['Alcance', num(o.alc,0)+'% da meta'],
+      ['Estado', ESTADO[est].rot],
+      ['Distância da meta', o.alc>=100 ? 'meta superada' : num(100-o.alc,0)+' p.p.']
+    ]);
+  });
+
+  /* régua da meta */
+  el('line',{x1:X(100),x2:X(100),y1:MT-14,y2:MT+n*ALT,class:'refl'},s);
+  el('text',{x:X(100),y:MT-19,class:'refr','text-anchor':'middle'},s).textContent='META 100%';
+
+  $('#viz-obj').appendChild(s);
+
+  legenda('#leg-obj', ['bom','atencao','grave','critico'].map(k=>({
+    cor:cor(ESTADO[k].c), rot:ESTADO[k].rot + ({bom:' (≥95%)',atencao:' (85–94%)',grave:' (70–84%)',critico:' (<70%)'}[k]),
+    glifo:ESTADO[k].glifo
+  })));
+
+  tabela('#tab-obj','Alcance por objetivo estratégico, em % da meta do exercício.',
+    ['Objetivo','Descrição',{t:'Alcance',n:true},'Estado'],
+    D.map(o=>{
+      const e=estadoAlcance(o.alc);
+      return [o.id, esc(o.nome), num(o.alc,0)+'%',
+        `<span class="selo-e"><i class="pt" style="background:${cor(ESTADO[e].c)}"></i>${ESTADO[e].rot}</span>`];
+    }));
+}
+
+/* =====================================================================
+   EIXO 1 — arrecadação × meta
+   ===================================================================== */
+function pintaArrecadacao(){
+  const A=DADOS.arrecadacao, n=A.meses.length;
+  const W=560,H=300,ML=52,MR=58,MT=22,MB=40;
+  const s=svg(`0 0 ${W} ${H}`);
+  s.setAttribute('aria-label','Arrecadação acumulada realizada e meta, em R$ milhões');
+  const mx=4000;
+  const X=i=>ML+i*(W-ML-MR)/(n-1);
+  const Y=v=>H-MB-(v/mx)*(H-MT-MB);
+  for(let t=0;t<=mx;t+=1000){
+    el('line',{x1:ML,x2:W-MR,y1:Y(t),y2:Y(t),class:'grade-l'},s);
+    el('text',{x:ML-9,y:Y(t)+4,class:'tick','text-anchor':'end'},s).textContent=int(t);
+  }
+  el('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'eixo-l'},s);
+
+  const dMeta=A.meta.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  el('path',{d:dMeta,fill:'none',stroke:cor('--tinta-3'),'stroke-width':2,
+             'stroke-linecap':'round','stroke-linejoin':'round'},s);
+
+  const pts=A.realizado.map((v,i)=>({v,i})).filter(p=>p.v!=null);
+  const dReal=pts.map((p,k)=>`${k?'L':'M'}${X(p.i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');
+  /* sem preenchimento de área: são duas séries, e a mancha pertenceria só a uma —
+     no corte da série realizada ela ainda desenhava um paredão vertical falso */
+  el('path',{d:dReal,fill:'none',stroke:cor('--s1'),'stroke-width':2,
+             'stroke-linecap':'round','stroke-linejoin':'round'},s);
+
+  /* projeção — o tracejado aqui significa "ainda não aconteceu", que é
+     exatamente o que o traço interrompido comunica */
+  const pj=A.projecao.map((v,i)=>({v,i})).filter(p=>p.v!=null);
+  if(pj.length>1){
+    const dPj=pj.map((p,k)=>`${k?'L':'M'}${X(p.i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');
+    el('path',{d:dPj,fill:'none',stroke:cor('--s2'),'stroke-width':2,
+               'stroke-dasharray':'6 5','stroke-linecap':'round'},s);
+    const f=pj[pj.length-1];
+    el('circle',{cx:X(f.i),cy:Y(f.v),r:5,fill:cor('--s2'),
+                 stroke:cor('--superficie'),'stroke-width':2},s);
+  }
+
+  const ult=pts[pts.length-1];
+  el('circle',{cx:X(ult.i),cy:Y(ult.v),r:5,fill:cor('--s1'),
+               stroke:cor('--superficie'),'stroke-width':2},s);
+  el('text',{x:X(ult.i)-8,y:Y(ult.v)-9,class:'valor','text-anchor':'end'},s).textContent=int(ult.v);
+  el('text',{x:X(n-1)+8,y:Y(A.meta[n-1])+4,class:'tick','text-anchor':'start'},s).textContent='meta';
+
+  A.meses.forEach((m,i)=>{
+    if(i%2===0) el('text',{x:X(i),y:H-MB+18,class:'tick','text-anchor':'middle'},s).textContent=m;
+  });
+
+  const passo=(W-ML-MR)/(n-1);
+  A.meses.forEach((m,i)=>{
+    const r=el('rect',{x:X(i)-passo/2,y:MT,width:passo,height:H-MT-MB,fill:'transparent'},s);
+    const l=[['Meta acumulada','R$ '+int(A.meta[i])+' mi']];
+    const base = A.realizado[i]!=null ? A.realizado[i] : A.projecao[i];
+    if(A.realizado[i]!=null) l.unshift(['Realizado','R$ '+int(A.realizado[i])+' mi']);
+    else if(A.projecao[i]!=null) l.unshift(['Projetado','R$ '+int(A.projecao[i])+' mi']);
+    else l.unshift(['Realizado','ainda não apurado']);
+    if(base!=null){
+      const dif=base-A.meta[i];
+      l.push(['Desvio',(dif>=0?'+':'−')+'R$ '+int(Math.abs(dif))+' mi']);
+    }
+    alvo(r, m+' — acumulado', l);
+  });
+  $('#viz-arr').appendChild(s);
+
+  legenda('#leg-arr',[
+    {cor:cor('--s1'), rot:'Realizado (acumulado)', linha:true},
+    {cor:cor('--s2'), rot:'Projeção até o fechamento', linha:true},
+    {cor:cor('--tinta-3'), rot:'Meta LOA (acumulada)', linha:true}
+  ]);
+  /* a leitura que motiva a decisão fica fora do desenho: dentro do gráfico ela
+     cairia em cima da própria linha que anota */
+  if(pj.length>1){
+    const gap=pj[pj.length-1].v-A.meta[n-1];
+    const alerta=gap<0;
+    $('#nota-arr').innerHTML =
+      `<i class="pt" style="background:${cor(alerta?'--grave':'--bom')}"></i>` +
+      `<span>Mantido o ritmo atual, o exercício fecha em <b>R$ ${int(pj[pj.length-1].v)} mi</b> — ` +
+      `<b>R$ ${int(Math.abs(gap))} mi ${alerta?'abaixo':'acima'}</b> da meta da LOA. ` +
+      `O desvio aparece em setembro, com três meses para reagir.</span>`;
+  }
+
+  tabela('#tab-arr','Arrecadação acumulada, em R$ milhões. Valores projetados marcados com (p).',
+    ['Mês',{t:'Realizado',n:true},{t:'Meta',n:true},{t:'Desvio',n:true}],
+    A.meses.map((m,i)=>{
+      const proj = A.realizado[i]==null && A.projecao[i]!=null;
+      const base = A.realizado[i]!=null ? A.realizado[i] : (proj?A.projecao[i]:null);
+      return [m,
+        base==null ? '—' : int(base)+(proj?' (p)':''),
+        int(A.meta[i]),
+        base==null ? '—' : ((base-A.meta[i]>=0?'+':'−')+int(Math.abs(base-A.meta[i])))];
+    }));
+}
+
+/* =====================================================================
+   EIXO 1 — medidores de execução
+   ===================================================================== */
+function pintaMedidores(dest, itens){
+  $(dest).innerHTML = itens.map(m=>{
+    const max = m.max || 100;
+    const pct = Math.max(0, Math.min(100, (m.v/max)*100));
+    /* o preenchimento carrega severidade; o trilho é passo claro do mesmo tom */
+    const ating = m.inv ? (m.ref/m.v) : (m.v/m.ref);
+    const c = cor(ating>=0.98 ? '--bom' : ating>=0.9 ? '--atencao' : ating>=0.75 ? '--grave' : '--critico');
+    return `<div class="ln"><b>${esc(m.rot)}</b><span>${num(m.v, Number.isInteger(m.v)?0:1)}${esc(m.un)}</span></div>
+            <div class="trilho"><i style="width:${pct.toFixed(1)}%;background:${c}"></i></div>`;
+  }).join('');
+}
+function pintaGovernanca(){
+  $('#med-gov').innerHTML = DADOS.governanca.map(g=>{
+    const c=cor(ESTADO[g.est].c);
+    return `<div class="ln"><b>${esc(g.rot)}</b>
+              <span class="selo-e" style="font-size:12px"><i class="pt" style="background:${c}"></i>${num(g.v,0)}%</span></div>
+            <div class="trilho"><i style="width:${g.v}%;background:${c}"></i></div>`;
+  }).join('') +
+  `<p style="font-size:11.5px;color:var(--tinta-3);margin-top:-4px">
+     Marcos concluídos sobre marcos previstos no plano de implantação.</p>`;
+}
+
+/* =====================================================================
+   EIXO 2 — índice de exposição a risco
+   ===================================================================== */
+function pintaRisco(){
+  const R=DADOS.riscoSerie,n=R.meses.length;
+  const W=560,H=290,ML=42,MR=56,MT=22,MB=40;
+  const s=svg(`0 0 ${W} ${H}`);
+  s.setAttribute('aria-label','Índice de exposição a risco ao longo de 12 meses; menor é melhor');
+  const mx=100;
+  const X=i=>ML+i*(W-ML-MR)/(n-1);
+  const Y=v=>H-MB-(v/mx)*(H-MT-MB);
+  /* faixa de tolerância */
+  el('rect',{x:ML,y:Y(R.tolerancia),width:W-ML-MR,height:(H-MB)-Y(R.tolerancia),
+             fill:cor('--bom'),opacity:.07},s);
+  for(let t=0;t<=mx;t+=25){
+    el('line',{x1:ML,x2:W-MR,y1:Y(t),y2:Y(t),class:'grade-l'},s);
+    el('text',{x:ML-9,y:Y(t)+4,class:'tick','text-anchor':'end'},s).textContent=t;
+  }
+  el('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'eixo-l'},s);
+  el('line',{x1:ML,x2:W-MR,y1:Y(R.tolerancia),y2:Y(R.tolerancia),class:'refl'},s);
+  /* rótulo por dentro da área do gráfico: à direita ele seria cortado pela margem
+     e disputaria espaço com o valor da ponta da linha */
+  el('text',{x:ML+7,y:Y(R.tolerancia)-7,class:'refr','text-anchor':'start'},s)
+    .textContent='TOLERÂNCIA ≤ 40';
+
+  const d=R.valores.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  el('path',{d,fill:'none',stroke:cor('--s1'),'stroke-width':2,
+             'stroke-linecap':'round','stroke-linejoin':'round'},s);
+  const u=n-1;
+  el('circle',{cx:X(u),cy:Y(R.valores[u]),r:5,fill:cor('--s1'),
+               stroke:cor('--superficie'),'stroke-width':2},s);
+  el('text',{x:X(u)+10,y:Y(R.valores[u])+4,class:'valor'},s).textContent=int(R.valores[u]);
+  el('circle',{cx:X(0),cy:Y(R.valores[0]),r:5,fill:cor('--s1'),
+               stroke:cor('--superficie'),'stroke-width':2},s);
+  el('text',{x:X(0)+2,y:Y(R.valores[0])-11,class:'valor','text-anchor':'start'},s).textContent=int(R.valores[0]);
+
+  R.meses.forEach((m,i)=>{
+    if(i%2===0) el('text',{x:X(i),y:H-MB+18,class:'tick','text-anchor':'middle'},s).textContent=m;
+  });
+  const passo=(W-ML-MR)/(n-1);
+  R.meses.forEach((m,i)=>{
+    const r=el('rect',{x:X(i)-passo/2,y:MT,width:passo,height:H-MT-MB,fill:'transparent'},s);
+    alvo(r, m, [['Índice', int(R.valores[i])+' /100'],
+                ['Tolerância', '≤ '+R.tolerancia],
+                ['Situação', R.valores[i]<=R.tolerancia?'dentro da tolerância':'acima da tolerância']]);
+  });
+  $('#viz-risco').appendChild(s);
+
+  tabela('#tab-risco','Índice de exposição a risco (0–100); menor é melhor. Tolerância ≤ 40.',
+    ['Mês',{t:'Índice',n:true},'Situação'],
+    R.meses.map((m,i)=>[m,int(R.valores[i]),
+      R.valores[i]<=R.tolerancia?'Dentro da tolerância':'Acima da tolerância']));
+}
+
+/* =====================================================================
+   EIXO 2 — alertas por tipo
+   ===================================================================== */
+function pintaAlertas(){
+  /* severidade primeiro, volume depois: num painel de risco o que é crítico
+     precisa estar no topo mesmo quando é o menor número da lista */
+  const ORDEM={critico:0,grave:1,atencao:2,bom:3};
+  const A=[...DADOS.alertas].sort((a,b)=> ORDEM[a.sev]-ORDEM[b.sev] || b.n-a.n);
+  const n=A.length;
+  const W=620,ML=268,MR=54,MT=14,MB=34,ALT=30,BARRA=18;
+  const H=MT+n*ALT+MB;
+  const s=svg(`0 0 ${W} ${H}`);
+  s.setAttribute('aria-label','Alertas em aberto por tipo de risco e severidade');
+  const mx=60;
+  const X=v=>ML+(v/mx)*(W-ML-MR);
+  for(let t=0;t<=mx;t+=20){
+    el('line',{x1:X(t),x2:X(t),y1:MT,y2:MT+n*ALT,class:'grade-l'},s);
+    el('text',{x:X(t),y:MT+n*ALT+18,class:'tick','text-anchor':'middle'},s).textContent=t;
+  }
+  el('line',{x1:ML,x2:ML,y1:MT,y2:MT+n*ALT,class:'eixo-l'},s);
+  A.forEach((a,i)=>{
+    const y=MT+i*ALT+(ALT-BARRA)/2, c=cor(ESTADO[a.sev].c);
+    el('text',{x:0,y:y+BARRA/2+4,class:'rotulo'},s).textContent=a.tipo;
+    el('path',{d:caminhoBarraH(ML,y,X(a.n)-ML,BARRA,4),fill:c},s);
+    el('text',{x:X(a.n)+9,y:y+BARRA/2+4,class:'valor'},s).textContent=int(a.n);
+    const hit=el('rect',{x:0,y:MT+i*ALT,width:W,height:ALT,fill:'transparent'},s);
+    alvo(hit,a.tipo,[['Alertas em aberto',int(a.n)],['Severidade',ESTADO[a.sev].rot]]);
+  });
+  $('#viz-alertas').appendChild(s);
+
+  legenda('#leg-alertas',['critico','grave','atencao'].map(k=>({
+    cor:cor(ESTADO[k].c), rot:ESTADO[k].rot, glifo:ESTADO[k].glifo})));
+
+  tabela('#tab-alertas','Alertas em aberto por tipo de risco. Total: '+int(A.reduce((s,a)=>s+a.n,0))+'.',
+    ['Tipo de risco',{t:'Alertas',n:true},'Severidade'],
+    A.map(a=>[esc(a.tipo),int(a.n),
+      `<span class="selo-e"><i class="pt" style="background:${cor(ESTADO[a.sev].c)}"></i>${ESTADO[a.sev].rot}</span>`]));
+}
+
+/* =====================================================================
+   EIXO 3 — maturidade (haltere: base → atual)
+   ===================================================================== */
+function pintaMaturidade(){
+  const M=DADOS.maturidade,n=M.length;
+  const W=880,ML=250,MR=70,MT=26,MB=36,ALT=38;
+  const H=MT+n*ALT+MB;
+  const s=svg(`0 0 ${W} ${H}`);
+  s.setAttribute('aria-label','Maturidade em IA por dimensão, escala 0 a 5, da linha de base ao estágio atual');
+  const X=v=>ML+(v/5)*(W-ML-MR);
+  const NIVEIS=['0 · inexistente','1 · inicial','2 · em estruturação','3 · definido','4 · gerenciado','5 · otimizado'];
+  for(let t=0;t<=5;t++){
+    el('line',{x1:X(t),x2:X(t),y1:MT-6,y2:MT+n*ALT,class:'grade-l'},s);
+    el('text',{x:X(t),y:MT+n*ALT+18,class:'tick','text-anchor':'middle'},s).textContent=t;
+  }
+  el('line',{x1:ML,x2:ML,y1:MT-6,y2:MT+n*ALT,class:'eixo-l'},s);
+
+  M.forEach((m,i)=>{
+    const y=MT+i*ALT+ALT/2;
+    el('text',{x:0,y:y+4,class:'rotulo'},s).textContent=m.dim;
+    /* haste */
+    el('line',{x1:X(m.base),x2:X(m.atual),y1:y,y2:y,
+               stroke:cor('--s1'),'stroke-width':3,'stroke-linecap':'round',opacity:.30},s);
+    /* meta */
+    el('line',{x1:X(m.meta),x2:X(m.meta),y1:y-9,y2:y+9,class:'refl'},s);
+    /* base (passo claro) e atual (passo escuro) do mesmo tom */
+    el('circle',{cx:X(m.base),cy:y,r:5.5,fill:cor('--s1-med'),
+                 stroke:cor('--superficie'),'stroke-width':2},s);
+    el('circle',{cx:X(m.atual),cy:y,r:6.5,fill:cor('--s1'),
+                 stroke:cor('--superficie'),'stroke-width':2},s);
+    el('text',{x:X(m.atual)+13,y:y+4,class:'valor'},s).textContent=num(m.atual,1);
+    const hit=el('rect',{x:0,y:MT+i*ALT,width:W,height:ALT,fill:'transparent'},s);
+    alvo(hit,m.dim,[
+      ['Linha de base',num(m.base,1)+' — '+NIVEIS[Math.round(m.base)].split(' · ')[1]],
+      ['Atual',num(m.atual,1)+' — '+NIVEIS[Math.round(m.atual)].split(' · ')[1]],
+      ['Meta do ciclo',num(m.meta,1)],
+      ['Avanço','+'+num(m.atual-m.base,1)+' nível']
+    ]);
+  });
+  el('text',{x:X(0),y:MT-13,class:'refr','text-anchor':'start'},s).textContent='0 INEXISTENTE';
+  el('text',{x:X(5),y:MT-13,class:'refr','text-anchor':'end'},s).textContent='5 OTIMIZADO';
+  $('#viz-mat').appendChild(s);
+
+  legenda('#leg-mat',[
+    {cor:cor('--s1-med'), rot:'Linha de base (diagnóstico inicial)'},
+    {cor:cor('--s1'),     rot:'Estágio atual'},
+    {cor:cor('--tinta-3'),rot:'Meta do ciclo', linha:true}
+  ]);
+
+  const media = M.reduce((s,m)=>s+m.atual,0)/n;
+  tabela('#tab-mat','Maturidade por dimensão, escala 0–5. Média atual: '+num(media,2)+'.',
+    ['Dimensão',{t:'Base',n:true},{t:'Atual',n:true},{t:'Meta',n:true},{t:'Avanço',n:true}],
+    M.map(m=>[esc(m.dim),num(m.base,1),num(m.atual,1),num(m.meta,1),'+'+num(m.atual-m.base,1)]));
+}
+
+/* =====================================================================
+   EIXO 3 — prontidão da base de dados
+   ===================================================================== */
+function pintaQualidade(){
+  const Q=DADOS.qualidade,n=Q.length;
+  const W=620,ML=176,MR=64,MT=26,MB=36,ALT=40,BARRA=11,GAP=2;
+  const H=MT+n*ALT+MB;
+  const s=svg(`0 0 ${W} ${H}`);
+  s.setAttribute('aria-label','Cobertura e completude por base de dados, em percentual');
+  const X=v=>ML+(v/100)*(W-ML-MR);
+  for(let t=0;t<=100;t+=25){
+    el('line',{x1:X(t),x2:X(t),y1:MT-6,y2:MT+n*ALT,class:'grade-l'},s);
+    el('text',{x:X(t),y:MT+n*ALT+18,class:'tick','text-anchor':'middle'},s).textContent=t+'%';
+  }
+  el('line',{x1:ML,x2:ML,y1:MT-6,y2:MT+n*ALT,class:'eixo-l'},s);
+
+  Q.forEach((q,i)=>{
+    const yTopo=MT+i*ALT+(ALT-(2*BARRA+GAP))/2;
+    el('text',{x:0,y:yTopo+BARRA+1,class:'rotulo'},s).textContent=q.base;
+    /* duas barras adjacentes, separadas pelo vão de 2px na cor da superfície */
+    el('path',{d:caminhoBarraH(ML,yTopo,X(q.cob)-ML,BARRA,4),fill:cor('--s1')},s);
+    el('path',{d:caminhoBarraH(ML,yTopo+BARRA+GAP,X(q.comp)-ML,BARRA,4),fill:cor('--s2')},s);
+    const cl = q.lat<=2?'--bom':q.lat<=7?'--atencao':q.lat<=15?'--grave':'--critico';
+    /* a marca de latência fica fora da faixa das barras: a 100% de cobertura a
+       barra chega em X(100) e o ponto encostaria nela */
+    el('circle',{cx:W-MR+11,cy:yTopo+BARRA-3,r:3.5,fill:cor(cl)},s);
+    el('text',{x:W-MR+20,y:yTopo+BARRA+1,class:'tick','text-anchor':'start',
+               fill:cor('--tinta-2')},s).textContent=q.lat+'d';
+    const hit=el('rect',{x:0,y:MT+i*ALT,width:W,height:ALT,fill:'transparent'},s);
+    alvo(hit,q.base,[['Cobertura',num(q.cob,0)+'%'],['Completude',num(q.comp,0)+'%'],
+                     ['Latência',q.lat+' dia'+(q.lat>1?'s':'')]]);
+  });
+  el('text',{x:W-2,y:MT-13,class:'refr','text-anchor':'end'},s).textContent='LATÊNCIA';
+  $('#viz-qual').appendChild(s);
+
+  legenda('#leg-qual',[
+    {cor:cor('--s1'), rot:'Cobertura (registros disponíveis via API)'},
+    {cor:cor('--s2'), rot:'Completude (campos obrigatórios preenchidos)'},
+    {cor:cor('--tinta-3'), rot:'Latência: dias desde a última carga', linha:true}
+  ]);
+
+  tabela('#tab-qual','Prontidão por base de dados.',
+    ['Base',{t:'Cobertura',n:true},{t:'Completude',n:true},{t:'Latência',n:true}],
+    Q.map(q=>[esc(q.base),num(q.cob,0)+'%',num(q.comp,0)+'%',q.lat+' d']));
+}
+
+/* =====================================================================
+   catálogo
+   ===================================================================== */
+function pintaCatalogo(){
+  const t=$('#tab-catalogo');
+  t.innerHTML =
+    '<caption>Catálogo de indicadores propostos. E = estratégia · R = risco · M = maturidade.</caption>'+
+    '<thead><tr><th>Cód.</th><th>Indicador</th><th>Fórmula</th><th>Fonte</th><th>Periodicidade</th></tr></thead>'+
+    '<tbody>'+DADOS.catalogo.map(l=>
+      '<tr>'+l.map((c,i)=>`<td${i===0?' style="font-weight:700;white-space:nowrap"':''}>${esc(c)}</td>`).join('')+'</tr>'
+    ).join('')+'</tbody>';
+}
+
+/* =====================================================================
+   tema — a escolha do leitor vence o sistema, nos dois sentidos
+   ===================================================================== */
+$('#btema').addEventListener('click', ()=>{
+  const escuroAgora = document.documentElement.dataset.tema
+    ? document.documentElement.dataset.tema === 'escuro'
+    : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.tema = escuroAgora ? 'claro' : 'escuro';
+  redesenha();
+});
+
+/* =====================================================================
+   desenho
+   ===================================================================== */
+function redesenha(){
+  ['#viz-ige','#viz-obj','#viz-arr','#viz-risco','#viz-alertas','#viz-mat','#viz-qual','#nota-arr']
+    .forEach(id=>{ const e=$(id); if(e) e.innerHTML=''; });
+  $('#ladrilhos-eixos').innerHTML=''; $('#ladrilhos-risco').innerHTML='';
+  pintaHeroi(); pintaLadrilhos(); pintaObjetivos(); pintaArrecadacao();
+  pintaMedidores('#med-exec', DADOS.execucao); pintaGovernanca();
+  pintaRisco(); pintaAlertas(); pintaMaturidade(); pintaQualidade();
+}
+redesenha();
+pintaCatalogo();
+
+/* o tema do sistema muda enquanto a página está aberta */
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{
+  if(!document.documentElement.dataset.tema) redesenha();
+});
+</script>
+</body>
+</html>

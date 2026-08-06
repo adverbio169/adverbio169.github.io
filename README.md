@@ -35,3 +35,11 @@ de trabalho e sai de lá com o nome `Painel .html` — aqui ele é renomeado, e 
 
 O painel não faz chamada a servidor externo: não usa CDN, fonte, script, mapa nem
 imagem de fora. Tudo está embutido no próprio arquivo.
+
+## O que a pasta `proposta-ia/` NÃO é
+
+`proposta-ia/` é trabalho separado — uma proposta de painel sobre inteligência
+artificial no apoio à decisão, com **dados ilustrativos**. Não faz parte da
+publicação da Comissão, não é referenciada pela `index.html` e não entra em nada
+do que está impresso. O QR Code do relatório continua levando só ao material da
+Comissão. Ver `proposta-ia/README.md`.
