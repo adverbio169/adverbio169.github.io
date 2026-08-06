@@ -209,6 +209,21 @@ code{font-family:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,monospace;
 .tag.ok{background:rgba(12,163,12,.13);color:var(--bom-txt)}
 .tag.ver{background:rgba(250,178,25,.16);color:var(--aviso-txt,#8a5d00)}
 
+/* ---------------------------------------------------------------------
+   MARCA DE DADO ILUSTRATIVO
+   O aviso do topo some assim que alguém rola a página — e um print do
+   meio da tela vira "dado da SEFAZ" com o brasão do Estado em cima.
+   Por isso a marca vai em CADA cartão: nenhum recorte da tela consegue
+   deixá-la de fora. Some quando os números forem reais (ver README).
+   --------------------------------------------------------------------- */
+.cartao::before,.heroi::before,.ladrilho::before,.fonte::before{
+  content:"● Números ilustrativos";
+  display:block;grid-column:1/-1;
+  font-size:9.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--aviso-txt,#8a5d00);margin-bottom:10px;
+}
+.ladrilho::before{font-size:9px;margin-bottom:7px}
+
 /* ---------- rodapé ---------- */
 footer{margin-top:44px;padding:26px 0 40px;border-top:1px solid var(--linha);
        font-size:12.5px;color:var(--tinta-3)}
