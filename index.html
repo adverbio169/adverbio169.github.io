@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Comissão Mista do Subsídio dos Militares Estaduais &middot; Roraima</title>
 <meta name="description" content="Painel de inteligência estratégica, relatório final e planilha de dados da Comissão Mista de Estudo do Subsídio dos Militares Estaduais de Roraima.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1626'/%3E%3Cpath d='M16 6l2.4 6.2 6.6.4-5.1 4.2 1.7 6.4L16 19.6l-5.6 3.6 1.7-6.4-5.1-4.2 6.6-.4z' fill='%23c9a24b'/%3E%3C/svg%3E">
 <script>
 /* ===========================================================================
    MUDANÇA DE ENDEREÇO — leia antes de editar qualquer coisa nesta página.
@@ -23,55 +24,231 @@ var DESTINO = "";
 if (DESTINO) { location.replace(DESTINO); }
 </script>
 <style>
-  :root { --navy:#12233f; --ouro:#b8892b; --papel:#f7f5f0; --tinta:#22304a; --cinza:#5c6473; }
+  /* ---- fundação ------------------------------------------------------- */
+  :root{
+    --navy-900:#081120; --navy-800:#0b1626; --navy-700:#122036; --navy-600:#1a2c48;
+    --ouro:#c9a24b; --ouro-claro:#e8c87e; --ouro-escuro:#9a7326;
+    --papel:#f6f4ee; --branco:#ffffff; --tinta:#1d2a42; --cinza:#5d6678;
+    --linha:#e6e0d2; --sombra:18,35,63;
+    --serif:Georgia,"Times New Roman",Times,serif;
+    --sans:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+  }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--papel);color:var(--tinta);font-family:"Segoe UI",system-ui,Arial,sans-serif;
-       line-height:1.5;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:28px}
-  .cartao{max-width:660px;width:100%;background:#fff;border:1px solid #ddd7c9;border-radius:12px;
-          overflow:hidden;box-shadow:0 10px 30px rgba(18,35,63,.07)}
-  .topo{background:var(--navy);color:#fff;padding:26px 30px}
-  .topo .selo{font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:var(--ouro);font-weight:800}
-  .topo h1{font-size:23px;line-height:1.25;margin-top:8px;font-weight:700}
-  .topo .dec{font-size:12.5px;color:#c9d2e0;margin-top:8px}
-  .corpo{padding:26px 30px 30px}
-  .corpo p{font-size:15.5px;color:var(--cinza);margin-bottom:20px}
-  a.btn{display:flex;align-items:center;gap:14px;text-decoration:none;color:var(--tinta);
-        border:1px solid #ddd7c9;border-radius:9px;padding:14px 16px;margin-bottom:10px;background:#fff}
-  a.btn:hover{border-color:var(--ouro);background:#fdfbf6}
-  a.btn.pri{background:var(--navy);border-color:var(--navy);color:#fff}
-  a.btn.pri:hover{background:#1b3055}
-  a.btn .ico{font-size:22px;line-height:1}
-  a.btn .txt{display:flex;flex-direction:column}
-  a.btn .txt b{font-size:15.5px;font-weight:700}
-  a.btn .txt span{font-size:12.5px;color:var(--cinza)}
-  a.btn.pri .txt span{color:#c9d2e0}
-  .pe{margin-top:18px;font-size:12.5px;color:var(--cinza);border-top:1px solid #eee7da;padding-top:14px}
+  html{scroll-behavior:smooth}
+  body{background:var(--papel);color:var(--tinta);font-family:var(--sans);
+       line-height:1.55;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  ::selection{background:var(--ouro);color:var(--navy-900)}
+
+  /* ---- hero ------------------------------------------------------------ */
+  .hero{position:relative;overflow:hidden;background:var(--navy-800);color:#eef2f9;
+        padding:clamp(64px,10vh,120px) 24px clamp(120px,16vh,180px);isolation:isolate}
+  /* aurora: dois halos que respiram lentamente atrás do conteúdo */
+  .hero::before,.hero::after{content:"";position:absolute;z-index:-1;border-radius:50%;
+        filter:blur(90px);opacity:.55;pointer-events:none}
+  .hero::before{width:60vmax;height:60vmax;left:-18vmax;top:-30vmax;
+        background:radial-gradient(closest-side,#24406e,transparent 70%);
+        animation:deriva 26s ease-in-out infinite alternate}
+  .hero::after{width:44vmax;height:44vmax;right:-14vmax;bottom:-26vmax;
+        background:radial-gradient(closest-side,rgba(201,162,75,.38),transparent 70%);
+        animation:deriva 32s ease-in-out infinite alternate-reverse}
+  @keyframes deriva{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(6vmax,4vmax,0) scale(1.12)}}
+  /* trama fina de pontos, como papel-moeda */
+  .hero .trama{position:absolute;inset:0;z-index:-1;opacity:.5;pointer-events:none;
+        background-image:radial-gradient(rgba(232,200,126,.13) 1px,transparent 1.4px);
+        background-size:26px 26px}
+
+  .hero-inner{max-width:880px;margin:0 auto;text-align:center}
+  .selo{display:inline-flex;align-items:center;gap:12px;font-size:11.5px;font-weight:700;
+        letter-spacing:.34em;text-transform:uppercase;color:var(--ouro-claro)}
+  .selo::before,.selo::after{content:"";height:1px;width:44px;
+        background:linear-gradient(90deg,transparent,var(--ouro));display:inline-block}
+  .selo::after{background:linear-gradient(270deg,transparent,var(--ouro))}
+
+  .estrela{width:46px;height:46px;margin:26px auto 4px;display:block;color:var(--ouro);
+        filter:drop-shadow(0 0 18px rgba(201,162,75,.45))}
+
+  h1{font-family:var(--serif);font-weight:400;color:#fff;
+     font-size:clamp(34px,5.4vw,58px);line-height:1.14;letter-spacing:-.01em;
+     margin:18px auto 0;max-width:17em;text-wrap:balance}
+  h1 em{font-style:italic;color:var(--ouro-claro)}
+
+  .decreto{margin-top:22px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;
+        color:#93a3bd}
+  .decreto b{color:#c6d2e4;font-weight:600}
+
+  .lede{margin:26px auto 0;max-width:34em;font-size:clamp(15.5px,1.9vw,18px);
+        color:#b9c6da;line-height:1.7}
+
+  .filete{width:120px;height:22px;margin:34px auto 0;display:block;color:var(--ouro);opacity:.9}
+
+  /* entrada em cena, escalonada */
+  .sobe{opacity:0;transform:translateY(22px);
+        animation:sobe .9s cubic-bezier(.16,1,.3,1) forwards}
+  .d1{animation-delay:.05s}.d2{animation-delay:.16s}.d3{animation-delay:.27s}
+  .d4{animation-delay:.38s}.d5{animation-delay:.49s}.d6{animation-delay:.60s}
+  @keyframes sobe{to{opacity:1;transform:none}}
+
+  /* ---- documentos (cartões sobrepondo o hero) --------------------------- */
+  .docs{position:relative;max-width:880px;margin:clamp(-96px,-12vh,-72px) auto 0;
+        padding:0 24px;display:grid;gap:16px;z-index:2}
+  .doc{display:grid;grid-template-columns:64px 1fr auto auto;align-items:center;gap:20px;
+       background:var(--branco);border:1px solid var(--linha);border-radius:16px;
+       padding:22px 26px;text-decoration:none;color:var(--tinta);
+       box-shadow:0 1px 2px rgba(var(--sombra),.05),0 12px 32px rgba(var(--sombra),.08);
+       transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .35s ease}
+  .doc:hover,.doc:focus-visible{transform:translateY(-4px);border-color:var(--ouro);
+       box-shadow:0 2px 4px rgba(var(--sombra),.06),0 24px 56px rgba(var(--sombra),.16)}
+  .doc:focus-visible{outline:2px solid var(--ouro);outline-offset:3px}
+  .doc .quadro{width:64px;height:64px;border-radius:14px;display:grid;place-items:center;
+       background:linear-gradient(150deg,#fdf9ef,#f3ead2);border:1px solid #eadfc2;color:var(--ouro-escuro)}
+  .doc .quadro svg{width:30px;height:30px}
+  .doc h2{font-family:var(--serif);font-weight:600;font-size:20px;letter-spacing:-.01em}
+  .doc p{font-size:14px;color:var(--cinza);margin-top:3px}
+  .doc .tag{font-size:10.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+       color:var(--ouro-escuro);border:1px solid #e3d5ae;background:#faf5e7;
+       padding:4px 10px;border-radius:99px;white-space:nowrap;justify-self:end}
+  .doc .seta{justify-self:end;color:#b9b2a0;transition:transform .35s ease,color .35s ease}
+  .doc:hover .seta{transform:translateX(5px);color:var(--ouro-escuro)}
+
+  /* cartão principal: invertido, em navy, com brilho varrendo no hover */
+  .doc.pri{position:relative;overflow:hidden;background:linear-gradient(135deg,var(--navy-700),var(--navy-800));
+       border-color:var(--navy-600);color:#eef2f9}
+  .doc.pri h2{color:#fff}
+  .doc.pri p{color:#a9b8cf}
+  .doc.pri .quadro{background:linear-gradient(150deg,rgba(201,162,75,.22),rgba(201,162,75,.08));
+       border-color:rgba(201,162,75,.4);color:var(--ouro-claro)}
+  .doc.pri .tag{color:var(--ouro-claro);border-color:rgba(201,162,75,.45);background:rgba(201,162,75,.12)}
+  .doc.pri .seta{color:#7e8fa9}
+  .doc.pri:hover .seta{color:var(--ouro-claro)}
+  .doc.pri::after{content:"";position:absolute;top:0;bottom:0;left:-70%;width:45%;
+       background:linear-gradient(105deg,transparent,rgba(232,200,126,.14),transparent);
+       transform:skewX(-18deg);transition:left .7s ease}
+  .doc.pri:hover::after{left:130%}
+
+  /* ---- rodapé ------------------------------------------------------------ */
+  .pe{max-width:880px;margin:0 auto;padding:44px 24px 56px;text-align:center}
+  .pe .nota{display:inline-flex;align-items:center;gap:10px;font-size:13.5px;color:var(--cinza)}
+  .pe .nota svg{width:17px;height:17px;color:var(--ouro-escuro);flex:none}
+  .pe .fecho{margin-top:26px;font-size:11px;letter-spacing:.3em;text-transform:uppercase;
+       color:#a8a291;display:flex;align-items:center;justify-content:center;gap:16px}
+  .pe .fecho::before,.pe .fecho::after{content:"";height:1px;width:56px;background:var(--linha)}
+
+  /* ---- responsivo e acessibilidade -------------------------------------- */
+  @media (max-width:600px){
+    .doc{grid-template-columns:52px 1fr;padding:18px 18px}
+    .doc .quadro{width:52px;height:52px;border-radius:12px}
+    .doc .quadro svg{width:25px;height:25px}
+    .doc .tag{display:none}
+    .doc .seta{display:none}
+    .doc h2{font-size:17.5px}
+    .doc p{font-size:13px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .hero::before,.hero::after{animation:none}
+    .sobe{animation:none;opacity:1;transform:none}
+    .doc,.doc .seta,.doc.pri::after{transition:none}
+    html{scroll-behavior:auto}
+  }
 </style>
 </head>
 <body>
-  <main class="cartao">
-    <div class="topo">
-      <div class="selo">Governo do Estado de Roraima</div>
-      <h1>Comissão Mista de Estudo do Subsídio dos Militares Estaduais</h1>
-      <div class="dec">Decreto nº 40.811-E, de 1º de junho de 2026 &middot; DOERR nº 5.176</div>
-    </div>
-    <div class="corpo">
-      <p>Todo o material do estudo, em acesso aberto: o painel interativo com os dados
-         apurados, o relatório final e a planilha de conferência.</p>
-      <a class="btn pri" href="painel.html">
-        <span class="ico" aria-hidden="true">&#128202;</span>
-        <span class="txt"><b>Abrir o painel interativo</b>
-        <span>dados das 27 unidades da federação, gráficos e cenários</span></span></a>
-      <a class="btn" href="Relatorio_Final_Comissao_Subsidio_2026.pdf">
-        <span class="ico" aria-hidden="true">&#128196;</span>
-        <span class="txt"><b>Relatório final</b><span>PDF</span></span></a>
-      <a class="btn" href="Planilha_Companheira_Subsidio_PMRR.xlsx">
-        <span class="ico" aria-hidden="true">&#128200;</span>
-        <span class="txt"><b>Planilha companheira</b>
-        <span>XLSX &middot; uma aba por elemento do relatório</span></span></a>
-      <div class="pe">O painel funciona sem conexão depois de aberto: não usa servidor,
-        banco de dados nem serviço externo.</div>
-    </div>
-  </main>
+
+<header class="hero">
+  <div class="trama" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <p class="selo sobe d1">Governo do Estado de Roraima</p>
+
+    <svg class="estrela sobe d2" viewBox="0 0 46 46" fill="none" aria-hidden="true">
+      <path d="M23 4l4.2 11 11.8.7-9.2 7.5 3 11.4L23 28.3l-9.8 6.3 3-11.4L7 15.7l11.8-.7z"
+            fill="currentColor"/>
+      <circle cx="23" cy="23" r="21" stroke="currentColor" stroke-opacity=".35" stroke-width="1"/>
+    </svg>
+
+    <h1 class="sobe d3">Comissão Mista de Estudo do <em>Subsídio dos Militares Estaduais</em></h1>
+
+    <p class="decreto sobe d4"><b>Decreto nº 40.811-E</b>, de 1º de junho de 2026 &nbsp;&middot;&nbsp; DOERR nº 5.176</p>
+
+    <p class="lede sobe d5">Todo o material do estudo, em acesso aberto: o painel interativo
+       com os dados apurados nas 27 unidades da federação, o relatório final e a
+       planilha de conferência.</p>
+
+    <svg class="filete sobe d6" viewBox="0 0 120 22" fill="none" aria-hidden="true">
+      <path d="M2 11h38M80 11h38" stroke="currentColor" stroke-width="1"/>
+      <path d="M60 3l3.5 5.4L69 11l-5.5 2.6L60 19l-3.5-5.4L51 11l5.5-2.6z" fill="currentColor"/>
+    </svg>
+  </div>
+</header>
+
+<nav class="docs" aria-label="Documentos do estudo">
+
+  <a class="doc pri sobe d4" href="painel.html">
+    <span class="quadro" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 20h18"/><path d="M6 20V12"/><path d="M11 20V7"/><path d="M16 20v-9"/><path d="M21 20V4"/>
+      </svg>
+    </span>
+    <span>
+      <h2>Painel interativo</h2>
+      <p>Dados das 27 unidades da federação, gráficos e cenários de reajuste</p>
+    </span>
+    <span class="tag">Recomendado</span>
+    <svg class="seta" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6"/>
+    </svg>
+  </a>
+
+  <a class="doc sobe d5" href="Relatorio_Final_Comissao_Subsidio_2026.pdf">
+    <span class="quadro" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/>
+        <path d="M14 2v5h5"/><path d="M9 13h6M9 17h6"/>
+      </svg>
+    </span>
+    <span>
+      <h2>Relatório final</h2>
+      <p>Documento completo da Comissão, com metodologia e conclusões</p>
+    </span>
+    <span class="tag">PDF</span>
+    <svg class="seta" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6"/>
+    </svg>
+  </a>
+
+  <a class="doc sobe d6" href="Planilha_Companheira_Subsidio_PMRR.xlsx">
+    <span class="quadro" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
+      </svg>
+    </span>
+    <span>
+      <h2>Planilha companheira</h2>
+      <p>Dados de conferência &middot; uma aba por elemento do relatório</p>
+    </span>
+    <span class="tag">XLSX</span>
+    <svg class="seta" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6"/>
+    </svg>
+  </a>
+
+</nav>
+
+<footer class="pe">
+  <p class="nota">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>
+    </svg>
+    O painel funciona sem conexão depois de aberto: não usa servidor, banco de dados nem serviço externo.
+  </p>
+  <p class="fecho">Acesso aberto &middot; Roraima &middot; 2026</p>
+</footer>
+
 </body>
 </html>
