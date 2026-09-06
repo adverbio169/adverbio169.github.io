@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O desenho da Vitória</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px; padding: 28px 16px;
+    background: #efedE8; color: #33313a;
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  }
+  h1 { margin: 0; font-size: 1.5rem; font-weight: 600; text-align: center; }
+  p  { margin: 0; font-size: .95rem; color: #6b6875; text-align: center; }
+  video {
+    width: min(92vw, 480px); border-radius: 14px; background: #fff;
+    box-shadow: 0 10px 30px rgba(60, 55, 45, .22);
+  }
+  a { color: #b3223f; }
+</style>
+</head>
+<body>
+  <h1>O desenho da Vitória</h1>
+  <video controls autoplay muted loop playsinline poster="capa.png">
+    <source src="desenho-da-vitoria.mp4" type="video/mp4">
+    Seu navegador não reproduz vídeo. <a href="desenho-da-vitoria.mp4">Baixe o vídeo</a>.
+  </video>
+  <p>O desenho sendo feito traço a traço — e depois ganhando vida.<br>
+     <a href="desenho-da-vitoria.mp4" download>Baixar o vídeo (MP4)</a></p>
+</body>
+</html>
