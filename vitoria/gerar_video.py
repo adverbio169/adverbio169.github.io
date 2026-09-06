@@ -105,9 +105,9 @@ PARTS = [
 
 GAP = 0.12          # respiro entre um traco e outro
 T_TITLE = 1.35      # titulo aparecendo
-T_PAUSE = 0.75      # pausa depois do desenho pronto
-T_ALIVE = 7.2       # desenho "ganhando vida"
-T_END = 1.4         # respiro final
+T_PAUSE = 0.40      # pausa depois do desenho pronto
+T_ALIVE = 8.0       # desenho "ganhando vida"
+T_END = 1.0         # respiro final
 
 T_DRAW0 = T_TITLE
 DRAW_LEN = sum(p["dur"] + GAP for p in PARTS)
