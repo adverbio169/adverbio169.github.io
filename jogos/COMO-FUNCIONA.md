@@ -205,3 +205,26 @@ jogo, mude `aviao.html` e rode o script — `tv.html` acompanha. As bibliotecas
 
 **Mais controles** é o próximo passo natural: a sala já aceita conexões; o que
 falta é a TV manter um avião por conexão e o jogo desenhar todos.
+
+### Qualquer TV: os três caminhos, do melhor para o pior
+
+Não existe **um** mecanismo que alcance toda TV — cada fabricante escolheu o seu.
+Então o `aviao-tv.html` cobre os três, e o que estiver disponível aparece:
+
+**1. Chromecast embutido** (Google TV, Android TV, Chromecast na HDMI, a maioria
+das TCL, Sony, Philips). O botão *Enviar o jogo para a TV* aparece sozinho no
+celular, a TV abre o jogo e o celular vira controle. Sem código, sem digitar.
+É o caminho bom.
+
+**2. Navegador da própria TV** (Samsung, LG e qualquer TV com browser). A TV
+abre a página como tela; o celular entra pelo código. Digitar endereço no
+controle remoto é ruim, e por isso existe a pasta `jogos/tv/`: o endereço fica
+`…/jogos/tv/` em vez de `…/jogos/aviao-tv.html?papel=tela`. A sala mostra esse
+endereço curto na própria tela, para ler de longe.
+
+**3. Espelhamento** (Smart View, Miracast, AirPlay). Funciona em quase tudo, mas
+a TV vira um espelho do celular: o jogo e o controle ficam na mesma imagem, e
+sobra o atraso do espelhamento. É o plano C.
+
+Os três dependem de a página estar num endereço que a TV alcance — só o
+espelhamento dispensa isso.

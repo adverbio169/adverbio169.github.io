@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Avião &middot; tela</title>
+<!-- ===========================================================================
+     ENDEREÇO CURTO PARA DIGITAR NO CONTROLE DA TV.
+
+     Digitar ".../jogos/aviao-tv.html?papel=tela" com o controle remoto é uma
+     tortura. Esta pasta existe só para o endereço virar
+
+         .../jogos/tv/
+
+     que dá para digitar com o D-pad sem perder a paciência. Ela manda para a
+     página de verdade, já no papel de tela.
+     ======================================================================== -->
+<meta http-equiv="refresh" content="0; url=../aviao-tv.html?papel=tela">
+<script>
+  // leva junto o que vier no endereço (por exemplo ?servidor=ip:porta)
+  var extra = location.search.replace(/^\?/, '');
+  location.replace('../aviao-tv.html?papel=tela' + (extra ? '&' + extra : ''));
+</script>
+<style>
+  body{background:#0b1020;color:#e6edf9;font-family:system-ui,Arial,sans-serif;
+       display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-size:22px}
+  a{color:#ffc24d}
+</style>
+</head>
+<body>
+  <p>Abrindo o jogo… <a href="../aviao-tv.html?papel=tela">toque aqui se não abrir sozinho</a>.</p>
+</body>
+</html>

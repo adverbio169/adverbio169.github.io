@@ -64,7 +64,8 @@
   #salaCartao{max-width:900px;display:grid;grid-template-columns:1fr auto;gap:34px;align-items:center;margin:auto}
   @media (max-width:820px){ #salaCartao{grid-template-columns:1fr} }
   .codigao{font:800 clamp(56px,10vw,126px)/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.2em;color:#ffc24d;margin:8px 0 12px}
-  .url{font:600 12.5px ui-monospace,Menlo,Consolas,monospace;color:#8fb7ff;word-break:break-all}
+  .url{font:600 clamp(13px,1.6vw,22px)/1.45 ui-monospace,Menlo,Consolas,monospace;color:#8fb7ff;word-break:break-all}
+  @media (min-width:1000px){ #sala .txt{font-size:19px} #sala .estado{font-size:16px} #sala .pe{font-size:15px} }
   #qr{width:min(36vw,280px);height:min(36vw,280px);background:#fff;border-radius:14px;padding:12px;display:none}
   #qr.ver{display:block}
 
@@ -182,8 +183,9 @@
       <div class="selo">Avião &middot; o celular é o controle</div>
       <h1>No celular, abra esta mesma página e digite o código</h1>
       <div class="codigao" id="codigo">····</div>
-      <div class="txt" style="margin-bottom:6px">Endereço, para digitar ou ler no QR:</div>
+      <div class="txt" style="margin-bottom:6px">Endereço do controle, para digitar no celular ou ler no QR:</div>
       <div class="url" id="url">…</div>
+      <div class="txt" id="urlTv" style="margin-top:14px;display:none"></div>
       <div class="estado meio2" id="estado" style="margin-top:16px"><span class="luz"></span><span id="estadoTxt">abrindo a sala…</span></div>
       <div class="pe" style="margin-top:16px">Sem celular: <kbd>setas</kbd> voam, <kbd>Enter</kbd> começa, <kbd>F</kbd> tela cheia.</div>
     </div>
@@ -489,6 +491,15 @@ function abrirSala(){
     $('codigo').textContent = codigo; $('codigo2').textContent = codigo; $('codigo3').textContent = codigo;
     const url = urlDoControle();
     $('url').textContent = url;
+    // endereço curto desta mesma tela, para digitar no navegador de outra TV
+    if (/^https?:/.test(location.protocol)){
+      const t = new URL(location.href);
+      t.search = ''; t.hash = '';
+      t.pathname = t.pathname.replace(/[^/]*$/, 'tv/');
+      $('urlTv').innerHTML = 'Para abrir esta tela no navegador de uma TV: <b>' +
+                             t.href.replace(/^https?:\/\//, '') + '</b>';
+      $('urlTv').style.display = 'block';
+    }
     if (/^https?:/.test(location.protocol)){ desenhaQR($('qr'), url); $('qr').classList.add('ver'); }
     estado('meio2', 'esperando o controle…');
   });
