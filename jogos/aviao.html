@@ -51,6 +51,15 @@
   .estado.ok .luz{background:#5eff9a;box-shadow:0 0 9px #5eff9a}
   .estado.nao{color:#ffc9c9;border-color:rgba(255,90,90,.3)}
   .estado.nao .luz{background:#ff6a6a}
+  /* quando a página está dentro de uma moldura que bloqueia o sensor, este
+     botão abre a mesma página direto no navegador, onde o sensor é liberado */
+  a.fora{display:none;align-items:center;justify-content:center;gap:8px;text-decoration:none;
+         border-radius:12px;padding:13px 16px;font-size:14.5px;font-weight:800;margin-bottom:10px;
+         background:#ffc24d;color:#1a1400}
+  a.fora.ver{display:flex}
+  .foraUrl{display:none;font-size:11px;color:#9fb1cf;word-break:break-all;margin:-4px 0 10px;
+           border:1px dashed rgba(255,255,255,.18);border-radius:8px;padding:7px 9px;user-select:all;-webkit-user-select:all}
+  .foraUrl.ver{display:block}
   button.bt{padding:10px 14px;font-size:14px;margin-bottom:6px}
     .pe{font-size:10.5px;margin-top:8px;padding-top:8px;line-height:1.4}
     .placar{font-size:13px;line-height:1.45;margin-bottom:9px}
@@ -108,6 +117,8 @@
       <span id="estadoTxt">verificando o sensor&hellip;</span>
       <span class="medidor"><i id="estadoBarra"></i></span>
     </div>
+    <a class="fora" id="fora" href="#" target="_blank" rel="noopener">Abrir fora da moldura, no navegador &#8599;</a>
+    <div class="foraUrl" id="foraUrl"></div>
     <button class="bt pri" id="btSensor">Voar com a inclinação do celular</button>
     <button class="bt sec" id="btToque">Voar arrastando o dedo na tela</button>
     <div class="pe" id="pe">
@@ -720,8 +731,26 @@ Controle.escutar();
 const elEstado = document.getElementById('estado');
 const elEstadoTxt = document.getElementById('estadoTxt');
 const elEstadoBarra = document.getElementById('estadoBarra');
+const elFora = document.getElementById('fora');
+const elForaUrl = document.getElementById('foraUrl');
 setInterval(() => {
   if (capa.style.display === 'none') return;
+  // A página está numa moldura (iframe) que não libera o sensor? O navegador
+  // sabe responder isso antes mesmo de tentarmos ler alguma coisa.
+  const politica = document.permissionsPolicy || document.featurePolicy;
+  const molduraBloqueia = !!(politica && politica.allowsFeature &&
+      (!politica.allowsFeature('accelerometer') || !politica.allowsFeature('gyroscope')));
+  if (molduraBloqueia && !Controle.respondendo()){
+    elEstado.className = 'estado nao';
+    elEstadoTxt.textContent = 'a moldura desta página bloqueia o sensor';
+    if (location.protocol === 'https:' && window.top !== window){
+      elFora.href = location.href;
+      elFora.classList.add('ver');
+      elForaUrl.textContent = location.href;
+      elForaUrl.classList.add('ver');
+    }
+    return;
+  }
   if (!Controle.temSensor()){
     elEstado.className = 'estado nao';
     elEstadoTxt.textContent = 'este navegador não tem sensor de inclinação';
