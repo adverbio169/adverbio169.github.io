@@ -228,3 +228,22 @@ sobra o atraso do espelhamento. É o plano C.
 
 Os três dependem de a página estar num endereço que a TV alcance — só o
 espelhamento dispensa isso.
+
+### Testar sem publicar: `servir.py`
+
+O sensor exige `https`. Para testar na sua rede sem publicar nada, rode no
+computador, dentro desta pasta:
+
+```
+python3 servir.py          (no Windows costuma ser:  py servir.py)
+```
+
+Ele serve esta pasta por https com um certificado caseiro e imprime o endereço,
+tipo `https://192.168.0.15:8443/aviao-tv.html`. Abra no computador (vira a tela)
+e o mesmo endereço no celular (vira o controle). O celular vai avisar que "a
+conexão não é particular" — é esperado, o certificado não tem quem o assine;
+toque em *Avançado* → *Continuar*. Nada sai da sua rede.
+
+O que **não** funciona por esse caminho é o botão de enviar para a TV: o
+Chromecast não aceita certificado caseiro. Para ele, a página precisa estar num
+endereço https de verdade.
