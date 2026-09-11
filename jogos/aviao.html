@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>Avião &middot; o celular é o manche</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#0b1020;color:#fff;
+            font-family:system-ui,"Segoe UI",Arial,sans-serif;overscroll-behavior:none;touch-action:none}
+  #tela{display:block;width:100%;height:100%}
+
+  #hud{position:fixed;inset:0;pointer-events:none;padding:calc(10px + env(safe-area-inset-top)) 14px}
+  .caixa{position:absolute;background:rgba(8,12,26,.5);border:1px solid rgba(255,255,255,.14);
+         border-radius:10px;padding:7px 11px;backdrop-filter:blur(6px);line-height:1.15}
+  .rot{font-size:9.5px;letter-spacing:1.6px;text-transform:uppercase;color:#9fb4d8;font-weight:700}
+  .val{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
+  .val small{font-size:11px;font-weight:600;color:#9fb4d8;margin-left:2px}
+  #cArg{top:calc(10px + env(safe-area-inset-top));left:14px}
+  #cTempo{top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);text-align:center}
+  #cAlt{top:calc(10px + env(safe-area-inset-top));right:14px;text-align:right}
+  #cTempo.pouco .val{color:#ff6a6a}
+  #recorde{position:absolute;top:calc(74px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+           font-size:11px;color:#9fb4d8;text-align:center;width:100%}
+  #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;font-size:30px;font-weight:900;
+         letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
+
+  #capa{position:fixed;inset:0;background:linear-gradient(170deg,#101a33,#070b16 70%);
+        display:flex;align-items:flex-start;justify-content:center;overflow:auto;
+        padding:22px calc(22px + env(safe-area-inset-right)) calc(22px + env(safe-area-inset-bottom))
+                calc(22px + env(safe-area-inset-left))}
+  .cartao{width:100%;max-width:430px;margin:auto;background:rgba(255,255,255,.04);
+          border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:24px 22px}
+  /* celular deitado sobra pouca altura: encolhe tudo para caber sem rolar */
+  @media (max-height:470px){
+    #capa{padding:9px 14px}
+    .cartao{padding:14px 16px;border-radius:14px}
+    .selo{font-size:9px}
+    h1{font-size:19px;margin:5px 0 7px}
+    .txt{font-size:12.5px;line-height:1.42;margin-bottom:9px}
+    button.bt{padding:10px 14px;font-size:14px;margin-bottom:6px}
+    .pe{font-size:10.5px;margin-top:8px;padding-top:8px;line-height:1.4}
+    .placar{font-size:13px;line-height:1.45;margin-bottom:9px}
+    #erro{font-size:11.5px;padding:8px 10px;margin-bottom:9px}
+  }
+  /* tela ainda mais baixa: o rodapé é só informação extra, sai da frente */
+  @media (max-height:395px){ .pe{display:none} }
+  .selo{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;color:#5cc8ff;font-weight:800}
+  h1{font-size:26px;line-height:1.15;margin:8px 0 10px;font-weight:800}
+  .txt{font-size:14px;color:#aebbd4;line-height:1.55;margin-bottom:16px}
+  .txt b{color:#e6edf9}
+  button.bt{display:block;width:100%;border:0;border-radius:12px;padding:15px 16px;font-size:15.5px;
+            font-weight:800;font-family:inherit;margin-bottom:10px;cursor:pointer}
+  .bt.pri{background:#2d7dff;color:#fff}
+  .bt.sec{background:rgba(255,255,255,.09);color:#dce5f5;border:1px solid rgba(255,255,255,.16);font-weight:700}
+  .pe{font-size:12px;color:#7d8cab;margin-top:14px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px;line-height:1.5}
+  #erro{display:none;background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.35);border-radius:10px;
+        padding:11px 13px;font-size:13px;color:#ffc9c9;margin-bottom:14px;line-height:1.5}
+  .placar{font-size:15px;color:#e6edf9;margin-bottom:16px;line-height:1.7}
+  .placar span{color:#5cc8ff;font-weight:800}
+</style>
+</head>
+<body>
+
+<canvas id="tela"></canvas>
+
+<div id="hud">
+  <div class="caixa" id="cArg"><div class="rot">Argolas</div><div class="val" id="vArg">0</div></div>
+  <div class="caixa" id="cTempo"><div class="rot">Combustível</div><div class="val"><span id="vTempo">30</span><small>s</small></div></div>
+  <div class="caixa" id="cAlt"><div class="rot">Altitude</div><div class="val"><span id="vAlt">0</span><small>m</small></div></div>
+  <div id="recorde">recorde: <b id="vRec">0</b> argolas</div>
+  <div id="aviso"></div>
+</div>
+
+<div id="capa">
+  <div class="cartao">
+    <div class="selo">Jogo 2 &middot; sensor de inclinação</div>
+    <h1 id="tit">O celular é o manche</h1>
+    <div id="erro"></div>
+    <div class="placar" id="placar" style="display:none"></div>
+    <div class="txt" id="expl">
+      Segure o celular <b>deitado</b>. A posição da sua mão ao começar já é o
+      <b>voo reto</b>. <b>Girar de lado</b> inclina as asas e vira;
+      <b>puxar a borda de cima</b> levanta o nariz. Atravesse as <b>argolas</b>
+      para ganhar combustível.
+    </div>
+    <button class="bt pri" id="btSensor">Voar com a inclinação do celular</button>
+    <button class="bt sec" id="btToque">Voar arrastando o dedo na tela</button>
+    <div class="pe" id="pe">
+      No computador: setas <b>← → ↑ ↓</b>.<br>
+      O sensor só funciona em endereço <b>https</b> — pelo GitHub Pages funciona.
+    </div>
+  </div>
+</div>
+
+<script>
+/* =============================================================================
+   AVIÃO — voo em perspectiva, controlado pela rotação do celular.
+   Arquivo único, sem biblioteca nenhuma.
+
+   A PARTE 1 (Controle) é EXATAMENTE a mesma do jogo da corrida, de propósito:
+   é o pedaço que dá para copiar e colar em qualquer outro jogo.
+   ========================================================================== */
+
+
+/* =============================================================================
+   PARTE 1 — CONTROLE: a inclinação do aparelho
+
+       beta   = inclinação da frente para trás (levantar a borda de cima)
+       gamma  = inclinação de um lado para o outro (baixar a borda direita)
+       alpha  = giro tipo bússola — não usamos, é instável
+
+   eixos() converte beta/gamma (medidos em relação ao APARELHO) para os eixos
+   da TELA, olhando para screen.orientation.angle. Sem isso, o controle vira do
+   avesso quando a pessoa deita o celular.
+   ========================================================================== */
+const Controle = {
+  modo: 'nenhum',
+  volante: 0, manche: 0,
+  zeroVolante: 0, zeroManche: 0,
+  recebeu: false,
+  _volanteBruto: 0, _mancheBruto: 0,
+
+  temSensor(){ return typeof DeviceOrientationEvent !== 'undefined'; },
+  precisaPermissao(){
+    return this.temSensor() && typeof DeviceOrientationEvent.requestPermission === 'function';
+  },
+
+  async ligarSensor(){
+    if (!this.temSensor()) throw new Error('Este navegador não expõe o sensor de inclinação.');
+    if (this.precisaPermissao()){
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== 'granted') throw new Error('Permissão de movimento negada. Em Ajustes ▸ Safari, ligue "Movimento e orientação".');
+    }
+    window.addEventListener('deviceorientation', this._ler, true);
+    this.modo = 'sensor';
+    await new Promise((ok, falha) => {
+      const t0 = Date.now();
+      const olha = () => {
+        if (this.recebeu) return ok();
+        if (Date.now() - t0 > 1200){
+          window.removeEventListener('deviceorientation', this._ler, true);
+          this.modo = 'nenhum';
+          return falha(new Error('O aparelho não enviou nenhuma leitura de inclinação. Use o controle por toque.'));
+        }
+        requestAnimationFrame(olha);
+      };
+      olha();
+    });
+    this.calibrar();
+  },
+
+  _ler: (e) => {
+    if (e.beta === null && e.gamma === null) return;
+    const a = Controle.eixos(e.beta || 0, e.gamma || 0);
+    Controle._volanteBruto = a.volante;
+    Controle._mancheBruto  = a.manche;
+    Controle.volante = a.volante - Controle.zeroVolante;
+    Controle.manche  = a.manche  - Controle.zeroManche;
+    Controle.recebeu = true;
+  },
+
+  eixos(beta, gamma){
+    const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    switch (ang){
+      case 90:            return { volante:  beta,  manche: -gamma };
+      case -90: case 270: return { volante: -beta,  manche:  gamma };
+      case 180:           return { volante: -gamma, manche: -beta  };
+      default:            return { volante:  gamma, manche:  beta  };
+    }
+  },
+
+  calibrar(){
+    this.zeroVolante = this._volanteBruto || 0;
+    this.zeroManche  = this._mancheBruto  || 0;
+  }
+};
+
+function grausParaEixo(graus, maximo, zonaMorta){
+  const s = Math.sign(graus), g = Math.abs(graus);
+  if (g <= zonaMorta) return 0;
+  return s * Math.min(1, (g - zonaMorta) / (maximo - zonaMorta));
+}
+
+
+/* =============================================================================
+   PARTE 2 — O MUNDO
+
+   Coordenadas: x para a direita, y para cima, z para a frente.
+   A câmera fica parada atrás do avião; quem anda é o mundo, que vem vindo na
+   direção do avião (as argolas têm o z diminuído a cada quadro).
+   ========================================================================== */
+const CAMD   = 750;      // distância da câmera até o avião
+const CHAO   = -700;     // altura do solo
+const TETO   = 1500;     // altura máxima de voo
+const VOO    = 1750;     // velocidade para a frente, unidades por segundo
+const RAIO   = 380;      // raio das argolas
+const VAO    = 1650;     // distância entre uma argola e a seguinte
+const ALCANCE= 14000;    // até onde o mundo é gerado à frente
+
+const tela = document.getElementById('tela');
+const ctx  = tela.getContext('2d');
+let W=0, H=0, dpr=1, F=0, horizonte=0;
+
+function redimensiona(){
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.floor(window.innerWidth);
+  H = Math.floor(window.innerHeight);
+  tela.width  = Math.floor(W*dpr);
+  tela.height = Math.floor(H*dpr);
+  tela.style.width  = W+'px';
+  tela.style.height = H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  F = H * 0.95;                 // "distância focal": quanto maior, mais fechada a lente
+  horizonte = H * 0.38;
+}
+window.addEventListener('resize', redimensiona);
+window.addEventListener('orientationchange', () => setTimeout(redimensiona, 250));
+
+/* a projeção inteira do jogo cabe nestas quatro linhas */
+function projeta(x, y, z){
+  const d = z + CAMD;
+  if (d < 50) return null;
+  const s = F / d;
+  return { x: W/2 + (x - camX)*s, y: horizonte - (y - camY)*s, s: s, d: d };
+}
+
+/* --- estado --- */
+let aviaoX=0, aviaoY=200, vx=0, vy=0, inclinacao=0, nariz=0;
+let camX=0, camY=0;
+let argolas=[], nuvens=[], faiscas=[];
+let distancia=0, pontos=0, tempo=0, recorde=0;
+let proximoZ=0, jogando=false;
+let tecla={esq:false,dir:false,cima:false,baixo:false};
+let toqueX=0, toqueY=0, usandoToque=false;
+
+try { recorde = parseInt(localStorage.getItem('aviao.recorde') || '0', 10) || 0; } catch(e){}
+
+let audio=null;
+function bip(freq, dur, tipo, vol){
+  try{
+    if(!audio) audio = new (window.AudioContext||window.webkitAudioContext)();
+    const o=audio.createOscillator(), g=audio.createGain();
+    o.type=tipo||'sine'; o.frequency.value=freq;
+    g.gain.value = vol==null?0.06:vol;
+    g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime+dur);
+    o.connect(g); g.connect(audio.destination);
+    o.start(); o.stop(audio.currentTime+dur);
+  }catch(e){}
+}
+
+/* --- geração do percurso: as argolas passeiam devagar de um lado para o outro --- */
+let caminhoX=0, caminhoY=250;
+function geraArgolas(){
+  while (proximoZ < ALCANCE){
+    caminhoX += (Math.random()-0.5) * 1000;   // quanto maior, mais o percurso serpenteia
+    caminhoY += (Math.random()-0.5) * 620;
+    caminhoX = Math.max(-2200, Math.min(2200, caminhoX));
+    caminhoY = Math.max(CHAO+520, Math.min(TETO-320, caminhoY));
+    argolas.push({ x:caminhoX, y:caminhoY, z:proximoZ, passou:false, acerto:false, brilho:0 });
+    proximoZ += VAO + Math.random()*500;
+  }
+}
+function geraNuvens(){
+  while (nuvens.length < 18){
+    nuvens.push({
+      x: (Math.random()-0.5)*14000,
+      y: 700 + Math.random()*2000,
+      z: Math.random()*ALCANCE,
+      r: 320 + Math.random()*520
+    });
+  }
+}
+
+/* =============================================================================
+   PARTE 3 — DESENHO
+   ========================================================================== */
+function desenhaCeu(){
+  const g = ctx.createLinearGradient(0,0,0,horizonte+2);
+  g.addColorStop(0,'#0e2a5c'); g.addColorStop(0.6,'#3d7cc0'); g.addColorStop(1,'#a9cbe8');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,horizonte+2);
+  ctx.fillStyle='rgba(255,240,190,.9)';
+  ctx.beginPath(); ctx.arc(W*0.78, horizonte*0.35, Math.min(W,H)*0.07, 0, 7); ctx.fill();
+  ctx.fillStyle='#2f6a3f'; ctx.fillRect(0, horizonte, W, H-horizonte);
+  // bruma: o chão longe desbota para a cor do céu, senão o horizonte vira um corte seco
+  const b = ctx.createLinearGradient(0, horizonte, 0, horizonte + H*0.22);
+  b.addColorStop(0,'rgba(169,203,232,.85)'); b.addColorStop(1,'rgba(169,203,232,0)');
+  ctx.fillStyle=b; ctx.fillRect(0, horizonte, W, H*0.22);
+}
+
+/* o chão é uma grade: linhas atravessadas (que vêm vindo) e linhas compridas */
+function desenhaChao(){
+  const passo = 900;
+  const desl  = distancia % passo;
+  ctx.lineWidth = 1;
+  for (let i=1;i<=22;i++){
+    const z = i*passo - desl;
+    const a = projeta(-9000, CHAO, z), b = projeta(9000, CHAO, z);
+    if (!a || !b) continue;
+    ctx.strokeStyle = 'rgba(255,255,255,' + (0.30*(1 - i/22)).toFixed(3) + ')';
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+  for (let k=-7;k<=7;k++){
+    const x = k*1200;
+    const a = projeta(x, CHAO, 150), b = projeta(x, CHAO, 19000);
+    if (!a || !b) continue;
+    ctx.strokeStyle = 'rgba(255,255,255,.13)';
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+}
+
+function desenhaNuvens(){
+  const lista = nuvens.slice().sort((a,b)=>b.z-a.z);
+  for (const n of lista){
+    const p = projeta(n.x, n.y, n.z);
+    if (!p) continue;
+    const r = n.r * p.s;
+    if (r < 2 || p.x < -r*3 || p.x > W+r*3) continue;
+    // nuvem muito perto some aos poucos, senão vira um borrão branco na cara
+    const perto = Math.min(1, Math.max(0, n.z/2200));
+    ctx.fillStyle = 'rgba(255,255,255,' + (Math.min(0.5, 0.16 + r/(W*1.8)) * perto).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, r, r*0.42, 0, 0, 7); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(p.x - r*0.5, p.y + r*0.10, r*0.55, r*0.30, 0, 0, 7); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(p.x + r*0.55, p.y + r*0.08, r*0.5, r*0.28, 0, 0, 7); ctx.fill();
+  }
+}
+
+function desenhaArgolas(){
+  const lista = argolas.slice().sort((a,b)=>b.z-a.z);
+  let alvo = null;
+  for (const a of argolas) if (!a.passou && (alvo===null || a.z < alvo.z)) alvo = a;
+
+  for (const a of lista){
+    const p = projeta(a.x, a.y, a.z);
+    if (!p) continue;
+    const r = RAIO * p.s;
+    if (r < 1.5) continue;
+    if (p.x < -r-80 || p.x > W+r+80) continue;
+
+    const dist = 1 - Math.min(1, a.z/ALCANCE);
+    let cor;
+    if (a.brilho > 0)      cor = a.acerto ? '#67ff9a' : '#ff7b7b';
+    else if (a === alvo)   cor = '#ffd24d';
+    else                   cor = '#8fd4ff';
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0.12, dist);
+    ctx.strokeStyle = cor;
+    ctx.lineWidth = Math.max(1.5, r*0.13);
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r*0.94, 0, 0, 7); ctx.stroke();
+    ctx.globalAlpha = Math.max(0.06, dist*0.45);
+    ctx.lineWidth = Math.max(1, r*0.05);
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, r*0.80, r*0.75, 0, 0, 7); ctx.stroke();
+    if (a === alvo && a.brilho <= 0){
+      ctx.globalAlpha = 0.45 + Math.sin(Date.now()/180)*0.25;
+      ctx.lineWidth = Math.max(1, r*0.05);
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, r*1.16, r*1.10, 0, 0, 7); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function desenhaFaiscas(){
+  for (const f of faiscas){
+    const p = projeta(f.x, f.y, f.z);
+    if (!p) continue;
+    ctx.globalAlpha = Math.max(0, f.vida);
+    ctx.fillStyle = f.cor;
+    const r = Math.max(1, 26*p.s);
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* avião visto de trás, desenhado na hora */
+function desenhaAviao(){
+  const p = projeta(aviaoX, aviaoY, 0);
+  if (!p) return;
+  const t = Math.min(W,H) * 0.17;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(inclinacao * Math.PI/180);
+
+  ctx.fillStyle = '#cfd8e8';                          // asas
+  ctx.beginPath();
+  ctx.moveTo(-t*1.05, t*0.10); ctx.lineTo(-t*0.16,-t*0.06);
+  ctx.lineTo( t*0.16,-t*0.06); ctx.lineTo( t*1.05, t*0.10);
+  ctx.lineTo( t*0.95, t*0.21); ctx.lineTo(-t*0.95, t*0.21);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2d7dff';                          // faixas
+  ctx.fillRect(-t*0.86, t*0.10, t*0.26, t*0.11);
+  ctx.fillRect( t*0.60, t*0.10, t*0.26, t*0.11);
+  ctx.fillStyle = '#e9eef7';                          // fuselagem
+  ctx.beginPath(); ctx.ellipse(0, t*0.02, t*0.19, t*0.36, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#1b2a44';                          // cabine
+  ctx.beginPath(); ctx.ellipse(0, -t*0.16, t*0.12, t*0.13, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#cfd8e8';                          // leme
+  ctx.beginPath();
+  ctx.moveTo(-t*0.04, t*0.05); ctx.lineTo(-t*0.04,-t*0.40);
+  ctx.lineTo( t*0.04,-t*0.40); ctx.lineTo( t*0.04, t*0.05);
+  ctx.closePath(); ctx.fill();
+  // rastro dos motores
+  ctx.fillStyle = 'rgba(140,200,255,' + (0.25+Math.random()*0.25).toFixed(2) + ')';
+  ctx.beginPath(); ctx.ellipse(-t*0.52, t*0.26, t*0.09, t*0.05, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse( t*0.52, t*0.26, t*0.09, t*0.05, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function desenha(){
+  ctx.clearRect(0,0,W,H);
+  desenhaCeu();
+  desenhaChao();
+  desenhaNuvens();
+  desenhaArgolas();
+  desenhaFaiscas();
+  desenhaAviao();
+}
+
+
+/* =============================================================================
+   PARTE 4 — REGRAS
+   ========================================================================== */
+function eixos(){
+  if (Controle.modo === 'sensor'){
+    return {
+      lat: grausParaEixo(Controle.volante, 24, 2.5),
+      ver: grausParaEixo(Controle.manche,  20, 3)
+    };
+  }
+  if (usandoToque) return { lat: toqueX, ver: toqueY };
+  return {
+    lat: (tecla.esq?-1:0) + (tecla.dir?1:0),
+    ver: (tecla.cima?1:0) + (tecla.baixo?-1:0)
+  };
+}
+
+function atualiza(dt){
+  const e = eixos();
+
+  // as asas inclinam de forma suave, e é a inclinação que faz o avião virar
+  const alvoInc = e.lat * 42;
+  inclinacao += (alvoInc - inclinacao) * Math.min(1, dt*7);
+  nariz      += (e.ver*10 - nariz)     * Math.min(1, dt*6);
+
+  vx += ((inclinacao/42)*1900 - vx) * Math.min(1, dt*4);
+  vy += ((e.ver)*1250          - vy) * Math.min(1, dt*4);
+
+  aviaoX += vx*dt;
+  aviaoY += vy*dt;
+
+  if (aviaoX < -2600){ aviaoX = -2600; vx = 0; }
+  if (aviaoX >  2600){ aviaoX =  2600; vx = 0; }
+  if (aviaoY > TETO){ aviaoY = TETO; vy = 0; }
+  if (aviaoY < CHAO + 260){
+    aviaoY = CHAO + 260; vy = Math.max(0, vy);
+    mostraAviso('SUBA!', '#ff8080');
+  }
+
+  // A câmera segue o avião por inteiro, mas com ATRASO — é o atraso que dá a
+  // sensação de voo: numa virada o avião escorrega para o lado da tela e
+  // depois volta para o meio. ALTURA fica 240 unidades acima do avião, para
+  // ele aparecer na parte de baixo da tela, com o horizonte lá em cima.
+  camX += (aviaoX - camX)           * Math.min(1, dt*2.2);
+  camY += ((aviaoY + 240) - camY)   * Math.min(1, dt*2.6);
+  horizonte = H*0.38 + nariz*2.2;
+
+  // o mundo vem vindo
+  const avanco = VOO*dt;
+  distancia += avanco;
+  for (const n of nuvens){
+    n.z -= avanco;
+    if (n.z < -900){ n.z += ALCANCE; n.x = (Math.random()-0.5)*14000; n.y = 700+Math.random()*2000; }
+  }
+  for (const a of argolas){
+    const antes = a.z;
+    a.z -= avanco;
+    if (a.brilho > 0) a.brilho -= dt*2.2;
+    if (!a.passou && antes > 0 && a.z <= 0){
+      a.passou = true;
+      const dx = aviaoX - a.x, dy = aviaoY - a.y;
+      if (Math.sqrt(dx*dx + dy*dy) < RAIO){
+        a.acerto = true; a.brilho = 1;
+        pontos++; tempo += 3.2;
+        mostraAviso('+3 s', '#7dffb0');
+        bip(760, 0.08, 'sine', 0.07);
+        setTimeout(()=>bip(1140, 0.10, 'sine', 0.06), 80);
+        for (let i=0;i<14;i++){
+          const ang = Math.random()*Math.PI*2, r = RAIO*(0.6+Math.random()*0.5);
+          faiscas.push({ x: a.x+Math.cos(ang)*r, y: a.y+Math.sin(ang)*r, z: 60,
+                         vz: 260+Math.random()*300, vida: 1, cor:'#9dffc4' });
+        }
+      } else {
+        a.acerto = false; a.brilho = 1;
+        bip(150, 0.12, 'triangle', 0.05);
+      }
+    }
+  }
+  argolas = argolas.filter(a => a.z > -1200);
+  proximoZ -= avanco;
+  geraArgolas();
+
+  for (const f of faiscas){ f.z += f.vz*dt; f.vida -= dt*1.5; }
+  faiscas = faiscas.filter(f => f.vida > 0);
+
+  tempo -= dt;
+  if (tempo <= 0){ tempo = 0; fim(); }
+}
+
+let ultimoAviso = 0;
+function mostraAviso(txt, cor){
+  const el = document.getElementById('aviso');
+  if (el.textContent === txt && Date.now()-ultimoAviso < 400) return;
+  el.textContent = txt; el.style.color = cor; el.style.opacity = 1;
+  ultimoAviso = Date.now();
+  setTimeout(()=>{ if (Date.now()-ultimoAviso >= 700) el.style.opacity = 0; }, 750);
+}
+
+const elArg=document.getElementById('vArg'), elTempo=document.getElementById('vTempo');
+const elAlt=document.getElementById('vAlt'), elRec=document.getElementById('vRec');
+const elCTempo=document.getElementById('cTempo');
+function pinta(){
+  elArg.textContent   = pontos;
+  elTempo.textContent = Math.ceil(tempo);
+  elAlt.textContent   = Math.round((aviaoY - CHAO)/4);
+  elRec.textContent   = recorde;
+  elCTempo.classList.toggle('pouco', tempo < 8);
+}
+
+let ultimoT=0, sobrando=0;
+const PASSO = 1/60;
+function quadro(t){
+  if (!jogando) return;
+  const dt = Math.min(0.1, (t-ultimoT)/1000 || PASSO);
+  ultimoT = t;
+  sobrando += dt;
+  while (sobrando > PASSO){ atualiza(PASSO); sobrando -= PASSO; }
+  desenha(); pinta();
+  requestAnimationFrame(quadro);
+}
+
+
+/* =============================================================================
+   ENTRADA DO USUÁRIO
+   ========================================================================== */
+document.addEventListener('keydown', e => {
+  if (e.key==='ArrowLeft')  tecla.esq=true;
+  if (e.key==='ArrowRight') tecla.dir=true;
+  if (e.key==='ArrowUp')   { tecla.cima=true;  e.preventDefault(); }
+  if (e.key==='ArrowDown') { tecla.baixo=true; e.preventDefault(); }
+});
+document.addEventListener('keyup', e => {
+  if (e.key==='ArrowLeft')  tecla.esq=false;
+  if (e.key==='ArrowRight') tecla.dir=false;
+  if (e.key==='ArrowUp')    tecla.cima=false;
+  if (e.key==='ArrowDown')  tecla.baixo=false;
+});
+
+let toqueIni = null;
+tela.addEventListener('touchstart', e => {
+  if (Controle.modo === 'sensor') return;
+  toqueIni = { x:e.touches[0].clientX, y:e.touches[0].clientY };
+  usandoToque = true;
+}, {passive:true});
+tela.addEventListener('touchmove', e => {
+  if (!toqueIni) return;
+  toqueX = Math.max(-1, Math.min(1, (e.touches[0].clientX - toqueIni.x) / (W*0.16)));
+  toqueY = Math.max(-1, Math.min(1, (toqueIni.y - e.touches[0].clientY) / (H*0.16)));
+}, {passive:true});
+tela.addEventListener('touchend', () => { toqueIni=null; toqueX=0; toqueY=0; }, {passive:true});
+
+const capa = document.getElementById('capa');
+const elErro = document.getElementById('erro');
+function erro(msg){ elErro.textContent = msg; elErro.style.display='block'; }
+
+async function comSensor(){
+  elErro.style.display='none';
+  try { await Controle.ligarSensor(); telaCheia(); comeca(); }
+  catch(e){ erro(e.message + ' — dá para voar arrastando o dedo, no botão abaixo.'); }
+}
+function comToque(){ Controle.modo='toque'; telaCheia(); comeca(); }
+function telaCheia(){
+  try{
+    const el = document.documentElement;
+    const p = (el.requestFullscreen || el.webkitRequestFullscreen || (()=>{})).call(el);
+    if (p && p.then) p.then(() => {
+      try {
+        const t = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape');
+        if (t && t.catch) t.catch(()=>{});    // no computador nao da para travar: seguimos sem
+      } catch(e){}
+    }).catch(()=>{});
+  }catch(e){}
+}
+
+function comeca(){
+  argolas = []; nuvens = []; faiscas = [];
+  proximoZ = 2600; caminhoX = 0; caminhoY = 250;
+  geraArgolas(); geraNuvens();
+  aviaoX=0; aviaoY=250; vx=0; vy=0; inclinacao=0; nariz=0;
+  camX=0; camY=0; distancia=0; pontos=0; tempo=30;
+  jogando = true;
+  capa.style.display='none';
+  redimensiona();
+  ultimoT = performance.now(); sobrando = 0;
+  requestAnimationFrame(quadro);
+}
+
+function fim(){
+  jogando=false;
+  const novo = pontos > recorde;
+  if (novo){ recorde = pontos; try{ localStorage.setItem('aviao.recorde', String(pontos)); }catch(e){} }
+  document.getElementById('tit').textContent = novo ? 'Recorde novo!' : 'Acabou o combustível';
+  document.getElementById('expl').style.display='none';
+  document.getElementById('pe').style.display='none';
+  const p = document.getElementById('placar');
+  p.style.display='block';
+  p.innerHTML = 'Argolas: <span>' + pontos + '</span><br>' +
+                'Distância: <span>' + Math.round(distancia/20) + ' m</span><br>' +
+                'Recorde: <span>' + recorde + ' argolas</span>';
+  document.getElementById('btSensor').textContent = 'Voar de novo';
+  document.getElementById('btToque').textContent  = 'Voltar para a lista de jogos';
+  document.getElementById('btSensor').onclick = () => {
+    document.getElementById('placar').style.display='none';
+    if (Controle.modo === 'sensor') Controle.calibrar();
+    comeca();
+  };
+  document.getElementById('btToque').onclick = () => { location.href = 'index.html'; };
+  capa.style.display='flex';
+}
+
+document.getElementById('btSensor').onclick = comSensor;
+document.getElementById('btToque').onclick  = comToque;
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && jogando){ jogando=false; capa.style.display='flex'; }
+});
+
+redimensiona();
+if (!Controle.temSensor()){
+  document.getElementById('btSensor').classList.remove('pri');
+  document.getElementById('btSensor').classList.add('sec');
+  document.getElementById('btToque').classList.remove('sec');
+  document.getElementById('btToque').classList.add('pri');
+}
+</script>
+</body>
+</html>

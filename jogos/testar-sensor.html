@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Testar o sensor de inclinação</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0b1020;color:#e6edf9;font-family:system-ui,"Segoe UI",Arial,sans-serif;
+       padding:22px 18px calc(28px + env(safe-area-inset-bottom));line-height:1.5}
+  .caixa{max-width:460px;margin:0 auto}
+  .selo{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;color:#5cc8ff;font-weight:800}
+  h1{font-size:23px;margin:8px 0 8px;font-weight:800}
+  p.sub{font-size:14px;color:#aebbd4;margin-bottom:18px}
+  button{width:100%;border:0;border-radius:12px;padding:15px;font-size:15.5px;font-weight:800;
+         font-family:inherit;background:#2d7dff;color:#fff;margin-bottom:16px}
+  .diag{border-radius:12px;padding:12px 14px;font-size:13.5px;margin-bottom:16px;line-height:1.55}
+  .ok{background:rgba(90,255,150,.1);border:1px solid rgba(90,255,150,.3);color:#b6ffd2}
+  .ruim{background:rgba(255,90,90,.1);border:1px solid rgba(255,90,90,.3);color:#ffc9c9}
+  .neutro{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);color:#c3cfe4}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:18px}
+  td{padding:9px 0;border-bottom:1px solid rgba(255,255,255,.09)}
+  td:last-child{text-align:right;font-weight:800;font-variant-numeric:tabular-nums;font-size:17px}
+  td small{display:block;font-size:11px;color:#8fa3c8;font-weight:400;letter-spacing:.2px}
+  .nivel{height:46px;border:1px solid rgba(255,255,255,.16);border-radius:12px;position:relative;
+         overflow:hidden;background:rgba(255,255,255,.04);margin-bottom:8px}
+  .bolha{position:absolute;top:7px;width:30px;height:30px;border-radius:50%;background:#5cc8ff;
+         box-shadow:0 0 18px #5cc8ff;left:50%;margin-left:-15px;transition:left .05s linear}
+  .risco{position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(255,255,255,.3)}
+  .rot2{font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#8fa3c8;font-weight:700;margin-bottom:6px}
+  a{color:#8fb7ff;font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="caixa">
+  <div class="selo">Ferramenta de conferência</div>
+  <h1>Testar o sensor de inclinação</h1>
+  <p class="sub">Serve para saber se o sensor do aparelho está respondendo e para ver,
+     ao vivo, os números que os jogos usam.</p>
+
+  <button id="bt">Ligar o sensor</button>
+  <div class="diag neutro" id="diag">Aguardando. Toque no botão acima.</div>
+
+  <div class="rot2">Volante (girar de lado)</div>
+  <div class="nivel"><div class="risco"></div><div class="bolha" id="b1"></div></div>
+  <div class="rot2" style="margin-top:14px">Manche (nariz para cima / para baixo)</div>
+  <div class="nivel"><div class="risco"></div><div class="bolha" id="b2"></div></div>
+
+  <table style="margin-top:18px">
+    <tr><td>volante <small>eixo vertical da tela, já convertido</small></td><td id="v1">—</td></tr>
+    <tr><td>manche <small>eixo horizontal da tela, já convertido</small></td><td id="v2">—</td></tr>
+    <tr><td>beta <small>valor cru do aparelho</small></td><td id="v3">—</td></tr>
+    <tr><td>gamma <small>valor cru do aparelho</small></td><td id="v4">—</td></tr>
+    <tr><td>orientação da tela <small>screen.orientation.angle</small></td><td id="v5">—</td></tr>
+    <tr><td>leituras por segundo <small>quanto mais, mais suave</small></td><td id="v6">—</td></tr>
+  </table>
+  <a href="index.html">&larr; voltar para os jogos</a>
+</div>
+
+<script>
+function eixos(beta, gamma){
+  const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  switch (ang){
+    case 90:            return { volante:  beta,  manche: -gamma, ang };
+    case -90: case 270: return { volante: -beta,  manche:  gamma, ang };
+    case 180:           return { volante: -gamma, manche: -beta,  ang };
+    default:            return { volante:  gamma, manche:  beta,  ang };
+  }
+}
+
+const diag = document.getElementById('diag');
+let leituras = 0, total = 0, hz = 0, chegou = false;
+// alguns aparelhos so avisam quando o valor MUDA: por isso contamos o total
+// tambem, e nao so a taxa por segundo.
+setInterval(() => { hz = leituras; leituras = 0;
+  if (chegou) document.getElementById('v6').textContent = hz + ' Hz';
+}, 1000);
+
+function mostra(e){
+  chegou = true; leituras++; total++;
+  const a = eixos(e.beta || 0, e.gamma || 0);
+  document.getElementById('v1').textContent = a.volante.toFixed(1) + '°';
+  document.getElementById('v2').textContent = a.manche.toFixed(1) + '°';
+  document.getElementById('v3').textContent = (e.beta  == null ? 'nulo' : e.beta.toFixed(1) + '°');
+  document.getElementById('v4').textContent = (e.gamma == null ? 'nulo' : e.gamma.toFixed(1) + '°');
+  document.getElementById('v5').textContent = a.ang + '°';
+  document.getElementById('b1').style.left = (50 + Math.max(-45, Math.min(45, a.volante))) + '%';
+  document.getElementById('b2').style.left = (50 + Math.max(-45, Math.min(45, a.manche)))  + '%';
+}
+
+document.getElementById('bt').onclick = async () => {
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.protocol !== 'file:'){
+    diag.className = 'diag ruim';
+    diag.innerHTML = 'Esta página está em <b>' + location.protocol + '</b>. O sensor só é liberado em <b>https</b> (ou localhost).';
+    return;
+  }
+  if (typeof DeviceOrientationEvent === 'undefined'){
+    diag.className = 'diag ruim';
+    diag.textContent = 'Este navegador não tem DeviceOrientationEvent. Provavelmente é um computador sem sensor.';
+    return;
+  }
+  if (typeof DeviceOrientationEvent.requestPermission === 'function'){
+    try {
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== 'granted'){
+        diag.className = 'diag ruim';
+        diag.innerHTML = 'Permissão negada. No iPhone: <b>Ajustes ▸ Safari ▸ Movimento e orientação</b>, ligue, e recarregue esta página.';
+        return;
+      }
+    } catch (err){
+      diag.className = 'diag ruim';
+      diag.textContent = 'O pedido de permissão falhou: ' + err.message;
+      return;
+    }
+  }
+  window.addEventListener('deviceorientation', mostra, true);
+  diag.className = 'diag neutro';
+  diag.textContent = 'Sensor ligado. Incline o aparelho — as bolhas devem andar.';
+  setTimeout(() => {
+    if (chegou){
+      diag.className = 'diag ok';
+      diag.innerHTML = 'Funcionando — o aparelho está respondendo. Os jogos vão funcionar.';
+    } else {
+      diag.className = 'diag ruim';
+      diag.innerHTML = 'O sensor foi ligado mas <b>nenhuma leitura chegou</b>. O aparelho provavelmente não tem giroscópio/acelerômetro. Use o controle por toque nos jogos.';
+    }
+  }, 1500);
+};
+</script>
+</body>
+</html>

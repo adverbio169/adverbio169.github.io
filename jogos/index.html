@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>Jogos de inclinação</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{min-height:100%;background:linear-gradient(170deg,#101a33,#070b16 65%);color:#e6edf9;
+       font-family:system-ui,"Segoe UI",Arial,sans-serif;line-height:1.5;
+       padding:32px 18px calc(34px + env(safe-area-inset-bottom))}
+  .caixa{max-width:480px;margin:0 auto}
+  .selo{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;color:#ffc24d;font-weight:800}
+  h1{font-size:28px;line-height:1.15;margin:9px 0 12px;font-weight:800}
+  p.sub{font-size:14.5px;color:#aebbd4;margin-bottom:24px}
+  p.sub b{color:#e6edf9}
+  a.jogo{display:flex;gap:15px;align-items:center;text-decoration:none;color:inherit;
+         background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.12);
+         border-radius:16px;padding:17px 16px;margin-bottom:12px}
+  a.jogo:active{background:rgba(255,255,255,.09)}
+  .ico{width:52px;height:52px;flex:0 0 52px;border-radius:13px;display:flex;align-items:center;
+       justify-content:center;font-size:27px}
+  .i1{background:rgba(255,194,77,.16)}
+  .i2{background:rgba(92,200,255,.16)}
+  .i3{background:rgba(255,255,255,.07)}
+  .tx b{display:block;font-size:16.5px;font-weight:800;margin-bottom:2px}
+  .tx span{font-size:13px;color:#9fb1cf}
+  .nota{margin-top:22px;font-size:12.5px;color:#8093b3;border-top:1px solid rgba(255,255,255,.1);
+        padding-top:16px;line-height:1.6}
+  .nota b{color:#c3cfe4}
+</style>
+</head>
+<body>
+<div class="caixa">
+  <div class="selo">Feito para jogar no celular</div>
+  <h1>Jogos de inclinação</h1>
+  <p class="sub">Dois jogos em que o <b>controle é o próprio aparelho</b>: o navegador lê o
+     acelerômetro e o giroscópio do celular e transforma a inclinação em direção.
+     Melhor com o celular <b>deitado (paisagem)</b>.</p>
+
+  <a class="jogo" href="corrida.html">
+    <span class="ico i1">&#128663;</span>
+    <span class="tx"><b>Corrida</b><span>o celular é o volante &middot; incline para virar</span></span>
+  </a>
+
+  <a class="jogo" href="aviao.html">
+    <span class="ico i2">&#9992;</span>
+    <span class="tx"><b>Avião</b><span>gire para inclinar as asas &middot; puxe para levantar o nariz</span></span>
+  </a>
+
+  <a class="jogo" href="testar-sensor.html">
+    <span class="ico i3">&#128207;</span>
+    <span class="tx"><b>Testar o sensor</b><span>ver ao vivo o que o aparelho está enviando</span></span>
+  </a>
+
+  <div class="nota">
+    Os dois jogos são <b>um arquivo cada um</b>, sem biblioteca e sem servidor: dá para
+    mandar por WhatsApp, abrir sem internet e copiar o código para outro jogo.
+    O pedaço que lê o sensor está no começo de cada arquivo, comentado em português,
+    e é <b>igual nos dois</b> de propósito.<br><br>
+    Explicação de como o sensor funciona: <b>COMO-FUNCIONA.md</b>, nesta mesma pasta.
+  </div>
+</div>
+</body>
+</html>

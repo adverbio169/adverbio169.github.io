@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>Corrida &middot; o celular é o volante</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#0b1020;color:#fff;
+            font-family:system-ui,"Segoe UI",Arial,sans-serif;overscroll-behavior:none;touch-action:none}
+  #tela{display:block;width:100%;height:100%}
+
+  /* ---------- painel de informação (HUD) ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;padding:calc(10px + env(safe-area-inset-top)) 14px}
+  .caixa{position:absolute;background:rgba(8,12,26,.55);border:1px solid rgba(255,255,255,.14);
+         border-radius:10px;padding:7px 11px;backdrop-filter:blur(6px);line-height:1.15}
+  .rot{font-size:9.5px;letter-spacing:1.6px;text-transform:uppercase;color:#8fa3c8;font-weight:700}
+  .val{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
+  .val small{font-size:11px;font-weight:600;color:#8fa3c8;margin-left:2px}
+  #cVel{top:calc(10px + env(safe-area-inset-top));left:14px}
+  #cDist{top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);text-align:center}
+  #cTempo{top:calc(10px + env(safe-area-inset-top));right:14px;text-align:right}
+  #cTempo.pouco .val{color:#ff6a6a}
+  #recorde{position:absolute;top:calc(74px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+           font-size:11px;color:#8fa3c8;text-align:center;width:100%}
+
+  /* barra que mostra a inclinação lida do aparelho */
+  #volante{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+           width:min(62%,290px);height:9px;background:rgba(8,12,26,.55);border:1px solid rgba(255,255,255,.14);
+           border-radius:99px;overflow:hidden}
+  #agulha{position:absolute;top:0;bottom:0;width:12%;left:44%;background:#5cc8ff;border-radius:99px;
+          box-shadow:0 0 14px #5cc8ff}
+  #meio{position:absolute;top:-4px;bottom:-4px;left:50%;width:1px;background:rgba(255,255,255,.35)}
+
+  #aviso{position:absolute;top:42%;left:0;right:0;text-align:center;font-size:30px;font-weight:900;
+         letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
+
+  /* ---------- botão de freio ---------- */
+  #freio{position:fixed;right:calc(16px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));
+         width:88px;height:88px;border-radius:50%;border:2px solid rgba(255,255,255,.25);
+         background:rgba(255,70,70,.18);color:#fff;font-size:12px;font-weight:800;letter-spacing:1.4px;
+         display:none;align-items:center;justify-content:center;user-select:none}
+  #freio.on{background:rgba(255,70,70,.6)}
+  #freio.ver{display:flex}
+
+  /* ---------- telas de abertura / fim ---------- */
+  #capa{position:fixed;inset:0;background:linear-gradient(170deg,#101a33,#070b16 70%);
+        display:flex;align-items:flex-start;justify-content:center;overflow:auto;
+        padding:22px calc(22px + env(safe-area-inset-right)) calc(22px + env(safe-area-inset-bottom))
+                calc(22px + env(safe-area-inset-left))}
+  .cartao{width:100%;max-width:430px;margin:auto;background:rgba(255,255,255,.04);
+          border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:24px 22px}
+  /* celular deitado sobra pouca altura: encolhe tudo para caber sem rolar */
+  @media (max-height:470px){
+    #capa{padding:9px 14px}
+    .cartao{padding:14px 16px;border-radius:14px}
+    .selo{font-size:9px}
+    h1{font-size:19px;margin:5px 0 7px}
+    .txt{font-size:12.5px;line-height:1.42;margin-bottom:9px}
+    button.bt{padding:10px 14px;font-size:14px;margin-bottom:6px}
+    .pe{font-size:10.5px;margin-top:8px;padding-top:8px;line-height:1.4}
+    .placar{font-size:13px;line-height:1.45;margin-bottom:9px}
+    #erro{font-size:11.5px;padding:8px 10px;margin-bottom:9px}
+  }
+  /* tela ainda mais baixa: o rodapé é só informação extra, sai da frente */
+  @media (max-height:395px){ .pe{display:none} }
+  .selo{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;color:#ffc24d;font-weight:800}
+  h1{font-size:26px;line-height:1.15;margin:8px 0 10px;font-weight:800}
+  .txt{font-size:14px;color:#aebbd4;line-height:1.55;margin-bottom:16px}
+  .txt b{color:#e6edf9}
+  button.bt{display:block;width:100%;border:0;border-radius:12px;padding:15px 16px;font-size:15.5px;
+            font-weight:800;font-family:inherit;margin-bottom:10px;cursor:pointer}
+  .bt.pri{background:#2d7dff;color:#fff}
+  .bt.sec{background:rgba(255,255,255,.09);color:#dce5f5;border:1px solid rgba(255,255,255,.16);font-weight:700}
+  .pe{font-size:12px;color:#7d8cab;margin-top:14px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px;line-height:1.5}
+  .pe a{color:#8fb7ff}
+  #erro{display:none;background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.35);border-radius:10px;
+        padding:11px 13px;font-size:13px;color:#ffc9c9;margin-bottom:14px;line-height:1.5}
+  .placar{font-size:15px;color:#e6edf9;margin-bottom:16px;line-height:1.7}
+  .placar span{color:#ffc24d;font-weight:800}
+</style>
+</head>
+<body>
+
+<canvas id="tela"></canvas>
+
+<div id="hud">
+  <div class="caixa" id="cVel"><div class="rot">Velocidade</div><div class="val"><span id="vVel">0</span><small>km/h</small></div></div>
+  <div class="caixa" id="cDist"><div class="rot">Distância</div><div class="val"><span id="vDist">0</span><small>m</small></div></div>
+  <div class="caixa" id="cTempo"><div class="rot">Tempo</div><div class="val"><span id="vTempo">40</span><small>s</small></div></div>
+  <div id="recorde">recorde: <b id="vRec">0</b> m</div>
+  <div id="volante"><div id="meio"></div><div id="agulha"></div></div>
+  <div id="aviso"></div>
+</div>
+
+<div id="freio">FREIO</div>
+
+<div id="capa">
+  <div class="cartao">
+    <div class="selo">Jogo 1 &middot; sensor de inclinação</div>
+    <h1 id="tit">O celular é o volante</h1>
+    <div id="erro"></div>
+    <div class="placar" id="placar" style="display:none"></div>
+    <div class="txt" id="expl">
+      Segure o celular <b>deitado</b> e incline como um volante:
+      <b>lado direito para baixo vira à direita</b>. O carro acelera sozinho — o freio
+      é o botão redondo. Passe pelos <b>arcos amarelos</b> para ganhar tempo.
+    </div>
+    <button class="bt pri" id="btSensor">Jogar com a inclinação do celular</button>
+    <button class="bt sec" id="btToque">Jogar arrastando o dedo na tela</button>
+    <div class="pe" id="pe">
+      No computador: setas <b>←</b> <b>→</b> para virar e <b>espaço</b> para frear.<br>
+      O sensor só funciona em endereço <b>https</b> — pelo GitHub Pages funciona.
+    </div>
+  </div>
+</div>
+
+<script>
+/* =============================================================================
+   CORRIDA — pista em falsa perspectiva (3D), controlada pela inclinação do
+   celular. Arquivo único, sem biblioteca nenhuma, funciona aberto direto do
+   navegador.
+
+   O JOGO TEM TRÊS PARTES INDEPENDENTES:
+     1) CONTROLE  — lê a inclinação do aparelho e devolve um número de -1 a 1.
+     2) PISTA     — uma lista de segmentos; cada um sabe sua curva e sua altura.
+     3) DESENHO   — projeta os segmentos na tela, do mais longe para o mais perto.
+
+   A parte 1 é a que interessa para reaproveitar em outros jogos: está isolada
+   de propósito, e é a mesma coisa no jogo do avião.
+   ========================================================================== */
+
+
+/* =============================================================================
+   PARTE 1 — CONTROLE: a inclinação do aparelho
+
+   O navegador avisa a inclinação pelo evento 'deviceorientation', que traz
+   três ângulos em graus:
+
+       beta   = inclinação da frente para trás (levantar a borda de cima)
+       gamma  = inclinação de um lado para o outro (baixar a borda direita)
+       alpha  = giro tipo bússola  — NÃO usamos: é instável e precisa de calibragem
+
+   O problema: beta e gamma são medidos em relação ao aparelho, não à tela.
+   Quando você vira o celular para paisagem, os dois trocam de papel. Por isso
+   existe a função eixos() abaixo: ela olha para screen.orientation.angle e
+   devolve sempre a mesma coisa, não importa como o celular esteja virado:
+
+       volante  = girar em torno do eixo vertical da tela (virar para os lados)
+       manche   = girar em torno do eixo horizontal da tela (nariz sobe/desce)
+   ========================================================================== */
+const Controle = {
+  modo: 'nenhum',          // 'sensor' | 'toque' | 'teclado' | 'nenhum'
+  volante: 0,              // graus, já descontada a calibragem
+  manche: 0,               // graus, já descontada a calibragem
+  zeroVolante: 0,
+  zeroManche: 0,
+  recebeu: false,          // chegou pelo menos uma leitura do sensor?
+
+  temSensor(){ return typeof DeviceOrientationEvent !== 'undefined'; },
+
+  // iPhone/iPad exigem pedir permissão, e o pedido só vale se sair de um toque
+  // do usuário (por isso ele está no clique do botão, e não no carregamento).
+  precisaPermissao(){
+    return this.temSensor() && typeof DeviceOrientationEvent.requestPermission === 'function';
+  },
+
+  async ligarSensor(){
+    if (!this.temSensor()) throw new Error('Este navegador não expõe o sensor de inclinação.');
+    if (this.precisaPermissao()){
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== 'granted') throw new Error('Permissão de movimento negada. Em Ajustes ▸ Safari, ligue "Movimento e orientação".');
+    }
+    window.addEventListener('deviceorientation', this._ler, true);
+    this.modo = 'sensor';
+
+    // Espera a primeira leitura chegar. Se não vier, é sinal de que o aparelho
+    // não tem giroscópio (ou é um computador) — melhor avisar do que travar.
+    await new Promise((ok, falha) => {
+      const t0 = Date.now();
+      const olha = () => {
+        if (this.recebeu) return ok();
+        if (Date.now() - t0 > 1200){
+          window.removeEventListener('deviceorientation', this._ler, true);
+          this.modo = 'nenhum';
+          return falha(new Error('O aparelho não enviou nenhuma leitura de inclinação. Use o controle por toque.'));
+        }
+        requestAnimationFrame(olha);
+      };
+      olha();
+    });
+    this.calibrar();
+  },
+
+  _ler: (e) => {
+    if (e.beta === null && e.gamma === null) return;
+    const a = Controle.eixos(e.beta || 0, e.gamma || 0);
+    Controle._volanteBruto = a.volante;
+    Controle._mancheBruto  = a.manche;
+    Controle.volante = a.volante - Controle.zeroVolante;
+    Controle.manche  = a.manche  - Controle.zeroManche;
+    Controle.recebeu = true;
+  },
+
+  // converte beta/gamma do aparelho para os eixos DA TELA
+  eixos(beta, gamma){
+    const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    switch (ang){
+      case 90:            return { volante:  beta,  manche: -gamma };
+      case -90: case 270: return { volante: -beta,  manche:  gamma };
+      case 180:           return { volante: -gamma, manche: -beta  };
+      default:            return { volante:  gamma, manche:  beta  }; // retrato
+    }
+  },
+
+  // "zera" na posição em que a pessoa está segurando agora, para ela não
+  // precisar manter o celular perfeitamente na horizontal
+  calibrar(){
+    this.zeroVolante = this._volanteBruto || 0;
+    this.zeroManche  = this._mancheBruto  || 0;
+  },
+
+  _volanteBruto: 0, _mancheBruto: 0
+};
+
+// transforma graus em um valor de -1 a 1, com zona morta (para a mão tremer sem virar)
+function grausParaEixo(graus, maximo, zonaMorta){
+  const s = Math.sign(graus), g = Math.abs(graus);
+  if (g <= zonaMorta) return 0;
+  return s * Math.min(1, (g - zonaMorta) / (maximo - zonaMorta));
+}
+
+
+/* =============================================================================
+   PARTE 2 — A PISTA
+   ========================================================================== */
+const SEGL   = 200;        // comprimento de um segmento (unidades de mundo)
+const ROADW  = 2000;       // meia-largura da pista
+const PISTAS = 3;          // faixas
+const CAMH   = 1000;       // altura da câmera acima do chão
+const DRAW   = 260;        // quantos segmentos desenhar para frente
+const FOG    = 4.2;        // densidade da neblina do horizonte
+const CAMFOV = 100;        // abertura da lente, em graus
+
+const camDepth = 1 / Math.tan((CAMFOV / 2) * Math.PI / 180);
+const PLAYERZ  = CAMH * camDepth;   // distância da câmera até o carro
+
+const COR = {
+  claro:  { estrada:'#4d4d57', grama:'#2e8b4f', mureta:'#d9dde6', faixa:'#f2f4f8' },
+  escuro: { estrada:'#47474f', grama:'#267944', mureta:'#c04848', faixa:null },
+  arco:   { estrada:'#5c6070', grama:'#f0c33c', mureta:'#f0c33c', faixa:'#ffffff' }
+};
+const CORNEBLINA = '#8fb0d8';
+
+let segmentos = [], compPista = 0;
+
+function seg(i){ return segmentos[i % segmentos.length]; }
+function achaSegmento(z){ return segmentos[Math.floor(z / SEGL) % segmentos.length]; }
+
+function poeSegmento(curva, altura){
+  const n = segmentos.length;
+  segmentos.push({
+    indice: n,
+    p1: { mundo:{ y: ultimaAltura(), z: n * SEGL }, camera:{}, tela:{} },
+    p2: { mundo:{ y: altura,          z: (n+1)*SEGL }, camera:{}, tela:{} },
+    curva: curva,
+    cor: Math.floor(n / 3) % 2 ? COR.escuro : COR.claro,
+    carros: [], enfeites: [], arco: false
+  });
+}
+function ultimaAltura(){ return segmentos.length === 0 ? 0 : segmentos[segmentos.length-1].p2.mundo.y; }
+
+const suaveEntra = (a,b,p) => a + (b-a)*Math.pow(p,2);
+const suaveSai   = (a,b,p) => a + (b-a)*(1-Math.pow(1-p,2));
+const suaveTudo  = (a,b,p) => a + (b-a)*((-Math.cos(p*Math.PI)/2)+0.5);
+const interp     = (a,b,p) => a + (b-a)*p;
+
+function poeTrecho(entra, mantem, sai, curva, altura){
+  const y0 = ultimaAltura(), total = entra + mantem + sai;
+  for (let n=0;n<entra;n++)  poeSegmento(suaveEntra(0,curva,n/entra), suaveTudo(y0, y0+altura, n/total));
+  for (let n=0;n<mantem;n++) poeSegmento(curva,                      suaveTudo(y0, y0+altura, (entra+n)/total));
+  for (let n=0;n<sai;n++)    poeSegmento(suaveSai(curva,0,n/sai),    suaveTudo(y0, y0+altura, (entra+mantem+n)/total));
+}
+const R = { curto:25, medio:50, longo:100 };
+const C = { leve:2, media:4, forte:6 };
+const A = { baixa:20, media:40, alta:60 };
+
+const reta   = (n=R.medio,          a=0) => poeTrecho(n, n, n, 0, a);
+const curva  = (n=R.medio, c=C.media, a=0) => poeTrecho(n, n, n, c, a);
+const morro  = (n=R.medio, a=A.media)     => poeTrecho(n, n, n, 0, a);
+function sinuoso(){
+  poeTrecho(R.curto, R.curto, R.curto,  -C.leve,   A.baixa);
+  poeTrecho(R.medio, R.medio, R.medio,   C.media,  A.media);
+  poeTrecho(R.medio, R.medio, R.medio,  -C.media,  A.baixa);
+  poeTrecho(R.curto, R.curto, R.curto,   C.leve,  -A.baixa);
+  poeTrecho(R.medio, R.medio, R.medio,  -C.leve,  -A.media);
+}
+
+function montaPista(){
+  segmentos = [];
+  reta(R.curto);
+  curva(R.medio, C.leve, A.baixa);
+  morro(R.medio, A.media);
+  curva(R.longo, -C.media, 0);
+  reta(R.curto, -A.baixa);
+  sinuoso();
+  curva(R.medio, C.forte, A.media);
+  reta(R.medio);
+  curva(R.longo, -C.forte, -A.media);
+  morro(R.longo, A.alta);
+  sinuoso();
+  curva(R.medio, C.media, -A.media);
+  reta(R.longo);
+
+  // arcos de verificação: dão tempo extra ao serem cruzados
+  for (let i = 90; i < segmentos.length - 40; i += 150) segmentos[i].arco = true;
+
+  // árvores e placas nas laterais, para dar sensação de velocidade
+  for (let n = 12; n < segmentos.length; n += 4 + Math.floor(Math.random()*5)){
+    const lado = Math.random() < 0.5 ? -1 : 1;
+    segmentos[n].enfeites.push({
+      tipo: Math.random() < 0.78 ? 'arvore' : 'placa',
+      desvio: lado * (1.35 + Math.random()*1.4),
+      escala: 0.8 + Math.random()*0.7
+    });
+  }
+  compPista = segmentos.length * SEGL;
+}
+
+/* ---- carros da pista (o "trânsito") ---- */
+const CORESCARRO = ['#e04b4b','#f0b429','#4bb3e0','#9d7bff','#f2f2f2','#5ed17c','#ff8a3d'];
+let carros = [];
+function montaCarros(){
+  carros = [];
+  const quantos = Math.floor(segmentos.length / 85);   // ~1 carro a cada 90 m
+  for (let i=0;i<quantos;i++){
+    const z = Math.floor(Math.random()*segmentos.length) * SEGL;
+    carros.push({
+      desvio: -0.82 + Math.random()*1.64,
+      z: z,
+      vel: VMAX/5.5 + Math.random()*(VMAX/4.2),
+      cor: CORESCARRO[i % CORESCARRO.length],
+      largura: 1000
+    });
+  }
+}
+
+
+/* =============================================================================
+   PARTE 3 — DESENHO E ESTADO DO JOGO
+   ========================================================================== */
+const tela = document.getElementById('tela');
+const ctx  = tela.getContext('2d');
+let W = 0, H = 0, dpr = 1;
+
+function redimensiona(){
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.floor(window.innerWidth);
+  H = Math.floor(window.innerHeight);
+  tela.width  = Math.floor(W * dpr);
+  tela.height = Math.floor(H * dpr);
+  tela.style.width  = W + 'px';
+  tela.style.height = H + 'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', redimensiona);
+window.addEventListener('orientationchange', () => setTimeout(redimensiona, 250));
+
+/* --- física --- */
+const VMAX    = SEGL / (1/60);      // velocidade máxima: 1 segmento por quadro
+const ACEL    = VMAX / 4.5;
+const FREIO   = -VMAX / 1.6;
+const SOLTO   = -VMAX / 6;
+const FORAPIS = -VMAX / 2.2;
+const LIMFORA = VMAX / 3.6;         // teto de velocidade fora do asfalto
+const CENTRIF = 0.32;               // força que joga o carro para fora na curva
+
+let posicao = 0, carroX = 0, velocidade = 0;
+let distancia = 0, tempo = 0, recorde = 0;
+let batidas = 0, tremor = 0, ultimoArco = -1, semBatida = 0;
+let jogando = false, acabou = false;
+let freando = false, tecla = { esq:false, dir:false, freio:false };
+let toqueEixo = 0, usandoToque = false;
+
+try { recorde = parseInt(localStorage.getItem('corrida.recorde') || '0', 10) || 0; } catch(e){}
+
+/* --- som curtinho, gerado na hora (sem arquivo) --- */
+let audio = null;
+function bip(freq, dur, tipo, vol){
+  try {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = tipo || 'square'; o.frequency.value = freq;
+    g.gain.value = vol == null ? 0.06 : vol;
+    g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
+    o.connect(g); g.connect(audio.destination);
+    o.start(); o.stop(audio.currentTime + dur);
+  } catch(e){}
+}
+
+/* --- projeção: leva um ponto do mundo para a tela --- */
+function projeta(p, camX, camY, camZ){
+  p.camera.x = (p.mundo.x || 0) - camX;
+  p.camera.y = (p.mundo.y || 0) - camY;
+  p.camera.z = (p.mundo.z || 0) - camZ;
+  p.tela.escala = camDepth / p.camera.z;
+  p.tela.x = Math.round(W/2 + p.tela.escala * p.camera.x * W/2);
+  p.tela.y = Math.round(H/2 - p.tela.escala * p.camera.y * H/2);
+  p.tela.w = Math.round(       p.tela.escala * ROADW      * W/2);
+}
+const neblina = (d, densidade) => 1 / Math.pow(Math.E, (d*d*densidade));
+const sobra   = (n, total) => { const s = n % total; return s / total; };
+
+function quad(x1,y1,x2,y2,x3,y3,x4,y4,cor){
+  ctx.fillStyle = cor;
+  ctx.beginPath();
+  ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.lineTo(x4,y4);
+  ctx.closePath(); ctx.fill();
+}
+const largMureta = w => w / Math.max(6, 2*PISTAS);
+const largFaixa  = w => w / Math.max(30, 8*PISTAS);
+
+function desenhaCeu(){
+  const g = ctx.createLinearGradient(0,0,0,H*0.62);
+  g.addColorStop(0,   '#123063');
+  g.addColorStop(0.55,'#4a7fbd');
+  g.addColorStop(1,   '#9fc0e2');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H*0.62);
+  // sol
+  ctx.fillStyle = 'rgba(255,236,180,.85)';
+  ctx.beginPath(); ctx.arc(W*0.72, H*0.20, Math.min(W,H)*0.075, 0, 7); ctx.fill();
+  // serras ao fundo, deslocando com a curva
+  const desl = (posicao/SEGL) * 0.4;
+  ctx.fillStyle = '#6d8fb5';
+  ctx.beginPath(); ctx.moveTo(0, H*0.50);
+  for (let x=0; x<=W; x+=W/14){
+    const k = (x/W)*8 + desl*0.02;
+    ctx.lineTo(x, H*0.50 - (Math.sin(k)*0.5 + Math.sin(k*2.3)*0.5 + 1) * H*0.045);
+  }
+  ctx.lineTo(W,H*0.62); ctx.lineTo(0,H*0.62); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#5b7ea6';
+  ctx.fillRect(0, H*0.555, W, H*0.07);
+}
+
+function desenhaSegmento(s){
+  const p1 = s.p1.tela, p2 = s.p2.tela, c = s.arco ? COR.arco : s.cor;
+  const m1 = largMureta(p1.w), m2 = largMureta(p2.w);
+  const f1 = largFaixa(p1.w),  f2 = largFaixa(p2.w);
+
+  ctx.fillStyle = c.grama;
+  ctx.fillRect(0, p2.y, W, p1.y - p2.y);
+
+  quad(p1.x-p1.w-m1,p1.y, p1.x-p1.w,p1.y, p2.x-p2.w,p2.y, p2.x-p2.w-m2,p2.y, c.mureta);
+  quad(p1.x+p1.w+m1,p1.y, p1.x+p1.w,p1.y, p2.x+p2.w,p2.y, p2.x+p2.w+m2,p2.y, c.mureta);
+  quad(p1.x-p1.w,p1.y, p1.x+p1.w,p1.y, p2.x+p2.w,p2.y, p2.x-p2.w,p2.y, c.estrada);
+
+  if (c.faixa){
+    let lw1 = p1.w*2/PISTAS, lw2 = p2.w*2/PISTAS;
+    let lx1 = p1.x - p1.w + lw1, lx2 = p2.x - p2.w + lw2;
+    for (let i=1;i<PISTAS;i++, lx1+=lw1, lx2+=lw2)
+      quad(lx1-f1/2,p1.y, lx1+f1/2,p1.y, lx2+f2/2,p2.y, lx2-f2/2,p2.y, c.faixa);
+  }
+  if (s.neblina < 1){
+    ctx.globalAlpha = 1 - s.neblina;
+    ctx.fillStyle = CORNEBLINA;
+    ctx.fillRect(0, p2.y, W, p1.y - p2.y);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* --- carro visto de trás, desenhado na hora (nenhuma imagem) --- */
+function desenhaCarro(x, y, w, h, cor, recorte){
+  if (recorte != null && y > recorte) { // esconde o que fica atrás de um morro
+    const corte = y - recorte;
+    if (corte >= h) return;
+    ctx.save(); ctx.beginPath(); ctx.rect(x-2, y-h-2, w+4, h-corte+2); ctx.clip();
+  } else ctx.save();
+
+  const t = y - h;
+  ctx.fillStyle = 'rgba(0,0,0,.28)';
+  ctx.beginPath(); ctx.ellipse(x+w/2, y, w*0.55, h*0.16, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#1b1b22';                       // pneus
+  ctx.fillRect(x, t+h*0.55, w*0.16, h*0.45);
+  ctx.fillRect(x+w*0.84, t+h*0.55, w*0.16, h*0.45);
+  ctx.fillStyle = cor;                              // carroceria
+  ctx.beginPath();
+  ctx.moveTo(x+w*0.06, y-h*0.06); ctx.lineTo(x+w*0.02, t+h*0.42);
+  ctx.lineTo(x+w*0.18, t+h*0.10); ctx.lineTo(x+w*0.82, t+h*0.10);
+  ctx.lineTo(x+w*0.98, t+h*0.42); ctx.lineTo(x+w*0.94, y-h*0.06);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(20,30,50,.8)';              // vidro
+  ctx.fillRect(x+w*0.22, t+h*0.16, w*0.56, h*0.24);
+  ctx.fillStyle = '#ff5555';                        // lanternas
+  ctx.fillRect(x+w*0.08, t+h*0.55, w*0.14, h*0.13);
+  ctx.fillRect(x+w*0.78, t+h*0.55, w*0.14, h*0.13);
+  ctx.restore();
+}
+
+function desenhaEnfeite(e, s){
+  const p = s.p1.tela;
+  if (p.escala == null) return;
+  const escalaTela = p.escala * W/2;
+  const x = p.x + escalaTela * e.desvio * ROADW;
+  const y = p.y;
+  const h = escalaTela * 2400 * e.escala;
+  if (h < 1.5 || h > H*1.6) return;   // longe demais ou colado na câmera
+  const w = h * 0.55;
+  if (s.clip != null && y > s.clip) return;
+  if (e.tipo === 'arvore'){
+    ctx.fillStyle = '#4a3520'; ctx.fillRect(x-w*0.07, y-h*0.32, w*0.14, h*0.32);
+    ctx.fillStyle = '#1f6b3a';
+    ctx.beginPath();
+    ctx.moveTo(x, y-h); ctx.lineTo(x+w*0.42, y-h*0.30); ctx.lineTo(x-w*0.42, y-h*0.30);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2b8b4c';
+    ctx.beginPath();
+    ctx.moveTo(x, y-h*0.92); ctx.lineTo(x+w*0.33, y-h*0.44); ctx.lineTo(x-w*0.33, y-h*0.44);
+    ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillStyle = '#b9bfcc'; ctx.fillRect(x-w*0.07, y-h*0.56, w*0.14, h*0.56);
+    ctx.fillStyle = '#2d7dff'; ctx.fillRect(x-w*0.30, y-h*0.88, w*0.60, h*0.34);
+    ctx.fillStyle = '#fff';    ctx.fillRect(x-w*0.22, y-h*0.80, w*0.44, h*0.06);
+  }
+}
+
+function desenhaArco(s){
+  const p = s.p1.tela;
+  if (p.escala == null || s.clip != null && p.y > s.clip) return;
+  const h = p.escala * W/2 * 3600;
+  if (h < 2) return;
+  const w = p.w * 1.35;
+  ctx.strokeStyle = '#f0c33c'; ctx.lineWidth = Math.max(1, h*0.05);
+  ctx.beginPath();
+  ctx.moveTo(p.x-w, p.y); ctx.lineTo(p.x-w, p.y-h);
+  ctx.lineTo(p.x+w, p.y-h); ctx.lineTo(p.x+w, p.y);
+  ctx.stroke();
+}
+
+function desenha(){
+  const base        = achaSegmento(posicao);
+  const basePerc    = sobra(posicao, SEGL);
+  const segJogador  = achaSegmento(posicao + PLAYERZ);
+  const percJogador = sobra(posicao + PLAYERZ, SEGL);
+  const alturaJog   = interp(segJogador.p1.mundo.y, segJogador.p2.mundo.y, percJogador);
+
+  let maxy = H, x = 0, dx = -(base.curva * basePerc);
+
+  ctx.clearRect(0,0,W,H);
+  desenhaCeu();
+
+  for (let n=0;n<DRAW;n++){
+    const s = seg(base.indice + n);
+    s.voltou  = s.indice < base.indice;
+    s.neblina = neblina(n/DRAW, FOG);
+    s.clip    = maxy;
+    const zbase = posicao - (s.voltou ? compPista : 0);
+    projeta(s.p1, (carroX*ROADW) - x,      alturaJog + CAMH, zbase);
+    projeta(s.p2, (carroX*ROADW) - x - dx, alturaJog + CAMH, zbase);
+    x += dx; dx += s.curva;
+    if (s.p1.camera.z <= camDepth || s.p2.tela.y >= s.p1.tela.y || s.p2.tela.y >= maxy) continue;
+    desenhaSegmento(s);
+    maxy = s.p2.tela.y;
+  }
+
+  // do mais longe para o mais perto, para o que está perto cobrir o que está longe
+  for (let n=DRAW-1;n>0;n--){
+    const s = seg(base.indice + n);
+    if (s.arco) desenhaArco(s);
+    for (const c of s.carros){
+      const p = s.p1.tela;
+      if (p.escala == null) continue;
+      const escalaTela = p.escala * W/2;
+      let w = escalaTela * c.largura;
+      // teto: sem isto, um carro colado na câmera cobre a tela inteira
+      if (w > W*0.40) w = W*0.40;
+      const h = w * 0.62;
+      if (w < 1) continue;
+      desenhaCarro(p.x + escalaTela * c.desvio * ROADW - w/2, p.y, w, h, c.cor, s.clip);
+    }
+    for (const e of s.enfeites) desenhaEnfeite(e, s);
+  }
+
+  // o carro do jogador, sempre no mesmo lugar da tela
+  const lw = Math.min(W*0.21, H*0.42), lh = lw * 0.62;
+  const lean = (eixoAtual() * 8) + Math.sin(Date.now()/90) * (velocidade/VMAX) * 1.2;
+  ctx.save();
+  ctx.translate(W/2, H*0.845);
+  ctx.rotate(lean * Math.PI/180 * 0.35);
+  desenhaCarro(-lw/2, 0, lw, lh, '#e8eaf0');
+  if (freando){
+    ctx.fillStyle = 'rgba(255,60,60,.95)';
+    ctx.fillRect(-lw/2 + lw*0.08, -lh*0.45, lw*0.14, lh*0.13);
+    ctx.fillRect(-lw/2 + lw*0.78, -lh*0.45, lw*0.14, lh*0.13);
+  }
+  ctx.restore();
+}
+
+
+/* =============================================================================
+   LAÇO DO JOGO
+   ========================================================================== */
+function eixoAtual(){
+  if (Controle.modo === 'sensor') return grausParaEixo(Controle.volante, 22, 2.5);
+  if (usandoToque) return toqueEixo;
+  return (tecla.esq ? -1 : 0) + (tecla.dir ? 1 : 0);
+}
+
+function atualiza(dt){
+  const segJog = achaSegmento(posicao + PLAYERZ);
+  const eixo   = eixoAtual();
+  const vel    = velocidade / VMAX;
+
+  posicao = (posicao + velocidade*dt) % compPista;
+  if (posicao < 0) posicao += compPista;
+  distancia += velocidade*dt / 200;  // 200 unidades de mundo = 1 metro
+
+  // o volante pesa mais quanto mais rápido o carro vai
+  carroX += dt * 2.4 * vel * eixo;
+  // força centrífuga: a curva empurra o carro para fora
+  carroX -= dt * 2 * vel * segJog.curva * CENTRIF;
+
+  freando = tecla.freio || botaoFreio;
+  if (freando)            velocidade = acelera(velocidade, FREIO, dt);
+  else if (velocidade < VMAX) velocidade = acelera(velocidade, ACEL, dt);
+  else                    velocidade = acelera(velocidade, SOLTO, dt);
+
+  // saiu do asfalto: perde velocidade e treme
+  if ((carroX < -1 || carroX > 1) && velocidade > LIMFORA){
+    velocidade = acelera(velocidade, FORAPIS, dt);
+    tremor = 3;
+  }
+  carroX = Math.max(-2.2, Math.min(2.2, carroX));
+  velocidade = Math.max(0, Math.min(VMAX, velocidade));
+
+  // trânsito
+  for (const c of carros){
+    const antigo = achaSegmento(c.z);
+    c.desvio += Math.sin(c.z/2600 + c.vel) * dt * 0.06;
+    c.desvio = Math.max(-0.85, Math.min(0.85, c.desvio));
+    c.z = (c.z + c.vel*dt) % compPista;
+    const novo = achaSegmento(c.z);
+    if (antigo !== novo){
+      const i = antigo.carros.indexOf(c);
+      if (i >= 0) antigo.carros.splice(i,1);
+      novo.carros.push(c);
+    }
+  }
+
+  // batida — depois de bater, 1,2 s sem colisão. Sem essa pausa o carro
+  // recupera velocidade ainda encostado no outro e bate de novo, em cadeia.
+  semBatida = Math.max(0, semBatida - dt);
+  if (semBatida === 0){
+    for (const c of segJog.carros){
+      if (velocidade > c.vel && encosta(carroX, 0.55, c.desvio, c.largura/ROADW, 0.75)){
+        velocidade = c.vel * 0.8;
+        posicao = (c.z - PLAYERZ + compPista - SEGL*2) % compPista;
+        carroX += (carroX >= c.desvio ? 0.3 : -0.3);   // desvia para o lado
+        semBatida = 1.2;
+        batidas++; tremor = 12;
+        mostraAviso('BATEU!', '#ff8080');
+        bip(90, 0.18, 'sawtooth', 0.12);
+        break;
+      }
+    }
+  }
+
+  // arco de verificação: ganha tempo
+  if (segJog.arco && segJog.indice !== ultimoArco){
+    ultimoArco = segJog.indice;
+    tempo += 18;
+    mostraAviso('+18 SEGUNDOS', '#ffd86b');
+    bip(880, 0.09, 'square', 0.07); setTimeout(()=>bip(1320,0.10,'square',0.07), 90);
+  }
+
+  tempo -= dt;
+  if (tempo <= 0){ tempo = 0; fim(); }
+  if (tremor > 0) tremor = Math.max(0, tremor - dt*22);
+}
+function acelera(v, a, dt){ return v + a*dt; }
+function encosta(x1,w1,x2,w2,tolerancia){
+  const t = tolerancia || 0.8;
+  return !((x1 + w1/2*t < x2 - w2/2*t) || (x1 - w1/2*t > x2 + w2/2*t));
+}
+
+let ultimoAviso = 0;
+function mostraAviso(txt, cor){
+  const el = document.getElementById('aviso');
+  el.textContent = txt; el.style.color = cor; el.style.opacity = 1;
+  ultimoAviso = Date.now();
+  setTimeout(()=>{ if (Date.now()-ultimoAviso >= 850) el.style.opacity = 0; }, 900);
+}
+
+/* --- painel --- */
+const elVel = document.getElementById('vVel'), elDist = document.getElementById('vDist');
+const elTempo = document.getElementById('vTempo'), elRec = document.getElementById('vRec');
+const elAgulha = document.getElementById('agulha'), elCTempo = document.getElementById('cTempo');
+function pinta(){
+  elVel.textContent   = Math.round(velocidade * 3.6 / 200);  // unidades/s -> km/h
+  elDist.textContent  = Math.round(distancia);
+  elTempo.textContent = Math.ceil(tempo);
+  elRec.textContent   = Math.round(recorde);
+  elCTempo.classList.toggle('pouco', tempo < 10);
+  elAgulha.style.left = (44 + eixoAtual()*38) + '%';
+}
+
+let ultimoT = 0, sobrando = 0;
+const PASSO = 1/60;
+function quadro(t){
+  if (!jogando){ return; }
+  const dt = Math.min(0.1, (t - ultimoT)/1000 || PASSO);
+  ultimoT = t;
+  sobrando += dt;
+  while (sobrando > PASSO){ atualiza(PASSO); sobrando -= PASSO; }
+
+  ctx.save();
+  if (tremor > 0.2){
+    ctx.translate((Math.random()-0.5)*tremor, (Math.random()-0.5)*tremor);
+  }
+  desenha();
+  ctx.restore();
+  pinta();
+  requestAnimationFrame(quadro);
+}
+
+
+/* =============================================================================
+   ENTRADA DO USUÁRIO
+   ========================================================================== */
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft')  tecla.esq = true;
+  if (e.key === 'ArrowRight') tecla.dir = true;
+  if (e.key === ' ' || e.key === 'ArrowDown') { tecla.freio = true; e.preventDefault(); }
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft')  tecla.esq = false;
+  if (e.key === 'ArrowRight') tecla.dir = false;
+  if (e.key === ' ' || e.key === 'ArrowDown') tecla.freio = false;
+});
+
+// controle por toque: arrasta o dedo na metade de baixo da tela
+let toqueInicioX = null;
+tela.addEventListener('touchstart', e => {
+  if (Controle.modo === 'sensor') return;
+  toqueInicioX = e.touches[0].clientX; usandoToque = true;
+}, {passive:true});
+tela.addEventListener('touchmove', e => {
+  if (toqueInicioX == null) return;
+  const d = e.touches[0].clientX - toqueInicioX;
+  toqueEixo = Math.max(-1, Math.min(1, d / (W*0.18)));
+}, {passive:true});
+tela.addEventListener('touchend', () => { toqueInicioX = null; toqueEixo = 0; }, {passive:true});
+
+// botão de freio
+let botaoFreio = false;
+const elFreio = document.getElementById('freio');
+const pressiona = v => e => { botaoFreio = v; elFreio.classList.toggle('on', v); e.preventDefault(); };
+elFreio.addEventListener('touchstart', pressiona(true),  {passive:false});
+elFreio.addEventListener('touchend',   pressiona(false), {passive:false});
+elFreio.addEventListener('mousedown',  pressiona(true));
+window.addEventListener('mouseup',     pressiona(false));
+
+/* --- início e fim --- */
+const capa = document.getElementById('capa');
+const elErro = document.getElementById('erro');
+
+function erro(msg){
+  elErro.textContent = msg;
+  elErro.style.display = 'block';
+}
+
+async function comSensor(){
+  elErro.style.display = 'none';
+  try {
+    await Controle.ligarSensor();
+    telaCheia();
+    comeca();
+  } catch (e){
+    erro(e.message + ' — dá para jogar arrastando o dedo, no botão abaixo.');
+  }
+}
+function comToque(){
+  Controle.modo = 'toque';
+  telaCheia();
+  comeca();
+}
+function telaCheia(){
+  try {
+    const el = document.documentElement;
+    const p = (el.requestFullscreen || el.webkitRequestFullscreen || (()=>{})).call(el);
+    if (p && p.then) p.then(() => {
+      try {
+        const t = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape');
+        if (t && t.catch) t.catch(()=>{});    // no computador nao da para travar: seguimos sem
+      } catch(e){}
+    }).catch(()=>{});
+  } catch(e){}
+}
+
+function comeca(){
+  montaPista(); montaCarros();
+  for (const c of carros) achaSegmento(c.z).carros.push(c);
+  posicao = 0; carroX = 0; velocidade = 0;
+  distancia = 0; tempo = 40; batidas = 0; tremor = 0; ultimoArco = -1;
+  semBatida = 0; acabou = false; jogando = true;
+  capa.style.display = 'none';
+  document.getElementById('freio').classList.add('ver');
+  redimensiona();
+  ultimoT = performance.now(); sobrando = 0;
+  requestAnimationFrame(quadro);
+}
+
+function fim(){
+  jogando = false; acabou = true;
+  const d = Math.round(distancia);
+  const novo = d > recorde;
+  if (novo){ recorde = d; try { localStorage.setItem('corrida.recorde', String(d)); } catch(e){} }
+
+  document.getElementById('tit').textContent = novo ? 'Recorde novo!' : 'Acabou o tempo';
+  document.getElementById('expl').style.display = 'none';
+  document.getElementById('pe').style.display = 'none';
+  const p = document.getElementById('placar');
+  p.style.display = 'block';
+  p.innerHTML = 'Distância: <span>' + d + ' m</span><br>' +
+                'Batidas: <span>' + batidas + '</span><br>' +
+                'Recorde: <span>' + Math.round(recorde) + ' m</span>';
+  document.getElementById('btSensor').textContent = 'Correr de novo';
+  document.getElementById('btToque').textContent  = 'Voltar para a lista de jogos';
+  document.getElementById('btSensor').onclick = () => {
+    document.getElementById('placar').style.display = 'none';
+    if (Controle.modo === 'sensor') Controle.calibrar();
+    comeca();
+  };
+  document.getElementById('btToque').onclick = () => { location.href = 'index.html'; };
+  capa.style.display = 'flex';
+}
+
+document.getElementById('btSensor').onclick = comSensor;
+document.getElementById('btToque').onclick  = comToque;
+
+// se a pessoa sair do navegador, pausa em vez de continuar correndo sozinho
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && jogando){ jogando = false; capa.style.display = 'flex'; }
+});
+
+redimensiona();
+if (!Controle.temSensor()){
+  document.getElementById('btSensor').classList.remove('pri');
+  document.getElementById('btSensor').classList.add('sec');
+  document.getElementById('btToque').classList.remove('sec');
+  document.getElementById('btToque').classList.add('pri');
+}
+</script>
+</body>
+</html>

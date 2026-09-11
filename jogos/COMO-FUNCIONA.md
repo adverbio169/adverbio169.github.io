@@ -1,0 +1,147 @@
+# Como o celular vira controle
+
+Resposta curta para a pergunta "isso é possível?": **sim, e sem instalar nada.**
+Todo navegador de celular avisa a inclinação do aparelho. Você escuta esse aviso
+e usa o número como se fosse um analógico de videogame. É isso — o resto é jogo
+comum, desenhado no `<canvas>`.
+
+## O evento
+
+```js
+window.addEventListener('deviceorientation', (e) => {
+  e.beta    // inclinação da frente para trás, em graus
+  e.gamma   // inclinação de um lado para o outro, em graus
+  e.alpha   // giro tipo bússola
+});
+```
+
+Três regras que economizam muita dor de cabeça:
+
+1. **Não use `alpha`.** É o giro em torno do eixo que sai da tela — parece o
+   movimento natural de um volante, mas depende de bússola, deriva sozinho e
+   varia de aparelho para aparelho. Volante de verdade se faz com `beta`/`gamma`.
+2. **Só funciona em `https`** (ou em `localhost`, ou em arquivo aberto
+   localmente). No GitHub Pages funciona, porque o Pages é https.
+3. **No iPhone e iPad é preciso pedir permissão**, e o pedido só é aceito se
+   sair de um toque do usuário — por isso o pedido fica dentro do clique do
+   botão "Jogar", nunca no carregamento da página:
+
+```js
+if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+  const r = await DeviceOrientationEvent.requestPermission();
+  if (r !== 'granted') { /* cai para o controle por toque */ }
+}
+```
+
+## A pegadinha principal: beta e gamma trocam de lugar
+
+`beta` e `gamma` são medidos em relação ao **aparelho**, não à tela. Quando a
+pessoa deita o celular para jogar, a tela gira mas os eixos do aparelho não.
+Resultado: o controle inverte, ou o "volante" passa a levantar o nariz.
+
+A correção é olhar para `screen.orientation.angle` e converter. É o que a função
+`eixos()` faz nos dois jogos:
+
+| tela | volante (virar para os lados) | manche (nariz sobe/desce) |
+|---|---|---|
+| retrato (0°) | `gamma` | `beta` |
+| paisagem (90°) | `beta` | `-gamma` |
+| paisagem (270°) | `-beta` | `gamma` |
+| retrato invertido (180°) | `-gamma` | `-beta` |
+
+Depois dessa conversão, **volante** é sempre "girar em torno do eixo vertical da
+tela" e **manche** é sempre "girar em torno do eixo horizontal da tela", não
+importa como a pessoa esteja segurando o aparelho.
+
+Para conferir isso no seu celular, abra `testar-sensor.html`: ele mostra os
+números crus, os convertidos e o ângulo da tela, ao vivo.
+
+## Os três ajustes que fazem o controle parecer bom
+
+Sensor cru não é controle. Sem estes três tratamentos, o jogo parece quebrado
+mesmo estando certo:
+
+**1. Calibragem (zerar na mão de quem joga).** Ninguém segura o celular
+perfeitamente na horizontal. Na hora de começar, guarde a leitura atual e
+subtraia dela para sempre:
+
+```js
+zero = leituraAtual;          // uma vez, ao começar
+valor = leituraAtual - zero;  // todo quadro
+```
+
+**2. Zona morta.** Abaixo de uns 2 a 3 graus, ignore: é o tremor da mão.
+
+**3. Teto.** Escolha o quanto a pessoa precisa inclinar para ir ao máximo — uns
+20 a 25 graus é confortável — e transforme graus em um número de −1 a 1:
+
+```js
+function grausParaEixo(graus, maximo, zonaMorta){
+  const s = Math.sign(graus), g = Math.abs(graus);
+  if (g <= zonaMorta) return 0;
+  return s * Math.min(1, (g - zonaMorta) / (maximo - zonaMorta));
+}
+```
+
+Esse −1 a 1 é o que o jogo consome. A partir daí o sensor desaparece do
+problema: é igual a uma seta do teclado, só que analógica.
+
+## Exemplo mínimo que funciona
+
+Uma bolinha que corre atrás da inclinação. Salve como `.html`, publique e abra
+no celular:
+
+```html
+<canvas id="c" style="width:100%;height:100vh;display:block"></canvas>
+<button id="b" style="position:fixed;top:10px;left:10px">ligar</button>
+<script>
+const c = document.getElementById('c'), x = c.getContext('2d');
+let g = 0, bx = 0;
+c.width = innerWidth; c.height = innerHeight;
+
+document.getElementById('b').onclick = async () => {
+  if (typeof DeviceOrientationEvent.requestPermission === 'function')
+    await DeviceOrientationEvent.requestPermission();
+  addEventListener('deviceorientation', e => { g = e.gamma || 0; });
+  document.getElementById('b').remove();
+};
+
+(function laco(){
+  bx += (g / 45) * 8;                                   // inclinação -> velocidade
+  bx = Math.max(-c.width/2, Math.min(c.width/2, bx));
+  x.fillStyle = '#111'; x.fillRect(0, 0, c.width, c.height);
+  x.fillStyle = '#5cc8ff';
+  x.beginPath(); x.arc(c.width/2 + bx, c.height/2, 26, 0, 7); x.fill();
+  requestAnimationFrame(laco);
+})();
+</script>
+```
+
+## Sempre deixe uma saída
+
+Tem celular sem giroscópio, tem permissão negada, e tem gente que vai abrir no
+computador. Os dois jogos aqui esperam 1,2 segundo pela primeira leitura; se não
+vier nada, avisam e oferecem o controle por toque. Teclado funciona no
+computador. Sem isso, o jogo simplesmente não abre para parte das pessoas e
+você não descobre por quê.
+
+## Onde está cada coisa nos jogos
+
+| arquivo | o que tem dentro |
+|---|---|
+| `corrida.html` | Parte 1: controle &middot; Parte 2: a pista (lista de segmentos com curva e altura) &middot; Parte 3: desenho em falsa perspectiva |
+| `aviao.html` | Parte 1: controle (idêntica) &middot; Parte 2: o mundo e a projeção &middot; Parte 3: desenho &middot; Parte 4: regras |
+| `testar-sensor.html` | só o sensor, com os números na tela — para depurar no aparelho |
+
+A "Parte 1" é igual nos dois arquivos de propósito: é o pedaço para copiar no
+próximo jogo.
+
+## Ideias de próximo passo
+
+- **Trocar o desenho do carro pelo personagem da sua filha.** No `corrida.html`,
+  a função `desenhaCarro()` desenha tudo à mão; troque por uma imagem
+  (`ctx.drawImage`) e o jogo inteiro continua funcionando.
+- **Dois jogadores no mesmo celular** não dá com inclinação, mas dá com um
+  celular controlando o jogo que aparece na TV — aí já entra rede, e é um
+  projeto bem maior.
+- **Vibração** nas batidas: `navigator.vibrate(120)` funciona no Android.

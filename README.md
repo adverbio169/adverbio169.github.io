@@ -35,3 +35,10 @@ de trabalho e sai de lá com o nome `Painel .html` — aqui ele é renomeado, e 
 
 O painel não faz chamada a servidor externo: não usa CDN, fonte, script, mapa nem
 imagem de fora. Tudo está embutido no próprio arquivo.
+
+## Pasta `jogos/`
+
+Não faz parte do material da Comissão. São páginas independentes (dois jogos que
+usam o sensor de inclinação do celular), guardadas aqui só por conveniência de
+hospedagem. Nada nelas é carregado pelo `index.html`, pelo `painel.html` ou pelo
+relatório — apagar a pasta inteira não afeta a publicação oficial.
