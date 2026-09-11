@@ -140,6 +140,7 @@
       <span class="medidor"><i id="estadoBarra"></i></span>
     </div>
     <a class="fora" id="fora" href="#" target="_blank" rel="noopener">Abrir fora da moldura, no navegador &#8599;</a>
+    <div class="foraUrl" id="foraMsg" style="color:#ffd27a"></div>
     <div class="foraUrl" id="foraUrl"></div>
     <button class="bt pri" id="btSensor">Jogar com a inclinação do celular</button>
     <button class="bt sec" id="btToque">Jogar arrastando o dedo na tela</button>
@@ -960,6 +961,30 @@ setInterval(() => {
     elEstadoTxt.textContent = 'sem resposta do sensor até agora';
   }
 }, 200);
+
+// O toque no botão de saída tenta, nesta ordem, o que uma moldura pode deixar
+// passar: abrir aba nova; navegar a aba inteira; copiar o endereço. O que
+// funcionar primeiro, vale.
+(function(){
+  const a = document.getElementById('fora'), u = document.getElementById('foraUrl'), m = document.getElementById('foraMsg');
+  if (!a) return;
+  a.addEventListener('click', function(ev){
+    ev.preventDefault();
+    const href = location.href;
+    let w = null;
+    try { w = window.open(href, '_blank'); } catch(e){}
+    if (w) return;
+    try { window.top.location.href = href; return; } catch(e){}
+    u.classList.add('ver');
+    m.classList.add('ver');
+    m.textContent = 'A moldura não deixou abrir. Segure o dedo no endereço abaixo, copie e cole na barra do Chrome.';
+    try {
+      navigator.clipboard.writeText(href).then(function(){
+        m.textContent = 'Endereço copiado. Abra o Chrome, toque na barra de endereço e cole.';
+      });
+    } catch(e){}
+  });
+})();
 
 redimensiona();
 if (!Controle.temSensor()){
