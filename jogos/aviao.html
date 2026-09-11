@@ -620,14 +620,25 @@ function fim(){
   p.innerHTML = 'Argolas: <span>' + pontos + '</span><br>' +
                 'Distância: <span>' + Math.round(distancia/20) + ' m</span><br>' +
                 'Recorde: <span>' + recorde + ' argolas</span>';
-  document.getElementById('btSensor').textContent = 'Voar de novo';
-  document.getElementById('btToque').textContent  = 'Voltar para a lista de jogos';
-  document.getElementById('btSensor').onclick = () => {
-    document.getElementById('placar').style.display='none';
-    if (Controle.modo === 'sensor') Controle.calibrar();
+  const btDeNovo = document.getElementById('btSensor');
+  const btOutro  = document.getElementById('btToque');
+
+  btDeNovo.textContent = 'Voar de novo';
+  btDeNovo.onclick = () => {
+    p.style.display='none';
+    if (Controle.modo === 'sensor') Controle.calibrar();   // zera na mão de novo
     comeca();
   };
-  document.getElementById('btToque').onclick = () => { location.href = 'index.html'; };
+
+  // Trocar de controle sem sair do jogo. Antes daqui saía um link para a lista
+  // de jogos, que não existe quando o arquivo é aberto solto no celular.
+  if (Controle.modo === 'sensor'){
+    btOutro.textContent = 'Trocar para o toque na tela';
+    btOutro.onclick = () => { p.style.display='none'; Controle.modo = 'toque'; comeca(); };
+  } else {
+    btOutro.textContent = 'Tentar com a inclinação do celular';
+    btOutro.onclick = () => { p.style.display='none'; comSensor(); };
+  }
   capa.style.display='flex';
 }
 
