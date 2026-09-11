@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>Avião &middot; TV e controle</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#0b1020;color:#e6edf9;
+            font-family:system-ui,"Segoe UI",Arial,sans-serif;overscroll-behavior:none}
+  body.jogando{touch-action:none}
+  #tela{display:block;width:100%;height:100%}
+
+  /* ================= painel do jogo (modo TV) ================= */
+  #hud{position:fixed;inset:0;pointer-events:none;padding:14px 18px;display:none}
+  #hud.ver{display:block}
+  .caixa{position:absolute;background:rgba(8,12,26,.5);border:1px solid rgba(255,255,255,.14);
+         border-radius:10px;padding:8px 13px;backdrop-filter:blur(6px);line-height:1.15}
+  .rot{font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#9fb4d8;font-weight:700}
+  .val{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+  .val small{font-size:12px;font-weight:600;color:#9fb4d8;margin-left:2px}
+  #cArg{top:14px;left:18px}
+  #cTempo{top:14px;left:50%;transform:translateX(-50%);text-align:center}
+  #cAlt{top:14px;right:18px;text-align:right}
+  #cTempo.pouco .val{color:#ff6a6a}
+  #recorde{position:absolute;top:84px;left:50%;transform:translateX(-50%);font-size:12px;color:#9fb4d8;text-align:center;width:100%}
+  #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;padding:0 16px;font-size:clamp(22px,4.5vw,44px);
+         font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
+  #sala2{position:absolute;bottom:14px;left:18px;font-size:12px;color:#9fb4d8;letter-spacing:.5px}
+  #sala2 b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;color:#fff;letter-spacing:.2em}
+
+  /* ================= véus (telas por cima) ================= */
+  .veu{position:fixed;inset:0;display:none;align-items:flex-start;justify-content:center;overflow:auto;
+       padding:24px calc(20px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+       background:linear-gradient(170deg,#101a33,#070b16 70%)}
+  .veu.ver{display:flex}
+  .meio{margin:auto;width:100%;max-width:430px;display:flex;flex-direction:column;gap:12px}
+  .selo{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;color:#5cc8ff;font-weight:800}
+  h1{font-size:clamp(22px,5.4vw,30px);font-weight:800;line-height:1.14;text-wrap:balance}
+  .txt{font-size:14px;color:#aebbd4;line-height:1.5}
+  .txt b{color:#e6edf9}
+  .pe{font-size:12px;color:#7d8cab;line-height:1.5;border-top:1px solid rgba(255,255,255,.1);padding-top:12px}
+  .pe kbd{font:600 11px ui-monospace,Menlo,Consolas,monospace;background:rgba(255,255,255,.1);border-radius:5px;padding:2px 6px;color:#dce5f5}
+
+  /* ================= botões ================= */
+  button.bt,a.bt{display:flex;flex-direction:column;gap:3px;width:100%;border:0;border-radius:14px;
+        padding:15px 17px;font-family:inherit;text-align:left;text-decoration:none;cursor:pointer}
+  .bt b{font-size:16.5px;font-weight:800;line-height:1.2}
+  .bt span{font-size:12.5px;font-weight:500;line-height:1.35;opacity:.8}
+  .bt.pri{background:#ffc24d;color:#1a1400}
+  .bt.sec{background:rgba(255,255,255,.07);color:#dce5f5;border:1px solid rgba(255,255,255,.14)}
+  .bt.azul{background:#2d7dff;color:#fff}
+  .bt:disabled{opacity:.45}
+  .bt.centro{text-align:center;align-items:center}
+
+  /* ================= entrar com código ================= */
+  #codigoEntrada{width:100%;font:800 40px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.3em;
+          text-align:center;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.06);
+          border:2px solid rgba(255,255,255,.18);border-radius:14px;padding:16px 6px 16px 20px;outline:none}
+  #codigoEntrada:focus{border-color:#5cc8ff}
+
+  /* ================= sala na TV (código grande + QR) ================= */
+  #salaCartao{max-width:900px;display:grid;grid-template-columns:1fr auto;gap:34px;align-items:center;margin:auto}
+  @media (max-width:820px){ #salaCartao{grid-template-columns:1fr} }
+  .codigao{font:800 clamp(56px,10vw,126px)/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.2em;color:#ffc24d;margin:8px 0 12px}
+  .url{font:600 12.5px ui-monospace,Menlo,Consolas,monospace;color:#8fb7ff;word-break:break-all}
+  #qr{width:min(36vw,280px);height:min(36vw,280px);background:#fff;border-radius:14px;padding:12px;display:none}
+  #qr.ver{display:block}
+
+  /* ================= estado ================= */
+  .estado{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#9fb1cf;
+          border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px 12px}
+  .estado .luz{width:9px;height:9px;border-radius:50%;background:#6b7a95;flex:0 0 9px}
+  .estado.ok{color:#a9ecc4;border-color:rgba(94,255,154,.3)} .estado.ok .luz{background:#5eff9a;box-shadow:0 0 9px #5eff9a}
+  .estado.nao{color:#ffc9c9;border-color:rgba(255,90,90,.3)} .estado.nao .luz{background:#ff6a6a}
+  .estado.meio2{color:#ffe1a8;border-color:rgba(255,194,77,.35)} .estado.meio2 .luz{background:#ffc24d}
+
+  /* ================= o controle ================= */
+  #controle{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+            gap:12px;padding:calc(12px + env(safe-area-inset-top)) 20px calc(12px + env(safe-area-inset-bottom))}
+  #controle.ver{display:flex}
+  #horizonte{--d:min(70vw,44vh,290px);width:var(--d);height:var(--d);flex-shrink:0;border-radius:50%;
+             overflow:hidden;position:relative;border:3px solid rgba(255,255,255,.18);
+             box-shadow:0 0 0 8px rgba(255,255,255,.04),0 20px 50px rgba(0,0,0,.5);background:#2f6a3f}
+  #ceu{position:absolute;left:-50%;top:-50%;width:200%;height:200%;
+       background:linear-gradient(#0e2a5c 0%,#3d7cc0 45%,#a9cbe8 50%,#2f6a3f 50%,#245532 100%);
+       transform-origin:center;will-change:transform}
+  #mira{position:absolute;inset:0;pointer-events:none}
+  #mira:before{content:"";position:absolute;left:18%;right:18%;top:50%;height:3px;margin-top:-1px;background:#ffc24d;
+               border-radius:2px;clip-path:polygon(0 0,36% 0,36% 100%,0 100%,0 0,64% 0,100% 0,100% 100%,64% 100%,64% 0)}
+  #mira:after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#ffc24d}
+  .placar{display:flex;gap:20px;font-variant-numeric:tabular-nums}
+  .placar div{text-align:center}
+  .placar .val2{font-size:21px;font-weight:800}
+  .linha{display:flex;gap:10px;width:100%;max-width:310px}
+  .linha .bt{flex:1}
+  #dica{font-size:12px;color:#7d8cab;text-align:center;max-width:36ch;line-height:1.5}
+  @media (max-height:470px){ #controle{gap:8px} #dica{display:none} }
+  /* celular deitado na tela de escolha: encolhe para os botões caberem sem rolar */
+  @media (max-height:480px){
+    .veu{padding-top:14px;padding-bottom:14px}
+    .meio{gap:8px}
+    h1{font-size:19px}
+    button.bt,a.bt{padding:11px 15px;gap:1px}
+    .bt b{font-size:14.5px} .bt span{font-size:11.5px}
+    .pe{font-size:11px;padding-top:9px}
+    .estado{font-size:11.5px;padding:7px 10px}
+    #codigoEntrada{font-size:30px;padding:11px 4px 11px 14px}
+  }
+
+  #btCheia{position:fixed;right:14px;bottom:14px;border:1px solid rgba(255,255,255,.2);background:rgba(8,12,26,.6);
+           color:#dce5f5;border-radius:10px;padding:9px 13px;font:700 12.5px system-ui;cursor:pointer;
+           letter-spacing:.5px;display:none}
+  #btCheia.ver{display:block}
+</style>
+</head>
+<body>
+
+<canvas id="tela"></canvas>
+
+<div id="hud">
+  <div class="caixa" id="cArg"><div class="rot">Argolas</div><div class="val" id="vArg">0</div></div>
+  <div class="caixa" id="cTempo"><div class="rot">Combustível</div><div class="val"><span id="vTempo">30</span><small>s</small></div></div>
+  <div class="caixa" id="cAlt"><div class="rot">Altitude</div><div class="val"><span id="vAlt">0</span><small>m</small></div></div>
+  <div id="recorde">recorde: <b id="vRec">0</b> argolas</div>
+  <div id="aviso"></div>
+  <div id="sala2">sala <b id="codigo2">····</b></div>
+</div>
+
+<!-- ============ 1. ESCOLHA (só quando a página não sabe o que é) ============ -->
+<div class="veu" id="escolha">
+  <div class="meio">
+    <div>
+      <div class="selo">Avião</div>
+      <h1>Onde este aparelho vai entrar?</h1>
+    </div>
+
+    <button class="bt pri" id="btCast" style="display:none">
+      <b>Enviar o jogo para a TV &#8599;</b>
+      <span>a TV mostra o jogo e este celular vira só o controle</span>
+    </button>
+    <div class="estado meio2" id="estadoCast" style="display:none"><span class="luz"></span><span id="estadoCastTxt"></span></div>
+
+    <button class="bt azul" id="btSouControle">
+      <b>Sou o controle</b>
+      <span>o jogo está em outra tela — vou digitar o código de lá</span>
+    </button>
+
+    <button class="bt sec" id="btSouTela">
+      <b>Sou a tela</b>
+      <span>o jogo roda aqui e um celular manda o controle</span>
+    </button>
+
+    <button class="bt sec centro" id="btSozinho">
+      <b>Jogar só neste aparelho</b>
+      <span>sem segunda tela: inclinação ou setas do teclado</span>
+    </button>
+
+    <div class="pe" id="peEscolha"></div>
+  </div>
+</div>
+
+<!-- ============ 2. DIGITAR O CÓDIGO ============ -->
+<div class="veu" id="entrar">
+  <div class="meio">
+    <div>
+      <div class="selo">Controle</div>
+      <h1>Digite o código que está na tela do jogo</h1>
+    </div>
+    <input id="codigoEntrada" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD" inputmode="text">
+    <div class="estado" id="estadoSensor"><span class="luz"></span><span id="estadoSensorTxt">verificando o sensor&hellip;</span></div>
+    <button class="bt azul centro" id="btConectar"><b>Conectar</b></button>
+    <button class="bt sec centro" id="btVoltar1"><b>Voltar</b></button>
+  </div>
+</div>
+
+<!-- ============ 3. SALA: a tela esperando o controle ============ -->
+<div class="veu" id="sala">
+  <div id="salaCartao">
+    <div>
+      <div class="selo">Avião &middot; o celular é o controle</div>
+      <h1>No celular, abra esta mesma página e digite o código</h1>
+      <div class="codigao" id="codigo">····</div>
+      <div class="txt" style="margin-bottom:6px">Endereço, para digitar ou ler no QR:</div>
+      <div class="url" id="url">…</div>
+      <div class="estado meio2" id="estado" style="margin-top:16px"><span class="luz"></span><span id="estadoTxt">abrindo a sala…</span></div>
+      <div class="pe" style="margin-top:16px">Sem celular: <kbd>setas</kbd> voam, <kbd>Enter</kbd> começa, <kbd>F</kbd> tela cheia.</div>
+    </div>
+    <canvas id="qr" width="600" height="600"></canvas>
+  </div>
+</div>
+
+<!-- ============ 4. PAUSA / FIM ============ -->
+<div class="veu" id="pausa">
+  <div class="meio" style="text-align:center">
+    <h1>Sem sinal do controle</h1>
+    <div class="txt">O jogo pausou. Assim que o celular voltar, continua de onde parou.<br>Sala <b id="codigo3">····</b>.</div>
+  </div>
+</div>
+
+<div class="veu" id="fimTela">
+  <div class="meio" style="text-align:center">
+    <div class="selo">Fim de voo</div>
+    <h1 id="fimTit">Acabou o combustível</h1>
+    <div class="txt" id="fimPlacar" style="font-size:17px;color:#e6edf9;line-height:1.8"></div>
+    <div class="txt" id="fimComo"></div>
+  </div>
+</div>
+
+<!-- ============ 5. O CONTROLE ============ -->
+<div id="controle">
+  <div class="estado" id="estadoRede" style="max-width:340px;width:100%"><span class="luz"></span><span id="estadoRedeTxt">conectando&hellip;</span></div>
+  <div id="horizonte"><div id="ceu"></div><div id="mira"></div></div>
+  <div class="placar">
+    <div><div class="rot">Argolas</div><div class="val2" id="pArg">0</div></div>
+    <div><div class="rot">Combustível</div><div class="val2" id="pTempo">&ndash;</div></div>
+    <div><div class="rot">Atraso</div><div class="val2" id="pMs">&ndash;</div></div>
+  </div>
+  <div class="linha">
+    <button class="bt azul centro" id="btComecar"><b>Começar</b></button>
+    <button class="bt sec centro" id="btCalibrar"><b>Zerar</b></button>
+  </div>
+  <div id="dica">Segure o celular <b>deitado</b>. <b>Zerar</b> torna a posição atual da sua mão o voo reto.
+    Girar de lado inclina as asas; puxar a borda de cima levanta o nariz.</div>
+</div>
+
+<button id="btCheia" title="tela cheia (F)">TELA CHEIA</button>
+
+<script>
+__PEERJS__
+</script>
+<script>
+__QRCODE__
+</script>
+
+<script>
+/* =============================================================================
+   AVIÃO — UM ARQUIVO SÓ, TRÊS PAPÉIS
+
+   A mesma página serve de três jeitos, e ela mesma descobre qual é o seu:
+
+     TELA     — roda o jogo e mostra um código de 4 letras (é o "modo TV")
+     CONTROLE — lê a inclinação do celular e manda para a tela
+     SOZINHO  — joga tudo no próprio aparelho, como antes
+
+   Como ela descobre:
+     · aberta pelo Chromecast (a TV foi quem carregou)  -> TELA, já conectada
+     · endereço com ?papel=tela                          -> TELA
+     · endereço com ?sala=ABCD                           -> CONTROLE
+     · tela grande e sem toque (computador)              -> TELA
+     · resto (celular)                                   -> pergunta, com o botão
+                                                            de enviar para a TV
+                                                            em primeiro lugar
+   ========================================================================== */
+
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+
+/* =============================================================================
+   O CANAL — o mesmo par de funções para os dois transportes possíveis:
+   a conexão do Chromecast (Presentation API) ou o WebRTC com código de sala.
+   ========================================================================== */
+const Canal = {
+  tipo: null, conn: null, aberto: false,
+  aoAbrir: null, aoFechar: null, aoDado: null,
+
+  usarCast(c){
+    this.tipo = 'cast'; this.conn = c;
+    const abriu = () => { this.aberto = true; this.aoAbrir && this.aoAbrir(); };
+    c.onconnect = abriu;
+    c.onclose = c.onterminate = () => { this.aberto = false; this.aoFechar && this.aoFechar(); };
+    c.onmessage = e => { try { this.aoDado && this.aoDado(JSON.parse(e.data)); } catch(err){} };
+    if (c.state === 'connected') abriu();
+  },
+
+  usarPeer(c){
+    this.tipo = 'peer'; this.conn = c;
+    const abriu = () => { this.aberto = true; this.aoAbrir && this.aoAbrir(); };
+    c.on('open', abriu);
+    c.on('close', () => { this.aberto = false; this.aoFechar && this.aoFechar(); });
+    c.on('data', d => this.aoDado && this.aoDado(d));
+    if (c.open) abriu();
+  },
+
+  envia(o){
+    if (!this.aberto || !this.conn) return;
+    try { this.tipo === 'cast' ? this.conn.send(JSON.stringify(o)) : this.conn.send(o); } catch(e){}
+  },
+
+  fecha(){ try { this.tipo === 'cast' ? this.conn.terminate() : this.conn.close(); } catch(e){} }
+};
+
+/* =============================================================================
+   SENSOR — igual aos outros jogos
+   ========================================================================== */
+const Sensor = {
+  volante: 0, manche: 0, zeroVolante: 0, zeroManche: 0,
+  recebeu: false, escutando: false, ultimaLeitura: 0, _v: 0, _m: 0,
+
+  tem(){ return typeof DeviceOrientationEvent !== 'undefined'; },
+  precisaPermissao(){ return this.tem() && typeof DeviceOrientationEvent.requestPermission === 'function'; },
+  escutar(){
+    if (!this.tem() || this.escutando) return;
+    window.addEventListener('deviceorientation', this._ler, true);
+    this.escutando = true;
+  },
+  respondendo(){ return this.recebeu && (Date.now() - this.ultimaLeitura) < 2000; },
+  async pedirPermissao(){
+    if (!this.precisaPermissao()) return true;
+    try { return (await DeviceOrientationEvent.requestPermission()) === 'granted'; } catch(e){ return false; }
+  },
+  _ler: e => {
+    if (e.beta === null && e.gamma === null) return;
+    const a = Sensor.eixos(e.beta || 0, e.gamma || 0);
+    Sensor._v = a.volante; Sensor._m = a.manche;
+    Sensor.volante = a.volante - Sensor.zeroVolante;
+    Sensor.manche  = a.manche  - Sensor.zeroManche;
+    Sensor.recebeu = true; Sensor.ultimaLeitura = Date.now();
+    Controle.modo = 'sensor';
+  },
+  // beta/gamma são medidos em relação ao APARELHO; aqui viram eixos da TELA
+  eixos(beta, gamma){
+    const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    switch (ang){
+      case 90:            return { volante:  beta,  manche: -gamma };
+      case -90: case 270: return { volante: -beta,  manche:  gamma };
+      case 180:           return { volante: -gamma, manche: -beta  };
+      default:            return { volante:  gamma, manche:  beta  };
+    }
+  },
+  calibrar(){
+    this.zeroVolante = this._v || 0; this.zeroManche = this._m || 0;
+    this.volante = 0; this.manche = 0;
+  }
+};
+
+/* O núcleo do jogo lê daqui. No modo TELA os valores chegam pela rede; no modo
+   SOZINHO vêm do sensor do próprio aparelho. */
+const Controle = { modo: 'nenhum', volante: 0, manche: 0, ultimo: 0 };
+
+function grausParaEixo(graus, maximo, zonaMorta){
+  const s = Math.sign(graus), g = Math.abs(graus);
+  if (g <= zonaMorta) return 0;
+  return s * Math.min(1, (g - zonaMorta) / (maximo - zonaMorta));
+}
+
+__NUCLEO__
+
+/* =============================================================================
+   O JOGO: começar, pausar, terminar
+   ========================================================================== */
+let acabou = false, pausado = false, papel = null, sozinho = false;
+
+function comeca(){
+  argolas = []; nuvens = []; faiscas = [];
+  proximoZ = 2600; caminhoX = 0; caminhoY = 250;
+  geraArgolas(); geraNuvens();
+  aviaoX = 0; aviaoY = 250; vx = 0; vy = 0; inclinacao = 0; nariz = 0;
+  camX = 0; camY = 0; distancia = 0; pontos = 0; tempo = 30;
+  acabou = false; pausado = false; jogando = true;
+  if (sozinho) Sensor.calibrar();
+  $('sala').classList.remove('ver'); $('fimTela').classList.remove('ver'); $('pausa').classList.remove('ver');
+  $('hud').classList.add('ver'); document.body.classList.add('jogando');
+  redimensiona();
+  ultimoT = performance.now(); sobrando = 0;
+  requestAnimationFrame(quadro);
+}
+
+function fim(){
+  jogando = false; acabou = true;
+  const novo = pontos > recorde;
+  if (novo){ recorde = pontos; try { localStorage.setItem('aviao.recorde', String(pontos)); } catch(e){} }
+  $('fimTit').textContent = novo ? 'Recorde novo!' : 'Acabou o combustível';
+  $('fimPlacar').innerHTML = 'Argolas: <b>' + pontos + '</b> &nbsp;·&nbsp; Distância: <b>' +
+                             Math.round(distancia/20) + ' m</b> &nbsp;·&nbsp; Recorde: <b>' + recorde + '</b>';
+  $('fimComo').innerHTML = sozinho ? 'Toque na tela ou aperte <b>Enter</b> para voar de novo.'
+                                   : 'Toque em <b>Jogar de novo</b> no celular — ou <b>Enter</b> aqui.';
+  $('fimTela').classList.add('ver');
+  mandaEstado();
+}
+
+function pausa(){
+  if (!jogando || pausado || sozinho) return;
+  pausado = true; jogando = false;
+  Controle.modo = 'nenhum'; Controle.volante = 0; Controle.manche = 0;
+  $('pausa').classList.add('ver');
+}
+function retoma(){
+  if (!pausado) return;
+  pausado = false; jogando = true;
+  $('pausa').classList.remove('ver');
+  ultimoT = performance.now(); sobrando = 0;
+  requestAnimationFrame(quadro);
+}
+
+/* teclado — serve para jogar e para testar sem celular */
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft')  tecla.esq = true;
+  if (e.key === 'ArrowRight') tecla.dir = true;
+  if (e.key === 'ArrowUp')   { tecla.cima = true;  e.preventDefault(); }
+  if (e.key === 'ArrowDown') { tecla.baixo = true; e.preventDefault(); }
+  if (e.key === 'Enter' && papel === 'tela' && !jogando && !pausado) comeca();
+  if (e.key === 'f' || e.key === 'F') telaCheia();
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft')  tecla.esq = false;
+  if (e.key === 'ArrowRight') tecla.dir = false;
+  if (e.key === 'ArrowUp')    tecla.cima = false;
+  if (e.key === 'ArrowDown')  tecla.baixo = false;
+});
+function telaCheia(){
+  try { const el = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || (()=>{})).call(el); } catch(e){}
+}
+$('btCheia').onclick = telaCheia;
+
+/* =============================================================================
+   MODO TELA — a sala, o código, o QR
+   ========================================================================== */
+function opcoesPeer(){
+  const s = params.get('servidor');
+  if (!s) return { debug: 0 };
+  const [host, porta] = s.split(':');
+  return { host, port: parseInt(porta || '9000', 10), path: '/sinal', secure: location.protocol === 'https:', debug: 0 };
+}
+const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // sem 0/O, 1/I/L
+function novoCodigo(){ let s = ''; for (let i = 0; i < 4; i++) s += ALFABETO[Math.floor(Math.random()*ALFABETO.length)]; return s; }
+
+let peer = null, codigo = '';
+function estado(classe, txt){ $('estado').className = 'estado ' + classe; $('estadoTxt').textContent = txt; }
+
+function urlDoControle(){
+  const u = new URL(location.href);
+  u.search = ''; u.hash = '';
+  if (params.get('servidor')) u.searchParams.set('servidor', params.get('servidor'));
+  u.searchParams.set('sala', codigo);
+  return u.href;
+}
+function desenhaQR(canvas, texto){
+  const qr = qrcode(0, 'M'); qr.addData(texto); qr.make();
+  const n = qr.getModuleCount(), c2 = canvas.getContext('2d');
+  const cel = Math.floor(canvas.width / (n + 2)), off = Math.floor((canvas.width - cel*n) / 2);
+  c2.fillStyle = '#fff'; c2.fillRect(0, 0, canvas.width, canvas.height);
+  c2.fillStyle = '#0b1020';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) c2.fillRect(off + c*cel, off + r*cel, cel, cel);
+}
+
+function ligaCanalDaTela(){
+  Canal.aoAbrir = () => { estado('ok', 'controle conectado — toque em Começar nele'); mandaEstado(); };
+  Canal.aoFechar = () => { estado('nao', 'o controle desconectou'); pausa(); };
+  Canal.aoDado = d => {
+    if (!d || !d.t) return;
+    switch (d.t){
+      case 'eixo':
+        Controle.volante = d.v; Controle.manche = d.m; Controle.modo = 'sensor'; Controle.ultimo = Date.now();
+        if (pausado) retoma();
+        break;
+      case 'ping':  Canal.envia({ t: 'pong', at: d.at }); break;
+      case 'oi':    estado('ok', 'controle conectado — toque em Começar nele'); mandaEstado(); break;
+      case 'botao': if (d.b === 'comecar' && !jogando && !pausado) comeca(); break;
+    }
+  };
+}
+function mandaEstado(){ Canal.envia({ t: 'estado', jogando, pontos, tempo, acabou }); }
+
+function viraTela(comSala){
+  papel = 'tela';
+  $('escolha').classList.remove('ver'); $('entrar').classList.remove('ver');
+  $('btCheia').classList.add('ver');
+  ligaCanalDaTela();
+  redimensiona();
+
+  if (!comSala){                       // veio pelo Chromecast: já tem canal
+    $('sala').classList.remove('ver');
+    $('hud').classList.add('ver');
+    estado('ok', 'controle conectado');
+    desenhaCeuParado();
+    return;
+  }
+
+  $('sala').classList.add('ver');
+  abrirSala();
+}
+
+function abrirSala(){
+  codigo = novoCodigo();
+  peer = new Peer('aviao-rr-' + codigo, opcoesPeer());
+  peer.on('open', () => {
+    $('codigo').textContent = codigo; $('codigo2').textContent = codigo; $('codigo3').textContent = codigo;
+    const url = urlDoControle();
+    $('url').textContent = url;
+    if (/^https?:/.test(location.protocol)){ desenhaQR($('qr'), url); $('qr').classList.add('ver'); }
+    estado('meio2', 'esperando o controle…');
+  });
+  peer.on('connection', c => {
+    if (Canal.conn && Canal.conn !== c) Canal.fecha();
+    Canal.usarPeer(c);
+  });
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id'){ try { peer.destroy(); } catch(x){} abrirSala(); return; }
+    if (e.type === 'network' || e.type === 'server-error') estado('nao', 'sem acesso ao servidor de sinalização. Esta tela tem internet?');
+    else estado('nao', 'erro: ' + (e.type || e));
+  });
+  peer.on('disconnected', () => { try { peer.reconnect(); } catch(e){} });
+}
+
+// enquanto a tela espera, desenha o cenário parado atrás do véu
+function desenhaCeuParado(){
+  if (jogando) return;
+  argolas = []; nuvens = []; proximoZ = 2600; caminhoX = 0; caminhoY = 250;
+  geraArgolas(); geraNuvens();
+  aviaoX = 0; aviaoY = 250; camX = 0; camY = 240; distancia = 0;
+  redimensiona(); desenha();
+}
+
+// sem sinal por 2 s no meio do jogo: pausa, para o avião não ficar preso na
+// última inclinação recebida
+setInterval(() => {
+  if (papel === 'tela' && jogando && !sozinho && Controle.modo === 'sensor' && Date.now() - Controle.ultimo > 2000) pausa();
+}, 300);
+setInterval(() => { if (papel === 'tela') mandaEstado(); }, 250);
+
+/* =============================================================================
+   MODO CONTROLE
+   ========================================================================== */
+let seq = 0, latencia = null, ultimoPong = 0, pontosAntes = 0;
+function estadoRede(classe, txt){ $('estadoRede').className = 'estado ' + classe; $('estadoRedeTxt').textContent = txt; }
+function vibra(ms){ try { navigator.vibrate && navigator.vibrate(ms); } catch(e){} }
+
+function ligaCanalDoControle(){
+  Canal.aoAbrir = () => {
+    estadoRede('ok', Canal.tipo === 'cast' ? 'conectado na TV' : 'conectado na sala ' + $('codigoEntrada').value);
+    Canal.envia({ t: 'oi' });
+    try { navigator.wakeLock && navigator.wakeLock.request('screen'); } catch(e){}
+  };
+  Canal.aoFechar = () => estadoRede('nao', 'a tela do jogo desconectou');
+  Canal.aoDado = d => {
+    if (!d || !d.t) return;
+    if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
+    if (d.t === 'estado'){
+      $('pArg').textContent = d.pontos;
+      $('pTempo').textContent = d.jogando ? Math.ceil(d.tempo) + 's' : '–';
+      $('btComecar').innerHTML = '<b>' + (d.jogando ? 'Jogando…' : (d.pontos > 0 || d.acabou ? 'Jogar de novo' : 'Começar')) + '</b>';
+      $('btComecar').disabled = !!d.jogando;
+      if (d.pontos > pontosAntes) vibra(60);
+      pontosAntes = d.pontos;
+    }
+  };
+}
+
+function viraControle(){
+  papel = 'controle';
+  ['escolha','entrar','sala','pausa','fimTela'].forEach(i => $(i).classList.remove('ver'));
+  $('hud').classList.remove('ver');
+  $('controle').classList.add('ver');
+  document.body.classList.add('jogando');
+  Sensor.escutar();
+  ligaCanalDoControle();
+  setTimeout(() => Sensor.calibrar(), 600);
+}
+
+// manda os ângulos 30 vezes por segundo; um ping por segundo mede o atraso
+setInterval(() => {
+  if (papel !== 'controle') return;
+  Canal.envia({ t: 'eixo', v: +Sensor.volante.toFixed(1), m: +Sensor.manche.toFixed(1), s: seq++ });
+}, 33);
+setInterval(() => {
+  if (papel !== 'controle') return;
+  Canal.envia({ t: 'ping', at: Date.now() });
+  $('pMs').textContent = latencia == null ? '–' : latencia + ' ms';
+  if (ultimoPong && Date.now() - ultimoPong > 4000) estadoRede('nao', 'a tela do jogo parou de responder');
+}, 1000);
+
+// horizonte artificial do controle
+(function anima(){
+  if (papel === 'controle') $('ceu').style.transform = 'rotate(' + (-Sensor.volante) + 'deg) translateY(' + (Sensor.manche * 1.4) + '%)';
+  requestAnimationFrame(anima);
+})();
+
+// se não houver sensor, arrasta o dedo no horizonte
+let toqueIni = null;
+$('horizonte').addEventListener('touchstart', e => {
+  if (Sensor.respondendo()) return;
+  toqueIni = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, {passive:true});
+$('horizonte').addEventListener('touchmove', e => {
+  if (!toqueIni) return;
+  Sensor.volante = Math.max(-30, Math.min(30, (e.touches[0].clientX - toqueIni.x) / 3));
+  Sensor.manche  = Math.max(-30, Math.min(30, (toqueIni.y - e.touches[0].clientY) / 3));
+}, {passive:true});
+$('horizonte').addEventListener('touchend', () => { toqueIni = null; Sensor.volante = 0; Sensor.manche = 0; }, {passive:true});
+
+$('btCalibrar').onclick = () => { Sensor.calibrar(); vibra(30); };
+$('btComecar').onclick  = () => { Canal.envia({ t: 'botao', b: 'comecar' }); Sensor.calibrar(); };
+
+/* =============================================================================
+   MODO SOZINHO — o jogo e o sensor no mesmo aparelho
+   ========================================================================== */
+function viraSozinho(){
+  papel = 'tela'; sozinho = true;
+  $('escolha').classList.remove('ver');
+  $('btCheia').classList.add('ver');
+  Sensor.escutar();
+  // o núcleo lê de Controle; aqui o sensor local alimenta esse objeto
+  setInterval(() => {
+    if (!sozinho) return;
+    if (Sensor.respondendo()){ Controle.modo = 'sensor'; Controle.volante = Sensor.volante; Controle.manche = Sensor.manche; }
+    else Controle.modo = 'nenhum';
+  }, 16);
+  telaCheia();
+  comeca();
+}
+$('tela').addEventListener('pointerdown', () => { if (sozinho && !jogando) comeca(); });
+
+/* =============================================================================
+   ENVIAR PARA A TV (Chromecast — Presentation API)
+   ========================================================================== */
+let pedidoCast = null;
+function preparaCast(){
+  // isSecureContext é o critério certo: cobre https e também localhost
+  const podeCast = ('PresentationRequest' in window) && window.isSecureContext;
+  if (!podeCast){
+    $('estadoCast').style.display = 'flex';
+    $('estadoCast').className = 'estado nao';
+    $('estadoCastTxt').textContent = window.isSecureContext
+      ? 'este navegador não tem o envio para TV (só o Chrome tem)'
+      : 'o envio para TV só funciona em endereço https';
+    return;
+  }
+  const u = new URL(location.href);
+  u.search = ''; u.searchParams.set('papel', 'tela');
+  if (params.get('servidor')) u.searchParams.set('servidor', params.get('servidor'));
+  pedidoCast = new PresentationRequest([u.href]);
+
+  const mostra = tem => {
+    $('btCast').style.display = tem ? 'flex' : 'none';
+    $('estadoCast').style.display = tem ? 'none' : 'flex';
+    $('estadoCast').className = 'estado meio2';
+    $('estadoCastTxt').textContent = 'nenhuma TV compatível encontrada nesta WiFi';
+  };
+  pedidoCast.getAvailability()
+    .then(av => { mostra(av.value); av.onchange = () => mostra(av.value); })
+    .catch(() => { $('btCast').style.display = 'flex'; });   // sem lista: mostra e deixa tentar
+}
+
+$('btCast').onclick = async () => {
+  if (!pedidoCast) return;
+  await Sensor.pedirPermissao();
+  try {
+    const c = await pedidoCast.start();     // abre a lista de TVs do navegador
+    Canal.usarCast(c);
+    viraControle();
+    estadoRede('meio2', 'abrindo o jogo na TV…');
+  } catch (e){
+    $('estadoCast').style.display = 'flex';
+    $('estadoCast').className = 'estado nao';
+    $('estadoCastTxt').textContent = 'não deu para enviar: ' + (e.message || e.name || e);
+  }
+};
+
+/* =============================================================================
+   QUEM SOU EU — a decisão, na abertura
+   ========================================================================== */
+const elCod = $('codigoEntrada');
+elCod.addEventListener('input', () => { elCod.value = elCod.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); });
+elCod.addEventListener('keydown', e => { if (e.key === 'Enter') $('btConectar').click(); });
+
+function conectaComCodigo(cod){
+  estadoRede('meio2', 'procurando a sala ' + cod + '…');
+  const p = new Peer(undefined, opcoesPeer());
+  p.on('open', () => {
+    const c = p.connect('aviao-rr-' + cod, { reliable: false, serialization: 'json' });
+    Canal.usarPeer(c);
+    setTimeout(() => { if (!c.open) estadoRede('nao', 'sala ' + cod + ' não encontrada. O código está certo? A outra tela está aberta?'); }, 8000);
+  });
+  p.on('error', e => {
+    if (e.type === 'peer-unavailable') estadoRede('nao', 'sala ' + cod + ' não encontrada. Confira o código na tela do jogo.');
+    else if (e.type === 'network' || e.type === 'server-error') estadoRede('nao', 'sem acesso ao servidor de sinalização. Tem internet?');
+    else estadoRede('nao', 'erro: ' + (e.type || e));
+  });
+  p.on('disconnected', () => { try { p.reconnect(); } catch(e){} });
+}
+
+$('btConectar').onclick = async () => {
+  const cod = elCod.value.trim().toUpperCase();
+  if (cod.length !== 4){ $('estadoSensorTxt').textContent = 'o código tem 4 letras — está na tela do jogo'; return; }
+  await Sensor.pedirPermissao();
+  viraControle();
+  telaCheia();
+  conectaComCodigo(cod);
+};
+$('btSouControle').onclick = () => { $('escolha').classList.remove('ver'); $('entrar').classList.add('ver'); elCod.focus(); };
+$('btVoltar1').onclick     = () => { $('entrar').classList.remove('ver'); $('escolha').classList.add('ver'); };
+$('btSouTela').onclick     = () => viraTela(true);
+$('btSozinho').onclick     = async () => { await Sensor.pedirPermissao(); viraSozinho(); };
+
+// luz do sensor na tela de digitar o código
+Sensor.escutar();
+setInterval(() => {
+  if (!$('entrar').classList.contains('ver')) return;
+  const el = $('estadoSensor'), tx = $('estadoSensorTxt');
+  if (!Sensor.tem()){ el.className = 'estado nao'; tx.textContent = 'sem sensor aqui — dá para arrastar o dedo no controle'; }
+  else if (Sensor.respondendo()){ el.className = 'estado ok'; tx.textContent = 'sensor respondendo — incline para conferir'; }
+  else if (Sensor.precisaPermissao()){ el.className = 'estado'; tx.textContent = 'o iPhone vai pedir permissão ao conectar'; }
+  else { el.className = 'estado nao'; tx.textContent = 'sem resposta do sensor até agora'; }
+}, 250);
+
+(function decide(){
+  const receptor = !!(navigator.presentation && navigator.presentation.receiver);
+
+  if (receptor){                       // a TV abriu esta página: já nasce conectada
+    navigator.presentation.receiver.connectionList.then(lista => {
+      lista.connections.forEach(c => Canal.usarCast(c));
+      lista.onconnectionavailable = e => Canal.usarCast(e.connection);
+    });
+    viraTela(false);
+    return;
+  }
+  if (params.get('papel') === 'tela'){ viraTela(true); return; }
+  if (params.get('sala')){
+    elCod.value = params.get('sala').toUpperCase().slice(0, 4);
+    $('entrar').classList.add('ver');
+    return;
+  }
+  // computador (tela grande, sem toque) vira a tela do jogo sem perguntar
+  const ehComputador = window.innerWidth >= 900 && !('ontouchstart' in window) && !navigator.maxTouchPoints;
+  if (ehComputador){ viraTela(true); return; }
+
+  $('peEscolha').innerHTML = 'Os dois aparelhos precisam estar na mesma WiFi.' +
+    (location.protocol === 'https:' ? '' : ' <b>Aviso:</b> fora de um endereço https, o sensor de inclinação não liga — sobra o controle por toque.');
+  preparaCast();
+  $('escolha').classList.add('ver');
+})();
+</script>
+</body>
+</html>

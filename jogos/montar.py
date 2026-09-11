@@ -2,6 +2,8 @@
 """
 Monta tv.html e controle.html a partir das partes:
 
+  aviao-tv.html = aviao-tv.modelo.html + PeerJS + gerador de QR + núcleo de aviao.html
+                  (arquivo único: decide sozinho se é tela, controle ou os dois)
   tv.html       = tv.modelo.html  + PeerJS + gerador de QR + núcleo de aviao.html
   controle.html = controle.modelo.html + PeerJS
 
@@ -44,6 +46,10 @@ cab = ('/* ---------------------------------------------------------------------
 def seguro(js):  # um "</script>" dentro da biblioteca fecharia o bloco antes da hora
     return js.replace('</script', '<\\/script')
 
+um = open('aviao-tv.modelo.html', encoding='utf-8').read()
+um = um.replace('__PEERJS__', seguro(peer)).replace('__QRCODE__', seguro(qr)).replace('__NUCLEO__', cab + nucleo)
+open('aviao-tv.html', 'w', encoding='utf-8').write(um)
+
 tv = open('tv.modelo.html', encoding='utf-8').read()
 tv = tv.replace('__PEERJS__', seguro(peer)).replace('__QRCODE__', seguro(qr)).replace('__NUCLEO__', cab + nucleo)
 open('tv.html', 'w', encoding='utf-8').write(tv)
@@ -51,4 +57,5 @@ open('tv.html', 'w', encoding='utf-8').write(tv)
 ct = open('controle.modelo.html', encoding='utf-8').read().replace('__PEERJS__', seguro(peer))
 open('controle.html', 'w', encoding='utf-8').write(ct)
 
-print('tv.html: %d KB   controle.html: %d KB   (núcleo: linhas %d-%d de aviao.html)' % (len(tv)//1024, len(ct)//1024, i2+1, i4))
+print('aviao-tv.html: %d KB   tv.html: %d KB   controle.html: %d KB   (núcleo: linhas %d-%d de aviao.html)'
+      % (len(um)//1024, len(tv)//1024, len(ct)//1024, i2+1, i4))

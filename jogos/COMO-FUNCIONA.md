@@ -152,8 +152,31 @@ próximo jogo.
 
 | arquivo | onde abrir | o que faz |
 |---|---|---|
-| `tv.html` | monitor, TV, notebook | roda o jogo do avião e mostra um **código de sala** de 4 letras (e um QR) |
-| `controle.html` | celular | lê o sensor e manda a inclinação para a TV, 30 vezes por segundo |
+| `aviao-tv.html` | **nos dois** | um arquivo só: descobre sozinho se é a tela, o controle, ou os dois |
+| `tv.html` | monitor, TV, notebook | a versão separada: só a tela |
+| `controle.html` | celular | a versão separada: só o controle |
+
+**O `aviao-tv.html` decide o papel assim**, na ordem:
+
+1. foi a TV que abriu a página (Chromecast) → é a **tela**, e já nasce conectada;
+2. endereço com `?papel=tela` → é a **tela**;
+3. endereço com `?sala=ABCD` → é o **controle**, com o código preenchido;
+4. tela grande e sem toque (um computador) → é a **tela**, sem perguntar;
+5. resto (um celular) → **pergunta**, e o botão de enviar para a TV vem primeiro.
+
+### O botão "Enviar o jogo para a TV"
+
+Usa a **Presentation API** — a mesma coisa que o ícone de transmitir do YouTube.
+O celular manda a TV abrir esta página com `?papel=tela`, e o canal de conversa
+entre os dois é criado pelo próprio navegador: **sem código de sala, sem digitar
+nada**. Duas exigências, e nenhuma delas está no meu código:
+
+- a TV precisa ser **Chromecast, Google TV, Android TV** ou equivalente
+  (**Samsung não é** — usa sistema próprio e o botão não a enxerga);
+- a página precisa estar num endereço **https** de verdade, porque quem vai
+  buscá-la é a TV. Arquivo no celular não serve para esse botão.
+
+Quando não dá, o botão some sozinho e sobram os outros caminhos.
 
 **Como os dois se acham.** Cada um abre uma conexão **WebRTC** — os aparelhos
 falam direto entre si pela WiFi, com uns 5 a 20 ms de atraso. Só para se
