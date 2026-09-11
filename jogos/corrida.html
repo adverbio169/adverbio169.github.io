@@ -273,6 +273,7 @@ const Controle = {
   calibrar(){
     this.zeroVolante = this._volanteBruto || 0;
     this.zeroManche  = this._mancheBruto  || 0;
+    this.volante = 0; this.manche = 0;   // vale já, não só na próxima leitura
   },
 
   _volanteBruto: 0, _mancheBruto: 0

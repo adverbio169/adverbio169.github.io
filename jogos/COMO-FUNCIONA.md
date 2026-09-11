@@ -145,3 +145,40 @@ próximo jogo.
   celular controlando o jogo que aparece na TV — aí já entra rede, e é um
   projeto bem maior.
 - **Vibração** nas batidas: `navigator.vibrate(120)` funciona no Android.
+
+## O celular como controle, o jogo na TV
+
+É o modelo Jackbox / AirConsole, e são dois arquivos:
+
+| arquivo | onde abrir | o que faz |
+|---|---|---|
+| `tv.html` | monitor, TV, notebook | roda o jogo do avião e mostra um **código de sala** de 4 letras (e um QR) |
+| `controle.html` | celular | lê o sensor e manda a inclinação para a TV, 30 vezes por segundo |
+
+**Como os dois se acham.** Cada um abre uma conexão **WebRTC** — os aparelhos
+falam direto entre si pela WiFi, com uns 5 a 20 ms de atraso. Só para se
+encontrarem pelo código eles passam por um *servidor de sinalização*: por
+padrão, o servidor público do PeerJS (precisa de internet nos dois aparelhos,
+mas só naquele instante). Depois disso, o tráfego é local.
+
+Para usar um servidor próprio — numa rede sem internet, por exemplo — abra os
+dois com `?servidor=ip:porta` e rode `npx peerjs --host 0.0.0.0 --port 9000 --path /sinal`.
+
+**O que viaja pela rede.** O celular manda `{t:'eixo', v: volante, m: manche}`
+em graus, já calibrados. A TV manda de volta o placar a cada 250 ms, e o celular
+vibra quando o número de argolas sobe. Se o sinal cair por 2 segundos, a TV
+pausa; quando o celular volta, continua de onde parou.
+
+**A regra de ouro continua valendo:** a página do celular precisa estar num
+endereço `https` de verdade (ou aberta como arquivo local pelo `file://`),
+porque é ela que lê o sensor. A página da TV não lê sensor nenhum — pode ser
+aberta até com dois cliques num arquivo.
+
+**Como o jogo entrou lá dentro.** `tv.html` é o `aviao.html` com uma troca: o
+objeto `Controle` não lê o sensor, recebe os ângulos pela rede. O núcleo do jogo
+(mundo, desenho, regras) é copiado sem alteração pelo `montar.py`. Para mudar o
+jogo, mude `aviao.html` e rode o script — `tv.html` acompanha. As bibliotecas
+(PeerJS e o gerador de QR) ficam embutidas, para cada página ser um arquivo só.
+
+**Mais controles** é o próximo passo natural: a sala já aceita conexões; o que
+falta é a TV manter um avião por conexão e o jogo desenhar todos.

@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>Controle &middot; avião</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#0b1020;color:#e6edf9;
+            font-family:system-ui,"Segoe UI",Arial,sans-serif;overscroll-behavior:none;touch-action:none}
+  .tela{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+        padding:calc(12px + env(safe-area-inset-top)) 22px calc(12px + env(safe-area-inset-bottom));gap:12px;overflow:auto}
+  @media (max-height:480px){ .tela{gap:8px} #dica{display:none} .placar .val{font-size:18px} }
+  .selo{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;color:#5cc8ff;font-weight:800}
+  h1{font-size:24px;font-weight:800;line-height:1.15;text-align:center}
+  p.txt{font-size:14px;color:#aebbd4;line-height:1.5;text-align:center;max-width:36ch}
+  p.txt b{color:#e6edf9}
+
+  /* ---- código da sala ---- */
+  #codigo{width:100%;max-width:300px;font:800 42px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.35em;
+          text-align:center;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.06);
+          border:2px solid rgba(255,255,255,.18);border-radius:14px;padding:16px 10px 16px 22px;outline:none}
+  #codigo:focus{border-color:#5cc8ff}
+  button.bt{width:100%;max-width:300px;border:0;border-radius:12px;padding:15px 16px;font-size:15.5px;
+            font-weight:800;font-family:inherit;cursor:pointer}
+  .bt.pri{background:#2d7dff;color:#fff}
+  .bt.sec{background:rgba(255,255,255,.09);color:#dce5f5;border:1px solid rgba(255,255,255,.16);font-weight:700}
+  .bt:disabled{opacity:.5}
+  #erro{display:none;max-width:340px;background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.35);
+        border-radius:10px;padding:10px 13px;font-size:13px;color:#ffc9c9;line-height:1.5;text-align:center}
+
+  /* ---- estado (linha de status) ---- */
+  .estado{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#9fb1cf;
+          border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px 12px;max-width:340px;width:100%}
+  .estado .luz{width:9px;height:9px;border-radius:50%;background:#6b7a95;flex:0 0 9px}
+  .estado.ok{color:#a9ecc4;border-color:rgba(94,255,154,.3)} .estado.ok .luz{background:#5eff9a;box-shadow:0 0 9px #5eff9a}
+  .estado.nao{color:#ffc9c9;border-color:rgba(255,90,90,.3)} .estado.nao .luz{background:#ff6a6a}
+  .estado.meio{color:#ffe1a8;border-color:rgba(255,194,77,.35)} .estado.meio .luz{background:#ffc24d}
+
+  /* ---- a tela de controle: um horizonte artificial ---- */
+  #telaControle{display:none}
+  /* flex-shrink:0 e o limite em vh: sem isso, com o celular deitado o círculo era
+     esmagado pela coluna e virava uma elipse */
+  #horizonte{--d:min(72vw,46vh,300px);width:var(--d);height:var(--d);flex-shrink:0;
+             border-radius:50%;overflow:hidden;position:relative;
+             border:3px solid rgba(255,255,255,.18);box-shadow:0 0 0 8px rgba(255,255,255,.04),0 20px 50px rgba(0,0,0,.5);
+             background:#2f6a3f}
+  #ceu{position:absolute;left:-50%;top:-50%;width:200%;height:200%;
+       background:linear-gradient(#0e2a5c 0%,#3d7cc0 45%,#a9cbe8 50%,#2f6a3f 50%,#245532 100%);
+       transform-origin:center;will-change:transform}
+  #mira{position:absolute;inset:0;pointer-events:none}
+  #mira:before{content:"";position:absolute;left:18%;right:18%;top:50%;height:3px;margin-top:-1px;background:#ffc24d;
+               border-radius:2px;clip-path:polygon(0 0,36% 0,36% 100%,0 100%,0 0,64% 0,100% 0,100% 100%,64% 100%,64% 0)}
+  #mira:after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#ffc24d}
+  .placar{display:flex;gap:18px;font-variant-numeric:tabular-nums}
+  .placar div{text-align:center}
+  .placar .rot{font-size:9.5px;letter-spacing:1.6px;text-transform:uppercase;color:#8fa3c8;font-weight:700}
+  .placar .val{font-size:22px;font-weight:800}
+  .linha{display:flex;gap:10px;width:100%;max-width:300px}
+  .linha .bt{flex:1}
+  #dica{font-size:12px;color:#7d8cab;text-align:center;max-width:36ch;line-height:1.5}
+</style>
+</head>
+<body>
+
+<!-- ============ TELA 1: entrar na sala ============ -->
+<div class="tela" id="telaCodigo">
+  <div class="selo">Controle &middot; avião</div>
+  <h1>Digite o código que está na TV</h1>
+  <input id="codigo" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD" inputmode="text">
+  <div id="erro"></div>
+  <div class="estado" id="estadoSensor"><span class="luz"></span><span id="estadoSensorTxt">verificando o sensor&hellip;</span></div>
+  <button class="bt pri" id="btConectar">Conectar</button>
+  <p class="txt">Abra <b>tv.html</b> no monitor ou na TV: o código aparece lá, grande.</p>
+</div>
+
+<!-- ============ TELA 2: o controle ============ -->
+<div class="tela" id="telaControle">
+  <div class="estado" id="estadoRede"><span class="luz"></span><span id="estadoRedeTxt">conectando&hellip;</span></div>
+  <div id="horizonte"><div id="ceu"></div><div id="mira"></div></div>
+  <div class="placar">
+    <div><div class="rot">Argolas</div><div class="val" id="pArg">0</div></div>
+    <div><div class="rot">Combustível</div><div class="val" id="pTempo">&ndash;</div></div>
+    <div><div class="rot">Atraso</div><div class="val" id="pMs">&ndash;</div></div>
+  </div>
+  <div class="linha">
+    <button class="bt pri" id="btComecar">Começar</button>
+    <button class="bt sec" id="btCalibrar">Zerar</button>
+  </div>
+  <div id="dica">Segure o celular <b>deitado</b>. <b>Zerar</b> torna a posição atual da sua mão o voo reto.
+    Girar de lado inclina as asas; puxar a borda de cima levanta o nariz.</div>
+</div>
+
+<!-- PeerJS (WebRTC com sinalização), embutido para a página ser um arquivo só -->
+<script>
+__PEERJS__
+</script>
+
+<script>
+/* =============================================================================
+   CONTROLE REMOTO — o celular vira só o controle; o jogo roda em tv.html.
+
+   Como funciona:
+     1. tv.html cria uma "sala" com um código de 4 letras e fica esperando.
+     2. Este arquivo lê o sensor de inclinação e manda os ângulos para a TV,
+        30 vezes por segundo, direto pela WiFi (WebRTC). Um servidor de
+        sinalização só serve para os dois se acharem pelo código; depois
+        disso o tráfego é entre os dois aparelhos.
+
+   A parte do sensor (Controle) é a mesma dos outros jogos.
+   ========================================================================== */
+const Controle = {
+  modo: 'nenhum', volante: 0, manche: 0, zeroVolante: 0, zeroManche: 0,
+  recebeu: false, escutando: false, ultimaLeitura: 0, _volanteBruto: 0, _mancheBruto: 0,
+  temSensor(){ return typeof DeviceOrientationEvent !== 'undefined'; },
+  precisaPermissao(){ return this.temSensor() && typeof DeviceOrientationEvent.requestPermission === 'function'; },
+  escutar(){
+    if (!this.temSensor() || this.escutando) return;
+    window.addEventListener('deviceorientation', this._ler, true);
+    this.escutando = true;
+  },
+  respondendo(){ return this.recebeu && (Date.now() - this.ultimaLeitura) < 2000; },
+  async pedirPermissao(){
+    if (!this.precisaPermissao()) return true;
+    const r = await DeviceOrientationEvent.requestPermission();
+    return r === 'granted';
+  },
+  _ler: (e) => {
+    if (e.beta === null && e.gamma === null) return;
+    const a = Controle.eixos(e.beta || 0, e.gamma || 0);
+    Controle._volanteBruto = a.volante;
+    Controle._mancheBruto  = a.manche;
+    Controle.volante = a.volante - Controle.zeroVolante;
+    Controle.manche  = a.manche  - Controle.zeroManche;
+    Controle.recebeu = true;
+    Controle.ultimaLeitura = Date.now();
+    Controle.modo = 'sensor';
+  },
+  eixos(beta, gamma){
+    const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    switch (ang){
+      case 90:            return { volante:  beta,  manche: -gamma };
+      case -90: case 270: return { volante: -beta,  manche:  gamma };
+      case 180:           return { volante: -gamma, manche: -beta  };
+      default:            return { volante:  gamma, manche:  beta  };
+    }
+  },
+  calibrar(){
+    this.zeroVolante = this._volanteBruto || 0; this.zeroManche = this._mancheBruto || 0;
+    this.volante = 0; this.manche = 0;   // vale já, não só na próxima leitura
+  }
+};
+
+/* --- controle por toque, se o sensor não existir: arrasta o dedo no horizonte --- */
+let toque = null;
+const elHorizonte = document.getElementById('horizonte');
+elHorizonte.addEventListener('touchstart', e => {
+  if (Controle.respondendo()) return;
+  toque = { x: e.touches[0].clientX, y: e.touches[0].clientY }; Controle.modo = 'toque';
+}, {passive:true});
+elHorizonte.addEventListener('touchmove', e => {
+  if (!toque) return;
+  Controle.volante = Math.max(-30, Math.min(30, (e.touches[0].clientX - toque.x) / 3));
+  Controle.manche  = Math.max(-30, Math.min(30, (toque.y - e.touches[0].clientY) / 3));
+}, {passive:true});
+elHorizonte.addEventListener('touchend', () => { toque = null; Controle.volante = 0; Controle.manche = 0; }, {passive:true});
+
+/* =============================================================================
+   REDE
+   ========================================================================== */
+// ?servidor=host:porta usa um servidor de sinalização próprio (para testes ou
+// para uma rede sem internet). Sem isso, usa o servidor público do PeerJS.
+function opcoesPeer(){
+  const s = new URLSearchParams(location.search).get('servidor');
+  if (!s) return { debug: 0 };
+  const [host, porta] = s.split(':');
+  return { host, port: parseInt(porta || '9000', 10), path: '/sinal', secure: location.protocol === 'https:', debug: 0 };
+}
+
+let peer = null, conn = null, seq = 0, latencia = null, ultimoPong = 0, pontosAntes = 0;
+const $ = id => document.getElementById(id);
+
+function estadoRede(classe, txt){ $('estadoRede').className = 'estado ' + classe; $('estadoRedeTxt').textContent = txt; }
+function erro(msg){ const e = $('erro'); e.textContent = msg; e.style.display = 'block'; }
+
+function conectar(codigo){
+  estadoRede('meio', 'procurando a sala ' + codigo + '…');
+  peer = new Peer(undefined, opcoesPeer());
+  peer.on('open', () => {
+    conn = peer.connect('aviao-rr-' + codigo, { reliable: false, serialization: 'json' });
+    conn.on('open', () => {
+      estadoRede('ok', 'conectado na sala ' + codigo);
+      conn.send({ t: 'oi' });
+      try { navigator.wakeLock && navigator.wakeLock.request('screen'); } catch(e){}
+    });
+    conn.on('data', d => {
+      if (!d || !d.t) return;
+      if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
+      if (d.t === 'estado'){
+        $('pArg').textContent = d.pontos;
+        $('pTempo').textContent = d.jogando ? Math.ceil(d.tempo) + 's' : '–';
+        $('btComecar').textContent = d.jogando ? 'Jogando…' : (d.pontos > 0 || d.acabou ? 'Jogar de novo' : 'Começar');
+        $('btComecar').disabled = !!d.jogando;
+        if (d.pontos > pontosAntes) vibra(60);
+        pontosAntes = d.pontos;
+      }
+    });
+    conn.on('close', () => { estadoRede('nao', 'a TV desconectou'); });
+    conn.on('error', e => { estadoRede('nao', 'erro na conexão: ' + (e.message || e.type || e)); });
+    // se a sala não existir, o PeerJS demora a avisar; vigiamos por conta própria
+    setTimeout(() => { if (!conn.open) estadoRede('nao', 'sala ' + codigo + ' não encontrada. O código está certo? A TV está aberta?'); }, 8000);
+  });
+  peer.on('error', e => {
+    const tipo = e.type || '';
+    if (tipo === 'peer-unavailable') estadoRede('nao', 'sala ' + codigo + ' não encontrada. Confira o código na TV.');
+    else if (tipo === 'network' || tipo === 'server-error') estadoRede('nao', 'sem acesso ao servidor de sinalização. Tem internet?');
+    else estadoRede('nao', 'erro: ' + tipo);
+  });
+  peer.on('disconnected', () => { try { peer.reconnect(); } catch(e){} });
+}
+
+function vibra(ms){ try { navigator.vibrate && navigator.vibrate(ms); } catch(e){} }
+
+// 30 vezes por segundo: os ângulos já calibrados. Uma vez por segundo: ping.
+setInterval(() => {
+  if (!conn || !conn.open) return;
+  conn.send({ t: 'eixo', v: +Controle.volante.toFixed(1), m: +Controle.manche.toFixed(1), s: seq++ });
+}, 33);
+setInterval(() => {
+  if (!conn || !conn.open) return;
+  conn.send({ t: 'ping', at: Date.now() });
+  $('pMs').textContent = latencia == null ? '–' : latencia + ' ms';
+  if (ultimoPong && Date.now() - ultimoPong > 4000) estadoRede('nao', 'a TV parou de responder');
+}, 1000);
+
+/* =============================================================================
+   TELA
+   ========================================================================== */
+// horizonte artificial: gira com o volante, sobe/desce com o manche
+(function anima(){
+  const v = Controle.volante, m = Controle.manche;
+  $('ceu').style.transform = 'rotate(' + (-v) + 'deg) translateY(' + (m * 1.4) + '%)';
+  requestAnimationFrame(anima);
+})();
+
+// luz do sensor na tela de entrada
+Controle.escutar();
+setInterval(() => {
+  const el = $('estadoSensor'), tx = $('estadoSensorTxt');
+  if (!Controle.temSensor()){ el.className = 'estado nao'; tx.textContent = 'sem sensor neste navegador — dá para arrastar o dedo'; }
+  else if (Controle.respondendo()){ el.className = 'estado ok'; tx.textContent = 'sensor respondendo — incline para conferir'; }
+  else if (Controle.precisaPermissao()){ el.className = 'estado'; tx.textContent = 'o iPhone vai pedir permissão ao conectar'; }
+  else { el.className = 'estado nao'; tx.textContent = 'sem resposta do sensor até agora'; }
+}, 250);
+
+const elCodigo = $('codigo');
+elCodigo.addEventListener('input', () => { elCodigo.value = elCodigo.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); });
+elCodigo.addEventListener('keydown', e => { if (e.key === 'Enter') $('btConectar').click(); });
+
+$('btConectar').onclick = async () => {
+  const codigo = elCodigo.value.trim().toUpperCase();
+  if (codigo.length !== 4){ erro('O código tem 4 letras — está escrito na TV.'); return; }
+  $('erro').style.display = 'none';
+  try { if (!(await Controle.pedirPermissao())) erro('Permissão de movimento negada; dá para jogar arrastando o dedo no horizonte.'); } catch(e){}
+  Controle.escutar();
+  $('telaCodigo').style.display = 'none';
+  $('telaControle').style.display = 'flex';
+  try { const el = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || (()=>{})).call(el); } catch(e){}
+  conectar(codigo);
+  setTimeout(() => Controle.calibrar(), 600);   // zera na mão, depois que a pessoa se ajeitou
+};
+$('btCalibrar').onclick = () => { Controle.calibrar(); vibra(30); };
+$('btComecar').onclick  = () => { if (conn && conn.open) conn.send({ t: 'botao', b: 'comecar' }); Controle.calibrar(); };
+
+// código vindo pelo endereço (?sala=ABCD), por exemplo lendo o QR da TV
+const salaUrl = new URLSearchParams(location.search).get('sala');
+if (salaUrl){ elCodigo.value = salaUrl.toUpperCase().slice(0, 4); }
+</script>
+</body>
+</html>
