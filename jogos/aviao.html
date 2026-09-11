@@ -23,7 +23,7 @@
   #cTempo.pouco .val{color:#ff6a6a}
   #recorde{position:absolute;top:calc(74px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
            font-size:11px;color:#9fb4d8;text-align:center;width:100%}
-  #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;font-size:30px;font-weight:900;
+  #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;padding:0 16px;font-size:clamp(19px,5.6vw,30px);font-weight:900;
          letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
 
   #capa{position:fixed;inset:0;background:linear-gradient(170deg,#101a33,#070b16 70%);
@@ -39,13 +39,31 @@
     .selo{font-size:9px}
     h1{font-size:19px;margin:5px 0 7px}
     .txt{font-size:12.5px;line-height:1.42;margin-bottom:9px}
-    button.bt{padding:10px 14px;font-size:14px;margin-bottom:6px}
+    /* luz do sensor: mostra na tela de abertura se o aparelho está respondendo,
+     antes de a pessoa começar a jogar e descobrir do jeito ruim */
+  .estado{display:flex;align-items:center;gap:10px;font-size:12.5px;color:#9fb1cf;margin-bottom:12px;
+          border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px 12px}
+  .estado .luz{width:9px;height:9px;border-radius:50%;background:#6b7a95;flex:0 0 9px}
+  .estado .medidor{margin-left:auto;width:62px;height:6px;border-radius:99px;flex:0 0 62px;
+                   background:rgba(255,255,255,.1);position:relative;overflow:hidden}
+  .estado .medidor i{position:absolute;top:0;bottom:0;width:12px;border-radius:99px;background:#5cc8ff;left:40%}
+  .estado.ok{color:#a9ecc4;border-color:rgba(94,255,154,.3)}
+  .estado.ok .luz{background:#5eff9a;box-shadow:0 0 9px #5eff9a}
+  .estado.nao{color:#ffc9c9;border-color:rgba(255,90,90,.3)}
+  .estado.nao .luz{background:#ff6a6a}
+  button.bt{padding:10px 14px;font-size:14px;margin-bottom:6px}
     .pe{font-size:10.5px;margin-top:8px;padding-top:8px;line-height:1.4}
     .placar{font-size:13px;line-height:1.45;margin-bottom:9px}
     #erro{font-size:11.5px;padding:8px 10px;margin-bottom:9px}
   }
-  /* tela ainda mais baixa: o rodapé é só informação extra, sai da frente */
-  @media (max-height:395px){ .pe{display:none} }
+  /* tela ainda mais baixa: o rodapé é só informação extra, sai da frente,
+     e o resto encolhe o suficiente para o botão caber sem rolagem */
+  @media (max-height:480px){
+    .pe{display:none}
+    h1{font-size:17px;margin:4px 0 6px}
+    .txt{font-size:12px;line-height:1.38;margin-bottom:8px}
+    .estado{padding:6px 10px;font-size:11.5px;margin-bottom:8px;gap:8px}
+  }
   .selo{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;color:#5cc8ff;font-weight:800}
   h1{font-size:26px;line-height:1.15;margin:8px 0 10px;font-weight:800}
   .txt{font-size:14px;color:#aebbd4;line-height:1.55;margin-bottom:16px}
@@ -85,6 +103,11 @@
       <b>puxar a borda de cima</b> levanta o nariz. Atravesse as <b>argolas</b>
       para ganhar combustível.
     </div>
+    <div class="estado" id="estado">
+      <span class="luz"></span>
+      <span id="estadoTxt">verificando o sensor&hellip;</span>
+      <span class="medidor"><i id="estadoBarra"></i></span>
+    </div>
     <button class="bt pri" id="btSensor">Voar com a inclinação do celular</button>
     <button class="bt sec" id="btToque">Voar arrastando o dedo na tela</button>
     <div class="pe" id="pe">
@@ -120,6 +143,9 @@ const Controle = {
   volante: 0, manche: 0,
   zeroVolante: 0, zeroManche: 0,
   recebeu: false,
+  escutando: false,
+  ultimaLeitura: 0,
+  esperandoSensor: false,
   _volanteBruto: 0, _mancheBruto: 0,
 
   temSensor(){ return typeof DeviceOrientationEvent !== 'undefined'; },
@@ -127,27 +153,41 @@ const Controle = {
     return this.temSensor() && typeof DeviceOrientationEvent.requestPermission === 'function';
   },
 
-  async ligarSensor(){
+  // Liga o ouvinte assim que a página abre. No Android não precisa de permissão,
+  // e ligar cedo dá tempo do sensor acordar antes de a pessoa tocar em Jogar.
+  escutar(){
+    if (!this.temSensor() || this.escutando) return;
+    window.addEventListener('deviceorientation', this._ler, true);
+    this.escutando = true;
+  },
+
+  // chegou leitura agora há pouco? = o sensor está vivo neste exato momento
+  respondendo(){ return this.recebeu && (Date.now() - this.ultimaLeitura) < 2000; },
+
+  async ligarSensor(aoEsperar){
     if (!this.temSensor()) throw new Error('Este navegador não expõe o sensor de inclinação.');
     if (this.precisaPermissao()){
       const r = await DeviceOrientationEvent.requestPermission();
       if (r !== 'granted') throw new Error('Permissão de movimento negada. Em Ajustes ▸ Safari, ligue "Movimento e orientação".');
     }
-    window.addEventListener('deviceorientation', this._ler, true);
+    this.escutar();
+
+    // Espera até 5 s pela primeira leitura. O sensor do Android às vezes leva
+    // alguns segundos para acordar; desistir rápido demais faz o jogo dizer que
+    // não tem sensor quando ele só estava demorando.
+    const t0 = Date.now();
+    while (!this.recebeu){
+      if (Date.now() - t0 > 5000){
+        // NÃO desliga o ouvinte: se o sensor acordar depois, _ler assume o
+        // controle sozinho, mesmo com o jogo já rodando no toque.
+        this.esperandoSensor = true;
+        throw new Error('O sensor não respondeu em 5 segundos.');
+      }
+      if (aoEsperar) aoEsperar((Date.now()-t0)/1000);
+      await new Promise(r => setTimeout(r, 100));
+    }
     this.modo = 'sensor';
-    await new Promise((ok, falha) => {
-      const t0 = Date.now();
-      const olha = () => {
-        if (this.recebeu) return ok();
-        if (Date.now() - t0 > 1200){
-          window.removeEventListener('deviceorientation', this._ler, true);
-          this.modo = 'nenhum';
-          return falha(new Error('O aparelho não enviou nenhuma leitura de inclinação. Use o controle por toque.'));
-        }
-        requestAnimationFrame(olha);
-      };
-      olha();
-    });
+    this.esperandoSensor = false;
     this.calibrar();
   },
 
@@ -159,6 +199,14 @@ const Controle = {
     Controle.volante = a.volante - Controle.zeroVolante;
     Controle.manche  = a.manche  - Controle.zeroManche;
     Controle.recebeu = true;
+    Controle.ultimaLeitura = Date.now();
+    // o sensor acordou depois de o jogo já ter caído para o toque: assume
+    if (Controle.esperandoSensor){
+      Controle.esperandoSensor = false;
+      Controle.modo = 'sensor';
+      Controle.calibrar();
+      if (typeof mostraAviso === 'function') mostraAviso('SENSOR LIGADO', '#7dffb0');
+    }
   },
 
   eixos(beta, gamma){
@@ -511,12 +559,13 @@ function atualiza(dt){
 }
 
 let ultimoAviso = 0;
-function mostraAviso(txt, cor){
+function mostraAviso(txt, cor, ms){
   const el = document.getElementById('aviso');
+  const dur = ms || 900;
   if (el.textContent === txt && Date.now()-ultimoAviso < 400) return;
   el.textContent = txt; el.style.color = cor; el.style.opacity = 1;
   ultimoAviso = Date.now();
-  setTimeout(()=>{ if (Date.now()-ultimoAviso >= 700) el.style.opacity = 0; }, 750);
+  setTimeout(()=>{ if (Date.now()-ultimoAviso >= dur-60) el.style.opacity = 0; }, dur);
 }
 
 const elArg=document.getElementById('vArg'), elTempo=document.getElementById('vTempo');
@@ -577,9 +626,23 @@ const elErro = document.getElementById('erro');
 function erro(msg){ elErro.textContent = msg; elErro.style.display='block'; }
 
 async function comSensor(){
-  elErro.style.display='none';
-  try { await Controle.ligarSensor(); telaCheia(); comeca(); }
-  catch(e){ erro(e.message + ' — dá para voar arrastando o dedo, no botão abaixo.'); }
+  elErro.style.display = 'none';
+  const bt = document.getElementById('btSensor');
+  const rotulo = bt.textContent;
+  bt.disabled = true;
+  try {
+    await Controle.ligarSensor(s => { bt.textContent = 'aguardando o sensor… ' + s.toFixed(0) + 's'; });
+    bt.textContent = rotulo; bt.disabled = false;
+    telaCheia(); comeca();
+  } catch (e){
+    bt.textContent = rotulo; bt.disabled = false;
+    // Ninguém fica preso na tela de abertura: começa no toque, avisa o motivo,
+    // e o ouvinte continua ligado — se o sensor acordar, ele assume sozinho.
+    erro(e.message + ' Começou no controle por toque; se o sensor acordar, ele assume sozinho.');
+    Controle.modo = 'toque';
+    telaCheia(); comeca();
+    mostraAviso('SEM SENSOR — USE O DEDO', '#ffb86b', 3200);
+  }
 }
 function comToque(){ Controle.modo='toque'; telaCheia(); comeca(); }
 function telaCheia(){
@@ -648,6 +711,32 @@ document.getElementById('btToque').onclick  = comToque;
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && jogando){ jogando=false; capa.style.display='flex'; }
 });
+
+/* --- luz do sensor na tela de abertura -------------------------------------
+   Liga o ouvinte assim que a página abre (no Android não precisa de permissão)
+   e mostra ao vivo se o aparelho está respondendo. Assim a pessoa vê a verdade
+   antes de tocar em Jogar, em vez de descobrir dentro do jogo. --------------*/
+Controle.escutar();
+const elEstado = document.getElementById('estado');
+const elEstadoTxt = document.getElementById('estadoTxt');
+const elEstadoBarra = document.getElementById('estadoBarra');
+setInterval(() => {
+  if (capa.style.display === 'none') return;
+  if (!Controle.temSensor()){
+    elEstado.className = 'estado nao';
+    elEstadoTxt.textContent = 'este navegador não tem sensor de inclinação';
+  } else if (Controle.respondendo()){
+    elEstado.className = 'estado ok';
+    elEstadoTxt.textContent = 'sensor respondendo — incline o celular';
+    elEstadoBarra.style.left = (40 + Math.max(-38, Math.min(38, Controle._volanteBruto))) + '%';
+  } else if (Controle.precisaPermissao()){
+    elEstado.className = 'estado';
+    elEstadoTxt.textContent = 'toque no botão para o iPhone pedir permissão';
+  } else {
+    elEstado.className = 'estado nao';
+    elEstadoTxt.textContent = 'sem resposta do sensor até agora';
+  }
+}, 200);
 
 redimensiona();
 if (!Controle.temSensor()){
