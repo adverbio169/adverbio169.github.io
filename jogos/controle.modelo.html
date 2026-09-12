@@ -209,7 +209,7 @@ body.paisagem #controle.ver,
        então dá para trocar de arma com os olhos na tela grande. -->
   <div class="armas" id="seletorArma">
     <div class="armaLado" id="armaAnt"></div>
-    <div class="armaAtual" id="armaAtual">BOMBA<i id="mArma">14</i></div>
+    <div class="armaAtual" id="armaAtual">NUCLEAR<i id="mArma">6</i></div>
     <div class="armaLado" id="armaProx"></div>
     <div class="armaDica">‹ deslize ›</div>
   </div>
@@ -575,9 +575,9 @@ function enviaCtl(o){ if (conn && conn.open) conn.send(o); }
   if (!fogo || !sel) return;
 
   const ORDEM = ['bomba','missil','metralha'];
-  const NOME  = { bomba:'BOMBA', missil:'MÍSSIL', metralha:'METRA' };
+  const NOME  = { bomba:'NUCLEAR', missil:'MÍSSIL', metralha:'METRA' };
   const TOQUES= { bomba:[28], missil:[28,60,28], metralha:[28,60,28,60,28] };
-  let iArma = 0, municoes = { bomba:'14', missil:'8', metralha:'400' };
+  let iArma = 0, municoes = { bomba:'6', missil:'8', metralha:'400' };
 
   const elAtual = document.getElementById('armaAtual');
   const elMun   = document.getElementById('mArma');

@@ -43,7 +43,7 @@
   #cPontos{left:18px;top:130px}
   #btVisao{position:absolute;left:18px;bottom:62px;pointer-events:auto;cursor:pointer;
            border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.55);border-radius:10px;
-           padding:6px 9px;font-size:15px;line-height:1}
+           padding:9px 12px;font-size:24px;line-height:1}
   /* altímetro: trilho vertical na direita com uma marca que sobe e desce.
      Sem ele o jogador não tem como perceber que está subindo. */
   #altimetro{position:absolute;right:22px;top:50%;transform:translateY(-50%);
@@ -67,7 +67,7 @@
   /* Fica aberto o jogo inteiro: enquanto o QR estiver na tela, mais gente pode
      entrar na sala sem parar a partida. Encolhe sozinho depois de um tempo
      para não atrapalhar, e volta ao tamanho ao passar o rato / tocar. */
-  #convite{position:absolute;bottom:14px;left:18px;display:flex;align-items:center;gap:10px;
+  #convite{position:absolute;bottom:62px;left:18px;display:flex;align-items:center;gap:10px;
            background:rgba(8,12,26,.55);border:1px solid rgba(255,255,255,.14);border-radius:12px;
            padding:8px 12px 8px 8px;pointer-events:auto;transition:opacity .4s, transform .3s;
            transform-origin:left bottom}
@@ -299,7 +299,7 @@ body.paisagem #controle.ver,
   <div id="selTurbo">TURBO</div>
   <div id="barraProg2"><i id="barraProg"></i></div>
   <div class="caixa" id="cArma"><div class="rot">Arma <span class="dica2">(1 2 3 &middot; espaço atira)</span></div>
-    <div class="val"><span id="vArma">BOMBA</span> <small>x<span id="vMun">14</span></small></div></div>
+    <div class="val"><span id="vArma">NUCLEAR</span> <small>x<span id="vMun">6</span></small></div></div>
   <div class="caixa" id="cPontos"><div class="rot">Pontos</div><div class="val" id="vPontos">0</div>
     <div class="rot" style="margin-top:4px">Alvos <b id="vAlvos">0/0</b></div></div>
   <button id="btVisao" title="cabine / de fora (V)">&#128065;</button>
@@ -420,7 +420,7 @@ body.paisagem #controle.ver,
        então dá para trocar de arma com os olhos na tela grande. -->
   <div class="armas" id="seletorArma">
     <div class="armaLado" id="armaAnt"></div>
-    <div class="armaAtual" id="armaAtual">BOMBA<i id="mArma">14</i></div>
+    <div class="armaAtual" id="armaAtual">NUCLEAR<i id="mArma">6</i></div>
     <div class="armaLado" id="armaProx"></div>
     <div class="armaDica">‹ deslize ›</div>
   </div>
@@ -2999,12 +2999,13 @@ const DA_NORMAL  = 20;
 const DA_AZUL    = 32;
 const TURBO_SEG  = 5;
 
+const RAIO_NUKE  = 9000;   // o estrago da bomba: 450 m no placar
 const RAIO_POMBO = 170;
 const RAIO_AVIAO = 430;
 
 /* --- armas ---------------------------------------------------------------- */
 const ARMAS = {
-  bomba:    { nome:'BOMBA',        municao:14,  recarga:0.55, cor:'#ffc24d' },
+  bomba:    { nome:'NUCLEAR',      municao:6,   recarga:2.2,  cor:'#ffc24d' },
   missil:   { nome:'MÍSSIL',       municao:8,   recarga:0.85, cor:'#ff7a4d' },
   metralha: { nome:'METRALHADORA', municao:400, recarga:0.07, cor:'#ffe98a' }
 };
@@ -3050,7 +3051,7 @@ let cosR=1, senR=0, rumo=0;                  // rumo (só para bússola e recort
 let inclinacao=0, arfagem=0;                 // ângulos LIDOS da base, para os relógios
 let cockpit=false;
 let tambores=[], obstaculos=[], predios=[], alvos=[], nuvens=[], particulas=[];
-let bombas=[], tiros=[];
+let bombas=[], tiros=[], cogumelos=[];
 let distancia=0, recorde=0, combustivel=100, turbo=0, voo=VOO_BASE;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
@@ -3059,6 +3060,13 @@ let tecla={esq:false,dir:false,cima:false,baixo:false,lemeE:false,lemeD:false};
 let leme=0;                                  // posição do leme, -1 a 1
 let toqueX=0, toqueY=0, usandoToque=false;
 let vq=0;                                    // velocidade de queda, só na queda
+
+/* MODO TESTE: combustível infinito. Ligado por enquanto, a pedido do Brunno,
+   para dar para explorar o mapa sem ficar procurando tambor. Para voltar ao
+   jogo normal é só abrir com ?infinito=0 no endereço — ou me pedir que eu
+   inverto o padrão daqui. */
+let infinito = true;
+try { if (new URLSearchParams(location.search).get('infinito') === '0') infinito = false; } catch(e){}
 
 /* --- a TORRE, para o segundo jogador ---------------------------------------
    O copiloto não pilota: ele aponta. miraX e miraY são o desvio da torre em
@@ -3412,7 +3420,7 @@ function geraNuvens(){
 }
 
 function reiniciaMundo(){
-  particulas = []; bombas = []; tiros = [];
+  particulas = []; bombas = []; tiros = []; cogumelos = [];
   distancia = 0;
   montaMapa(); geraNuvens();
   aviaoX = 0; aviaoZ = 0; aviaoY = 1500;
@@ -3951,6 +3959,120 @@ function desenhaTiro(t){
   ctx.beginPath(); ctx.moveTo(q.x,q.y); ctx.lineTo(p.x,p.y); ctx.stroke();
 }
 
+/* O cogumelo é desenhado NO MUNDO: sobe, abre o chapéu e vai sumindo. Como
+   passa pela mesma projeção do resto, encolhe com a distância e gira junto
+   quando o avião está de lado — e não parece adesivo colado na tela.
+
+   Uma coisa que a primeira versão errou: passei a coluna pela névoa cheia, e
+   como a névoa puxa tudo para a cor do céu, o cogumelo sumia no próprio céu.
+   Aqui a névoa entra com um terço da força — uma explosão dessas tem luz
+   própria, não se apaga na distância como um prédio. */
+function corNuke(rgb, luz, zr){ return comNevoa(rgb, luz, zr*0.33); }
+
+function desenhaCogumelo(c){
+  const sobe = Math.min(1, c.t/2.6);
+  const vida = Math.max(0, 1 - Math.max(0, c.t - 6)/4);
+  if (vida <= 0) return;
+  const alturaTopo = CHAO + 600 + sobe*8400;
+  const rTopo = 700 + sobe*2600;
+  const zr = longe(c.x, c.z);
+  const pBase = projetaM(c.x, CHAO + 30, c.z);
+  const pTopo = projetaM(c.x, alturaTopo, c.z);
+  ctx.save();
+  ctx.globalAlpha = vida;
+
+  // 1) a marca preta no chão. Desenhada como polígono PROJETADO, não como
+  //    elipse na tela: assim ela deita no terreno e acompanha a inclinação do
+  //    avião, em vez de ficar como um adesivo redondo colado no vidro.
+  const rq = RAIO_NUKE*0.55;
+  ctx.fillStyle = 'rgba(26,22,20,' + (0.5*vida).toFixed(2) + ')';
+  ctx.beginPath();
+  let abriu = false;
+  for (let i = 0; i <= 40; i++){
+    const a = (i/40)*Math.PI*2;
+    const q = projetaM(c.x + Math.cos(a)*rq, CHAO + 10, c.z + Math.sin(a)*rq);
+    if (!q){ abriu = false; continue; }
+    if (!abriu){ ctx.moveTo(q.x, q.y); abriu = true; } else ctx.lineTo(q.x, q.y);
+  }
+  if (abriu){ ctx.closePath(); ctx.fill(); }
+
+  // 2) a bola de fogo dos primeiros instantes
+  if (c.t < 1.4 && pBase){
+    const f = 1 - c.t/1.4;
+    const rb = (1200 + c.t*2200) * pBase.s;
+    const g = ctx.createRadialGradient(pBase.x, pBase.y - rb*0.4, rb*0.1, pBase.x, pBase.y - rb*0.4, rb);
+    g.addColorStop(0, 'rgba(255,255,240,' + f.toFixed(2) + ')');
+    g.addColorStop(0.4, 'rgba(255,196,90,' + (f*0.9).toFixed(2) + ')');
+    g.addColorStop(1, 'rgba(255,120,40,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(pBase.x, pBase.y - rb*0.4, rb, 0, 7); ctx.fill();
+  }
+
+  // 3) a coluna: escura e grossa embaixo, clara em cima
+  const larg = 420 + sobe*520;
+  for (let i = 0; i <= 12; i++){
+    const f = i/12;
+    const p = projetaM(c.x, CHAO + (alturaTopo - CHAO)*f, c.z);
+    if (!p) continue;
+    const r = larg*(0.95 - f*0.35 + Math.sin(f*5 + c.t*1.2)*0.13) * p.s;
+    if (r < 0.7) continue;
+    const tom = 0.72 + f*0.5;
+    ctx.fillStyle = corNuke([150, 140, 128], tom, zr);
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
+  }
+
+  // 4) o chapéu
+  if (pTopo){
+    const rt = rTopo * pTopo.s;
+    if (rt > 1){
+      // barriga escura
+      ctx.fillStyle = corNuke([96, 88, 80], 1, zr);
+      ctx.beginPath(); ctx.ellipse(pTopo.x, pTopo.y + rt*0.16, rt*1.06, rt*0.40, 0, 0, 7); ctx.fill();
+      for (let i = 0; i < 11; i++){
+        const a = (i/11)*Math.PI*2 + c.t*0.2;
+        const rr = rt*(0.40 + 0.15*Math.sin(i*2.3 + c.t));
+        ctx.fillStyle = corNuke([176, 166, 152], 1 + Math.cos(a)*0.16, zr);
+        ctx.beginPath();
+        ctx.arc(pTopo.x + Math.cos(a)*rt*0.72, pTopo.y + Math.sin(a)*rt*0.26 - rt*0.06, rr, 0, 7);
+        ctx.fill();
+      }
+      ctx.fillStyle = corNuke([214, 205, 190], 1.12, zr);
+      ctx.beginPath(); ctx.ellipse(pTopo.x, pTopo.y - rt*0.22, rt*0.80, rt*0.42, 0, 0, 7); ctx.fill();
+      if (c.t < 3.2){
+        ctx.globalAlpha = vida * (1 - c.t/3.2);
+        ctx.fillStyle = 'rgba(255,170,70,.8)';
+        ctx.beginPath(); ctx.ellipse(pTopo.x, pTopo.y, rt*0.46, rt*0.24, 0, 0, 7); ctx.fill();
+        ctx.globalAlpha = vida;
+      }
+    }
+  }
+
+  // 5) o anel de choque correndo pelo chão: é ele que dá a escala do estrago
+  if (c.t < 2.6){
+    const raio = RAIO_NUKE * Math.min(1, c.t/2.2);
+    const f = 1 - c.t/2.6;
+    for (const par of [[1.0, 'rgba(255,246,214,', 26], [0.86, 'rgba(255,170,80,', 14]]){
+      ctx.globalAlpha = vida * f * 0.95;
+      ctx.strokeStyle = par[1] + (0.9*f).toFixed(2) + ')';
+      let largura = 4;
+      const q0 = projetaM(c.x, CHAO + 30, c.z);
+      if (q0) largura = Math.max(2, par[2]*q0.s*6);
+      ctx.lineWidth = largura;
+      ctx.beginPath();
+      let comecou = false;
+      for (let i = 0; i <= 40; i++){
+        const a = (i/40)*Math.PI*2;
+        const q = projetaM(c.x + Math.cos(a)*raio*par[0], CHAO + 40, c.z + Math.sin(a)*raio*par[0]);
+        if (!q){ comecou = false; continue; }
+        if (!comecou){ ctx.moveTo(q.x, q.y); comecou = true; } else ctx.lineTo(q.x, q.y);
+      }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
 function desenhaParticula(f){
   const p = projetaM(f.x, f.y, f.z);
   if (!p) return;
@@ -4039,42 +4161,107 @@ function desenhaAviao(){
   if (cockpit) return;                      // de dentro não se vê o próprio avião
   const p = projetaM(aviaoX, aviaoY, aviaoZ);
   if (!p) return;
-  const t = Math.min(W,H) * 0.17;
+  const t = Math.min(W,H) * 0.19;
   ctx.save();
   ctx.translate(p.x, p.y);
-  ctx.rotate(giroQueda);                    // a câmera já acompanha o rolar
+  ctx.rotate(giroQueda);
+
+  /* Um caça mais encorpado: fuselagem grossa com ogiva, asa em flecha com
+     ponta cortada, dois motores aparentes e deriva dupla. O antigo era um
+     risco fino com dois retângulos — de longe sumia, e de perto parecia papel
+     recortado. Tudo aqui é pintado com degradê, que é o que dá volume. */
+  const sombra = (dx, dy) => { ctx.save(); ctx.translate(dx, dy); };
+
+  // rastro dos motores
   if (turbo > 0){
     for (const lado of [-1, 1]){
-      const g = ctx.createLinearGradient(lado*t*0.52, t*0.26, lado*t*0.52, t*1.5);
-      g.addColorStop(0,'rgba(120,200,255,.75)'); g.addColorStop(1,'rgba(120,200,255,0)');
+      const g = ctx.createLinearGradient(lado*t*0.30, t*0.42, lado*t*0.30, t*1.6);
+      g.addColorStop(0,'rgba(150,215,255,.85)'); g.addColorStop(0.35,'rgba(120,200,255,.5)');
+      g.addColorStop(1,'rgba(120,200,255,0)');
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.moveTo(lado*t*0.42, t*0.26); ctx.lineTo(lado*t*0.62, t*0.26);
-      ctx.lineTo(lado*t*0.54, t*(1.1+Math.random()*0.5)); ctx.closePath(); ctx.fill();
+      ctx.moveTo(lado*t*0.20, t*0.42); ctx.lineTo(lado*t*0.40, t*0.42);
+      ctx.lineTo(lado*t*0.31, t*(1.2+Math.random()*0.5)); ctx.closePath(); ctx.fill();
     }
   }
-  ctx.fillStyle = '#cfd8e8';
+
+  // ASA: em flecha, grossa na raiz e fina na ponta
+  const asa = ctx.createLinearGradient(0, -t*0.20, 0, t*0.30);
+  asa.addColorStop(0, '#eef3fb'); asa.addColorStop(0.55, '#c3ceE0'.replace('E','e'));
+  asa.addColorStop(1, '#8e9ab0');
+  ctx.fillStyle = asa;
   ctx.beginPath();
-  ctx.moveTo(-t*1.05, t*0.10); ctx.lineTo(-t*0.16,-t*0.06);
-  ctx.lineTo( t*0.16,-t*0.06); ctx.lineTo( t*1.05, t*0.10);
-  ctx.lineTo( t*0.95, t*0.21); ctx.lineTo(-t*0.95, t*0.21);
+  ctx.moveTo(-t*0.10, -t*0.16);          // raiz, à frente
+  ctx.lineTo(-t*1.02,  t*0.16);          // bordo de ataque até a ponta
+  ctx.lineTo(-t*1.02,  t*0.27);          // ponta cortada
+  ctx.lineTo(-t*0.26,  t*0.30);          // bordo de fuga
+  ctx.lineTo( t*0.26,  t*0.30);
+  ctx.lineTo( t*1.02,  t*0.27);
+  ctx.lineTo( t*1.02,  t*0.16);
+  ctx.lineTo( t*0.10, -t*0.16);
   ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(40,52,72,.35)'; ctx.lineWidth = Math.max(1, t*0.012); ctx.stroke();
+
+  // marcas nas asas
   ctx.fillStyle = turbo > 0 ? '#5cc8ff' : '#2d7dff';
-  ctx.fillRect(-t*0.86, t*0.10, t*0.26, t*0.11);
-  ctx.fillRect( t*0.60, t*0.10, t*0.26, t*0.11);
-  ctx.fillStyle = '#e9eef7';
-  ctx.beginPath(); ctx.ellipse(0, t*0.02, t*0.19, t*0.36, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#1b2a44';
-  ctx.beginPath(); ctx.ellipse(0, -t*0.16, t*0.12, t*0.13, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#cfd8e8';
+  ctx.fillRect(-t*0.86, t*0.17, t*0.30, t*0.10);
+  ctx.fillRect( t*0.56, t*0.17, t*0.30, t*0.10);
+
+  // MOTORES: dois casulos grossos colados na fuselagem
+  for (const lado of [-1, 1]){
+    const mx = lado*t*0.30;
+    const gm = ctx.createLinearGradient(mx - t*0.13, 0, mx + t*0.13, 0);
+    gm.addColorStop(0, '#7d879b'); gm.addColorStop(0.45, '#dbe3f0'); gm.addColorStop(1, '#6f7a8e');
+    ctx.fillStyle = gm;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(mx - t*0.13, -t*0.22, t*0.26, t*0.66, t*0.12);
+    else ctx.rect(mx - t*0.13, -t*0.22, t*0.26, t*0.66);
+    ctx.fill();
+    ctx.fillStyle = '#121821';
+    ctx.beginPath(); ctx.ellipse(mx, t*0.42, t*0.115, t*0.055, 0, 0, 7); ctx.fill();
+    const brasa = combustivel < 15 && !infinito ? 'rgba(90,90,100,' : 'rgba(150,205,255,';
+    ctx.fillStyle = brasa + (0.35+Math.random()*0.3).toFixed(2) + ')';
+    ctx.beginPath(); ctx.ellipse(mx, t*0.42, t*0.075, t*0.034, 0, 0, 7); ctx.fill();
+  }
+
+  // DERIVA DUPLA, inclinada para fora
+  for (const lado of [-1, 1]){
+    ctx.fillStyle = '#aab5c8';
+    ctx.beginPath();
+    ctx.moveTo(lado*t*0.17,  t*0.10);
+    ctx.lineTo(lado*t*0.30, -t*0.30);
+    ctx.lineTo(lado*t*0.24, -t*0.34);
+    ctx.lineTo(lado*t*0.09,  t*0.06);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // FUSELAGEM: grossa, com ogiva à frente
+  const fus = ctx.createLinearGradient(-t*0.22, 0, t*0.22, 0);
+  fus.addColorStop(0, '#7f8a9e'); fus.addColorStop(0.38, '#f2f6fc');
+  fus.addColorStop(0.72, '#cdd6e6'); fus.addColorStop(1, '#727d92');
+  ctx.fillStyle = fus;
   ctx.beginPath();
-  ctx.moveTo(-t*0.04, t*0.05); ctx.lineTo(-t*0.04,-t*0.40);
-  ctx.lineTo( t*0.04,-t*0.40); ctx.lineTo( t*0.04, t*0.05);
+  ctx.moveTo(0, -t*0.60);                                  // ponta do nariz
+  ctx.quadraticCurveTo( t*0.20, -t*0.42,  t*0.215, -t*0.10);
+  ctx.lineTo( t*0.20,  t*0.36);
+  ctx.quadraticCurveTo( t*0.12,  t*0.50,  0, t*0.50);
+  ctx.quadraticCurveTo(-t*0.12,  t*0.50, -t*0.20, t*0.36);
+  ctx.lineTo(-t*0.215, -t*0.10);
+  ctx.quadraticCurveTo(-t*0.20, -t*0.42,  0, -t*0.60);
   ctx.closePath(); ctx.fill();
-  const corJato = combustivel < 15 ? 'rgba(70,70,80,' : 'rgba(140,200,255,';
-  ctx.fillStyle = corJato + (0.25+Math.random()*0.25).toFixed(2) + ')';
-  ctx.beginPath(); ctx.ellipse(-t*0.52, t*0.26, t*0.09, t*0.05, 0, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.ellipse( t*0.52, t*0.26, t*0.09, t*0.05, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(40,52,72,.30)'; ctx.lineWidth = Math.max(1, t*0.012); ctx.stroke();
+
+  // canopy
+  const cab = ctx.createLinearGradient(0, -t*0.34, 0, -t*0.02);
+  cab.addColorStop(0, '#4e6f9e'); cab.addColorStop(0.5, '#1b2a44'); cab.addColorStop(1, '#0e1626');
+  ctx.fillStyle = cab;
+  ctx.beginPath(); ctx.ellipse(0, -t*0.20, t*0.115, t*0.19, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.22)';
+  ctx.beginPath(); ctx.ellipse(-t*0.04, -t*0.26, t*0.045, t*0.09, 0, 0, 7); ctx.fill();
+
+  // faixa da barriga, só para o olho pegar a direção
+  ctx.fillStyle = 'rgba(45,125,255,.55)';
+  ctx.fillRect(-t*0.035, -t*0.02, t*0.07, t*0.34);
   ctx.restore();
 }
 
@@ -4685,6 +4872,7 @@ function desenha(){
   for (const b of bombas)     { const z = perto(b); if (z!==null) fila.push({ z:z, o:b, k:'bomba' }); }
   for (const t of tiros)      { const z = perto(t); if (z!==null) fila.push({ z:z, o:t, k:'tiro' }); }
   for (const f of particulas) { const z = perto(f); if (z!==null) fila.push({ z:z, o:f, k:'part' }); }
+  for (const c of cogumelos)  { const z = perto(c); if (z!==null) fila.push({ z:z, o:c, k:'cogumelo' }); }
   fila.sort((a,b) => b.z - a.z);
 
   // o tambor mais próximo ganha o anel piscando, para se achar no mapa
@@ -4703,6 +4891,7 @@ function desenha(){
     else if (it.k === 'aviao')  desenhaAviaoInimigo(it.o);
     else if (it.k === 'bomba')  desenhaBomba(it.o);
     else if (it.k === 'tiro')   desenhaTiro(it.o);
+    else if (it.k === 'cogumelo') desenhaCogumelo(it.o);
     else                        desenhaParticula(it.o);
   }
 
@@ -4713,6 +4902,17 @@ function desenha(){
   if (!cockpit) bussola(H*0.175);
   ctx.restore();
 
+  // lembrete de que o modo de teste está ligado — para ninguém achar que o
+  // combustível quebrou
+  if (infinito && jogando){
+    ctx.save();
+    ctx.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(127,216,255,.75)';
+    ctx.fillText('TESTE · COMBUSTÍVEL INFINITO  (tecla I desliga)', W/2, H - 8);
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
   if (clarao > 0){
     ctx.fillStyle = 'rgba(150,220,255,' + (clarao*0.55).toFixed(3) + ')';
     ctx.fillRect(0,0,W,H);
@@ -4771,6 +4971,75 @@ function solta(x, y, z, n, cor, raio, forca, fumaca){
       vida: 1, raio: raio*(0.5+Math.random()), cor: cor, fumaca: !!fumaca
     });
   }
+}
+
+/* ---------------------------------------------------------------------------
+   A BOMBA NUCLEAR
+
+   Três coisas separadas, que juntas fazem o efeito: o CLARÃO (a tela inteira
+   branca, e é isso que se vê primeiro de longe), o COGUMELO (coluna que sobe e
+   abre o chapéu, desenhado no mundo, então cresce e some com a distância como
+   qualquer outra coisa) e o ANEL no chão, que é o que dá a escala do estrago.
+   O som é um estrondo grave e longo, com a cauda descendo de tom.
+   ------------------------------------------------------------------------ */
+function nuclear(x, z){
+  cogumelos.push({ x:x, z:z, t:0 });
+  clarao = 1.6; tremor = 34;
+  somNuclear();
+  const R2 = RAIO_NUKE*RAIO_NUKE;
+  for (const a of alvos){
+    if (!a.vivo) continue;
+    const dx = a.x-x, dz = a.z-z;
+    if (dx*dx + dz*dz > R2) continue;
+    a.vivo = false; alvosDestruidos++; pontos += 500;
+    mostraAviso('ALVO DESTRUÍDO! ' + alvosDestruidos + '/' + alvosTotal, '#ffd257', 1600);
+  }
+  for (const p of predios){
+    if (!p.vivo) continue;
+    const dx = p.x-x, dz = p.z-z;
+    if (dx*dx + dz*dz < R2){ p.vivo = false; pontos += 25; }
+  }
+  for (const o of obstaculos){
+    if (!o.vivo) continue;
+    const dx = o.x-x, dz = o.z-z;
+    if (dx*dx + dz*dz < R2*0.5){ o.vivo = false; pontos += 50; }
+  }
+  if (alvosDestruidos >= alvosTotal && alvosTotal > 0){ venceu = true; Motor.desliga(); fim(); return; }
+  // quem larga bomba nuclear voando baixo vai junto
+  const dpx = aviaoX-x, dpz = aviaoZ-z;
+  if (dpx*dpx + dpz*dpz < R2*0.36 && aviaoY < CHAO + 3000) derruba('nuclear');
+}
+
+function somNuclear(){
+  if (!audio) return;
+  try{
+    const t0 = audio.currentTime;
+    // estrondo: ruído passando por um filtro que vai fechando
+    const n = audio.sampleRate * 3.2;
+    const buf = audio.createBuffer(1, n, audio.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/n, 1.6);
+    const fonte = audio.createBufferSource(); fonte.buffer = buf;
+    const f = audio.createBiquadFilter(); f.type = 'lowpass';
+    f.frequency.setValueAtTime(2200, t0);
+    f.frequency.exponentialRampToValueAtTime(90, t0 + 2.8);
+    const g = audio.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.55, t0 + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 3.2);
+    fonte.connect(f); f.connect(g); g.connect(audio.destination);
+    fonte.start(t0);
+    // e o baque grave por baixo, que é o que faz sentir no peito
+    const o = audio.createOscillator(), go = audio.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, t0);
+    o.frequency.exponentialRampToValueAtTime(24, t0 + 1.8);
+    go.gain.setValueAtTime(0.0001, t0);
+    go.gain.exponentialRampToValueAtTime(0.5, t0 + 0.04);
+    go.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.4);
+    o.connect(go); go.connect(audio.destination);
+    o.start(t0); o.stop(t0 + 2.5);
+  }catch(e){}
 }
 
 function explode(x, y, z, escala){
@@ -4873,15 +5142,8 @@ function atualizaTiros(dt){
       if (Math.random() < dt*10) solta(b.x, b.y, b.z, 1, 'rgba(180,180,190,.5)', 30, 40, true);
       if (b.y <= CHAO){
         b.morto = true;
-        if (!atingeAlvo(b.x, b.z, 520)){
-          explode(b.x, CHAO + 120, b.z, 1.1);
-          // derruba prédio que estiver por perto
-          for (const p of predios){
-            if (p.vivo && Math.abs(p.z - b.z) < 700 && Math.abs(p.x - b.x) < 700){
-              p.vivo = false; pontos += 25;
-            }
-          }
-        }
+        explode(b.x, CHAO + 200, b.z, 2.4);     // a bola de fogo inicial
+        nuclear(b.x, b.z);                      // e o resto do estrago
       }
     }
   }
@@ -4924,6 +5186,8 @@ function atualiza(dt){
     f.vy -= dt*220; f.vida -= dt*(f.fumaca ? 0.6 : 1.25);
   }
   particulas = particulas.filter(f => f.vida > 0);
+  for (const c of cogumelos) c.t += dt;
+  cogumelos = cogumelos.filter(c => c.t < 10);
 
   if (caindo){ atualizaQueda(dt); return; }
 
@@ -4991,7 +5255,7 @@ function atualiza(dt){
     if (turbo <= 0){ turbo = 0; mostraAviso('fim do turbo', '#9fd8ff', 900); }
   }
   voo += ((turbo > 0 ? VOO_TURBO : VOO_BASE) - voo) * Math.min(1, dt*2.5);
-  combustivel -= dt * (turbo > 0 ? GASTO_TURBO : GASTO);
+  if (!infinito) combustivel -= dt * (turbo > 0 ? GASTO_TURBO : GASTO);
   if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
   if (combustivel < 18 && Math.random() < dt*2.2) mostraAviso('COMBUSTÍVEL BAIXO', '#ffb86b', 700);
 
@@ -5105,6 +5369,8 @@ document.addEventListener('keydown', e => {
   if (e.key === '2') trocaArma('missil');
   if (e.key === '3') trocaArma('metralha');
   if (e.key === 'v' || e.key === 'V') cockpit = !cockpit;
+  if (e.key === 'i' || e.key === 'I'){ infinito = !infinito;
+    mostraAviso(infinito ? 'COMBUSTÍVEL INFINITO' : 'combustível normal', '#7fd8ff', 1200); }
   if (e.key === ' '){ atirando = true; e.preventDefault(); }
 });
 document.addEventListener('keyup', e => { if (e.key === ' ') atirando = false; });
@@ -5737,9 +6003,9 @@ function pintaGiro(){
   if (!fogo || !sel) return;
 
   const ORDEM = ['bomba','missil','metralha'];
-  const NOME  = { bomba:'BOMBA', missil:'MÍSSIL', metralha:'METRA' };
+  const NOME  = { bomba:'NUCLEAR', missil:'MÍSSIL', metralha:'METRA' };
   const TOQUES= { bomba:[28], missil:[28,60,28], metralha:[28,60,28,60,28] };
-  let iArma = 0, municoes = { bomba:'14', missil:'8', metralha:'400' };
+  let iArma = 0, municoes = { bomba:'6', missil:'8', metralha:'400' };
 
   const elAtual = document.getElementById('armaAtual');
   const elMun   = document.getElementById('mArma');

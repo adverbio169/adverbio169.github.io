@@ -492,3 +492,53 @@ piloto largava o jogo.
 cima para longe que vira a tela para cima. Sem o sinal negativo, empurrar subia
 e puxar descia. Agora vale o manche de verdade: **puxar a borda de cima levanta
 o nariz**, que é o que o aviso na tela sempre prometeu.
+
+## Leme, bomba nuclear e o celular preso deitado
+
+### O leme, pelo movimento lateral
+
+Os outros dois eixos vêm da **inclinação**, que o sensor mede direto. O leme
+vem de **deslocar** o celular para o lado — e aí tem um limite físico que vale
+dizer em voz alta: **acelerômetro não sente posição, só mudança de movimento**.
+Deslocar e segurar parado na esquerda é, para ele, idêntico a estar parado no
+meio. O que dá para medir é o **deslizar**. Então o leme dá chute e volta ao
+centro, como pedal de leme de verdade.
+
+Separar o empurrão da freada deu duas tentativas erradas antes da certa:
+
+| tentativa | por que não serve |
+|---|---|
+| integrar a velocidade lateral | a freada no fim do gesto invertia o leme |
+| trava de tempo depois de cada gesto | deslizando várias vezes seguidas, a freada caía fora da trava e virava gesto novo, para o lado contrário |
+| **silêncio antes do empurrão** | é o que distingue os dois: empurrão começa com a mão parada, freada vem colada |
+
+O leme aparece na **bolinha de derrapagem** do horizonte artificial e numa
+marca embaixo da cruz do HUD. No computador é **A** e **D**.
+
+### A bomba nuclear
+
+Três coisas separadas, que juntas fazem o efeito: o **clarão** (é o que se vê
+primeiro, de longe), o **cogumelo** e o **anel** correndo pelo chão, que é o
+que dá a escala. O som é um estrondo grave e longo com a cauda descendo de tom.
+
+Um erro que custou uma rodada: passei o cogumelo pela névoa cheia, e como a
+névoa puxa tudo para a cor do céu, ele **sumia dentro do próprio céu**. Uma
+explosão dessas tem luz própria — agora a névoa entra com um terço da força.
+
+A marca preta no chão é desenhada como **polígono projetado**, não como elipse
+na tela: assim ela deita no terreno e acompanha a inclinação do avião, em vez
+de ficar como adesivo colado no vidro.
+
+Ela derruba tudo num raio de 450 m — inclusive **você**, se largar voando
+baixo demais. Por isso são só 6, com recarga longa.
+
+### Preso deitado
+
+Girando o celular a página se remontava "em pé" e o controle mudava de lugar na
+mão. Agora tenta-se a trava de verdade (tela cheia + `orientation.lock`) e,
+quando o navegador não deixa — é o caso do Safari do iPhone —, a página é
+**girada por CSS** para continuar deitada.
+
+Para isso a `@media (max-height:520px)` do controle virou **classe**: com o giro
+por CSS o navegador continua achando que a tela é alta, a media query não casava
+e o controle saía montado em coluna, transbordando para fora da área visível.

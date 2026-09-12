@@ -40,7 +40,7 @@
   #cPontos{left:18px;top:130px}
   #btVisao{position:absolute;left:18px;bottom:62px;pointer-events:auto;cursor:pointer;
            border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.55);border-radius:10px;
-           padding:6px 9px;font-size:15px;line-height:1}
+           padding:9px 12px;font-size:24px;line-height:1}
   /* altímetro: trilho vertical na direita com uma marca que sobe e desce.
      Sem ele o jogador não tem como perceber que está subindo. */
   #altimetro{position:absolute;right:22px;top:50%;transform:translateY(-50%);
@@ -64,7 +64,7 @@
   /* Fica aberto o jogo inteiro: enquanto o QR estiver na tela, mais gente pode
      entrar na sala sem parar a partida. Encolhe sozinho depois de um tempo
      para não atrapalhar, e volta ao tamanho ao passar o rato / tocar. */
-  #convite{position:absolute;bottom:14px;left:18px;display:flex;align-items:center;gap:10px;
+  #convite{position:absolute;bottom:62px;left:18px;display:flex;align-items:center;gap:10px;
            background:rgba(8,12,26,.55);border:1px solid rgba(255,255,255,.14);border-radius:12px;
            padding:8px 12px 8px 8px;pointer-events:auto;transition:opacity .4s, transform .3s;
            transform-origin:left bottom}
@@ -121,7 +121,7 @@
   <div id="selTurbo">TURBO</div>
   <div id="barraProg2"><i id="barraProg"></i></div>
   <div class="caixa" id="cArma"><div class="rot">Arma <span class="dica2">(1 2 3 &middot; espaço atira)</span></div>
-    <div class="val"><span id="vArma">BOMBA</span> <small>x<span id="vMun">14</span></small></div></div>
+    <div class="val"><span id="vArma">NUCLEAR</span> <small>x<span id="vMun">6</span></small></div></div>
   <div class="caixa" id="cPontos"><div class="rot">Pontos</div><div class="val" id="vPontos">0</div>
     <div class="rot" style="margin-top:4px">Alvos <b id="vAlvos">0/0</b></div></div>
   <button id="btVisao" title="cabine / de fora (V)">&#128065;</button>
