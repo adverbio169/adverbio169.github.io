@@ -293,15 +293,14 @@ endereço https de verdade.
 
 ## Versão missão: cidade, alvos e armas
 
-O mapa deixou de ser infinito. Agora tem **15 km e um fim**, e isso mudou a
-arquitetura: todo cenário guarda o seu **z absoluto**, e quem anda é o avião
-(`distancia`). Na hora de desenhar, a posição relativa é `objeto.z - distancia`.
-Antes o mundo vinha vindo e cada objeto tinha o z alterado a cada quadro — não
-dá para fazer isso com uma cidade inteira, e não permitia ter começo e fim.
+O mapa deixou de ser infinito. Todo cenário guarda o seu **x e z absolutos**, e
+quem anda é o avião. Antes o mundo vinha vindo e cada objeto tinha o z alterado
+a cada quadro — não dá para fazer isso com uma cidade inteira, e não permitia
+ter começo e fim.
 
 | coisa | como funciona |
 |---|---|
-| cidade | bairros com quarteirões e ruas, gerados uma vez no começo. Cada prédio é desenhado com três faces (frente, lateral visível e telhado) e ganha janelas quando está perto |
+| cidade | bairros com quarteirões e ruas, gerados uma vez no começo. Cada prédio é uma caixa: das quatro paredes, desenham-se as que a câmera está vendo de fora, com janelas quando está perto |
 | alvos | depósitos de combustível, marcados com um círculo piscando. Valem 500 pontos |
 | bomba | cai em queda livre e leva o avanço do avião junto. A **mira no chão** mostra onde vai cair, e fica verde quando está em cima de um alvo |
 | míssil | vai reto e rápido, bom contra avião inimigo |
@@ -312,11 +311,55 @@ No computador: **1 2 3** trocam de arma, **espaço** atira, **V** alterna entre
 ver de fora e ver de dentro da cabine. No celular, o controle ganhou os três
 botões de arma e um botão **FOGO** grande.
 
+## Versão 360°: o avião vira
+
+O jogo era um trilho: inclinar empurrava o avião para o lado, mas ele sempre ia
+para a frente, na mesma direção. Agora o avião tem **rumo**. Inclinar faz
+**curva** — com a asa toda inclinada, a volta completa sai em uns 7 segundos —
+e dá para ir para qualquer canto do mapa e voltar por onde veio.
+
+O mapa é um **quadrado de 6 km de lado**, com um rio de norte a sul e duas
+estradas que se cruzam. A missão não é mais chegar ao fim: é **derrubar os 14
+depósitos** espalhados pelos bairros.
+
+Como isso funciona no desenho: uma função só, `paraCamera(x, z)`, gira o mapa
+inteiro em volta do avião antes de projetar, de modo que "para a frente" é
+sempre o nariz. O resto do desenho continua igual. O que mudou de verdade foi
+o que **não dava mais para supor**:
+
+| antes (trilho) | agora (360°) |
+|---|---|
+| a lista de prédios estava ordenada por z, e bastava varrer uma fatia | a ordem muda a cada quadro: tudo é convertido para o eixo do nariz e ordenado do fundo para a frente |
+| pegar combustível era "passou do meu z?" | é distância de verdade nos três eixos, porque dá para chegar no tambor por qualquer lado |
+| o chão era uma escada de faixas em z | é uma grade do mapa, recortada pelo campo de visão e ordenada por distância |
+| o prédio tinha "a frente e uma lateral" | é uma caixa: para cada parede, vejo se a câmera está do lado de fora dela |
+| o sol ficava preso num canto da tela | tem um rumo no mapa, e anda pela tela quando se vira |
+| a serra do horizonte rolava com o deslocamento | é desenhada pelo **rumo** de cada ponto da tela, com ondas de período inteiro — girando 360° as mesmas montanhas voltam ao mesmo lugar |
+
+E entrou uma peça nova que num corredor não fazia falta: a **bússola**. Mostra
+o rumo, e dois marcadores dizem onde está o tambor de combustível mais próximo
+e o alvo mais próximo, com a distância em metros. Quando a coisa fica para
+trás, o marcador encosta na ponta da fita e vira seta. Sem isso, voar em
+círculo desorienta em dez segundos.
+
 ### Visão de cabine
 
 É a mesma projeção, com duas diferenças: a câmera vai para dentro do avião
 (`d = z + 60` em vez de `z + 750`), e o avião do jogador deixa de ser desenhado.
-Por cima vem a moldura da cabine, que balança junto com a inclinação das asas.
+
+A cabine foi desenhada a partir de fotos de cockpit de verdade. O que as fotos
+ensinaram, e que eu tinha errado:
+
+- **quem rola é o mundo, não a cabine.** O piloto e o painel ficam parados e o
+  horizonte é que se inclina. Eu tinha feito ao contrário, e o painel saía de
+  quadro quando o avião virava;
+- o **painel de teto** lá em cima, cheio de disjuntores, é o que mais entrega
+  "isto é um avião" — sem ele o alto da tela era só um vazio preto;
+- o painel é **escuro**, e quem brilha são os mostradores;
+- os instrumentos seguem o **T básico**: velocidade à esquerda, horizonte
+  artificial no meio, altímetro à direita;
+- o **HUD é uma projeção no vidro**: tem que ser recortado pelo para-brisa. Se
+  escorre para cima da armação, não parece vidro nenhum.
 
 ### Duas armadilhas de CSS que custaram caro aqui
 

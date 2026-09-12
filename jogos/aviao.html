@@ -343,13 +343,18 @@ function grausParaEixo(graus, maximo, zonaMorta){
 /* =============================================================================
    PARTE 2 — O MUNDO
 
-   Coordenadas: x para a direita, y para cima, z para a frente.
+   Coordenadas do MAPA: x para o leste, y para cima, z para o norte. O mapa é
+   um quadrado parado, e o avião anda dentro dele.
 
-   MUDANÇA IMPORTANTE: o mapa agora é FINITO e fica parado. Tudo que é cenário
-   guarda o seu z ABSOLUTO, e quem anda é o avião (a variável `distancia`).
-   Na hora de desenhar, a posição relativa é `objeto.z - distancia`. Antes o
-   mundo vinha vindo e cada objeto tinha o z alterado a cada quadro — o que não
-   dá para fazer com uma cidade inteira, e não permitia ter começo e fim.
+   MUDANÇA IMPORTANTE (o pedido do Brunno: "o jogo nao pode ser linear, quero
+   poder fazer 360"): o avião agora tem RUMO. Ele não anda mais sempre para o
+   mesmo lado com o manche puxando para os lados — ele VIRA. Inclinar faz curva,
+   e dá para dar a volta completa e voltar por onde veio.
+
+   Como isso funciona no desenho: todo objeto guarda x e z ABSOLUTOS no mapa.
+   Antes de projetar, `paraCamera(x,z)` gira o mundo inteiro em volta do avião,
+   de modo que "para a frente" é sempre o nariz. É uma conta só, e o resto do
+   desenho continua igual ao de antes.
    ========================================================================== */
 const CAMD     = 750;      // distância da câmera até o avião (visão de fora)
 const CHAO     = -700;     // altura do solo
@@ -357,7 +362,8 @@ const TETO     = 5200;     // altura máxima de voo
 const VOO_BASE = 1700;     // velocidade normal, unidades por segundo
 const VOO_TURBO= 3000;     // velocidade com o combustível azul
 const ALCANCE  = 17000;    // até onde se enxerga à frente
-const MISSAO   = 300000;   // comprimento do mapa (15 km no placar) — tem fim!
+const MAPA     = 60000;    // meio lado do mapa: 120000 u = 6 km de ponta a ponta
+const GIRO     = 0.85;     // rad/s de curva com a asa toda inclinada (~7 s o 360)
 const METRO    = 20;       // unidades de mundo por metro no placar
 
 const RAIO_PEGA  = 340;
@@ -396,16 +402,9 @@ function redimensiona(){
 window.addEventListener('resize', redimensiona);
 window.addEventListener('orientationchange', () => setTimeout(redimensiona, 250));
 
-/* projeção: z aqui já é RELATIVO ao avião (zAbs - distancia) */
-function projeta(x, y, z){
-  const d = z + (cockpit ? 60 : CAMD);
-  if (d < 50) return null;
-  const s = F / d;
-  return { x: W/2 + (x - camX)*s, y: horizonte - (y - camY)*s, s: s, d: d };
-}
-
 /* --- estado --- */
-let aviaoX=0, aviaoY=250, vx=0, vy=0, inclinacao=0, nariz=0;
+let aviaoX=0, aviaoZ=0, aviaoY=250, vy=0, inclinacao=0, nariz=0;
+let rumo=0, cosR=1, senR=0;          // para onde o nariz aponta (0 = norte)
 let camX=0, camY=0, cockpit=false;
 let tambores=[], obstaculos=[], predios=[], alvos=[], nuvens=[], particulas=[];
 let bombas=[], tiros=[];
@@ -415,7 +414,31 @@ let arma='bomba', municao={}, recarga=0, atirando=false;
 let jogando=false, caindo=false, giroQueda=0, tremor=0, clarao=0, motivoQueda='';
 let tecla={esq:false,dir:false,cima:false,baixo:false};
 let toqueX=0, toqueY=0, usandoToque=false;
-let iPredio=0;
+
+/* Gira o mapa para o ponto de vista do avião: devolve x (para os lados) e
+   z (para a frente) já no eixo do nariz. É o coração da virada de 360°. */
+function paraCamera(wx, wz){
+  const dx = wx - aviaoX, dz = wz - aviaoZ;
+  return { x: dx*cosR - dz*senR, z: dx*senR + dz*cosR };
+}
+function atualizaRumo(){ cosR = Math.cos(rumo); senR = Math.sin(rumo); }
+
+/* projeção: x e z aqui já estão no eixo da CÂMERA (use projetaM para o mapa) */
+function projeta(x, y, z){
+  const d = z + (cockpit ? 60 : CAMD);
+  if (d < 50) return null;
+  const s = F / d;
+  return { x: W/2 + (x - camX)*s, y: horizonte - (y - camY)*s, s: s, d: d };
+}
+/* projeção a partir das coordenadas do MAPA */
+function projetaM(wx, wy, wz){
+  const c = paraCamera(wx, wz);
+  return projeta(c.x, wy, c.z);
+}
+/* distância no plano, do avião até um ponto do mapa */
+function longe(wx, wz){ const dx = wx-aviaoX, dz = wz-aviaoZ; return Math.sqrt(dx*dx + dz*dz); }
+/* ângulo de um ponto do mapa em relação ao nariz: 0 à frente, + à direita */
+function paraOnde(wx, wz){ const c = paraCamera(wx, wz); return Math.atan2(c.x, c.z); }
 
 try { recorde = parseInt(localStorage.getItem('aviao.recorde') || '0', 10) || 0; } catch(e){}
 
@@ -550,86 +573,104 @@ setInterval(() => { if (Motor.ligado && Date.now() - Motor.ultimoAjuste > 400) M
 try{ Motor.mudo = localStorage.getItem('aviao.mudo') === '1'; }catch(e){}
 
 /* =============================================================================
-   O MAPA — construído uma vez, do começo ao fim
+   O MAPA — um quadrado de 6 km, construído uma vez
+
+   Como o avião agora vira para qualquer lado, o mapa não pode mais ser um
+   corredor. É uma região quadrada, com um rio de norte a sul, duas estradas
+   que se cruzam e bairros espalhados. Os cruzamentos servem de referência
+   para saber onde se está — sem isso, voar em círculo desorienta.
    ========================================================================== */
-const rioX     = z => Math.sin(z/5200)*2600 + Math.sin(z/1700)*500;
-const estradaX = z => -3400 + Math.sin(z/9000)*1100;
+const rioX     = z => Math.sin(z/9000)*4200 + Math.sin(z/3100)*900;
+const estradaZ = x => 8000 + Math.sin(x/11000)*2600;      // estrada leste-oeste
+const estradaXv = z => -21000 + Math.sin(z/13000)*1800;   // estrada norte-sul
 
 // a cidade não é contínua: são bairros, com campo aberto entre eles
-function ehCidade(z){
-  const f = Math.sin(z/24000) + Math.sin(z/9700 + 1.2)*0.6;
-  return f > 0.35;
+function ehCidade(x, z){
+  const f = Math.sin(x/17000 + 0.6) + Math.sin(z/15000 - 0.4)
+          + Math.sin((x + z)/11000)*0.7 + Math.sin((x - z)/23000)*0.5;
+  return f > 0.62;
 }
 
 function montaMapa(){
   predios = []; alvos = []; tambores = []; obstaculos = [];
-  let cX = 0, cY = 1500, z = 2600;
 
-  while (z < MISSAO + 6000){
-    // --- combustível ---
-    cX += (Math.random()-0.5) * 1000;
-    cY += (Math.random()-0.5) * 620;
-    cX = Math.max(-2200, Math.min(2200, cX));
-    cY = Math.max(CHAO+1500, Math.min(3000, cY));   // os tambores ficam acima da cidade
-    tambores.push({ x:cX, y:cY, z:z, azul: Math.random() < 0.18,
-                    passou:false, brilho:0, giro:Math.random()*6.28 });
-
-    // --- obstáculos no ar ---
-    const dif = Math.min(1, z/200000);
-    if (Math.random() < 0.45 + dif*0.45){
-      obstaculos.push({
-        tipo: Math.random() < 0.28 + dif*0.22 ? 'aviao' : 'pombo',
-        x: cX + (Math.random()<0.5?-1:1)*(500 + Math.random()*1500),
-        y: cY + (Math.random()-0.5)*800,
-        z: z + 740 + Math.random()*740,
-        fase: Math.random()*6.28, deriva:(Math.random()-0.5)*300,
-        x0:0, y0:0, vivo:true, passou:false
-      });
+  // --- combustível e bichos: espalhados pelo mapa todo -------------------
+  const PASSO_T = 5200;
+  for (let x = -MAPA; x <= MAPA; x += PASSO_T){
+    for (let z = -MAPA; z <= MAPA; z += PASSO_T){
+      if (Math.random() < 0.42) continue;
+      const tx = x + (Math.random()-0.5)*PASSO_T*0.8;
+      const tz = z + (Math.random()-0.5)*PASSO_T*0.8;
+      tambores.push({ x:tx, y: 1200 + Math.random()*1800, z:tz,
+                      azul: Math.random() < 0.18, pego:false, brilho:0,
+                      giro:Math.random()*6.28 });
+      if (Math.random() < 0.55){
+        obstaculos.push({
+          tipo: Math.random() < 0.34 ? 'aviao' : 'pombo',
+          x: tx + (Math.random()-0.5)*3000,
+          y: 900 + Math.random()*2200,
+          z: tz + (Math.random()-0.5)*3000,
+          fase: Math.random()*6.28, deriva:(Math.random()-0.5)*300,
+          x0:0, y0:0, vivo:true
+        });
+      }
     }
-    z += 1650 + Math.random()*500;
   }
   for (const o of obstaculos){ o.x0 = o.x; o.y0 = o.y; }
 
-  // --- a cidade: quarteirões com ruas entre eles ---
-  const QUADRA = 1600, RUA = 520;
-  for (let zz = 3000; zz < MISSAO + 4000; zz += QUADRA + RUA){
-    if (!ehCidade(zz)) continue;
-    for (let k = -4; k <= 4; k++){
-      const bx = k*(QUADRA + RUA) + Math.sin(zz/3000)*400;
-      if (Math.abs(bx - rioX(zz)) < 1100) continue;          // não constrói dentro do rio
-      if (Math.random() < 0.18) continue;                     // praça / terreno vazio
-      const largura = 420 + Math.random()*520;
-      const fundo   = 420 + Math.random()*520;
-      const altura  = 260 + Math.random()*Math.random()*1500; // poucos bem altos
-      predios.push({ x:bx + (Math.random()-0.5)*300, z:zz + (Math.random()-0.5)*300,
-                     w:largura, d:fundo, h:altura, tom: Math.random(), vivo:true });
+  // --- a cidade: quarteirões com ruas entre eles -------------------------
+  const QUADRA = 1600, RUA = 520, P = QUADRA + RUA;
+  for (let zz = -MAPA; zz < MAPA; zz += P){
+    for (let xx = -MAPA; xx < MAPA; xx += P){
+      if (!ehCidade(xx, zz)) continue;
+      if (Math.abs(xx - rioX(zz)) < 1100) continue;        // não constrói no rio
+      if (Math.abs(zz - estradaZ(xx)) < 700) continue;     // nem em cima da estrada
+      if (Math.abs(xx - estradaXv(zz)) < 700) continue;
+      if (Math.random() < 0.20) continue;                  // praça / terreno vazio
+      predios.push({ x:xx + (Math.random()-0.5)*300, z:zz + (Math.random()-0.5)*300,
+                     w: 420 + Math.random()*520, d: 420 + Math.random()*520,
+                     h: 260 + Math.random()*Math.random()*1500,
+                     tom: Math.random(), vivo:true });
     }
   }
-  predios.sort((a,b) => a.z - b.z);
 
-  // --- alvos: depósitos de combustível, no meio da cidade ---
-  let zA = 9000;
-  while (zA < MISSAO - 4000){
-    const bx = (Math.random()-0.5) * 6000;
-    if (Math.abs(bx - rioX(zA)) > 900)
-      alvos.push({ x:bx, z:zA, r:520, vivo:true, fase:Math.random()*6.28 });
-    zA += 9000 + Math.random()*7000;
+  // --- alvos: depósitos de combustível, dentro dos bairros ---------------
+  let tentativas = 0;
+  while (alvos.length < 14 && tentativas < 4000){
+    tentativas++;
+    const ax = (Math.random()-0.5)*MAPA*1.8, az = (Math.random()-0.5)*MAPA*1.8;
+    if (!ehCidade(ax, az)) continue;
+    if (Math.abs(ax - rioX(az)) < 1200) continue;
+    if (alvos.some(a => Math.hypot(a.x-ax, a.z-az) < 9000)) continue;
+    if (Math.hypot(ax, az) < 6000) continue;               // não em cima da largada
+    alvos.push({ x:ax, z:az, r:520, vivo:true, fase:Math.random()*6.28 });
   }
   alvosTotal = alvos.length;
+  // os prédios em cima de um alvo saem da frente, senão o depósito fica enterrado
+  predios = predios.filter(p => !alvos.some(a => Math.hypot(a.x-p.x, a.z-p.z) < 1400));
 }
 
+/* As nuvens acompanham o avião: quando uma fica longe demais, nasce de novo
+   à frente. Assim sempre há céu com nuvem, para qualquer lado que se vire. */
+function recolocaNuvem(n, emVolta){
+  const a = rumo + (emVolta ? Math.random()*6.28 : (Math.random()-0.5)*2.2);
+  const d = emVolta ? Math.random()*ALCANCE : ALCANCE*(0.55 + Math.random()*0.45);
+  n.x = aviaoX + Math.sin(a)*d;
+  n.z = aviaoZ + Math.cos(a)*d;
+  n.y = 2400 + Math.random()*2600;
+  n.r = 320 + Math.random()*560;
+}
 function geraNuvens(){
   nuvens = [];
-  for (let i=0;i<24;i++) nuvens.push({
-    x:(Math.random()-0.5)*15000, y:2400+Math.random()*2600,   // acima da cidade, não dentro dela
-    z: Math.random()*ALCANCE, r:320+Math.random()*560 });
+  for (let i=0;i<24;i++){ const n = {}; recolocaNuvem(n, true); nuvens.push(n); }
 }
 
 function reiniciaMundo(){
   particulas = []; bombas = []; tiros = [];
-  distancia = 0; iPredio = 0;
+  distancia = 0;
+  rumo = 0; atualizaRumo();
   montaMapa(); geraNuvens();
-  aviaoX = 0; aviaoY = 1500; vx = 0; vy = 0; inclinacao = 0; nariz = 0;
+  aviaoX = 0; aviaoZ = 0; aviaoY = 1500; vy = 0; inclinacao = 0; nariz = 0;
   camX = 0; camY = 1740;
   combustivel = 100; turbo = 0; voo = VOO_BASE;
   pontos = 0; alvosDestruidos = 0; venceu = false;
@@ -647,7 +688,9 @@ function reiniciaMundo(){
    um desenho chapado de uma vista 3D de verdade. */
 const CEU_LONGE = [186, 214, 236];
 function comNevoa(rgb, luz, zr){
-  const t = Math.min(0.88, Math.max(0, (zr - 1500) / (ALCANCE*0.8)));
+  // A curva importa: linear desde perto lavava a cidade inteira de cinza. Com
+  // expoente, o que está por perto fica nítido e só o fundo some no céu.
+  const t = Math.min(0.82, Math.pow(Math.max(0, (zr - 2600) / (ALCANCE*0.95)), 1.4));
   const r = rgb[0]*luz, g = rgb[1]*luz, b = rgb[2]*luz;
   return 'rgb(' + Math.round(r + (CEU_LONGE[0]-r)*t) + ',' +
                   Math.round(g + (CEU_LONGE[1]-g)*t) + ',' +
@@ -663,155 +706,224 @@ function quadro4(a,b,c,d,cor){
 
 // sobra para os cantos não ficarem vazios quando o mundo roda na visão de cabine
 function margem(){ return cockpit ? Math.max(W,H)*0.75 : 0; }
+
+/* O sol fica num ponto FIXO do mapa (a nordeste). Como o avião gira, ele tem
+   que andar pela tela — se ficasse preso num canto, dar meia-volta não mudava
+   nada e a sensação de estar virando sumia. */
+const SOL_RUMO = 0.9;                    // radianos: nordeste
+const SOL_DIR  = { x: Math.sin(SOL_RUMO), z: Math.cos(SOL_RUMO) };
+function anguloCurto(a){ while (a > Math.PI) a -= 6.283185; while (a < -Math.PI) a += 6.283185; return a; }
+
 function desenhaCeu(){
   const M = margem();
   const g = ctx.createLinearGradient(0,-M,0,horizonte+2);
   g.addColorStop(0,'#071b45'); g.addColorStop(0.45,'#2f6fb8'); g.addColorStop(0.8,'#77aede'); g.addColorStop(1,'#bcd9ef');
   ctx.fillStyle=g; ctx.fillRect(-M,-M,W+M*2,horizonte+2+M);
-  const sx = W*0.76, sy = horizonte*0.34, r = Math.min(W,H)*0.055;
-  const halo = ctx.createRadialGradient(sx,sy,r*0.3, sx,sy,r*5);
-  halo.addColorStop(0,'rgba(255,236,170,.55)'); halo.addColorStop(1,'rgba(255,236,170,0)');
-  ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(sx,sy,r*5,0,7); ctx.fill();
-  ctx.fillStyle='rgba(255,246,205,.95)'; ctx.beginPath(); ctx.arc(sx,sy,r,0,7); ctx.fill();
-  serra(horizonte, H*0.085, '#3c5f86', camX*0.020, 0.9);
-  serra(horizonte, H*0.052, '#4d7396', camX*0.038, 1.7);
+
+  const dS = anguloCurto(SOL_RUMO - rumo);
+  if (Math.abs(dS) < 1.25){
+    const sx = W/2 + Math.tan(dS)*F, sy = horizonte*0.34, r = Math.min(W,H)*0.055;
+    const halo = ctx.createRadialGradient(sx,sy,r*0.3, sx,sy,r*5);
+    halo.addColorStop(0,'rgba(255,236,170,.55)'); halo.addColorStop(1,'rgba(255,236,170,0)');
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(sx,sy,r*5,0,7); ctx.fill();
+    ctx.fillStyle='rgba(255,246,205,.95)'; ctx.beginPath(); ctx.arc(sx,sy,r,0,7); ctx.fill();
+  }
+  serra(horizonte, H*0.085, '#3c5f86', 0.0, 3);
+  serra(horizonte, H*0.052, '#4d7396', 1.7, 5);
 }
-function serra(base, altura, cor, desloc, freq){
+
+/* A serra é desenhada pelo RUMO de cada ponto da tela, e as ondas têm período
+   inteiro — então, girando 360°, as mesmas montanhas voltam ao mesmo lugar. */
+function serra(base, altura, cor, fase, freq){
   const M = margem();
   ctx.fillStyle = cor;
   ctx.beginPath(); ctx.moveTo(-M-10, base+2);
-  for (let x=-M-10; x<=W+M+10; x+=W/26){
-    const k = (x + desloc)/W * 7 * freq;
-    const h = (Math.sin(k)*0.5 + Math.sin(k*2.7+1.3)*0.3 + Math.sin(k*5.1)*0.2 + 1) * altura*0.5;
+  for (let x=-M-10; x<=W+M+10; x+=W/40){
+    const k = (rumo + Math.atan((x - W/2)/F)) * freq + fase;
+    const h = (Math.sin(k)*0.5 + Math.sin(k*3+1.3)*0.3 + Math.sin(k*7)*0.2 + 1) * altura*0.5;
     ctx.lineTo(x, base + 2 - h);
   }
   ctx.lineTo(W+margem()+10, base+2); ctx.closePath(); ctx.fill();
 }
 
-const PASSO_Z = 900, PASSO_X = 1500;
-const VERDES = ['#2a5c33','#38754a','#245029','#47895a','#57964f','#6b8f3c','#84a04a','#2f6b3e','#3f6e2f','#537f36'];
-function corDoCampo(a,b){
-  const h = Math.abs(Math.sin(a*127.1 + b*311.7) * 43758.5453) % 1;
-  return VERDES[Math.floor(h*VERDES.length)];
-}
+const PASSO_CH = 2200;
+const VERDES = [[42,92,51],[56,117,74],[36,80,41],[71,137,90],[87,150,79],
+                [107,143,60],[132,160,74],[47,107,62],[63,110,47],[83,127,54]];
+const CINZAS = [[91,95,99],[84,88,92],[96,100,105],[79,83,87]];
+function baralha(a,b){ return Math.abs(Math.sin(a*127.1 + b*311.7) * 43758.5453) % 1; }
+function corDoCampo(a,b){ return VERDES[Math.floor(baralha(a,b)*VERDES.length)]; }
 
+/* O chão é uma grade do MAPA (não da tela): pego as células num quadrado em
+   volta do avião, jogo fora as que estão atrás ou fora do campo de visão, e
+   desenho da mais longe para a mais perto. */
 function desenhaChao(){
   const M = margem();
-  ctx.fillStyle = '#2f6a3f';
+  ctx.fillStyle = ehCidade(aviaoX, aviaoZ) ? '#55595d' : '#2f6a3f';
   ctx.fillRect(-M, horizonte, W+M*2, H-horizonte+M);
-  const desl  = distancia % PASSO_Z;
-  const baseK = Math.floor(distancia / PASSO_Z);
-  const j0 = Math.floor((camX - 11000)/PASSO_X), j1 = Math.ceil((camX + 11000)/PASSO_X);
 
-  for (let i = 16; i >= 0; i--){
-    const z1 = i*PASSO_Z - desl, z2 = z1 + PASSO_Z;
-    if (z2 < 140) continue;
-    const zAbs = distancia + z1;
-    const cidade = ehCidade(zAbs);
-    for (let j = j0; j <= j1; j++){
-      const a = projeta(j*PASSO_X, CHAO, z1), b = projeta((j+1)*PASSO_X, CHAO, z1),
-            c = projeta((j+1)*PASSO_X, CHAO, z2), d = projeta(j*PASSO_X, CHAO, z2);
-      if (!a||!b||!c||!d) continue;
-      if ((a.x > W+40 && d.x > W+40) || (b.x < -40 && c.x < -40)) continue;
-      quadro4(a,b,c,d, cidade ? (((j+baseK+i) & 1) ? '#5b5f63' : '#54585c') : corDoCampo(j, baseK + i));
-    }
-    const e1 = estradaX(zAbs), e2 = estradaX(zAbs + PASSO_Z);
-    const ea = projeta(e1-150, CHAO, z1), eb = projeta(e1+150, CHAO, z1),
-          ec = projeta(e2+150, CHAO, z2), ed = projeta(e2-150, CHAO, z2);
-    if (ea&&eb&&ec&&ed) quadro4(ea,eb,ec,ed,'#6b6a63');
-    const r1 = rioX(zAbs), r2 = rioX(zAbs + PASSO_Z);
-    const ra = projeta(r1-520, CHAO, z1), rb = projeta(r1+520, CHAO, z1),
-          rc = projeta(r2+520, CHAO, z2), rd = projeta(r2-520, CHAO, z2);
-    if (ra&&rb&&rc&&rd) quadro4(ra,rb,rc,rd,'#3f7fa8');
+  const i0 = Math.floor((aviaoX - ALCANCE)/PASSO_CH), i1 = Math.ceil((aviaoX + ALCANCE)/PASSO_CH);
+  const k0 = Math.floor((aviaoZ - ALCANCE)/PASSO_CH), k1 = Math.ceil((aviaoZ + ALCANCE)/PASSO_CH);
+  const meia = (W/2 + margem()) / F;              // meia abertura da tela, em tangente
+  const celulas = [];
+  for (let i=i0;i<=i1;i++) for (let k=k0;k<=k1;k++){
+    const c = paraCamera((i+0.5)*PASSO_CH, (k+0.5)*PASSO_CH);
+    const d2 = c.x*c.x + c.z*c.z;
+    if (d2 > ALCANCE*ALCANCE) continue;
+    if (c.z < -PASSO_CH) continue;                                   // atrás
+    if (Math.abs(c.x) > (c.z + CAMD)*meia + PASSO_CH*1.6) continue;  // fora de quadro
+    celulas.push({ i:i, k:k, d:d2 });
+  }
+  celulas.sort((a,b) => b.d - a.d);
+  for (const cel of celulas){
+    const x0 = cel.i*PASSO_CH, z0 = cel.k*PASSO_CH, x1 = x0+PASSO_CH, z1 = z0+PASSO_CH;
+    const a = projetaM(x0,CHAO,z0), b = projetaM(x1,CHAO,z0),
+          c = projetaM(x1,CHAO,z1), d = projetaM(x0,CHAO,z1);
+    if (!a||!b||!c||!d) continue;
+    // a névoa também no chão: sem isso o mapa aberto vira um tabuleiro de
+    // xadrez gigante até o horizonte, que foi como ficou na primeira tentativa
+    const rgb = ehCidade(x0+PASSO_CH/2, z0+PASSO_CH/2)
+                  ? CINZAS[Math.floor(baralha(cel.i*1.7, cel.k*2.3)*CINZAS.length)]
+                  : corDoCampo(cel.i, cel.k);
+    quadro4(a,b,c,d, comNevoa(rgb, 1, Math.sqrt(cel.d)));
   }
 
-  // bruma bem de leve: só para o corte céu/chão não ficar seco. Forte demais
-  // vira uma faixa clara atravessando a cidade.
-  const b = ctx.createLinearGradient(0, horizonte - 2, 0, horizonte + H*0.09);
-  b.addColorStop(0,'rgba(188,217,239,.55)'); b.addColorStop(0.4,'rgba(188,217,239,.18)');
+  // rio (norte-sul) e as duas estradas: são as referências do mapa
+  fitaZ(rioX, 560, [63,127,168]);
+  fitaZ(estradaXv, 150, [107,106,99]);
+  fitaX(estradaZ, 150, [107,106,99]);
+
+  const b = ctx.createLinearGradient(0, horizonte - 2, 0, horizonte + H*0.14);
+  b.addColorStop(0,'rgba(188,217,239,.62)'); b.addColorStop(0.35,'rgba(188,217,239,.20)');
   b.addColorStop(1,'rgba(188,217,239,0)');
-  ctx.fillStyle=b; ctx.fillRect(-M, horizonte - 2, W+M*2, H*0.09);
+  ctx.fillStyle=b; ctx.fillRect(-M, horizonte - 2, W+M*2, H*0.14);
 }
 
-/* --- um prédio: sombra, três faces iluminadas pelo sol e detalhe no telhado --- */
-const SOL_X = 1;          // o sol está à direita, então a face direita é a clara
-function desenhaPredio(p){
-  const zr = p.z - distancia;
-  const z1 = zr - p.d/2, z2 = zr + p.d/2;
-  if (z2 < 60) return;
-  const topo = CHAO + p.h;
-  const xa = p.x - p.w/2, xb = p.x + p.w/2;
+/* faixa que corre ao longo do eixo z (rio, estrada vertical) */
+function fitaZ(fn, meia, cor){
+  const P = 2400, z0 = Math.floor((aviaoZ - ALCANCE)/P)*P;
+  for (let z = z0; z < aviaoZ + ALCANCE; z += P){
+    const a = projetaM(fn(z)-meia, CHAO, z),   b = projetaM(fn(z)+meia, CHAO, z),
+          c = projetaM(fn(z+P)+meia, CHAO, z+P), d = projetaM(fn(z+P)-meia, CHAO, z+P);
+    if (a&&b&&c&&d) quadro4(a,b,c,d,comNevoa(cor, 1, longe(fn(z), z)));
+  }
+}
+/* faixa que corre ao longo do eixo x (estrada horizontal) */
+function fitaX(fn, meia, cor){
+  const P = 2400, x0 = Math.floor((aviaoX - ALCANCE)/P)*P;
+  for (let x = x0; x < aviaoX + ALCANCE; x += P){
+    const a = projetaM(x, CHAO, fn(x)-meia),   b = projetaM(x, CHAO, fn(x)+meia),
+          c = projetaM(x+P, CHAO, fn(x+P)+meia), d = projetaM(x+P, CHAO, fn(x+P)-meia);
+    if (a&&b&&c&&d) quadro4(a,b,c,d,comNevoa(cor, 1, longe(x, fn(x))));
+  }
+}
 
-  const f1 = projeta(xa, CHAO, z1), f2 = projeta(xb, CHAO, z1),
-        f3 = projeta(xb, topo, z1), f4 = projeta(xa, topo, z1);
-  if (!f1||!f2||!f3||!f4) return;
-  if ((f1.x > W+80 && f2.x > W+80) || (f1.x < -80 && f2.x < -80)) return;
+/* --- um prédio: uma caixa de verdade ---------------------------------------
+   Com o avião podendo virar, não dá mais para desenhar "a frente e uma
+   lateral": depende de onde a câmera está. Então eu vejo, para cada uma das
+   quatro paredes, se a câmera está do lado de fora dela — essas são as que
+   aparecem — e ilumino cada uma conforme o lado em que o sol está. */
+function camMundo(){
+  const d = cockpit ? 60 : CAMD;
+  return { x: aviaoX - senR*d, z: aviaoZ - cosR*d };
+}
+const PAREDES = [                       // [canto a, canto b, normal x, normal z]
+  [0,1, 0,-1], [1,2, 1,0], [2,3, 0,1], [3,0, -1,0]
+];
+function desenhaPredio(p){
+  const c = paraCamera(p.x, p.z);
+  if (c.z < -(p.w + p.d)) return;
+  const zr = Math.sqrt(c.x*c.x + c.z*c.z);
+  const topo = CHAO + p.h;
+  const x0 = p.x - p.w/2, x1 = p.x + p.w/2, z0 = p.z - p.d/2, z1 = p.z + p.d/2;
+  const cantos = [[x0,z0],[x1,z0],[x1,z1],[x0,z1]];
+  const cc = cantos.map(q => paraCamera(q[0], q[1]));
+  const pb = cc.map(q => projeta(q.x, CHAO, q.z));
+  const pt = cc.map(q => projeta(q.x, topo, q.z));
+  if (pb.some(q=>!q) || pt.some(q=>!q)) return;
+  if (pb.every(q => q.x > W+90) || pb.every(q => q.x < -90)) return;
 
   const base = [156, 162, 174];
   const tom  = 0.78 + p.tom*0.34;          // cada prédio com o seu concreto
 
   // sombra no chão, jogada para o lado contrário ao sol
-  const sx = -SOL_X * p.h * 0.55;
-  const s1 = projeta(xa + sx, CHAO, z1), s2 = projeta(xb + sx, CHAO, z1),
-        s3 = projeta(xb + sx*0.4, CHAO, z2), s4 = projeta(xa + sx*0.4, CHAO, z2);
-  if (s1&&s2&&s3&&s4){
+  const sx = -SOL_DIR.x * p.h * 0.55, sz = -SOL_DIR.z * p.h * 0.55;
+  const so = cantos.map(q => projetaM(q[0] + sx, CHAO, q[1] + sz));
+  if (so.every(q=>q)){
     ctx.globalAlpha = 0.20 * (1 - Math.min(1, zr/(ALCANCE*0.7)));
-    quadro4(s1,s2,s3,s4,'#101820');
+    quadro4(so[0],so[1],so[2],so[3],'#101820');
     ctx.globalAlpha = 1;
   }
 
-  // lateral: a que dá para ver. Clara se for a do lado do sol.
-  const eDir = p.x > camX;
-  const xl = eDir ? xa : xb;
-  const lateralNoSol = (eDir ? -1 : 1) === SOL_X;
-  const l1 = projeta(xl, CHAO, z1), l2 = projeta(xl, CHAO, z2),
-        l3 = projeta(xl, topo, z2), l4 = projeta(xl, topo, z1);
-  if (l1&&l2&&l3&&l4) quadro4(l1,l2,l3,l4, comNevoa(base, tom*(lateralNoSol?1.12:0.62), zr));
+  const cam = camMundo();
+  const visiveis = [];
+  for (const f of PAREDES){
+    const fora = (f[2] > 0 && cam.x > x1) || (f[2] < 0 && cam.x < x0) ||
+                 (f[3] > 0 && cam.z > z1) || (f[3] < 0 && cam.z < z0);
+    if (!fora) continue;
+    const luz = f[2]*SOL_DIR.x + f[3]*SOL_DIR.z;        // -1 na sombra, +1 no sol
+    const meio = paraCamera((cantos[f[0]][0]+cantos[f[1]][0])/2, (cantos[f[0]][1]+cantos[f[1]][1])/2);
+    visiveis.push({ a:f[0], b:f[1], luz: 0.60 + Math.max(0, luz)*0.55, d: meio.z });
+  }
+  visiveis.sort((u,v) => v.d - u.d);      // a parede mais longe primeiro
 
-  // telhado
-  const t1 = projeta(xa, topo, z1), t2 = projeta(xb, topo, z1),
-        t3 = projeta(xb, topo, z2), t4 = projeta(xa, topo, z2);
-  if (t1&&t2&&t3&&t4) quadro4(t1,t2,t3,t4, comNevoa(base, tom*1.30, zr));
+  const alturaTela = Math.abs(pb[0].y - pt[0].y);
+  for (const f of visiveis){
+    quadro4(pb[f.a], pb[f.b], pt[f.b], pt[f.a], comNevoa(base, tom*f.luz, zr));
+    if (alturaTela > 40) janelas(cc[f.a], cc[f.b], topo, zr, p);
+  }
 
-  // frente
-  quadro4(f1,f2,f3,f4, comNevoa(base, tom*0.92, zr));
-
-  const alturaTela = Math.abs(f1.y - f4.y), largTela = Math.abs(f2.x - f1.x);
+  // telhado, por cima de tudo
+  quadro4(pt[0],pt[1],pt[2],pt[3], comNevoa(base, tom*1.30, zr));
 
   // caixa d'água e antena, só quando vale a pena desenhar
   if (alturaTela > 70 && p.h > 900){
-    const cw = p.w*0.26, ct = topo + p.h*0.10;
-    const c1 = projeta(p.x-cw, topo, zr), c2 = projeta(p.x+cw, topo, zr),
-          c3 = projeta(p.x+cw, ct, zr),   c4 = projeta(p.x-cw, ct, zr);
-    if (c1&&c2&&c3&&c4) quadro4(c1,c2,c3,c4, comNevoa(base, tom*1.05, zr));
-    const a1 = projeta(p.x, ct, zr), a2 = projeta(p.x, ct + p.h*0.22, zr);
+    const cw = p.w*0.26, cd = p.d*0.26, ct = topo + p.h*0.10;
+    const cx2 = [[p.x-cw,p.z-cd],[p.x+cw,p.z-cd],[p.x+cw,p.z+cd],[p.x-cw,p.z+cd]];
+    const ca = cx2.map(q => projetaM(q[0], ct, q[1]));
+    if (ca.every(q=>q)) quadro4(ca[0],ca[1],ca[2],ca[3], comNevoa(base, tom*1.12, zr));
+    const a1 = projetaM(p.x, ct, p.z), a2 = projetaM(p.x, ct + p.h*0.22, p.z);
     if (a1&&a2){
       ctx.strokeStyle = comNevoa([90,96,110], 1, zr);
-      ctx.lineWidth = Math.max(1, 12*f1.s);
+      ctx.lineWidth = Math.max(1, 12*a1.s);
       ctx.beginPath(); ctx.moveTo(a1.x,a1.y); ctx.lineTo(a2.x,a2.y); ctx.stroke();
     }
   }
+}
 
-  // janelas
-  if (alturaTela > 40 && largTela > 16){
-    const col = Math.max(2, Math.min(6, Math.round(p.w/150)));
-    const lin = Math.max(2, Math.min(12, Math.round(p.h/260)));
-    const jw = largTela/col*0.5, jh = alturaTela/lin*0.45;
-    const perto = 1 - Math.min(0.85, Math.max(0, (zr-1500)/(ALCANCE*0.8)));
-    for (let i=0;i<col;i++) for (let j=0;j<lin;j++){
-      const acesa = ((i*7 + j*13 + Math.round(p.x/97)) % 5) < 2;
-      ctx.globalAlpha = perto;
+/* Janelas numa parede qualquer. A parede pode estar de esguelha, então cada
+   coluna é projetada no seu próprio lugar; as linhas saem de conta, porque
+   numa mesma coluna a profundidade não muda com a altura. */
+function janelas(A, B, topo, zr, p){
+  const col = Math.max(2, Math.min(5, Math.round(p.w/170)));
+  const lin = Math.max(2, Math.min(9, Math.round(p.h/260)));
+  const perto = 1 - Math.min(0.85, Math.max(0, (zr-1500)/(ALCANCE*0.8)));
+  if (perto < 0.12) return;
+  ctx.globalAlpha = perto;
+  for (let i=0;i<col;i++){
+    const t0 = (i+0.22)/col, t1 = (i+0.78)/col;
+    const q0 = projeta(A.x+(B.x-A.x)*t0, CHAO, A.z+(B.z-A.z)*t0);
+    const q1 = projeta(A.x+(B.x-A.x)*t1, CHAO, A.z+(B.z-A.z)*t1);
+    if (!q0||!q1) continue;
+    if ((q0.x < -40 && q1.x < -40) || (q0.x > W+40 && q1.x > W+40)) continue;
+    for (let j=0;j<lin;j++){
+      const yb = CHAO + (topo-CHAO)*(j+0.24)/lin, yt = CHAO + (topo-CHAO)*(j+0.74)/lin;
+      const acesa = ((i*7 + j*13 + Math.round(p.x/97) + Math.round(p.z/89)) % 5) < 2;
       ctx.fillStyle = acesa ? 'rgba(255,226,150,.8)' : 'rgba(38,50,70,.55)';
-      ctx.fillRect(f1.x + largTela*(i+0.28)/col, f4.y + alturaTela*(j+0.28)/lin, jw, jh);
+      ctx.beginPath();
+      ctx.moveTo(q0.x, horizonte - (yt-camY)*F/q0.d);
+      ctx.lineTo(q1.x, horizonte - (yt-camY)*F/q1.d);
+      ctx.lineTo(q1.x, horizonte - (yb-camY)*F/q1.d);
+      ctx.lineTo(q0.x, horizonte - (yb-camY)*F/q0.d);
+      ctx.closePath(); ctx.fill();
     }
-    ctx.globalAlpha = 1;
   }
+  ctx.globalAlpha = 1;
 }
 
 /* --- alvo no chão: depósito de combustível, com marca para achar de longe --- */
 function desenhaAlvo(a){
-  const zr = a.z - distancia;
-  const p = projeta(a.x, CHAO, zr);
+  const c = paraCamera(a.x, a.z);
+  const p = projeta(c.x, CHAO, c.z);
   if (!p) return;
   const r = a.r * p.s;
   if (r < 1 || r > Math.min(W,H)*0.9) return;
@@ -819,7 +931,7 @@ function desenhaAlvo(a){
 
   // três tanques cilíndricos
   for (const dx of [-0.55, 0, 0.55]){
-    const q = projeta(a.x + dx*a.r, CHAO, zr);
+    const q = projetaM(a.x + dx*a.r*cosR, CHAO, a.z - dx*a.r*senR);
     if (!q) continue;
     const rw = a.r*0.34*q.s, rh = a.r*0.5*q.s;
     ctx.fillStyle = '#c94f3d';
@@ -841,11 +953,12 @@ function desenhaAlvo(a){
 }
 
 function desenhaNuvem(n){
-  const p = projeta(n.x, n.y, n.z - distancia);
+  const c = paraCamera(n.x, n.z);
+  const p = projeta(c.x, n.y, c.z);
   if (!p) return;
   const r = n.r * p.s;
   if (r < 2 || p.x < -r*3 || p.x > W+r*3) return;
-  const perto = Math.min(1, Math.max(0, (n.z - distancia)/2200));
+  const perto = Math.min(1, Math.max(0, c.z/2200));
   ctx.fillStyle = 'rgba(255,255,255,' + (Math.min(0.5, 0.16 + r/(W*1.8)) * perto).toFixed(3) + ')';
   ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r*0.42, 0, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.ellipse(p.x - r*0.5, p.y + r*0.10, r*0.55, r*0.30, 0, 0, 7); ctx.fill();
@@ -853,12 +966,13 @@ function desenhaNuvem(n){
 }
 
 function desenhaTambor(t, alvo){
-  const p = projeta(t.x, t.y, t.z - distancia);
+  const c = paraCamera(t.x, t.z);
+  const p = projeta(c.x, t.y, c.z);
   if (!p) return;
   const r = 125 * p.s;
   if (r < 1.2 || r > Math.min(W,H)*0.40) return;
   if (p.x < -r*4 || p.x > W+r*4) return;
-  const dist = 1 - Math.min(1, (t.z - distancia)/ALCANCE);
+  const dist = 1 - Math.min(1, c.z/ALCANCE);
   const corpo = t.azul ? '#3aa0ff' : '#ffb43a';
   const faixa = t.azul ? '#cfeaff' : '#fff0cf';
   ctx.save();
@@ -889,14 +1003,15 @@ function desenhaTambor(t, alvo){
 }
 
 function desenhaPombo(o){
-  const p = projeta(o.x, o.y, o.z - distancia);
+  const c = paraCamera(o.x, o.z);
+  const p = projeta(c.x, o.y, c.z);
   if (!p) return;
   const r = 150 * p.s;
   if (r < 0.8 || r > Math.min(W,H)*0.42) return;   // colado na câmera: não desenha
   if (p.x < -r*5 || p.x > W+r*5) return;
   const bate = Math.sin(Date.now()/90 + o.fase);
   ctx.save(); ctx.translate(p.x, p.y);
-  ctx.globalAlpha = Math.max(0.25, 1 - (o.z-distancia)/ALCANCE);
+  ctx.globalAlpha = Math.max(0.25, 1 - c.z/ALCANCE);
   ctx.fillStyle = '#3b4150';
   ctx.beginPath(); ctx.ellipse(0, 0, r*0.55, r*0.38, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#4a5266';
@@ -915,7 +1030,7 @@ function desenhaPombo(o){
 }
 
 function desenhaAviaoInimigo(o){
-  const p = projeta(o.x, o.y, o.z - distancia);
+  const p = projetaM(o.x, o.y, o.z);
   if (!p) return;
   const r = 420 * p.s;
   if (r < 1 || r > Math.min(W,H)*0.55) return;
@@ -946,7 +1061,7 @@ function desenhaAviaoInimigo(o){
 }
 
 function desenhaBomba(b){
-  const p = projeta(b.x, b.y, b.z - distancia);
+  const p = projetaM(b.x, b.y, b.z);
   if (!p) return;
   const r = Math.max(1, 90 * p.s);
   ctx.save(); ctx.translate(p.x, p.y);
@@ -970,8 +1085,8 @@ function desenhaBomba(b){
 }
 
 function desenhaTiro(t){
-  const p = projeta(t.x, t.y, t.z - distancia);
-  const q = projeta(t.x, t.y, t.z - distancia - 900);
+  const p = projetaM(t.x, t.y, t.z);
+  const q = projetaM(t.x - t.dx*900, t.y, t.z - t.dz*900);
   if (!p || !q) return;
   ctx.strokeStyle = 'rgba(255,236,150,.9)';
   ctx.lineWidth = Math.max(1, 26*p.s);
@@ -979,7 +1094,7 @@ function desenhaTiro(t){
 }
 
 function desenhaParticula(f){
-  const p = projeta(f.x, f.y, f.z - distancia);
+  const p = projetaM(f.x, f.y, f.z);
   if (!p) return;
   const r = Math.max(0.6, f.raio * p.s);
   ctx.globalAlpha = Math.max(0, Math.min(1, f.vida));
@@ -992,15 +1107,15 @@ function desenhaParticula(f){
    nesse tempo. Sem esta marca no chão, bombardear é adivinhação. */
 function miraBomba(){
   const t = Math.sqrt(Math.max(0, 2*(aviaoY - CHAO)/1400));
-  return { x: aviaoX + vx*0.5*t, z: distancia + voo*t, t: t };
+  return { x: aviaoX + senR*voo*t, z: aviaoZ + cosR*voo*t, t: t };
 }
 function desenhaMira(){
   if (caindo || arma !== 'bomba') return;
   const m = miraBomba();
-  const p = projeta(m.x, CHAO + 20, m.z - distancia);
+  const p = projetaM(m.x, CHAO + 20, m.z);
   if (!p) return;
   const r = Math.max(6, 260 * p.s);
-  const perto = alvos.some(a => a.vivo && Math.abs(a.z - m.z) < 700 && Math.abs(a.x - m.x) < 700);
+  const perto = alvos.some(a => a.vivo && Math.hypot(a.z - m.z, a.x - m.x) < 800);
   ctx.save();
   ctx.strokeStyle = perto ? 'rgba(120,255,150,.95)' : 'rgba(255,255,255,.6)';
   ctx.lineWidth = perto ? 3 : 2;
@@ -1016,7 +1131,7 @@ function desenhaMira(){
 
 function desenhaAviao(){
   if (cockpit) return;                      // de dentro não se vê o próprio avião
-  const p = projeta(aviaoX, aviaoY, 0);
+  const p = projeta(0, aviaoY, 0);
   if (!p) return;
   const t = Math.min(W,H) * 0.17;
   ctx.save();
@@ -1077,22 +1192,46 @@ function desenhaAviao(){
    ========================================================================== */
 const GRAU = () => H*0.0166;          // pixels por grau de arfagem na tela
 
+/* -----------------------------------------------------------------------------
+   A FORMA DA CABINE, tirada das fotos
+
+   Três faixas, de cima para baixo:
+     PAINEL DE TETO — a peça escura lá em cima, cheia de disjuntores. É o que
+       mais entrega na hora "isto é um avião". A minha cabine não tinha, e por
+       isso o alto da tela era só um vazio preto.
+     VIDRO — largo, dividido por montantes. Mais alto no meio e caindo para os
+       lados, que é onde ficam as janelas laterais.
+     PAINEL — escuro (nas fotos nenhum painel é cinza claro), com os relógios
+       embutidos e acesos, a capota por cima e o pedestal embaixo.
+--------------------------------------------------------------------------- */
+const VID_L = 0.045, VID_R = 0.955;
+function tetoY(f){                                              // borda do teto
+  // curva, não bico: com |f-0.5| puro o teto fazia um V no meio da tela
+  return H*0.062 + Math.pow(Math.abs(f-0.5)*2, 1.7)*H*0.105;
+}
+function paraY(f){                                              // borda do painel
+  const a = Math.abs(f - 0.5);
+  return H*0.632 + (a < 0.30 ? 0 : (a - 0.30) * H*0.82);
+}
 function caminhoBolha(novo){
-  const L = W*0.10, R = W*0.90, T = H*0.028, B = H*0.665;
   if (novo !== false) ctx.beginPath();
-  ctx.moveTo(L, T + H*0.10);
-  ctx.quadraticCurveTo(W*0.5, T - H*0.045, R, T + H*0.12);
-  ctx.lineTo(R, B - H*0.10);
-  ctx.quadraticCurveTo(W*0.5, B + H*0.065, L, B - H*0.12);
+  ctx.moveTo(W*VID_L, tetoY(VID_L));
+  for (let f = VID_L; f <= VID_R + 0.0001; f += 0.025) ctx.lineTo(W*f, tetoY(f));
+  ctx.lineTo(W*VID_R, tetoY(VID_R));
+  ctx.lineTo(W*VID_R, paraY(VID_R));
+  for (let f = VID_R; f >= VID_L - 0.0001; f -= 0.025) ctx.lineTo(W*f, paraY(f));
   ctx.closePath();
 }
 
+/* Um relógio embutido: nas fotos o painel é escuro e quem brilha é o mostrador.
+   Por isso o fundo é quase preto com um brilho no meio, a moldura tem um fio de
+   luz em cima (é o metal pegando a luz do para-brisa) e o ponteiro tem sombra. */
 function mostrador(cx, cy, r, frac, rotulo, cor, texto){
-  ctx.fillStyle = '#080d16';
+  const g = ctx.createRadialGradient(cx, cy - r*0.3, r*0.1, cx, cy, r*1.1);
+  g.addColorStop(0, '#1a2331'); g.addColorStop(1, '#070b12');
+  ctx.fillStyle = g;
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();
-  ctx.strokeStyle = '#2c3648'; ctx.lineWidth = Math.max(1.5, r*0.09);
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke();
-  ctx.strokeStyle = 'rgba(150,170,200,.45)'; ctx.lineWidth = Math.max(1, r*0.05);
+  ctx.strokeStyle = 'rgba(150,170,200,.40)'; ctx.lineWidth = Math.max(1, r*0.05);
   for (let i=0;i<=10;i++){
     const a = -Math.PI*0.75 + (i/10)*Math.PI*1.5;
     ctx.beginPath();
@@ -1101,17 +1240,84 @@ function mostrador(cx, cy, r, frac, rotulo, cor, texto){
     ctx.stroke();
   }
   const a = -Math.PI*0.75 + Math.max(0,Math.min(1,frac))*Math.PI*1.5;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = Math.max(2, r*0.14);
+  ctx.beginPath(); ctx.moveTo(cx+1.5,cy+1.5); ctx.lineTo(cx+Math.cos(a)*r*0.74+1.5, cy+Math.sin(a)*r*0.74+1.5); ctx.stroke();
   ctx.strokeStyle = cor; ctx.lineWidth = Math.max(2, r*0.12);
   ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r*0.74, cy+Math.sin(a)*r*0.74); ctx.stroke();
+  ctx.lineCap = 'butt';
+  ctx.fillStyle = '#39414d';
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.09, 0, 7); ctx.fill();
   ctx.textAlign = 'center';
-  if (texto){
+  if (texto !== undefined && texto !== null){
     ctx.fillStyle = '#cfe0ff';
-    ctx.font = '700 ' + Math.max(8, r*0.34).toFixed(0) + 'px ui-monospace, monospace';
-    ctx.fillText(texto, cx, cy + r*0.62);
+    ctx.font = '700 ' + Math.max(8, r*0.32).toFixed(0) + 'px ui-monospace, monospace';
+    ctx.fillText(texto, cx, cy + r*0.64);
   }
-  ctx.fillStyle = '#2b3340';          // painel claro pede letra escura
+  rotuloRelogio(cx, cy, r, rotulo);
+}
+function rotuloRelogio(cx, cy, r, rotulo){
+  ctx.fillStyle = '#8d9aae';
   ctx.font = '800 ' + Math.max(8, r*0.32).toFixed(0) + 'px system-ui, sans-serif';
+  ctx.textAlign = 'center';
   ctx.fillText(rotulo, cx, cy + r*1.52);
+}
+
+function mostradorHorizonte(cx, cy, r){
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.88, 0, 7); ctx.clip();
+  ctx.translate(cx, cy); ctx.rotate(-inclinacao*Math.PI/180);
+  const desl = Math.max(-r, Math.min(r, nariz*1.6));
+  ctx.fillStyle = '#2f6fb8'; ctx.fillRect(-r*2, -r*2 + desl, r*4, r*2);
+  ctx.fillStyle = '#6b5a3a'; ctx.fillRect(-r*2, desl, r*4, r*2);
+  ctx.strokeStyle = '#e8eef7'; ctx.lineWidth = Math.max(1.2, r*0.06);
+  ctx.beginPath(); ctx.moveTo(-r*2, desl); ctx.lineTo(r*2, desl); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(150,170,200,.35)'; ctx.lineWidth = Math.max(1, r*0.05);
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.88, 0, 7); ctx.stroke();
+  ctx.strokeStyle = '#ffc24d'; ctx.lineWidth = Math.max(2, r*0.1);
+  ctx.beginPath();
+  ctx.moveTo(cx-r*0.55, cy); ctx.lineTo(cx-r*0.18, cy);
+  ctx.moveTo(cx+r*0.18, cy); ctx.lineTo(cx+r*0.55, cy);
+  ctx.moveTo(cx, cy-r*0.08); ctx.lineTo(cx, cy+r*0.08);
+  ctx.stroke();
+  rotuloRelogio(cx, cy, r, 'HORIZONTE');
+  ctx.textAlign = 'center';
+}
+
+/* bússola de verdade no painel: a rosa gira, o nariz fica sempre no topo */
+function mostradorBussola(cx, cy, r){
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.88, 0, 7); ctx.clip();
+  ctx.fillStyle = '#080d16';
+  ctx.fillRect(cx-r, cy-r, r*2, r*2);
+  ctx.translate(cx, cy); ctx.rotate(-rumo);
+  ctx.textAlign = 'center';
+  for (let i = 0; i < 8; i++){
+    const a = i*Math.PI/4;
+    const x = Math.sin(a)*r*0.60, y = -Math.cos(a)*r*0.60;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rumo);
+    ctx.fillStyle = i === 0 ? '#ff8a6a' : (i % 2 === 0 ? '#dce8fb' : '#7d8cab');
+    ctx.font = '800 ' + Math.max(7, r*(i%2===0?0.36:0.26)).toFixed(0) + 'px system-ui, sans-serif';
+    ctx.fillText(NOMES_RUMO[i], 0, r*0.12);
+    ctx.restore();
+  }
+  ctx.strokeStyle = 'rgba(150,170,200,.45)'; ctx.lineWidth = Math.max(1, r*0.05);
+  for (let i = 0; i < 24; i++){
+    const a = i*Math.PI/12;
+    ctx.beginPath();
+    ctx.moveTo(Math.sin(a)*r*0.80, -Math.cos(a)*r*0.80);
+    ctx.lineTo(Math.sin(a)*r*0.88, -Math.cos(a)*r*0.88);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.strokeStyle = '#2c3648'; ctx.lineWidth = Math.max(1.5, r*0.09);
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.88, 0, 7); ctx.stroke();
+  ctx.fillStyle = '#ffc24d';                       // o índice do nariz
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r*0.62); ctx.lineTo(cx - r*0.16, cy - r*0.86);
+  ctx.lineTo(cx + r*0.16, cy - r*0.86); ctx.closePath(); ctx.fill();
+  rotuloRelogio(cx, cy, r, 'RUMO');
 }
 
 function mostradorHorizonte(cx, cy, r){
@@ -1216,7 +1422,7 @@ function hudCaca(){
   ctx.stroke();
 
   // vetor de velocidade: para onde o avião REALMENTE vai
-  const vvx = cx + (vx/voo) * F * 0.5;
+  const vvx = cx + (inclinacao/45) * W*0.05;
   const vvy = horizonte - (vy/voo) * F * 0.5;
   const r = Math.max(7, H*0.017);
   ctx.lineWidth = 2;
@@ -1250,128 +1456,212 @@ function hudCaca(){
   ctx.textAlign = 'left';
 }
 
+/* =============================================================================
+   BÚSSOLA — a peça que faz um mapa aberto ser jogável
+
+   Num corredor não precisa: é só ir em frente. Podendo virar para qualquer
+   lado, sem isto a pessoa se perde em dez segundos. A fita mostra o rumo, e
+   dois marcadores dizem onde está o tambor de combustível mais próximo e o
+   alvo mais próximo — com a distância em metros. Quando a coisa fica para
+   trás, o marcador encosta na ponta e vira seta.
+   ========================================================================== */
+function maisPerto(lista, filtro){
+  let m = null, d = 1e12;
+  for (const o of lista){
+    if (filtro && !filtro(o)) continue;
+    const dx = o.x-aviaoX, dz = o.z-aviaoZ, q = dx*dx + dz*dz;
+    if (q < d){ d = q; m = o; }
+  }
+  return m;
+}
+
+const ABERTURA = 1.05;                     // meio campo mostrado na fita (60°)
+function marcaBussola(cx, meia, y, o, cor, abaixo){
+  if (!o) return;
+  const dl = anguloCurto(Math.atan2(o.x-aviaoX, o.z-aviaoZ) - rumo);
+  const preso = Math.abs(dl) > ABERTURA;
+  const x = cx + Math.max(-1, Math.min(1, dl/ABERTURA))*meia;
+  const t = Math.max(5, meia*0.030);
+  ctx.fillStyle = cor;
+  ctx.beginPath();
+  if (preso){                               // ficou para trás: vira seta
+    const s = dl > 0 ? 1 : -1;
+    ctx.moveTo(x + s*t*1.5, y); ctx.lineTo(x - s*t*0.3, y - t); ctx.lineTo(x - s*t*0.3, y + t);
+  } else {
+    ctx.moveTo(x, y + t*1.3); ctx.lineTo(x - t, y - t*0.5); ctx.lineTo(x + t, y - t*0.5);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = cor;
+  ctx.font = '700 ' + Math.max(9, H*0.019).toFixed(0) + 'px ui-monospace, monospace';
+  ctx.fillText(Math.round(longe(o.x, o.z)/METRO) + 'm', x, abaixo ? y + t*3.0 : y - t*1.4);
+}
+
+const NOMES_RUMO = ['N','NE','L','SE','S','SO','O','NO'];
+function bussola(y){
+  const meia = Math.min(W*0.27, H*0.55), cx = W/2;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(9,15,25,.55)';
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(cx-meia, y-H*0.028, meia*2, H*0.050, 4);
+  else ctx.rect(cx-meia, y-H*0.028, meia*2, H*0.050);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120,255,170,.30)'; ctx.lineWidth = 1; ctx.stroke();
+
+  const g = rumo*180/Math.PI;
+  const base = Math.round(g/15)*15;
+  for (let k = -6; k <= 6; k++){
+    const abs = base + k*15;
+    const dl = anguloCurto((abs - g)*Math.PI/180);
+    if (Math.abs(dl) > ABERTURA) continue;
+    const x = cx + (dl/ABERTURA)*meia;
+    const card = ((abs % 360) + 360) % 360;
+    const eCard = card % 45 === 0;
+    ctx.strokeStyle = 'rgba(140,255,190,' + (eCard ? '.9' : '.45') + ')';
+    ctx.lineWidth = eCard ? 2 : 1.2;
+    ctx.beginPath(); ctx.moveTo(x, y-H*0.026); ctx.lineTo(x, y-H*0.026 + (eCard?H*0.016:H*0.010)); ctx.stroke();
+    if (eCard){
+      ctx.fillStyle = card % 90 === 0 ? 'rgba(190,255,215,1)' : 'rgba(140,255,190,.75)';
+      ctx.font = '800 ' + Math.max(9, H*(card % 90 === 0 ? 0.022 : 0.018)).toFixed(0) + 'px system-ui, sans-serif';
+      ctx.fillText(NOMES_RUMO[card/45], x, y + H*0.006);
+    }
+  }
+  // marcadores: combustível e alvo
+  // um em cima do outro não dá: o combustível põe o número acima do triângulo,
+  // o alvo põe abaixo, e cada um na sua linha
+  marcaBussola(cx, meia, y + H*0.052, maisPerto(tambores, t => !t.pego), '#ffd257', false);
+  marcaBussola(cx, meia, y + H*0.056, maisPerto(alvos, a => a.vivo), '#ff6a5a', true);
+  // índice do meio: para onde o nariz aponta
+  ctx.fillStyle = 'rgba(230,245,255,.95)';
+  ctx.beginPath();
+  ctx.moveTo(cx, y-H*0.030); ctx.lineTo(cx-6, y-H*0.044); ctx.lineTo(cx+6, y-H*0.044);
+  ctx.closePath(); ctx.fill();
+  ctx.font = '800 ' + Math.max(10, H*0.021).toFixed(0) + 'px ui-monospace, monospace';
+  ctx.fillText(((Math.round(g)+360)%360).toString().padStart(3,'0') + '°', cx, y - H*0.050);
+  ctx.restore();
+  ctx.textAlign = 'left';
+}
+
 function desenhaCockpit(){
   if (!cockpit) return;
   ctx.save();
+
+  // 1) tudo que não é vidro: o interior escuro
   const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0,   '#1c2433'); g.addColorStop(0.55,'#161d2a');
-  g.addColorStop(0.62,'#101723'); g.addColorStop(1,   '#070b13');
+  g.addColorStop(0,'#161c26'); g.addColorStop(0.5,'#111721'); g.addColorStop(1,'#080c13');
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.rect(-W*0.6, -H*0.6, W*2.2, H*2.2);
   caminhoBolha(false);
   ctx.fill('evenodd');
 
-  ctx.save(); caminhoBolha();
-  ctx.strokeStyle = '#39445a'; ctx.lineWidth = Math.max(4, W*0.008); ctx.stroke();
-  ctx.strokeStyle = 'rgba(190,210,240,.30)'; ctx.lineWidth = Math.max(1.5, W*0.002); ctx.stroke();
-  ctx.restore();
-
-  ctx.strokeStyle = '#39445a'; ctx.lineWidth = Math.max(3, W*0.007);
-  ctx.beginPath(); ctx.moveTo(W*0.5, H*0.005); ctx.lineTo(W*0.5, H*0.06); ctx.stroke();
-
-  // ---- paredes laterais ------------------------------------------------
-  // Sem isso as laterais eram dois buracos pretos. Nas fotos há estrutura:
-  // o montante do para-brisa e um console de lado, com luzinhas.
-  for (const lado of [-1, 1]){
-    const dentro = lado < 0 ? W*0.10 : W*0.90;      // onde começa o vidro
-    const fora   = lado < 0 ? 0 : W;
-    const gl = ctx.createLinearGradient(fora, 0, dentro, 0);
-    gl.addColorStop(0, '#252d3c'); gl.addColorStop(1, '#151b27');
-    ctx.fillStyle = gl;
-    ctx.fillRect(Math.min(fora, dentro), 0, W*0.10, H*0.80);
-    // montante do para-brisa, encostado no vidro (por FORA dele, não por dentro)
-    const px = lado < 0 ? dentro - W*0.016 : dentro;
-    ctx.fillStyle = '#39445a';
-    ctx.fillRect(px, H*0.02, W*0.016, H*0.62);
-    ctx.fillStyle = 'rgba(190,210,240,.18)';
-    ctx.fillRect(lado < 0 ? dentro - W*0.004 : dentro, H*0.02, W*0.004, H*0.62);
-    // nervuras
-    ctx.strokeStyle = 'rgba(160,185,220,.10)'; ctx.lineWidth = 1.5;
-    for (let i = 1; i <= 3; i++){
-      const y = H*(0.12 + i*0.135);
-      ctx.beginPath(); ctx.moveTo(fora, y); ctx.lineTo(dentro + lado*W*0.018, y + lado*H*0.012); ctx.stroke();
-    }
-    // console lateral com luzes de aviso
-    const cxL = fora - lado*W*0.048, cyL = H*0.50;
-    ctx.fillStyle = '#2b323f';
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(cxL - W*0.038, cyL - H*0.075, W*0.076, H*0.15, 6);
-    else ctx.rect(cxL - W*0.038, cyL - H*0.075, W*0.076, H*0.15);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1.2; ctx.stroke();
-    for (let i = 0; i < 4; i++){
-      const acesa = lado < 0 ? (i < 2 ? voo > VOO_BASE*1.05 : combustivel > 25)
-                             : (i % 2 === 0 ? municao[arma] > 0 : turbo > 0);
-      ctx.fillStyle = acesa ? 'rgba(120,220,160,.85)' : 'rgba(120,140,170,.22)';
-      ctx.fillRect(cxL - W*0.028, cyL - H*0.055 + i*H*0.033, W*0.056, H*0.018);
-    }
-  }
-
+  // 2) reflexo no vidro
   ctx.save(); caminhoBolha(); ctx.clip();
-  const r1 = ctx.createLinearGradient(W*0.1, H*0.05, W*0.55, H*0.5);
-  r1.addColorStop(0,'rgba(255,255,255,.14)'); r1.addColorStop(0.5,'rgba(255,255,255,.03)');
+  const r1 = ctx.createLinearGradient(W*0.05, H*0.05, W*0.55, H*0.55);
+  r1.addColorStop(0,'rgba(255,255,255,.13)'); r1.addColorStop(0.5,'rgba(255,255,255,.03)');
   r1.addColorStop(1,'rgba(255,255,255,0)');
   ctx.fillStyle = r1; ctx.fillRect(0,0,W,H);
   ctx.restore();
 
-  // ---- a estrutura da cabine, seguindo as fotos de referência ----------
-  // Três coisas que definem a forma: a CAPOTA escura e angular, com os ombros
-  // caindo para fora; o PAINEL em cinza claro (não preto) com os instrumentos
-  // embutidos escuros; e o PEDESTAL central embaixo.
-  const topo = H*0.615, capota = H*0.055;
-  const bordaX = x => {                      // o contorno angular da capota
-    const a = Math.abs(x - 0.5);
-    return a < 0.37 ? topo : topo + (a - 0.37) * H*0.95;
-  };
+  // 3) montantes do para-brisa: um no meio e dois dividindo os vidros laterais
+  for (const f of [0.5, 0.235, 0.765]){
+    const larg = f === 0.5 ? W*0.011 : W*0.009;
+    ctx.fillStyle = '#39424f';
+    ctx.fillRect(W*f - larg/2, tetoY(f) - 2, larg, paraY(f) - tetoY(f) + 4);
+    ctx.fillStyle = 'rgba(200,218,240,.16)';
+    ctx.fillRect(W*f - larg/2, tetoY(f) - 2, larg*0.3, paraY(f) - tetoY(f) + 4);
+  }
+  ctx.save(); caminhoBolha();
+  ctx.strokeStyle = '#2b333f'; ctx.lineWidth = Math.max(5, W*0.010); ctx.stroke();
+  ctx.strokeStyle = 'rgba(190,210,240,.28)'; ctx.lineWidth = Math.max(1.2, W*0.0016); ctx.stroke();
+  ctx.restore();
+
+  // 4) PAINEL DE TETO: a peça que faltava. Fileiras de disjuntores e luzinhas.
+  ctx.beginPath();
+  ctx.moveTo(-W*0.1, -H*0.1); ctx.lineTo(W*1.1, -H*0.1);
+  ctx.lineTo(W*1.1, tetoY(1.1));
+  for (let f = 1.1; f >= -0.1; f -= 0.025) ctx.lineTo(W*f, tetoY(f));
+  ctx.closePath();
+  const gt = ctx.createLinearGradient(0, 0, 0, H*0.16);
+  gt.addColorStop(0, '#313a48'); gt.addColorStop(1, '#1b2230');
+  ctx.fillStyle = gt; ctx.fill();
+  ctx.strokeStyle = 'rgba(190,210,240,.20)'; ctx.lineWidth = 1.4; ctx.stroke();
+  for (let lin = 0; lin < 3; lin++){
+    for (let i = 0; i < 26; i++){
+      const f = 0.08 + i*0.0335;
+      const y = tetoY(f) - H*0.052 + lin*H*0.017;
+      if (y < H*0.006) continue;
+      const semente = (i*13 + lin*29) % 11;
+      ctx.fillStyle = '#4a5464';
+      ctx.fillRect(W*f, y, W*0.017, H*0.010);
+      ctx.fillStyle = semente < 2 ? '#e8a33a' : (semente < 4 ? '#5ec98a' : '#20262f');
+      ctx.fillRect(W*f + W*0.004, y + H*0.002, W*0.009, H*0.005);
+    }
+  }
+  // o cano de ar e a luzinha de leitura, no meio do teto
+  ctx.fillStyle = '#0f141c';
+  ctx.beginPath(); ctx.ellipse(W*0.5, H*0.022, W*0.045, H*0.014, 0, 0, 7); ctx.fill();
+
+  // 5) paredes laterais, com o console de cada lado
+  for (const lado of [-1, 1]){
+    const dentro = lado < 0 ? W*VID_L : W*VID_R;
+    const fora   = lado < 0 ? 0 : W;
+    const gl = ctx.createLinearGradient(fora, 0, dentro, 0);
+    gl.addColorStop(0, '#1d242f'); gl.addColorStop(1, '#11161f');
+    ctx.fillStyle = gl;
+    ctx.fillRect(Math.min(fora, dentro), 0, W*VID_L, H*0.92);
+    const cxL = fora - lado*W*0.022, cyL = H*0.62;
+    ctx.fillStyle = '#242b36';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cxL - W*0.018, cyL - H*0.085, W*0.036, H*0.17, 5);
+    else ctx.rect(cxL - W*0.018, cyL - H*0.085, W*0.036, H*0.17);
+    ctx.fill();
+    for (let i = 0; i < 4; i++){
+      const acesa = lado < 0 ? (i < 2 ? voo > VOO_BASE*1.05 : combustivel > 25)
+                             : (i % 2 === 0 ? municao[arma] > 0 : turbo > 0);
+      ctx.fillStyle = acesa ? 'rgba(120,220,160,.85)' : 'rgba(120,140,170,.20)';
+      ctx.fillRect(cxL - W*0.013, cyL - H*0.062 + i*H*0.037, W*0.026, H*0.020);
+    }
+  }
+
+  // 6) a CAPOTA escura e o PAINEL, que nas fotos também é escuro
+  const capota = H*0.048;
   const contorno = (desloc) => {
     ctx.beginPath();
-    ctx.moveTo(-W*0.05, bordaX(-0.05) + desloc);
-    for (let f = 0; f <= 1.0001; f += 0.02) ctx.lineTo(W*f, bordaX(f) + desloc);
-    ctx.lineTo(W*1.05, bordaX(1.05) + desloc);
+    ctx.moveTo(-W*0.05, paraY(-0.05) + desloc);
+    for (let f = -0.05; f <= 1.0501; f += 0.02) ctx.lineTo(W*f, paraY(f) + desloc);
     ctx.lineTo(W*1.05, H*1.1); ctx.lineTo(-W*0.05, H*1.1);
     ctx.closePath();
   };
+  const gp = ctx.createLinearGradient(0, H*0.63, 0, H);
+  gp.addColorStop(0, '#333c4a'); gp.addColorStop(0.30, '#232a35'); gp.addColorStop(1, '#12161d');
+  ctx.fillStyle = '#0b0e14'; contorno(0); ctx.fill();          // a capota
+  ctx.fillStyle = gp;        contorno(capota); ctx.fill();     // o painel
+  ctx.strokeStyle = 'rgba(190,210,240,.20)'; ctx.lineWidth = 1.4;
+  contorno(capota); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.06)'; contorno(2); ctx.stroke();
 
-  // painel: cinza claro, como nas fotos
-  const gp = ctx.createLinearGradient(0, topo, 0, H);
-  gp.addColorStop(0, '#97a1ad'); gp.addColorStop(0.35, '#828d9a'); gp.addColorStop(1, '#5f6874');
-  ctx.fillStyle = gp; contorno(capota); ctx.fill();
+  // luz da cabine caindo no painel
+  const luz = ctx.createRadialGradient(W*0.5, H*0.66, 10, W*0.5, H*0.66, W*0.5);
+  luz.addColorStop(0, 'rgba(150,185,235,.10)'); luz.addColorStop(1, 'rgba(150,185,235,0)');
+  ctx.fillStyle = luz; contorno(capota); ctx.fill();
 
-  // Capota: a banda escura é simplesmente o que sobra entre os dois contornos.
-  // Pinta-se o escuro por baixo e o painel claro por cima, deslocado — sem
-  // composição nenhuma, que é onde eu ia arrumar artefato.
-  ctx.fillStyle = '#22272f'; contorno(0); ctx.fill();
-  ctx.fillStyle = gp;        contorno(capota); ctx.fill();
-  ctx.strokeStyle = '#3d4550'; ctx.lineWidth = 2; contorno(0); ctx.stroke();
-  ctx.strokeStyle = 'rgba(190,205,225,.22)'; ctx.lineWidth = 1.2;
-  contorno(2); ctx.stroke();
-
-  // régua de interruptores no alto da capota
-  for (let i = 0; i < 22; i++){
-    const f = 0.135 + i*0.0335;
-    if (f > 0.87) break;
-    const x = W*f, y = topo + capota*0.30;
-    ctx.fillStyle = '#7d8793';
-    ctx.fillRect(x, y, W*0.021, capota*0.42);
-    ctx.fillStyle = i % 4 === 0 ? '#e8a33a' : '#2c3440';
-    ctx.fillRect(x + W*0.004, y + capota*0.08, W*0.013, capota*0.14);
-  }
-
-  // ---- instrumentos: duas fileiras, com o T básico em cima -------------
-  // Tudo é medido a partir da borda de baixo da capota, e a fileira de baixo
-  // usa relógios menores — senão os rótulos COMB/RUMO/MISSÃO caem fora da tela.
+  const topo = H*0.632;
+  // ---- instrumentos: duas fileiras, T básico em cima -------------------
   const r = Math.min(W*0.030, H*0.048), rb = r*0.74;
   const yA = topo + capota + r*1.30;
   const yB = yA + r*1.82 + rb;
   const cx = W*0.5;
-  const caixa = (x, y, rr) => {              // a moldura embutida de cada relógio
-    ctx.fillStyle = '#2b313b';
+  const caixa = (x, y, rr) => {
+    ctx.fillStyle = '#0d1119';
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x-rr*1.22, y-rr*1.22, rr*2.44, rr*2.44, rr*0.22);
-    else ctx.rect(x-rr*1.22, y-rr*1.22, rr*2.44, rr*2.44);
+    if (ctx.roundRect) ctx.roundRect(x-rr*1.24, y-rr*1.24, rr*2.48, rr*2.48, rr*0.24);
+    else ctx.rect(x-rr*1.24, y-rr*1.24, rr*2.48, rr*2.48);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = 'rgba(190,210,240,.16)'; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x-rr*1.1, y-rr*1.22); ctx.lineTo(x+rr*1.1, y-rr*1.22); ctx.stroke();
   };
 
   [[cx - r*2.6, yA, r], [cx, yA, r*1.08], [cx + r*2.6, yA, r],
@@ -1382,25 +1672,26 @@ function desenhaCockpit(){
             'VEL', '#a9ecc4', Math.round(voo*3.6/METRO));
   mostrador(cx + r*2.6, yA, r, (aviaoY-CHAO)/(TETO-CHAO),
             'ALT', '#5cc8ff', Math.round((aviaoY-CHAO)/4));
-  mostrador(cx,          yB, rb, (aviaoX+6000)/12000, 'RUMO', '#e8eef7');
+  mostradorBussola(cx, yB, rb);
   mostrador(cx - rb*2.9, yB, rb, combustivel/100, 'COMB',
             combustivel < 20 ? '#ff6a6a' : '#ffc24d', Math.round(combustivel));
-  mostrador(cx + rb*2.9, yB, rb, distancia/MISSAO, 'MISSÃO', '#c9a7ff',
-            Math.round(distancia/MISSAO*100));
+  mostrador(cx + rb*2.9, yB, rb, alvosDestruidos/Math.max(1,alvosTotal), 'ALVOS', '#c9a7ff',
+            alvosDestruidos + '/' + alvosTotal);
 
-  // luzes de aviso, nas laterais do painel como nas fotos
+  // luzes de aviso nas laterais do painel
   const luzes = [['COMB', combustivel < 20, '#ff5a5a'], ['TURBO', turbo > 0, '#5cc8ff'],
-                 ['ALVO', alvos.some(a => a.vivo && a.z-distancia > 0 && a.z-distancia < 9000), '#ffd257'],
+                 ['ALVO', alvos.some(a => a.vivo && longe(a.x,a.z) < 9000), '#ffd257'],
                  [ARMAS[arma].nome.slice(0,5), municao[arma] > 0, ARMAS[arma].cor]];
   luzes.forEach((l, i) => {
     const lado = i < 2 ? -1 : 1;
     const lx = cx + lado*r*5.1, ly = yA + (i % 2) * r*1.5 - r*0.6;
-    ctx.fillStyle = l[1] ? l[2] : '#39414d';
+    ctx.fillStyle = l[1] ? l[2] : '#232a35';
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(lx - r*0.95, ly - r*0.42, r*1.9, r*0.84, 4);
     else ctx.rect(lx - r*0.95, ly - r*0.42, r*1.9, r*0.84);
     ctx.fill();
-    ctx.fillStyle = l[1] ? '#12161d' : '#767f8c';
+    ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = l[1] ? '#12161d' : '#6b7484';
     ctx.font = '800 ' + Math.max(7, r*0.42).toFixed(0) + 'px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(l[0], lx, ly + r*0.15);
@@ -1409,38 +1700,35 @@ function desenhaCockpit(){
   // ---- pedestal central: manetes e o seletor de arma ----
   const py = yB + rb*1.75 + H*0.012;
   if (py < H){
-    ctx.fillStyle = '#3c434e';
+    ctx.fillStyle = '#1b212b';
     ctx.beginPath();
     ctx.moveTo(cx - r*2.3, py); ctx.lineTo(cx + r*2.3, py);
     ctx.lineTo(cx + r*3.1, H*1.05); ctx.lineTo(cx - r*3.1, H*1.05);
     ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1.5; ctx.stroke();
-    // manetes
+    ctx.strokeStyle = 'rgba(190,210,240,.14)'; ctx.lineWidth = 1.4; ctx.stroke();
     for (let i=0;i<2;i++){
       const mx = cx + (i?1:-1)*r*1.25;
-      ctx.strokeStyle = '#161b23'; ctx.lineWidth = Math.max(3, r*0.22);
+      const alt = (voo-VOO_BASE)/(VOO_TURBO-VOO_BASE)*r*0.5;
+      ctx.strokeStyle = '#0a0d13'; ctx.lineWidth = Math.max(3, r*0.22);
       ctx.beginPath();
-      ctx.moveTo(mx, py + r*1.5);
-      ctx.lineTo(mx, py + r*0.35 - (voo-VOO_BASE)/(VOO_TURBO-VOO_BASE)*r*0.5);
+      ctx.moveTo(mx, py + r*1.5); ctx.lineTo(mx, py + r*0.35 - alt);
       ctx.stroke();
-      ctx.fillStyle = '#0e1219';
-      ctx.beginPath();
-      ctx.ellipse(mx, py + r*0.3 - (voo-VOO_BASE)/(VOO_TURBO-VOO_BASE)*r*0.5, r*0.34, r*0.26, 0, 0, 7);
-      ctx.fill();
+      ctx.fillStyle = '#e8eef7';
+      ctx.beginPath(); ctx.ellipse(mx, py + r*0.3 - alt, r*0.34, r*0.26, 0, 0, 7); ctx.fill();
     }
-    // fileira de botões
     for (let i=0;i<6;i++){
-      ctx.fillStyle = i === ['bomba','missil','metralha'].indexOf(arma) ? ARMAS[arma].cor : '#252b35';
+      ctx.fillStyle = i === ['bomba','missil','metralha'].indexOf(arma) ? ARMAS[arma].cor : '#161b23';
       ctx.fillRect(cx - r*2.0 + i*r*0.7, py + r*0.55, r*0.5, r*0.34);
     }
   }
   ctx.restore();
 
-  // O HUD é uma projeção NO VIDRO: só existe dentro da bolha. Antes ele
-  // escorria para cima da armação escura, e aí não parecia vidro nenhum.
+  // O HUD é uma projeção NO VIDRO: só existe dentro dele. Antes escorria para
+  // cima da armação escura, e aí não parecia vidro nenhum.
   ctx.save();
   caminhoBolha(); ctx.clip();
   hudCaca();          // não roda com a cabine: quem rola é o mundo lá fora
+  bussola(H*0.205);
   ctx.restore();
 }
 
@@ -1462,33 +1750,50 @@ function desenha(){
   desenhaCeu();
   desenhaChao();
 
-  // prédios: do fundo para a frente, só a fatia visível (a lista está ordenada)
-  const zIni = distancia - 2000, zFim = distancia + ALCANCE;
-  while (iPredio > 0 && predios[iPredio-1] && predios[iPredio-1].z > zIni) iPredio--;
-  while (iPredio < predios.length && predios[iPredio].z < zIni) iPredio++;
+  // Com o avião virando, a ordem de desenho muda a cada quadro: não dá mais
+  // para varrer uma lista ordenada por z. Cada coisa é convertida para o eixo
+  // do nariz e vai para a fila, do fundo para a frente.
+  const LIM = ALCANCE*ALCANCE;
   const visiveis = [];
-  for (let i = iPredio; i < predios.length && predios[i].z < zFim; i++)
-    if (predios[i].vivo) visiveis.push(predios[i]);
-  for (let i = visiveis.length-1; i >= 0; i--) desenhaPredio(visiveis[i]);
+  for (const p of predios){
+    if (!p.vivo) continue;
+    const dx = p.x-aviaoX, dz = p.z-aviaoZ;
+    if (dx*dx + dz*dz > LIM) continue;
+    const z = dx*senR + dz*cosR;
+    if (z < -1800) continue;
+    visiveis.push({ z:z, o:p });
+  }
+  visiveis.sort((a,b) => b.z - a.z);
+  for (const v of visiveis) desenhaPredio(v.o);
 
-  for (let i = alvos.length-1; i >= 0; i--)
-    if (alvos[i].vivo && alvos[i].z > zIni && alvos[i].z < zFim) desenhaAlvo(alvos[i]);
+  const perto = (o) => {
+    const dx = o.x-aviaoX, dz = o.z-aviaoZ;
+    if (dx*dx + dz*dz > LIM) return null;
+    const z = dx*senR + dz*cosR;
+    return z < -1200 ? null : z;
+  };
 
-  // o resto entra numa fila só, ordenada do fundo para a frente
   const fila = [];
-  for (const n of nuvens)     fila.push({ z:n.z, o:n, k:'nuvem' });
-  for (const t of tambores)   if (t.z > zIni && t.z < zFim) fila.push({ z:t.z, o:t, k:'tambor' });
-  for (const o of obstaculos) if (o.vivo && o.z > zIni && o.z < zFim) fila.push({ z:o.z, o:o, k:o.tipo });
-  for (const b of bombas)     fila.push({ z:b.z, o:b, k:'bomba' });
-  for (const t of tiros)      fila.push({ z:t.z, o:t, k:'tiro' });
-  for (const f of particulas) fila.push({ z:f.z, o:f, k:'part' });
+  for (const a of alvos)      if (a.vivo){ const z = perto(a); if (z!==null) fila.push({ z:z, o:a, k:'alvo' }); }
+  for (const n of nuvens)     { const z = perto(n); if (z!==null) fila.push({ z:z, o:n, k:'nuvem' }); }
+  for (const t of tambores)   if (!t.pego){ const z = perto(t); if (z!==null) fila.push({ z:z, o:t, k:'tambor' }); }
+  for (const o of obstaculos) if (o.vivo){ const z = perto(o); if (z!==null) fila.push({ z:z, o:o, k:o.tipo }); }
+  for (const b of bombas)     { const z = perto(b); if (z!==null) fila.push({ z:z, o:b, k:'bomba' }); }
+  for (const t of tiros)      { const z = perto(t); if (z!==null) fila.push({ z:z, o:t, k:'tiro' }); }
+  for (const f of particulas) { const z = perto(f); if (z!==null) fila.push({ z:z, o:f, k:'part' }); }
   fila.sort((a,b) => b.z - a.z);
 
-  let alvoT = null;
-  for (const t of tambores) if (!t.passou && t.z > distancia && (alvoT===null || t.z < alvoT.z)) alvoT = t;
+  // o tambor mais próximo ganha o anel piscando, para se achar no mapa
+  let alvoT = null, melhor = 1e12;
+  for (const t of tambores){
+    if (t.pego) continue;
+    const d = (t.x-aviaoX)*(t.x-aviaoX) + (t.z-aviaoZ)*(t.z-aviaoZ);
+    if (d < melhor){ melhor = d; alvoT = t; }
+  }
 
   for (const it of fila){
-    if (it.k === 'nuvem')       desenhaNuvem(it.o);
+    if (it.k === 'alvo')        desenhaAlvo(it.o);
+    else if (it.k === 'nuvem')  desenhaNuvem(it.o);
     else if (it.k === 'tambor') desenhaTambor(it.o, it.o === alvoT);
     else if (it.k === 'pombo')  desenhaPombo(it.o);
     else if (it.k === 'aviao')  desenhaAviaoInimigo(it.o);
@@ -1501,6 +1806,7 @@ function desenha(){
   desenhaAviao();
   if (cockpit) ctx.restore();      // fecha a rotação do mundo
   desenhaCockpit();
+  if (!cockpit) bussola(H*0.175);
   ctx.restore();
 
   if (clarao > 0){
@@ -1569,8 +1875,8 @@ function derruba(motivo){
   caindo = true; motivoQueda = motivo;
   turbo = 0; voo = VOO_BASE;
   mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL!' : 'BATEU!', '#ff8080', 2200);
-  if (motivo !== 'combustivel') explode(aviaoX, aviaoY, 0);
-  else { bip(160, 0.5, 'sawtooth', 0.10); solta(aviaoX, aviaoY, 0, 16, 'rgba(60,60,70,.7)', 150, 260, true); }
+  if (motivo !== 'combustivel') explode(aviaoX, aviaoY, aviaoZ);
+  else { bip(160, 0.5, 'sawtooth', 0.10); solta(aviaoX, aviaoY, aviaoZ, 16, 'rgba(60,60,70,.7)', 150, 260, true); }
 }
 
 /* --- armas --------------------------------------------------------------- */
@@ -1586,14 +1892,20 @@ function dispara(){
   if (municao[arma] <= 0){ bip(120, 0.08, 'square', 0.05); mostraAviso('SEM MUNIÇÃO', '#ff8080', 700); return; }
   municao[arma]--; recarga = ARMAS[arma].recarga;
 
+  // tudo sai na direção do nariz: dx/dz é para onde o avião está apontando
+  const dx = senR, dz = cosR;
   if (arma === 'bomba'){
-    bombas.push({ tipo:'bomba', x:aviaoX, y:aviaoY - 60, z:distancia, vx:vx*0.5, vy:-60, vz:voo });
+    bombas.push({ tipo:'bomba', x:aviaoX, y:aviaoY - 60, z:aviaoZ,
+                  vx:dx*voo, vz:dz*voo, vy:-60 });
     ruido(0.12, 400, 0.12);
   } else if (arma === 'missil'){
-    bombas.push({ tipo:'missil', x:aviaoX, y:aviaoY, z:distancia, vx:vx*0.3, vy:vy*0.3, vz:voo*3.2, vida:2.4 });
+    bombas.push({ tipo:'missil', x:aviaoX, y:aviaoY, z:aviaoZ,
+                  vx:dx*voo*3.2, vz:dz*voo*3.2, vy:vy*0.3, vida:2.4 });
     ruido(0.25, 2600, 0.18);
   } else {
-    tiros.push({ x:aviaoX + (Math.random()-0.5)*220, y:aviaoY - 20, z:distancia, vz:voo*6, vida:1.1 });
+    const lado = (Math.random()-0.5)*220;
+    tiros.push({ x:aviaoX + cosR*lado, y:aviaoY - 20, z:aviaoZ - senR*lado,
+                 dx:dx, dz:dz, v:voo*6, vida:1.1 });
     bip(900 + Math.random()*300, 0.04, 'square', 0.045);
     ruido(0.05, 3000, 0.06);
   }
@@ -1602,11 +1914,12 @@ function dispara(){
 function atingeAlvo(x, z, raio){
   for (const a of alvos){
     if (!a.vivo) continue;
-    if (Math.abs(a.z - z) < raio + a.r && Math.abs(a.x - x) < raio + a.r){
+    if (Math.hypot(a.x - x, a.z - z) < raio + a.r){
       a.vivo = false; alvosDestruidos++; pontos += 500;
-      explode(a.x, CHAO + 200, a.z - distancia, 2.2);
-      mostraAviso('ALVO DESTRUÍDO! +500', '#ffd257', 1400);
+      explode(a.x, CHAO + 200, a.z, 2.2);
+      mostraAviso('ALVO DESTRUÍDO! ' + alvosDestruidos + '/' + alvosTotal, '#ffd257', 1600);
       bip(300,0.1,'square',0.08); setTimeout(()=>bip(200,0.2,'square',0.07),110);
+      if (alvosDestruidos >= alvosTotal){ venceu = true; Motor.desliga(); fim(); }
       return true;
     }
   }
@@ -1617,10 +1930,10 @@ function atingeAr(x, y, z, raio){
   for (const o of obstaculos){
     if (!o.vivo) continue;
     const r = (o.tipo === 'aviao' ? RAIO_AVIAO : RAIO_POMBO) + raio;
-    if (Math.abs(o.z - z) < r && Math.abs(o.x - x) < r && Math.abs(o.y - y) < r){
+    if (Math.abs(o.y - y) < r && Math.hypot(o.x - x, o.z - z) < r){
       o.vivo = false;
       pontos += o.tipo === 'aviao' ? 200 : 50;
-      explode(o.x, o.y, o.z - distancia, o.tipo === 'aviao' ? 1.2 : 0.5);
+      explode(o.x, o.y, o.z, o.tipo === 'aviao' ? 1.2 : 0.5);
       mostraAviso(o.tipo === 'aviao' ? 'AVIÃO ABATIDO! +200' : '+50', '#ffd257', 800);
       return true;
     }
@@ -1633,22 +1946,21 @@ function atualizaTiros(dt){
   if (atirando) dispara();
 
   for (const b of bombas){
-    b.z += b.vz*dt;
-    b.x += b.vx*dt;
+    b.x += b.vx*dt; b.z += b.vz*dt;
     if (b.tipo === 'missil'){
       b.y += b.vy*dt;
       b.vida -= dt;
-      if (Math.random() < dt*30) solta(b.x, b.y, b.z - distancia, 1, 'rgba(255,190,120,.8)', 40, 60);
+      if (Math.random() < dt*30) solta(b.x, b.y, b.z, 1, 'rgba(255,190,120,.8)', 40, 60);
       if (atingeAr(b.x, b.y, b.z, 260) || atingeAlvo(b.x, b.z, 300)) b.morto = true;
       if (b.vida <= 0) b.morto = true;
     } else {
       b.vy -= dt*1400;                       // a bomba cai
       b.y += b.vy*dt;
-      if (Math.random() < dt*10) solta(b.x, b.y, b.z - distancia, 1, 'rgba(180,180,190,.5)', 30, 40, true);
+      if (Math.random() < dt*10) solta(b.x, b.y, b.z, 1, 'rgba(180,180,190,.5)', 30, 40, true);
       if (b.y <= CHAO){
         b.morto = true;
         if (!atingeAlvo(b.x, b.z, 520)){
-          explode(b.x, CHAO + 120, b.z - distancia, 1.1);
+          explode(b.x, CHAO + 120, b.z, 1.1);
           // derruba prédio que estiver por perto
           for (const p of predios){
             if (p.vivo && Math.abs(p.z - b.z) < 700 && Math.abs(p.x - b.x) < 700){
@@ -1659,10 +1971,10 @@ function atualizaTiros(dt){
       }
     }
   }
-  bombas = bombas.filter(b => !b.morto && b.z - distancia > -2000 && b.z - distancia < ALCANCE*1.6);
+  bombas = bombas.filter(b => !b.morto && longe(b.x, b.z) < ALCANCE*1.6);
 
   for (const t of tiros){
-    t.z += t.vz*dt; t.vida -= dt;
+    t.x += t.dx*t.v*dt; t.z += t.dz*t.v*dt; t.vida -= dt;
     if (atingeAr(t.x, t.y, t.z, 320)) t.vida = 0;
   }
   tiros = tiros.filter(t => t.vida > 0);
@@ -1673,15 +1985,16 @@ function atualizaQueda(dt){
   nariz -= dt * 60; if (nariz < -70) nariz = -70;
   vy -= dt * 1500;
   aviaoY += vy * dt;
-  aviaoX += vx * dt;
-  vx *= 0.985; voo *= 0.985;
+  aviaoX += senR * voo * dt;
+  aviaoZ += cosR * voo * dt;
+  voo *= 0.985;
   distancia += voo * dt;
-  camX += (aviaoX - camX) * Math.min(1, dt*2.2);
+  camX += (0 - camX) * Math.min(1, dt*2.2);
   camY += ((aviaoY + (cockpit?0:240)) - camY) * Math.min(1, dt*2.6);
   horizonte = H*0.38 + nariz*2.2;
   if (aviaoY <= CHAO + 120){
     aviaoY = CHAO + 120;
-    if (motivoQueda === 'combustivel'){ explode(aviaoX, aviaoY, 0, 1.6); motivoQueda = 'acabou'; }
+    if (motivoQueda === 'combustivel'){ explode(aviaoX, aviaoY, aviaoZ, 1.6); motivoQueda = 'acabou'; }
     if (tremor < 1){ Motor.desliga(); fim(); }
   }
 }
@@ -1700,16 +2013,31 @@ function atualiza(dt){
   if (caindo){ atualizaQueda(dt); return; }
 
   const e = eixos();
-  const alvoInc = e.lat * 42;
-  inclinacao += (alvoInc - inclinacao) * Math.min(1, dt*7);
-  nariz      += (e.ver*10 - nariz)     * Math.min(1, dt*6);
-  vx += ((inclinacao/42)*1900 - vx) * Math.min(1, dt*4);
-  vy += ((e.ver)*1250          - vy) * Math.min(1, dt*4);
-  aviaoX += vx*dt;
-  aviaoY += vy*dt;
+  inclinacao += (e.lat * 45 - inclinacao) * Math.min(1, dt*7);
+  nariz      += (e.ver * 10 - nariz)      * Math.min(1, dt*6);
 
-  if (aviaoX < -6000){ aviaoX = -6000; vx = 0; }
-  if (aviaoX >  6000){ aviaoX =  6000; vx = 0; }
+  // É AQUI que o jogo deixou de ser linear: inclinar não empurra para o lado,
+  // FAZ CURVA. Com a asa toda inclinada o giro completo sai em uns 7 segundos.
+  rumo += (inclinacao/45) * GIRO * dt;
+  if (rumo >  Math.PI) rumo -= 6.283185307;
+  if (rumo < -Math.PI) rumo += 6.283185307;
+  atualizaRumo();
+
+  vy += ((e.ver)*1250 - vy) * Math.min(1, dt*4);
+  aviaoY += vy*dt;
+  aviaoX += senR * voo * dt;
+  aviaoZ += cosR * voo * dt;
+
+  // a beirada do mapa
+  const fora = Math.max(Math.abs(aviaoX), Math.abs(aviaoZ));
+  if (fora > MAPA){
+    aviaoX = Math.max(-MAPA, Math.min(MAPA, aviaoX));
+    aviaoZ = Math.max(-MAPA, Math.min(MAPA, aviaoZ));
+    mostraAviso('FIM DO MAPA — DÊ MEIA-VOLTA', '#ffb86b', 900);
+  } else if (fora > MAPA - 9000 && Math.random() < dt*2){
+    mostraAviso('beirada do mapa', '#ffb86b', 700);
+  }
+
   if (aviaoY > TETO - 1200 && vy > 0){
     const p = Math.min(1, (aviaoY - (TETO-1200)) / 1200);
     vy -= vy * p * Math.min(1, dt*5);
@@ -1721,7 +2049,7 @@ function atualiza(dt){
     mostraAviso('SUBA!', '#ff8080');
   }
 
-  camX += (aviaoX - camX)                        * Math.min(1, dt*2.2);
+  camX += (inclinacao*2.2 - camX)                * Math.min(1, dt*2.2);
   camY += ((aviaoY + (cockpit?0:240)) - camY)    * Math.min(1, dt*2.6);
   horizonte = H*0.38 + nariz*2.2;
 
@@ -1737,53 +2065,51 @@ function atualiza(dt){
   distancia += voo*dt;
   atualizaTiros(dt);
 
-  // chegou ao fim do mapa
-  if (distancia >= MISSAO){ venceu = true; Motor.desliga(); fim(); return; }
+  // as nuvens que ficaram para trás nascem de novo à frente
+  for (const n of nuvens) if (longe(n.x, n.z) > ALCANCE*1.15) recolocaNuvem(n, false);
 
-  // pegar combustível
+  // pegar combustível: agora é distância de verdade, nos três eixos, porque
+  // o avião pode chegar no tambor por qualquer lado
+  const RP2 = (RAIO_PEGA*1.25) * (RAIO_PEGA*1.25);
   for (const t of tambores){
     if (t.brilho > 0) t.brilho -= dt*2.2;
-    if (t.passou || t.z > distancia) continue;
-    t.passou = true;
-    const dx = aviaoX - t.x, dy = aviaoY - t.y;
-    if (Math.sqrt(dx*dx + dy*dy) < RAIO_PEGA){
-      t.brilho = 1;
-      combustivel = Math.min(100, combustivel + (t.azul ? DA_AZUL : DA_NORMAL));
-      if (t.azul){
-        turbo = TURBO_SEG; clarao = 0.8; tremor = 8;
-        mostraAviso('TURBO AZUL!', '#7fd8ff', 1600);
-        solta(t.x, t.y, 40, 40, '#7fd8ff', 70, 700);
-        solta(t.x, t.y, 40, 18, '#ffffff', 50, 500);
-        bip(520,0.09,'sine',0.07); setTimeout(()=>bip(780,0.09,'sine',0.07),80);
-        setTimeout(()=>bip(1180,0.16,'sine',0.07),165);
-      } else {
-        mostraAviso('+' + DA_NORMAL + '%', '#ffd257', 800);
-        solta(t.x, t.y, 40, 16, '#ffd257', 55, 420);
-        bip(700,0.07,'sine',0.06); setTimeout(()=>bip(1000,0.09,'sine',0.05),70);
-      }
+    if (t.pego) continue;
+    const dx = aviaoX-t.x, dy = aviaoY-t.y, dz = aviaoZ-t.z;
+    if (dx*dx + dy*dy + dz*dz > RP2) continue;
+    t.pego = true; t.brilho = 1;
+    combustivel = Math.min(100, combustivel + (t.azul ? DA_AZUL : DA_NORMAL));
+    if (t.azul){
+      turbo = TURBO_SEG; clarao = 0.8; tremor = 8;
+      mostraAviso('TURBO AZUL!', '#7fd8ff', 1600);
+      solta(t.x, t.y, t.z, 40, '#7fd8ff', 70, 700);
+      solta(t.x, t.y, t.z, 18, '#ffffff', 50, 500);
+      bip(520,0.09,'sine',0.07); setTimeout(()=>bip(780,0.09,'sine',0.07),80);
+      setTimeout(()=>bip(1180,0.16,'sine',0.07),165);
+    } else {
+      mostraAviso('+' + DA_NORMAL + '%', '#ffd257', 800);
+      solta(t.x, t.y, t.z, 16, '#ffd257', 55, 420);
+      bip(700,0.07,'sine',0.06); setTimeout(()=>bip(1000,0.09,'sine',0.05),70);
     }
   }
 
-  // bater em pombo, avião ou prédio
+  // bater em pombo ou avião
   for (const o of obstaculos){
     if (!o.vivo) continue;
     o.fase += dt*2;
     o.x = o.x0 + Math.sin(o.fase*0.7) * o.deriva;
     if (o.tipo === 'pombo') o.y = o.y0 + Math.cos(o.fase*1.1) * 220;
-    if (o.passou || o.z > distancia) continue;
-    o.passou = true;
     const raio = (o.tipo === 'aviao' ? RAIO_AVIAO : RAIO_POMBO) + 150;
-    const dx = aviaoX - o.x, dy = aviaoY - o.y;
-    if (Math.sqrt(dx*dx + dy*dy) < raio){ derruba(o.tipo); return; }
+    const dx = aviaoX-o.x, dy = aviaoY-o.y, dz = aviaoZ-o.z;
+    if (dx*dx + dy*dy + dz*dz < raio*raio){ derruba(o.tipo); return; }
   }
-  // varre uma janelinha em volta do avião; começa atrás de iPredio de propósito,
-  // porque quem mexe nesse índice é o desenho, e ele roda depois daqui
-  for (let i = Math.max(0, iPredio - 30); i < predios.length && predios[i].z < distancia + 900; i++){
-    const p = predios[i];
+
+  // bater em prédio
+  for (const p of predios){
     if (!p.vivo) continue;
-    if (Math.abs(p.z - distancia) < p.d/2 + 260 &&
-        Math.abs(p.x - aviaoX) < p.w/2 + 260 &&
-        aviaoY < CHAO + p.h + 120){ derruba('predio'); return; }
+    if (aviaoY > CHAO + p.h + 120) continue;
+    if (Math.abs(p.z - aviaoZ) < p.d/2 + 260 && Math.abs(p.x - aviaoX) < p.w/2 + 260){
+      derruba('predio'); return;
+    }
   }
 }
 
@@ -1838,7 +2164,7 @@ function pinta(){
   if (elMun)   elMun.textContent = municao[arma];
   if (elPontos) elPontos.textContent = pontos;
   if (elAlvos) elAlvos.textContent = alvosDestruidos + '/' + alvosTotal;
-  if (elProg)  elProg.style.width = Math.min(100, distancia/MISSAO*100).toFixed(1) + '%';
+  if (elProg)  elProg.style.width = (alvosDestruidos/Math.max(1,alvosTotal)*100).toFixed(1) + '%';
 }
 
 /* teclado das armas: vale em qualquer versão, porque mora no núcleo */
@@ -1944,14 +2270,14 @@ function fim(){
   const novo = m > recorde;
   if (novo){ recorde = m; try{ localStorage.setItem('aviao.recorde', String(m)); }catch(e){} }
   document.getElementById('tit').textContent =
-      venceu ? 'Missão cumprida!' :
+      venceu ? 'Missão cumprida! Todos os alvos no chão.' :
       (motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível' :
        motivoQueda === 'predio' ? 'Bateu num prédio' : 'O avião caiu');
   document.getElementById('expl').style.display='none';
   document.getElementById('pe').style.display='none';
   const p = document.getElementById('placar');
   p.style.display='block';
-  p.innerHTML = 'Distância: <span>' + m + ' m</span> de ' + Math.round(MISSAO/METRO) + '<br>' +
+  p.innerHTML = 'Distância voada: <span>' + m + ' m</span><br>' +
                 'Alvos destruídos: <span>' + alvosDestruidos + ' de ' + alvosTotal + '</span><br>' +
                 'Pontos: <span>' + pontos + '</span><br>' +
                 'Recorde: <span>' + recorde + ' m</span>';
