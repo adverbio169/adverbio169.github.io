@@ -328,3 +328,29 @@ acontecia.
 **Estilo em linha.** `elemento.style.display = 'flex'` no JavaScript vence
 qualquer regra de CSS. Trocar por `classList.add('ver')` devolve o controle
 para a folha de estilo.
+
+### A cabine, refeita com a disposição real
+
+A primeira versão eu desenhei de cabeça, e saiu parecendo para-brisa de caminhão.
+Refeita a partir de como é de verdade:
+
+**Painel: arranjo "T básico".** É padrão em avião: horizonte artificial em cima
+no centro, **velocidade à esquerda dele**, **altímetro à direita**, **rumo logo
+abaixo**. Combustível e missão ficam nas pontas, fora do T.
+
+**HUD: símbolos de caça.** Fita de velocidade à esquerda, fita de altitude à
+direita, escada de arfagem no centro (linha cheia para subida, tracejada para
+descida, numerada de 5 em 5 graus, a do horizonte sem número), **cruz do canhão**
+fixa marcando para onde o nariz aponta, e o **vetor de velocidade** — o círculo
+com asinhas que mostra para onde o avião vai de verdade. Pôr o vetor em cima de
+um ponto do chão é ir naquele ponto.
+
+**O que rola e o que fica parado.** Este foi o erro que mais custou: eu rodava a
+cabine. É o contrário — o piloto e o painel ficam parados, e **o mundo é que
+rola**. A escada de arfagem acompanha o horizonte (rola junto), mas as fitas e a
+cruz do canhão ficam presas ao avião, e não rodam.
+
+Fontes que usei: o arranjo do painel em
+[Engineering LibreTexts](https://eng.libretexts.org/Bookshelves/Aerospace_Engineering/Fundamentals_of_Aerospace_Engineering_(Arnedo)/05:_Aircraft_instruments_and_systems/5.01:_Aircraft_instruments/5.1.04:_Instruments_layout)
+e a simbologia do HUD em [Falconpedia](http://falcon4.wikidot.com/avionics:hud)
+e na [documentação do DCS](https://dcs.man-sim.org/en/fa18c/05.hud/).
