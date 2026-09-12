@@ -3301,7 +3301,8 @@ function desenhaAlvo(a){
   const p = projeta(a.x, CHAO, zr);
   if (!p) return;
   const r = a.r * p.s;
-  if (r < 1 || p.x < -r*4 || p.x > W+r*4) return;
+  if (r < 1 || r > Math.min(W,H)*0.9) return;
+  if (p.x < -r*4 || p.x > W+r*4) return;
 
   // três tanques cilíndricos
   for (const dx of [-0.55, 0, 0.55]){
@@ -3342,7 +3343,8 @@ function desenhaTambor(t, alvo){
   const p = projeta(t.x, t.y, t.z - distancia);
   if (!p) return;
   const r = 125 * p.s;
-  if (r < 1.2 || p.x < -r*4 || p.x > W+r*4) return;
+  if (r < 1.2 || r > Math.min(W,H)*0.40) return;
+  if (p.x < -r*4 || p.x > W+r*4) return;
   const dist = 1 - Math.min(1, (t.z - distancia)/ALCANCE);
   const corpo = t.azul ? '#3aa0ff' : '#ffb43a';
   const faixa = t.azul ? '#cfeaff' : '#fff0cf';
@@ -3377,7 +3379,8 @@ function desenhaPombo(o){
   const p = projeta(o.x, o.y, o.z - distancia);
   if (!p) return;
   const r = 150 * p.s;
-  if (r < 0.8 || p.x < -r*5 || p.x > W+r*5) return;
+  if (r < 0.8 || r > Math.min(W,H)*0.42) return;   // colado na câmera: não desenha
+  if (p.x < -r*5 || p.x > W+r*5) return;
   const bate = Math.sin(Date.now()/90 + o.fase);
   ctx.save(); ctx.translate(p.x, p.y);
   ctx.globalAlpha = Math.max(0.25, 1 - (o.z-distancia)/ALCANCE);
@@ -3402,7 +3405,8 @@ function desenhaAviaoInimigo(o){
   const p = projeta(o.x, o.y, o.z - distancia);
   if (!p) return;
   const r = 420 * p.s;
-  if (r < 1 || p.x < -r*3 || p.x > W+r*3) return;
+  if (r < 1 || r > Math.min(W,H)*0.55) return;
+  if (p.x < -r*3 || p.x > W+r*3) return;
   const bal = Math.sin(Date.now()/700 + o.fase) * 0.10;
   ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(bal);
   ctx.fillStyle = 'rgba(0,0,0,.16)';
@@ -3592,9 +3596,9 @@ function mostrador(cx, cy, r, frac, rotulo, cor, texto){
     ctx.font = '700 ' + Math.max(8, r*0.34).toFixed(0) + 'px ui-monospace, monospace';
     ctx.fillText(texto, cx, cy + r*0.62);
   }
-  ctx.fillStyle = '#7d8cab';
-  ctx.font = '700 ' + Math.max(7, r*0.29).toFixed(0) + 'px system-ui, sans-serif';
-  ctx.fillText(rotulo, cx, cy + r*1.34);
+  ctx.fillStyle = '#2b3340';          // painel claro pede letra escura
+  ctx.font = '800 ' + Math.max(8, r*0.32).toFixed(0) + 'px system-ui, sans-serif';
+  ctx.fillText(rotulo, cx, cy + r*1.52);
 }
 
 function mostradorHorizonte(cx, cy, r){
@@ -3753,6 +3757,44 @@ function desenhaCockpit(){
   ctx.strokeStyle = '#39445a'; ctx.lineWidth = Math.max(3, W*0.007);
   ctx.beginPath(); ctx.moveTo(W*0.5, H*0.005); ctx.lineTo(W*0.5, H*0.06); ctx.stroke();
 
+  // ---- paredes laterais ------------------------------------------------
+  // Sem isso as laterais eram dois buracos pretos. Nas fotos há estrutura:
+  // o montante do para-brisa e um console de lado, com luzinhas.
+  for (const lado of [-1, 1]){
+    const dentro = lado < 0 ? W*0.10 : W*0.90;      // onde começa o vidro
+    const fora   = lado < 0 ? 0 : W;
+    const gl = ctx.createLinearGradient(fora, 0, dentro, 0);
+    gl.addColorStop(0, '#252d3c'); gl.addColorStop(1, '#151b27');
+    ctx.fillStyle = gl;
+    ctx.fillRect(Math.min(fora, dentro), 0, W*0.10, H*0.80);
+    // montante do para-brisa, encostado no vidro (por FORA dele, não por dentro)
+    const px = lado < 0 ? dentro - W*0.016 : dentro;
+    ctx.fillStyle = '#39445a';
+    ctx.fillRect(px, H*0.02, W*0.016, H*0.62);
+    ctx.fillStyle = 'rgba(190,210,240,.18)';
+    ctx.fillRect(lado < 0 ? dentro - W*0.004 : dentro, H*0.02, W*0.004, H*0.62);
+    // nervuras
+    ctx.strokeStyle = 'rgba(160,185,220,.10)'; ctx.lineWidth = 1.5;
+    for (let i = 1; i <= 3; i++){
+      const y = H*(0.12 + i*0.135);
+      ctx.beginPath(); ctx.moveTo(fora, y); ctx.lineTo(dentro + lado*W*0.018, y + lado*H*0.012); ctx.stroke();
+    }
+    // console lateral com luzes de aviso
+    const cxL = fora - lado*W*0.048, cyL = H*0.50;
+    ctx.fillStyle = '#2b323f';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cxL - W*0.038, cyL - H*0.075, W*0.076, H*0.15, 6);
+    else ctx.rect(cxL - W*0.038, cyL - H*0.075, W*0.076, H*0.15);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1.2; ctx.stroke();
+    for (let i = 0; i < 4; i++){
+      const acesa = lado < 0 ? (i < 2 ? voo > VOO_BASE*1.05 : combustivel > 25)
+                             : (i % 2 === 0 ? municao[arma] > 0 : turbo > 0);
+      ctx.fillStyle = acesa ? 'rgba(120,220,160,.85)' : 'rgba(120,140,170,.22)';
+      ctx.fillRect(cxL - W*0.028, cyL - H*0.055 + i*H*0.033, W*0.056, H*0.018);
+    }
+  }
+
   ctx.save(); caminhoBolha(); ctx.clip();
   const r1 = ctx.createLinearGradient(W*0.1, H*0.05, W*0.55, H*0.5);
   r1.addColorStop(0,'rgba(255,255,255,.14)'); r1.addColorStop(0.5,'rgba(255,255,255,.03)');
@@ -3760,47 +3802,133 @@ function desenhaCockpit(){
   ctx.fillStyle = r1; ctx.fillRect(0,0,W,H);
   ctx.restore();
 
-  // ---- painel em T ----
-  ctx.fillStyle = '#0e141f';
-  ctx.beginPath();
-  ctx.moveTo(-W*0.1, H*1.2); ctx.lineTo(-W*0.1, H*0.745);
-  ctx.quadraticCurveTo(W*0.5, H*0.645, W*1.1, H*0.745);
-  ctx.lineTo(W*1.1, H*1.2); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = '#2a3446'; ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(-W*0.1, H*0.745); ctx.quadraticCurveTo(W*0.5, H*0.645, W*1.1, H*0.745);
-  ctx.stroke();
+  // ---- a estrutura da cabine, seguindo as fotos de referência ----------
+  // Três coisas que definem a forma: a CAPOTA escura e angular, com os ombros
+  // caindo para fora; o PAINEL em cinza claro (não preto) com os instrumentos
+  // embutidos escuros; e o PEDESTAL central embaixo.
+  const topo = H*0.615, capota = H*0.055;
+  const bordaX = x => {                      // o contorno angular da capota
+    const a = Math.abs(x - 0.5);
+    return a < 0.37 ? topo : topo + (a - 0.37) * H*0.95;
+  };
+  const contorno = (desloc) => {
+    ctx.beginPath();
+    ctx.moveTo(-W*0.05, bordaX(-0.05) + desloc);
+    for (let f = 0; f <= 1.0001; f += 0.02) ctx.lineTo(W*f, bordaX(f) + desloc);
+    ctx.lineTo(W*1.05, bordaX(1.05) + desloc);
+    ctx.lineTo(W*1.05, H*1.1); ctx.lineTo(-W*0.05, H*1.1);
+    ctx.closePath();
+  };
 
-  const r = Math.min(W*0.040, H*0.070);
-  const yC = H*0.805, yB = H*0.925, cx = W*0.5;
-  mostradorHorizonte(cx, yC, r*1.12);
-  mostrador(cx - r*2.7, yC, r, (voo - VOO_BASE*0.4)/(VOO_TURBO - VOO_BASE*0.4),
-            'VELOCIDADE', '#a9ecc4', Math.round(voo*3.6/METRO));
-  mostrador(cx + r*2.7, yC, r, (aviaoY-CHAO)/(TETO-CHAO),
-            'ALTÍMETRO', '#5cc8ff', Math.round((aviaoY-CHAO)/4));
-  mostrador(cx, yB, r*0.72, (aviaoX+6000)/12000, 'RUMO', '#e8eef7');
-  mostrador(cx - r*5.0, yC, r*0.86, combustivel/100, 'COMB',
-            combustivel < 20 ? '#ff6a6a' : '#ffc24d', Math.round(combustivel) + '%');
-  mostrador(cx + r*5.0, yC, r*0.86, distancia/MISSAO, 'MISSÃO', '#c9a7ff',
-            Math.round(distancia/MISSAO*100) + '%');
+  // painel: cinza claro, como nas fotos
+  const gp = ctx.createLinearGradient(0, topo, 0, H);
+  gp.addColorStop(0, '#97a1ad'); gp.addColorStop(0.35, '#828d9a'); gp.addColorStop(1, '#5f6874');
+  ctx.fillStyle = gp; contorno(capota); ctx.fill();
 
+  // Capota: a banda escura é simplesmente o que sobra entre os dois contornos.
+  // Pinta-se o escuro por baixo e o painel claro por cima, deslocado — sem
+  // composição nenhuma, que é onde eu ia arrumar artefato.
+  ctx.fillStyle = '#22272f'; contorno(0); ctx.fill();
+  ctx.fillStyle = gp;        contorno(capota); ctx.fill();
+  ctx.strokeStyle = '#3d4550'; ctx.lineWidth = 2; contorno(0); ctx.stroke();
+  ctx.strokeStyle = 'rgba(190,205,225,.22)'; ctx.lineWidth = 1.2;
+  contorno(2); ctx.stroke();
+
+  // régua de interruptores no alto da capota
+  for (let i = 0; i < 22; i++){
+    const f = 0.135 + i*0.0335;
+    if (f > 0.87) break;
+    const x = W*f, y = topo + capota*0.30;
+    ctx.fillStyle = '#7d8793';
+    ctx.fillRect(x, y, W*0.021, capota*0.42);
+    ctx.fillStyle = i % 4 === 0 ? '#e8a33a' : '#2c3440';
+    ctx.fillRect(x + W*0.004, y + capota*0.08, W*0.013, capota*0.14);
+  }
+
+  // ---- instrumentos: duas fileiras, com o T básico em cima -------------
+  // Tudo é medido a partir da borda de baixo da capota, e a fileira de baixo
+  // usa relógios menores — senão os rótulos COMB/RUMO/MISSÃO caem fora da tela.
+  const r = Math.min(W*0.030, H*0.048), rb = r*0.74;
+  const yA = topo + capota + r*1.30;
+  const yB = yA + r*1.82 + rb;
+  const cx = W*0.5;
+  const caixa = (x, y, rr) => {              // a moldura embutida de cada relógio
+    ctx.fillStyle = '#2b313b';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x-rr*1.22, y-rr*1.22, rr*2.44, rr*2.44, rr*0.22);
+    else ctx.rect(x-rr*1.22, y-rr*1.22, rr*2.44, rr*2.44);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1.5; ctx.stroke();
+  };
+
+  [[cx - r*2.6, yA, r], [cx, yA, r*1.08], [cx + r*2.6, yA, r],
+   [cx - rb*2.9, yB, rb], [cx, yB, rb], [cx + rb*2.9, yB, rb]].forEach(c => caixa(c[0], c[1], c[2]));
+
+  mostradorHorizonte(cx, yA, r*1.08);
+  mostrador(cx - r*2.6, yA, r, (voo - VOO_BASE*0.4)/(VOO_TURBO - VOO_BASE*0.4),
+            'VEL', '#a9ecc4', Math.round(voo*3.6/METRO));
+  mostrador(cx + r*2.6, yA, r, (aviaoY-CHAO)/(TETO-CHAO),
+            'ALT', '#5cc8ff', Math.round((aviaoY-CHAO)/4));
+  mostrador(cx,          yB, rb, (aviaoX+6000)/12000, 'RUMO', '#e8eef7');
+  mostrador(cx - rb*2.9, yB, rb, combustivel/100, 'COMB',
+            combustivel < 20 ? '#ff6a6a' : '#ffc24d', Math.round(combustivel));
+  mostrador(cx + rb*2.9, yB, rb, distancia/MISSAO, 'MISSÃO', '#c9a7ff',
+            Math.round(distancia/MISSAO*100));
+
+  // luzes de aviso, nas laterais do painel como nas fotos
   const luzes = [['COMB', combustivel < 20, '#ff5a5a'], ['TURBO', turbo > 0, '#5cc8ff'],
+                 ['ALVO', alvos.some(a => a.vivo && a.z-distancia > 0 && a.z-distancia < 9000), '#ffd257'],
                  [ARMAS[arma].nome.slice(0,5), municao[arma] > 0, ARMAS[arma].cor]];
   luzes.forEach((l, i) => {
-    const lx = cx + (i-1)*W*0.105, ly = H*0.712;
-    ctx.fillStyle = l[1] ? l[2] : '#1b2433';
+    const lado = i < 2 ? -1 : 1;
+    const lx = cx + lado*r*5.1, ly = yA + (i % 2) * r*1.5 - r*0.6;
+    ctx.fillStyle = l[1] ? l[2] : '#39414d';
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(lx-W*0.042, ly-H*0.025, W*0.084, H*0.034, 5);
-    else ctx.rect(lx-W*0.042, ly-H*0.025, W*0.084, H*0.034);
+    if (ctx.roundRect) ctx.roundRect(lx - r*0.95, ly - r*0.42, r*1.9, r*0.84, 4);
+    else ctx.rect(lx - r*0.95, ly - r*0.42, r*1.9, r*0.84);
     ctx.fill();
-    ctx.fillStyle = l[1] ? '#0a0f18' : '#46536b';
-    ctx.font = '800 ' + Math.max(7, H*0.018).toFixed(0) + 'px system-ui, sans-serif';
+    ctx.fillStyle = l[1] ? '#12161d' : '#767f8c';
+    ctx.font = '800 ' + Math.max(7, r*0.42).toFixed(0) + 'px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(l[0], lx, ly + H*0.006);
+    ctx.fillText(l[0], lx, ly + r*0.15);
   });
+
+  // ---- pedestal central: manetes e o seletor de arma ----
+  const py = yB + rb*1.75 + H*0.012;
+  if (py < H){
+    ctx.fillStyle = '#3c434e';
+    ctx.beginPath();
+    ctx.moveTo(cx - r*2.3, py); ctx.lineTo(cx + r*2.3, py);
+    ctx.lineTo(cx + r*3.1, H*1.05); ctx.lineTo(cx - r*3.1, H*1.05);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1.5; ctx.stroke();
+    // manetes
+    for (let i=0;i<2;i++){
+      const mx = cx + (i?1:-1)*r*1.25;
+      ctx.strokeStyle = '#161b23'; ctx.lineWidth = Math.max(3, r*0.22);
+      ctx.beginPath();
+      ctx.moveTo(mx, py + r*1.5);
+      ctx.lineTo(mx, py + r*0.35 - (voo-VOO_BASE)/(VOO_TURBO-VOO_BASE)*r*0.5);
+      ctx.stroke();
+      ctx.fillStyle = '#0e1219';
+      ctx.beginPath();
+      ctx.ellipse(mx, py + r*0.3 - (voo-VOO_BASE)/(VOO_TURBO-VOO_BASE)*r*0.5, r*0.34, r*0.26, 0, 0, 7);
+      ctx.fill();
+    }
+    // fileira de botões
+    for (let i=0;i<6;i++){
+      ctx.fillStyle = i === ['bomba','missil','metralha'].indexOf(arma) ? ARMAS[arma].cor : '#252b35';
+      ctx.fillRect(cx - r*2.0 + i*r*0.7, py + r*0.55, r*0.5, r*0.34);
+    }
+  }
   ctx.restore();
 
-  hudCaca();          // o HUD é projetado no vidro: não roda com a cabine
+  // O HUD é uma projeção NO VIDRO: só existe dentro da bolha. Antes ele
+  // escorria para cima da armação escura, e aí não parecia vidro nenhum.
+  ctx.save();
+  caminhoBolha(); ctx.clip();
+  hudCaca();          // não roda com a cabine: quem rola é o mundo lá fora
+  ctx.restore();
 }
 
 function desenha(){
@@ -3867,6 +3995,8 @@ function desenha(){
     ctx.fillRect(0,0,W,H);
   }
   if (turbo > 0){
+    ctx.save();
+    if (cockpit){ caminhoBolha(); ctx.clip(); }   // senão riscam o painel todo
     ctx.strokeStyle = 'rgba(190,230,255,.5)'; ctx.lineWidth = 2;
     for (let i=0;i<14;i++){
       const a = (i/14)*Math.PI*2 + Date.now()/900;
@@ -3876,6 +4006,7 @@ function desenha(){
       ctx.lineTo(W/2+Math.cos(a)*d1, H*0.55+Math.sin(a)*d1);
       ctx.stroke();
     }
+    ctx.restore();
   }
 }
 
