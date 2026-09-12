@@ -32,6 +32,15 @@
             font-size:15px;font-weight:900;letter-spacing:3px;color:#0a2233;background:#7fd8ff;
             border-radius:99px;padding:5px 18px;box-shadow:0 0 30px #7fd8ff}
   #selTurbo.ver{display:block}
+  #barraProg2{position:absolute;left:18px;right:18px;top:112px;height:5px;border-radius:99px;
+              background:rgba(255,255,255,.14);overflow:hidden}
+  #barraProg{display:block;height:100%;width:0;background:#5cc8ff;border-radius:99px}
+  #cArma{left:50%;transform:translateX(-50%);bottom:18px;text-align:center}
+  .dica2{font-weight:600;color:#6b7a95;letter-spacing:0}
+  #cPontos{left:18px;top:130px}
+  #btVisao{position:absolute;left:18px;bottom:62px;pointer-events:auto;cursor:pointer;
+           border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.55);border-radius:10px;
+           padding:6px 9px;font-size:15px;line-height:1}
   /* altímetro: trilho vertical na direita com uma marca que sobe e desce.
      Sem ele o jogador não tem como perceber que está subindo. */
   #altimetro{position:absolute;right:22px;top:50%;transform:translateY(-50%);
@@ -98,6 +107,12 @@
   </div>
   <div class="caixa" id="cRec"><div class="rot">Recorde</div><div class="val"><span id="vRec">0</span><small>m</small></div></div>
   <div id="selTurbo">TURBO</div>
+  <div id="barraProg2"><i id="barraProg"></i></div>
+  <div class="caixa" id="cArma"><div class="rot">Arma <span class="dica2">(1 2 3 &middot; espaço atira)</span></div>
+    <div class="val"><span id="vArma">BOMBA</span> <small>x<span id="vMun">14</span></small></div></div>
+  <div class="caixa" id="cPontos"><div class="rot">Pontos</div><div class="val" id="vPontos">0</div>
+    <div class="rot" style="margin-top:4px">Alvos <b id="vAlvos">0/0</b></div></div>
+  <button id="btVisao" title="cabine / de fora (V)">&#128065;</button>
   <div id="altimetro"><i id="altMarca"></i></div>
   <div id="altNum"><span id="vAlt">0</span> m</div>
   <button id="btSom" title="som (liga/desliga)">&#128266;</button>
@@ -191,9 +206,13 @@ function fim(){
   const m = Math.round(distancia/20);
   const novo = m > recorde;
   if (novo){ recorde = m; try { localStorage.setItem('aviao.recorde', String(m)); } catch(e){} }
-  $('fimTit').textContent = novo ? 'Recorde novo!' :
-      (motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível' : 'O avião caiu');
-  $('fimPlacar').innerHTML = 'Distância: <span>' + m + ' m</span> &nbsp;·&nbsp; Recorde: <span>' + recorde + ' m</span>';
+  $('fimTit').textContent =
+      venceu ? 'Missão cumprida!' :
+      (motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível' :
+       motivoQueda === 'predio' ? 'Bateu num prédio' : 'O avião caiu');
+  $('fimPlacar').innerHTML = 'Distância: <span>' + m + '</span> de ' + Math.round(MISSAO/METRO) + ' m &nbsp;·&nbsp; ' +
+                             'Alvos: <span>' + alvosDestruidos + '/' + alvosTotal + '</span> &nbsp;·&nbsp; ' +
+                             'Pontos: <span>' + pontos + '</span> &nbsp;·&nbsp; Recorde: <span>' + recorde + ' m</span>';
   $('fimTela').classList.add('ver');
   mandaEstado();
 }
@@ -309,11 +328,16 @@ function trata(d){
     case 'ping':  if (conn && conn.open) conn.send({ t: 'pong', at: d.at }); break;
     case 'oi':    estado('ok', 'celular conectado — toque em Começar lá'); break;
     case 'botao': if (d.b === 'comecar' && !jogando && !pausado) comeca(); break;
+    case 'arma':  trocaArma(d.a); break;
+    case 'fogo':  atirando = !!d.v; break;
+    case 'visao': cockpit = !cockpit; break;
   }
 }
 
 function mandaEstado(){
-  if (conn && conn.open) conn.send({ t: 'estado', jogando, acabou, dist: Math.round(distancia/20), comb: Math.round(combustivel), turbo: turbo > 0 });
+  if (conn && conn.open) conn.send({ t: 'estado', jogando, acabou, dist: Math.round(distancia/METRO), comb: Math.round(combustivel),
+                          turbo: turbo > 0, arma, mun: municao[arma], pontos, alvos: alvosDestruidos + '/' + alvosTotal,
+                          prog: Math.min(100, Math.round(distancia/MISSAO*100)) });
 }
 setInterval(mandaEstado, 250);
 

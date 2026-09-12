@@ -35,6 +35,15 @@
             font-size:15px;font-weight:900;letter-spacing:3px;color:#0a2233;background:#7fd8ff;
             border-radius:99px;padding:5px 18px;box-shadow:0 0 30px #7fd8ff}
   #selTurbo.ver{display:block}
+  #barraProg2{position:absolute;left:18px;right:18px;top:112px;height:5px;border-radius:99px;
+              background:rgba(255,255,255,.14);overflow:hidden}
+  #barraProg{display:block;height:100%;width:0;background:#5cc8ff;border-radius:99px}
+  #cArma{left:50%;transform:translateX(-50%);bottom:18px;text-align:center}
+  .dica2{font-weight:600;color:#6b7a95;letter-spacing:0}
+  #cPontos{left:18px;top:130px}
+  #btVisao{position:absolute;left:18px;bottom:62px;pointer-events:auto;cursor:pointer;
+           border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.55);border-radius:10px;
+           padding:6px 9px;font-size:15px;line-height:1}
   /* altímetro: trilho vertical na direita com uma marca que sobe e desce.
      Sem ele o jogador não tem como perceber que está subindo. */
   #altimetro{position:absolute;right:22px;top:50%;transform:translateY(-50%);
@@ -127,12 +136,40 @@
   #dica{font-size:12px;color:#7d8cab;text-align:center;max-width:36ch;line-height:1.5}
   /* linha de orientação: mostra como o jogo acha que você está segurando o
      aparelho, e deixa corrigir à mão se errar */
+  /* armas e gatilho: é o controle que manda, o jogo fica na outra tela */
+  .armas{display:flex;gap:7px;width:100%;max-width:340px}
+  .arma{flex:1;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#aebbd4;
+        border-radius:10px;padding:7px 4px;font:800 11px/1.1 inherit;letter-spacing:.5px;cursor:pointer}
+  .arma i{display:block;font-style:normal;font-weight:600;font-size:10px;color:#7d8cab;margin-top:3px}
+  .arma.sel{background:#ffc24d;color:#1a1400;border-color:#ffc24d}
+  .arma.sel i{color:#6b5200}
+  #btFogo{width:100%;max-width:340px;border:0;border-radius:14px;padding:16px;cursor:pointer;
+          font:900 19px/1 inherit;letter-spacing:3px;color:#fff;background:#d8422f;
+          box-shadow:0 6px 0 #8f2a1d;user-select:none;-webkit-user-select:none}
+  #btFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
+  @media (max-height:470px){ .arma{padding:5px 3px;font-size:10px} #btFogo{padding:11px;font-size:16px} }
+  /* Celular deitado: em coluna única nada cabe. Vira duas colunas — o horizonte
+     à esquerda, ocupando toda a altura, e os comandos empilhados à direita. */
+  @media (max-height:520px){
+    /* as linhas precisam ser EXPLÍCITAS: com linhas implícitas o
+       grid-row:1/-1 do horizonte não estica, e ele fica numa linha só */
+    #controle.ver,#telaControle{display:grid;grid-template-columns:auto minmax(0,1fr);
+              grid-template-rows:repeat(7,auto);
+              align-content:center;justify-content:center;gap:7px 16px;padding:8px 14px}
+    #controle > *:not(#horizonte),#telaControle > *:not(#horizonte){grid-column:2;width:100%;max-width:360px}
+    #horizonte{grid-column:1;grid-row:1/-1;align-self:center;
+               --d:min(40vw,72vh,240px);width:var(--d);height:var(--d)}
+    #dica{display:none}
+    .placar{gap:14px}
+    .placar .val2{font-size:17px}
+    .estado{padding:6px 10px;font-size:11.5px}
+  }
   #giroLinha{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
              font-size:12px;color:#8fa3c8;text-align:center}
   #giroLinha b{color:#e6edf9;font-weight:700}
-  #btGiro{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.07);color:#dce5f5;
+  #btGiro,#btVisaoC{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.07);color:#dce5f5;
           border-radius:8px;padding:5px 11px;font:700 12px inherit;cursor:pointer}
-  #btGiro:active{background:rgba(255,255,255,.16)}
+  #btGiro:active,#btVisaoC:active{background:rgba(255,255,255,.16)}
   @media (max-height:470px){ #controle{gap:8px} #dica{display:none} }
   /* celular deitado na tela de escolha: encolhe para os botões caberem sem rolar */
   @media (max-height:480px){
@@ -165,6 +202,12 @@
   </div>
   <div class="caixa" id="cRec"><div class="rot">Recorde</div><div class="val"><span id="vRec">0</span><small>m</small></div></div>
   <div id="selTurbo">TURBO</div>
+  <div id="barraProg2"><i id="barraProg"></i></div>
+  <div class="caixa" id="cArma"><div class="rot">Arma <span class="dica2">(1 2 3 &middot; espaço atira)</span></div>
+    <div class="val"><span id="vArma">BOMBA</span> <small>x<span id="vMun">14</span></small></div></div>
+  <div class="caixa" id="cPontos"><div class="rot">Pontos</div><div class="val" id="vPontos">0</div>
+    <div class="rot" style="margin-top:4px">Alvos <b id="vAlvos">0/0</b></div></div>
+  <button id="btVisao" title="cabine / de fora (V)">&#128065;</button>
   <div id="altimetro"><i id="altMarca"></i></div>
   <div id="altNum"><span id="vAlt">0</span> m</div>
   <button id="btSom" title="som (liga/desliga)">&#128266;</button>
@@ -272,12 +315,19 @@
     <div><div class="rot">Combustível</div><div class="val2" id="pComb">&ndash;</div></div>
     <div><div class="rot">Atraso</div><div class="val2" id="pMs">&ndash;</div></div>
   </div>
+  <div class="armas">
+    <button class="arma sel" data-a="bomba">BOMBA<i id="mBomba">14</i></button>
+    <button class="arma" data-a="missil">MÍSSIL<i id="mMissil">8</i></button>
+    <button class="arma" data-a="metralha">METRA<i id="mMetralha">400</i></button>
+  </div>
+  <button id="btFogo">FOGO</button>
   <div class="linha">
     <button class="bt azul centro" id="btComecar"><b>Começar</b></button>
     <button class="bt sec centro" id="btCalibrar"><b>Zerar</b></button>
   </div>
   <div id="giroLinha">segurando: <b id="giroTxt">&hellip;</b>
-    <button id="btGiro">girar</button></div>
+    <button id="btGiro">girar</button>
+    <button id="btVisaoC">cabine</button></div>
   <div id="dica">Segure o celular <b>deitado</b>. <b>Zerar</b> torna a posição atual da sua mão o voo reto.
     Girar de lado inclina as asas; puxar a borda de cima levanta o nariz.</div>
 </div>
@@ -470,9 +520,13 @@ function fim(){
   const m = Math.round(distancia/20);
   const novo = m > recorde;
   if (novo){ recorde = m; try { localStorage.setItem('aviao.recorde', String(m)); } catch(e){} }
-  $('fimTit').textContent = novo ? 'Recorde novo!' :
-      (motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível' : 'O avião caiu');
-  $('fimPlacar').innerHTML = 'Distância: <b>' + m + ' m</b> &nbsp;·&nbsp; Recorde: <b>' + recorde + ' m</b>';
+  $('fimTit').textContent =
+      venceu ? 'Missão cumprida!' :
+      (motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível' :
+       motivoQueda === 'predio' ? 'Bateu num prédio' : 'O avião caiu');
+  $('fimPlacar').innerHTML = 'Distância: <b>' + m + '</b> de ' + Math.round(MISSAO/METRO) + ' m &nbsp;·&nbsp; ' +
+                             'Alvos: <b>' + alvosDestruidos + '/' + alvosTotal + '</b> &nbsp;·&nbsp; ' +
+                             'Pontos: <b>' + pontos + '</b> &nbsp;·&nbsp; Recorde: <b>' + recorde + ' m</b>';
   $('fimComo').innerHTML = sozinho ? 'Toque na tela ou aperte <b>Enter</b> para voar de novo.'
                                    : 'Toque em <b>Jogar de novo</b> no celular — ou <b>Enter</b> aqui.';
   $('fimTela').classList.add('ver');
@@ -557,10 +611,15 @@ function ligaCanalDaTela(){
       case 'ping':  Canal.envia({ t: 'pong', at: d.at }); break;
       case 'oi':    estado('ok', 'controle conectado — toque em Começar nele'); mandaEstado(); break;
       case 'botao': if (d.b === 'comecar' && !jogando && !pausado) comeca(); break;
+      case 'arma':  trocaArma(d.a); break;
+      case 'fogo':  atirando = !!d.v; break;
+      case 'visao': cockpit = !cockpit; break;
     }
   };
 }
-function mandaEstado(){ Canal.envia({ t: 'estado', jogando, acabou, dist: Math.round(distancia/20), comb: Math.round(combustivel), turbo: turbo > 0 }); }
+function mandaEstado(){ Canal.envia({ t: 'estado', jogando, acabou, dist: Math.round(distancia/METRO), comb: Math.round(combustivel),
+                turbo: turbo > 0, arma, mun: municao[arma], pontos, alvos: alvosDestruidos + '/' + alvosTotal,
+                prog: Math.min(100, Math.round(distancia/MISSAO*100)) }); }
 
 function viraTela(comSala){
   papel = 'tela';
@@ -647,6 +706,11 @@ function ligaCanalDoControle(){
     if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
     if (d.t === 'estado'){
       $('pDist').textContent = d.dist;
+      if (d.arma){
+        document.querySelectorAll('.arma').forEach(b => b.classList.toggle('sel', b.dataset.a === d.arma));
+        const m = document.getElementById('m' + d.arma.charAt(0).toUpperCase() + d.arma.slice(1));
+        if (m) m.textContent = d.mun;
+      }
       $('pComb').textContent = d.jogando ? d.comb + '%' : '–';
       $('pComb').style.color = d.jogando && d.comb < 20 ? '#ff6a6a' : '';
       $('btComecar').innerHTML = '<b>' + (d.jogando ? 'Voando…' : (d.acabou ? 'Voar de novo' : 'Começar')) + '</b>';
@@ -903,6 +967,30 @@ function pintaGiro(){
     try{ navigator.vibrate && navigator.vibrate(25); }catch(x){}
   };
   setInterval(pintaGiro, 400);
+})();
+
+/* --- armas no controle ---------------------------------------------------- */
+(function(){
+  const fogo = document.getElementById('btFogo');
+  if (!fogo) return;
+  document.querySelectorAll('.arma').forEach(b => {
+    b.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelectorAll('.arma').forEach(o => o.classList.remove('sel'));
+      b.classList.add('sel');
+      Canal.envia({ t:'arma', a:b.dataset.a });
+      try{ navigator.vibrate && navigator.vibrate(20); }catch(x){}
+    });
+  });
+  const puxa = v => e => { e.preventDefault(); Canal.envia({ t:'fogo', v:v });
+                           if (v) try{ navigator.vibrate && navigator.vibrate(15); }catch(x){} };
+  fogo.addEventListener('touchstart', puxa(true),  {passive:false});
+  fogo.addEventListener('touchend',   puxa(false), {passive:false});
+  fogo.addEventListener('touchcancel',puxa(false), {passive:false});
+  fogo.addEventListener('mousedown',  puxa(true));
+  window.addEventListener('mouseup',  puxa(false));
+  const vis = document.getElementById('btVisaoC');
+  if (vis) vis.addEventListener('click', e => { e.preventDefault(); Canal.envia({ t:'visao' }); });
 })();
 </script>
 </body>

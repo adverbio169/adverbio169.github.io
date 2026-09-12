@@ -35,6 +35,15 @@
             font-size:15px;font-weight:900;letter-spacing:3px;color:#0a2233;background:#7fd8ff;
             border-radius:99px;padding:5px 18px;box-shadow:0 0 30px #7fd8ff}
   #selTurbo.ver{display:block}
+  #barraProg2{position:absolute;left:18px;right:18px;top:112px;height:5px;border-radius:99px;
+              background:rgba(255,255,255,.14);overflow:hidden}
+  #barraProg{display:block;height:100%;width:0;background:#5cc8ff;border-radius:99px}
+  #cArma{left:50%;transform:translateX(-50%);bottom:18px;text-align:center}
+  .dica2{font-weight:600;color:#6b7a95;letter-spacing:0}
+  #cPontos{left:18px;top:130px}
+  #btVisao{position:absolute;left:18px;bottom:62px;pointer-events:auto;cursor:pointer;
+           border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.55);border-radius:10px;
+           padding:6px 9px;font-size:15px;line-height:1}
   /* altímetro: trilho vertical na direita com uma marca que sobe e desce.
      Sem ele o jogador não tem como perceber que está subindo. */
   #altimetro{position:absolute;right:22px;top:50%;transform:translateY(-50%);
@@ -127,12 +136,40 @@
   #dica{font-size:12px;color:#7d8cab;text-align:center;max-width:36ch;line-height:1.5}
   /* linha de orientação: mostra como o jogo acha que você está segurando o
      aparelho, e deixa corrigir à mão se errar */
+  /* armas e gatilho: é o controle que manda, o jogo fica na outra tela */
+  .armas{display:flex;gap:7px;width:100%;max-width:340px}
+  .arma{flex:1;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#aebbd4;
+        border-radius:10px;padding:7px 4px;font:800 11px/1.1 inherit;letter-spacing:.5px;cursor:pointer}
+  .arma i{display:block;font-style:normal;font-weight:600;font-size:10px;color:#7d8cab;margin-top:3px}
+  .arma.sel{background:#ffc24d;color:#1a1400;border-color:#ffc24d}
+  .arma.sel i{color:#6b5200}
+  #btFogo{width:100%;max-width:340px;border:0;border-radius:14px;padding:16px;cursor:pointer;
+          font:900 19px/1 inherit;letter-spacing:3px;color:#fff;background:#d8422f;
+          box-shadow:0 6px 0 #8f2a1d;user-select:none;-webkit-user-select:none}
+  #btFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
+  @media (max-height:470px){ .arma{padding:5px 3px;font-size:10px} #btFogo{padding:11px;font-size:16px} }
+  /* Celular deitado: em coluna única nada cabe. Vira duas colunas — o horizonte
+     à esquerda, ocupando toda a altura, e os comandos empilhados à direita. */
+  @media (max-height:520px){
+    /* as linhas precisam ser EXPLÍCITAS: com linhas implícitas o
+       grid-row:1/-1 do horizonte não estica, e ele fica numa linha só */
+    #controle.ver,#telaControle{display:grid;grid-template-columns:auto minmax(0,1fr);
+              grid-template-rows:repeat(7,auto);
+              align-content:center;justify-content:center;gap:7px 16px;padding:8px 14px}
+    #controle > *:not(#horizonte),#telaControle > *:not(#horizonte){grid-column:2;width:100%;max-width:360px}
+    #horizonte{grid-column:1;grid-row:1/-1;align-self:center;
+               --d:min(40vw,72vh,240px);width:var(--d);height:var(--d)}
+    #dica{display:none}
+    .placar{gap:14px}
+    .placar .val2{font-size:17px}
+    .estado{padding:6px 10px;font-size:11.5px}
+  }
   #giroLinha{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
              font-size:12px;color:#8fa3c8;text-align:center}
   #giroLinha b{color:#e6edf9;font-weight:700}
-  #btGiro{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.07);color:#dce5f5;
+  #btGiro,#btVisaoC{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.07);color:#dce5f5;
           border-radius:8px;padding:5px 11px;font:700 12px inherit;cursor:pointer}
-  #btGiro:active{background:rgba(255,255,255,.16)}
+  #btGiro:active,#btVisaoC:active{background:rgba(255,255,255,.16)}
   @media (max-height:470px){ #controle{gap:8px} #dica{display:none} }
   /* celular deitado na tela de escolha: encolhe para os botões caberem sem rolar */
   @media (max-height:480px){
@@ -165,6 +202,12 @@
   </div>
   <div class="caixa" id="cRec"><div class="rot">Recorde</div><div class="val"><span id="vRec">0</span><small>m</small></div></div>
   <div id="selTurbo">TURBO</div>
+  <div id="barraProg2"><i id="barraProg"></i></div>
+  <div class="caixa" id="cArma"><div class="rot">Arma <span class="dica2">(1 2 3 &middot; espaço atira)</span></div>
+    <div class="val"><span id="vArma">BOMBA</span> <small>x<span id="vMun">14</span></small></div></div>
+  <div class="caixa" id="cPontos"><div class="rot">Pontos</div><div class="val" id="vPontos">0</div>
+    <div class="rot" style="margin-top:4px">Alvos <b id="vAlvos">0/0</b></div></div>
+  <button id="btVisao" title="cabine / de fora (V)">&#128065;</button>
   <div id="altimetro"><i id="altMarca"></i></div>
   <div id="altNum"><span id="vAlt">0</span> m</div>
   <button id="btSom" title="som (liga/desliga)">&#128266;</button>
@@ -272,12 +315,19 @@
     <div><div class="rot">Combustível</div><div class="val2" id="pComb">&ndash;</div></div>
     <div><div class="rot">Atraso</div><div class="val2" id="pMs">&ndash;</div></div>
   </div>
+  <div class="armas">
+    <button class="arma sel" data-a="bomba">BOMBA<i id="mBomba">14</i></button>
+    <button class="arma" data-a="missil">MÍSSIL<i id="mMissil">8</i></button>
+    <button class="arma" data-a="metralha">METRA<i id="mMetralha">400</i></button>
+  </div>
+  <button id="btFogo">FOGO</button>
   <div class="linha">
     <button class="bt azul centro" id="btComecar"><b>Começar</b></button>
     <button class="bt sec centro" id="btCalibrar"><b>Zerar</b></button>
   </div>
   <div id="giroLinha">segurando: <b id="giroTxt">&hellip;</b>
-    <button id="btGiro">girar</button></div>
+    <button id="btGiro">girar</button>
+    <button id="btVisaoC">cabine</button></div>
   <div id="dica">Segure o celular <b>deitado</b>. <b>Zerar</b> torna a posição atual da sua mão o voo reto.
     Girar de lado inclina as asas; puxar a borda de cima levanta o nariz.</div>
 </div>
@@ -2760,30 +2810,38 @@ function grausParaEixo(graus, maximo, zonaMorta){
    PARTE 2 — O MUNDO
 
    Coordenadas: x para a direita, y para cima, z para a frente.
-   A câmera fica atrás do avião; quem anda é o mundo, que vem vindo na direção
-   dele (todo objeto tem o z diminuído a cada quadro).
 
-   O jogo agora é sobre COMBUSTÍVEL: ele só cai, e quando acaba o avião cai de
-   verdade. Pelo caminho há dois tipos de tambor para pegar e dois tipos de
-   obstáculo para desviar.
+   MUDANÇA IMPORTANTE: o mapa agora é FINITO e fica parado. Tudo que é cenário
+   guarda o seu z ABSOLUTO, e quem anda é o avião (a variável `distancia`).
+   Na hora de desenhar, a posição relativa é `objeto.z - distancia`. Antes o
+   mundo vinha vindo e cada objeto tinha o z alterado a cada quadro — o que não
+   dá para fazer com uma cidade inteira, e não permitia ter começo e fim.
    ========================================================================== */
-const CAMD     = 750;      // distância da câmera até o avião
+const CAMD     = 750;      // distância da câmera até o avião (visão de fora)
 const CHAO     = -700;     // altura do solo
-const TETO     = 5200;     // altura máxima de voo (antes era 1600: batia em 1,5 s)
+const TETO     = 5200;     // altura máxima de voo
 const VOO_BASE = 1700;     // velocidade normal, unidades por segundo
 const VOO_TURBO= 3000;     // velocidade com o combustível azul
-const ALCANCE  = 16000;    // até onde o mundo é gerado à frente
-const VAO      = 1650;     // distância entre um tambor e o seguinte
+const ALCANCE  = 17000;    // até onde se enxerga à frente
+const MISSAO   = 300000;   // comprimento do mapa (15 km no placar) — tem fim!
+const METRO    = 20;       // unidades de mundo por metro no placar
 
-const RAIO_PEGA  = 340;    // o quanto o avião pode passar longe e ainda pegar
-const GASTO      = 3.3;    // % de combustível gasto por segundo
-const GASTO_TURBO= 5.0;    // gasta mais rápido enquanto acelera
-const DA_NORMAL  = 20;     // % que um tambor amarelo devolve
-const DA_AZUL    = 32;     // % que um tambor azul devolve
-const TURBO_SEG  = 5;      // segundos de turbo por tambor azul
+const RAIO_PEGA  = 340;
+const GASTO      = 3.0;
+const GASTO_TURBO= 4.6;
+const DA_NORMAL  = 20;
+const DA_AZUL    = 32;
+const TURBO_SEG  = 5;
 
-const RAIO_POMBO = 170;    // tamanho de colisão dos obstáculos
+const RAIO_POMBO = 170;
 const RAIO_AVIAO = 430;
+
+/* --- armas ---------------------------------------------------------------- */
+const ARMAS = {
+  bomba:    { nome:'BOMBA',        municao:14,  recarga:0.55, cor:'#ffc24d' },
+  missil:   { nome:'MÍSSIL',       municao:8,   recarga:0.85, cor:'#ff7a4d' },
+  metralha: { nome:'METRALHADORA', municao:400, recarga:0.07, cor:'#ffe98a' }
+};
 
 const tela = document.getElementById('tela');
 const ctx  = tela.getContext('2d');
@@ -2798,15 +2856,15 @@ function redimensiona(){
   tela.style.width  = W+'px';
   tela.style.height = H+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  F = H * 0.95;                 // "distância focal": quanto maior, mais fechada a lente
+  F = H * 0.95;
   horizonte = H * 0.38;
 }
 window.addEventListener('resize', redimensiona);
 window.addEventListener('orientationchange', () => setTimeout(redimensiona, 250));
 
-/* a projeção inteira do jogo cabe nestas quatro linhas */
+/* projeção: z aqui já é RELATIVO ao avião (zAbs - distancia) */
 function projeta(x, y, z){
-  const d = z + CAMD;
+  const d = z + (cockpit ? 60 : CAMD);
   if (d < 50) return null;
   const s = F / d;
   return { x: W/2 + (x - camX)*s, y: horizonte - (y - camY)*s, s: s, d: d };
@@ -2814,13 +2872,16 @@ function projeta(x, y, z){
 
 /* --- estado --- */
 let aviaoX=0, aviaoY=250, vx=0, vy=0, inclinacao=0, nariz=0;
-let camX=0, camY=0;
-let tambores=[], obstaculos=[], nuvens=[], particulas=[];
+let camX=0, camY=0, cockpit=false;
+let tambores=[], obstaculos=[], predios=[], alvos=[], nuvens=[], particulas=[];
+let bombas=[], tiros=[];
 let distancia=0, recorde=0, combustivel=100, turbo=0, voo=VOO_BASE;
-let proximoZ=0, caminhoX=0, caminhoY=250;
+let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
+let arma='bomba', municao={}, recarga=0, atirando=false;
 let jogando=false, caindo=false, giroQueda=0, tremor=0, clarao=0, motivoQueda='';
 let tecla={esq:false,dir:false,cima:false,baixo:false};
 let toqueX=0, toqueY=0, usandoToque=false;
+let iPredio=0;
 
 try { recorde = parseInt(localStorage.getItem('aviao.recorde') || '0', 10) || 0; } catch(e){}
 
@@ -2836,33 +2897,25 @@ function bip(freq, dur, tipo, vol){
     o.start(); o.stop(audio.currentTime+dur);
   }catch(e){}
 }
-// barulho de explosão: ruído branco curto, feito na hora
-function estouro(){
+function ruido(dur, corte, vol){
   try{
     if(!audio) audio = new (window.AudioContext||window.webkitAudioContext)();
-    const n = audio.sampleRate * 0.55;
+    const n = Math.max(1, Math.floor(audio.sampleRate * dur));
     const buf = audio.createBuffer(1, n, audio.sampleRate);
     const d = buf.getChannelData(0);
     for (let i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/n, 2.2);
     const src = audio.createBufferSource(); src.buffer = buf;
-    const f = audio.createBiquadFilter(); f.type='lowpass'; f.frequency.value=900;
-    const g = audio.createGain(); g.gain.value = 0.35;
+    const f = audio.createBiquadFilter(); f.type='lowpass'; f.frequency.value=corte;
+    const g = audio.createGain(); g.gain.value = vol;
     src.connect(f); f.connect(g); g.connect(audio.destination);
     src.start();
   }catch(e){}
 }
+const estouro = () => ruido(0.55, 900, 0.4);
 
-/* -----------------------------------------------------------------------------
+/* =============================================================================
    O MOTOR — som contínuo, gerado na hora (nenhum arquivo de áudio)
-
-   São três vozes somadas: duas ondas graves (o ronco) e um chiado filtrado
-   (o ar passando). A altura do ronco acompanha a velocidade, então o turbo
-   se ouve antes de se ver. Com o tanque no fim o motor falha, e na queda ele
-   morre escorregando para o grave.
-
-   Só começa depois de um toque do usuário — navegador nenhum deixa tocar som
-   antes disso.
-   -------------------------------------------------------------------------- */
+   ========================================================================== */
 const Motor = {
   ligado:false, mudo:false, ultimoAjuste:0,
   osc1:null, osc2:null, osc3:null, chiado:null, gAr:null, gRonco:null, mestre:null,
@@ -2884,9 +2937,8 @@ const Motor = {
 
       this.osc1 = audio.createOscillator(); this.osc1.type = 'sawtooth'; this.osc1.frequency.value = 60;
       this.osc2 = audio.createOscillator(); this.osc2.type = 'square';   this.osc2.frequency.value = 91;
-      // Terceira voz, uma oitava e meia acima: alto-falante de celular e de TV
-      // quase não toca abaixo de 400 Hz, então sem ela o motor fica INAUDÍVEL
-      // fora de um fone. Medido: ela dobra a energia na faixa que se escuta.
+      // Terceira voz, bem mais aguda: alto-falante de celular e de TV quase não
+      // toca abaixo de 400 Hz, e sem ela o motor some fora de um fone.
       this.osc3 = audio.createOscillator(); this.osc3.type = 'sawtooth'; this.osc3.frequency.value = 360;
       const g2 = audio.createGain(); g2.gain.value = 0.35;
       const g3 = audio.createGain(); g3.gain.value = 0.55;
@@ -2894,19 +2946,16 @@ const Motor = {
       this.osc3.connect(g3); g3.connect(this.gRonco);
       this.osc1.start(); this.osc2.start(); this.osc3.start();
 
-      // chiado do ar: ruído branco em laço, passado por um filtro passa-baixa
       const n = audio.sampleRate * 2;
       const buf = audio.createBuffer(1, n, audio.sampleRate);
       const d = buf.getChannelData(0);
       for (let i=0;i<n;i++) d[i] = Math.random()*2-1;
       this.chiado = audio.createBufferSource(); this.chiado.buffer = buf; this.chiado.loop = true;
-      const filtroAr = audio.createBiquadFilter(); filtroAr.type='lowpass'; filtroAr.frequency.value = 1100;
-      this.gAr = audio.createGain(); this.gAr.gain.value = 0.05;
+      const filtroAr = audio.createBiquadFilter(); filtroAr.type='lowpass'; filtroAr.frequency.value = 2000;
+      this.gAr = audio.createGain(); this.gAr.gain.value = 0.14;
       this.chiado.connect(filtroAr); filtroAr.connect(this.gAr); this.gAr.connect(this.mestre);
       this.chiado.start();
 
-      // Analisador só para medir: serve de prova visual de que há som saindo.
-      // Se a barrinha mexe e ninguém ouve, o problema é o aparelho, não o jogo.
       this.analise = audio.createAnalyser(); this.analise.fftSize = 512;
       this._buf = new Float32Array(this.analise.fftSize);
       this.mestre.connect(this.analise);
@@ -2921,22 +2970,19 @@ const Motor = {
     if (!this.ligado) return;
     try{
       const t = audio.currentTime;
-      const acel = (voo - VOO_BASE) / (VOO_TURBO - VOO_BASE);         // 0 parado, 1 no turbo
+      const acel = (voo - VOO_BASE) / (VOO_TURBO - VOO_BASE);
       let base = 58 + acel*46;
       if (caindo) base = Math.max(22, this.osc1.frequency.value * 0.985);
       this.osc1.frequency.setTargetAtTime(base,      t, 0.12);
       this.osc2.frequency.setTargetAtTime(base*1.51, t, 0.12);
       this.osc3.frequency.setTargetAtTime(base*6,    t, 0.12);
       this.gAr.gain.setTargetAtTime(0.11 + acel*0.16, t, 0.2);
-
-      // tanque no fim: o motor engasga; caindo: ele vai morrendo
       let vol = caindo ? 0.35 : 1;
       if (!caindo && combustivel < 15) vol *= (Math.random() < 0.18 ? 0.15 : 1);
       this.mestre.gain.setTargetAtTime(vol, t, 0.05);
     }catch(e){}
   },
 
-  // quanto sinal está saindo agora, de 0 a 1
   nivel(){
     if (!this.ligado || !this.analise) return 0;
     try{
@@ -2966,64 +3012,96 @@ const Motor = {
     if (this.mudo) this.desliga(); else if (jogando) this.liga();
   }
 };
-// se o jogo parar (pausa, outra aba, fim), o motor cala sozinho
 setInterval(() => { if (Motor.ligado && Date.now() - Motor.ultimoAjuste > 400) Motor.desliga(); }, 200);
 try{ Motor.mudo = localStorage.getItem('aviao.mudo') === '1'; }catch(e){}
 
-/* --- geração do percurso ------------------------------------------------- */
-function geraMundo(){
-  while (proximoZ < ALCANCE){
-    // o caminho dos tambores passeia devagar de um lado para o outro
-    caminhoX += (Math.random()-0.5) * 1000;
-    caminhoY += (Math.random()-0.5) * 620;
-    caminhoX = Math.max(-2200, Math.min(2200, caminhoX));
-    caminhoY = Math.max(CHAO+520, Math.min(2600, caminhoY));   // faixa dos tambores, não o teto
+/* =============================================================================
+   O MAPA — construído uma vez, do começo ao fim
+   ========================================================================== */
+const rioX     = z => Math.sin(z/5200)*2600 + Math.sin(z/1700)*500;
+const estradaX = z => -3400 + Math.sin(z/9000)*1100;
 
-    const azul = Math.random() < 0.18;     // 1 em cada 5 e pouco é azul
-    tambores.push({ x:caminhoX, y:caminhoY, z:proximoZ, azul:azul,
+// a cidade não é contínua: são bairros, com campo aberto entre eles
+function ehCidade(z){
+  const f = Math.sin(z/24000) + Math.sin(z/9700 + 1.2)*0.6;
+  return f > 0.35;
+}
+
+function montaMapa(){
+  predios = []; alvos = []; tambores = []; obstaculos = [];
+  let cX = 0, cY = 1500, z = 2600;
+
+  while (z < MISSAO + 6000){
+    // --- combustível ---
+    cX += (Math.random()-0.5) * 1000;
+    cY += (Math.random()-0.5) * 620;
+    cX = Math.max(-2200, Math.min(2200, cX));
+    cY = Math.max(CHAO+1500, Math.min(3000, cY));   // os tambores ficam acima da cidade
+    tambores.push({ x:cX, y:cY, z:z, azul: Math.random() < 0.18,
                     passou:false, brilho:0, giro:Math.random()*6.28 });
 
-    // quanto mais longe o jogador chega, mais obstáculo aparece
-    const dificuldade = Math.min(1, distancia/140000);
-    const quantos = (Math.random() < 0.45 + dificuldade*0.45) ? 1 : 0;
-    for (let i=0;i<quantos;i++){
-      const ehAviao = Math.random() < 0.28 + dificuldade*0.22;
+    // --- obstáculos no ar ---
+    const dif = Math.min(1, z/200000);
+    if (Math.random() < 0.45 + dif*0.45){
       obstaculos.push({
-        tipo: ehAviao ? 'aviao' : 'pombo',
-        // fica ao lado do caminho dos tambores, para obrigar a desviar
-        x: caminhoX + (Math.random()<0.5?-1:1) * (500 + Math.random()*1500),
-        y: caminhoY + (Math.random()-0.5) * 800,
-        z: proximoZ + VAO*0.45 + Math.random()*VAO*0.45,
-        fase: Math.random()*6.28,
-        deriva: (Math.random()-0.5) * 300,
-        passou: false
+        tipo: Math.random() < 0.28 + dif*0.22 ? 'aviao' : 'pombo',
+        x: cX + (Math.random()<0.5?-1:1)*(500 + Math.random()*1500),
+        y: cY + (Math.random()-0.5)*800,
+        z: z + 740 + Math.random()*740,
+        fase: Math.random()*6.28, deriva:(Math.random()-0.5)*300,
+        x0:0, y0:0, vivo:true, passou:false
       });
     }
-    proximoZ += VAO + Math.random()*500;
+    z += 1650 + Math.random()*500;
   }
-}
-function geraNuvens(){
-  while (nuvens.length < 22){
-    nuvens.push({
-      x: (Math.random()-0.5)*15000,
-      y: 700 + Math.random()*2200,
-      z: Math.random()*ALCANCE,
-      r: 320 + Math.random()*560
-    });
+  for (const o of obstaculos){ o.x0 = o.x; o.y0 = o.y; }
+
+  // --- a cidade: quarteirões com ruas entre eles ---
+  const QUADRA = 1600, RUA = 520;
+  for (let zz = 3000; zz < MISSAO + 4000; zz += QUADRA + RUA){
+    if (!ehCidade(zz)) continue;
+    for (let k = -4; k <= 4; k++){
+      const bx = k*(QUADRA + RUA) + Math.sin(zz/3000)*400;
+      if (Math.abs(bx - rioX(zz)) < 1100) continue;          // não constrói dentro do rio
+      if (Math.random() < 0.18) continue;                     // praça / terreno vazio
+      const largura = 420 + Math.random()*520;
+      const fundo   = 420 + Math.random()*520;
+      const altura  = 260 + Math.random()*Math.random()*1500; // poucos bem altos
+      predios.push({ x:bx + (Math.random()-0.5)*300, z:zz + (Math.random()-0.5)*300,
+                     w:largura, d:fundo, h:altura, tom: Math.random(), vivo:true });
+    }
   }
+  predios.sort((a,b) => a.z - b.z);
+
+  // --- alvos: depósitos de combustível, no meio da cidade ---
+  let zA = 9000;
+  while (zA < MISSAO - 4000){
+    const bx = (Math.random()-0.5) * 6000;
+    if (Math.abs(bx - rioX(zA)) > 900)
+      alvos.push({ x:bx, z:zA, r:520, vivo:true, fase:Math.random()*6.28 });
+    zA += 9000 + Math.random()*7000;
+  }
+  alvosTotal = alvos.length;
 }
 
-/* reinicia o mundo inteiro — chamado pelo comeca() de cada versão do jogo */
+function geraNuvens(){
+  nuvens = [];
+  for (let i=0;i<24;i++) nuvens.push({
+    x:(Math.random()-0.5)*15000, y:900+Math.random()*2400,
+    z: Math.random()*ALCANCE, r:320+Math.random()*560 });
+}
+
 function reiniciaMundo(){
-  tambores = []; obstaculos = []; nuvens = []; particulas = [];
-  proximoZ = 2600; caminhoX = 0; caminhoY = 250;
-  distancia = 0;
-  geraMundo(); geraNuvens();
-  aviaoX = 0; aviaoY = 250; vx = 0; vy = 0; inclinacao = 0; nariz = 0;
-  camX = 0; camY = 0;
+  particulas = []; bombas = []; tiros = [];
+  distancia = 0; iPredio = 0;
+  montaMapa(); geraNuvens();
+  aviaoX = 0; aviaoY = 1500; vx = 0; vy = 0; inclinacao = 0; nariz = 0;
+  camX = 0; camY = 1740;
   combustivel = 100; turbo = 0; voo = VOO_BASE;
-  caindo = false; giroQueda = 0; tremor = 0; clarao = 0;
-  motivoQueda = '';
+  pontos = 0; alvosDestruidos = 0; venceu = false;
+  arma = 'bomba'; recarga = 0; atirando = false;
+  municao = {}; for (const k in ARMAS) municao[k] = ARMAS[k].municao;
+  caindo = false; giroQueda = 0; tremor = 0; clarao = 0; motivoQueda = '';
   Motor.liga();
 }
 
@@ -3037,27 +3115,21 @@ function quadro4(a,b,c,d,cor){
   ctx.closePath(); ctx.fill();
 }
 
-/* --- céu: gradiente, sol e duas serras ao fundo --- */
 function desenhaCeu(){
   const g = ctx.createLinearGradient(0,0,0,horizonte+2);
   g.addColorStop(0,'#071b45'); g.addColorStop(0.45,'#2f6fb8'); g.addColorStop(0.8,'#77aede'); g.addColorStop(1,'#bcd9ef');
   ctx.fillStyle=g; ctx.fillRect(0,0,W,horizonte+2);
-
-  // sol com brilho
   const sx = W*0.76, sy = horizonte*0.34, r = Math.min(W,H)*0.055;
   const halo = ctx.createRadialGradient(sx,sy,r*0.3, sx,sy,r*5);
   halo.addColorStop(0,'rgba(255,236,170,.55)'); halo.addColorStop(1,'rgba(255,236,170,0)');
   ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(sx,sy,r*5,0,7); ctx.fill();
   ctx.fillStyle='rgba(255,246,205,.95)'; ctx.beginPath(); ctx.arc(sx,sy,r,0,7); ctx.fill();
-
-  // serras: duas camadas, com deslocamento diferente conforme o avião anda de lado
   serra(horizonte, H*0.085, '#3c5f86', camX*0.020, 0.9);
   serra(horizonte, H*0.052, '#4d7396', camX*0.038, 1.7);
 }
 function serra(base, altura, cor, desloc, freq){
   ctx.fillStyle = cor;
-  ctx.beginPath();
-  ctx.moveTo(-10, base+2);
+  ctx.beginPath(); ctx.moveTo(-10, base+2);
   for (let x=-10; x<=W+10; x+=W/26){
     const k = (x + desloc)/W * 7 * freq;
     const h = (Math.sin(k)*0.5 + Math.sin(k*2.7+1.3)*0.3 + Math.sin(k*5.1)*0.2 + 1) * altura*0.5;
@@ -3066,107 +3138,165 @@ function serra(base, altura, cor, desloc, freq){
   ctx.lineTo(W+10, base+2); ctx.closePath(); ctx.fill();
 }
 
-/* --- chão: campos, rio, estrada e bruma --- */
 const PASSO_Z = 900, PASSO_X = 1500;
 const VERDES = ['#2a5c33','#38754a','#245029','#47895a','#57964f','#6b8f3c','#84a04a','#2f6b3e','#3f6e2f','#537f36'];
 function corDoCampo(a,b){
   const h = Math.abs(Math.sin(a*127.1 + b*311.7) * 43758.5453) % 1;
   return VERDES[Math.floor(h*VERDES.length)];
 }
-const rioX     = z => Math.sin((distancia+z)/5200)*2600 + Math.sin((distancia+z)/1700)*500;
-const estradaX = z => -3400 + Math.sin((distancia+z)/9000)*1100;
 
 function desenhaChao(){
   ctx.fillStyle = '#2f6a3f';
   ctx.fillRect(0, horizonte, W, H-horizonte);
-
   const desl  = distancia % PASSO_Z;
   const baseK = Math.floor(distancia / PASSO_Z);
-  const j0 = Math.floor((camX - 10000)/PASSO_X), j1 = Math.ceil((camX + 10000)/PASSO_X);
+  const j0 = Math.floor((camX - 11000)/PASSO_X), j1 = Math.ceil((camX + 11000)/PASSO_X);
 
-  // do fundo para a frente, para o que está perto cobrir o que está longe
-  for (let i = 15; i >= 0; i--){
+  for (let i = 16; i >= 0; i--){
     const z1 = i*PASSO_Z - desl, z2 = z1 + PASSO_Z;
     if (z2 < 140) continue;
-
+    const zAbs = distancia + z1;
+    const cidade = ehCidade(zAbs);
     for (let j = j0; j <= j1; j++){
       const a = projeta(j*PASSO_X, CHAO, z1), b = projeta((j+1)*PASSO_X, CHAO, z1),
             c = projeta((j+1)*PASSO_X, CHAO, z2), d = projeta(j*PASSO_X, CHAO, z2);
       if (!a||!b||!c||!d) continue;
-      if (a.x > W+40 && d.x > W+40) continue;
-      if (b.x < -40 && c.x < -40) continue;
-      quadro4(a,b,c,d, corDoCampo(j, baseK + i));
+      if ((a.x > W+40 && d.x > W+40) || (b.x < -40 && c.x < -40)) continue;
+      quadro4(a,b,c,d, cidade ? (((j+baseK+i) & 1) ? '#5b5f63' : '#54585c') : corDoCampo(j, baseK + i));
     }
-
-    // estrada e rio acompanham o terreno, serpenteando
-    const e1 = estradaX(z1), e2 = estradaX(z2);
+    const e1 = estradaX(zAbs), e2 = estradaX(zAbs + PASSO_Z);
     const ea = projeta(e1-150, CHAO, z1), eb = projeta(e1+150, CHAO, z1),
           ec = projeta(e2+150, CHAO, z2), ed = projeta(e2-150, CHAO, z2);
     if (ea&&eb&&ec&&ed) quadro4(ea,eb,ec,ed,'#6b6a63');
-
-    const r1 = rioX(z1), r2 = rioX(z2);
+    const r1 = rioX(zAbs), r2 = rioX(zAbs + PASSO_Z);
     const ra = projeta(r1-520, CHAO, z1), rb = projeta(r1+520, CHAO, z1),
           rc = projeta(r2+520, CHAO, z2), rd = projeta(r2-520, CHAO, z2);
     if (ra&&rb&&rc&&rd) quadro4(ra,rb,rc,rd,'#3f7fa8');
   }
 
-  // bruma: o chão longe desbota para a cor do céu
-  const b = ctx.createLinearGradient(0, horizonte - 2, 0, horizonte + H*0.13);
-  b.addColorStop(0,'rgba(188,217,239,.82)'); b.addColorStop(0.45,'rgba(188,217,239,.30)');
+  // bruma bem de leve: só para o corte céu/chão não ficar seco. Forte demais
+  // vira uma faixa clara atravessando a cidade.
+  const b = ctx.createLinearGradient(0, horizonte - 2, 0, horizonte + H*0.09);
+  b.addColorStop(0,'rgba(188,217,239,.55)'); b.addColorStop(0.4,'rgba(188,217,239,.18)');
   b.addColorStop(1,'rgba(188,217,239,0)');
-  ctx.fillStyle=b; ctx.fillRect(0, horizonte - 2, W, H*0.13);
+  ctx.fillStyle=b; ctx.fillRect(0, horizonte - 2, W, H*0.09);
 }
 
-/* --- os objetos do mundo, desenhados do mais longe para o mais perto ------ */
+/* --- um prédio: face da frente, telhado e uma lateral --- */
+function desenhaPredio(p){
+  const zr = p.z - distancia;
+  const z1 = zr - p.d/2, z2 = zr + p.d/2;
+  if (z2 < 60) return;
+  const topo = CHAO + p.h;
+  const eDir = p.x > camX;
+  const xa = p.x - p.w/2, xb = p.x + p.w/2;
+
+  const f1 = projeta(xa, CHAO, z1), f2 = projeta(xb, CHAO, z1),
+        f3 = projeta(xb, topo, z1), f4 = projeta(xa, topo, z1);
+  if (!f1||!f2||!f3||!f4) return;
+  if ((f1.x > W+60 && f2.x > W+60) || (f1.x < -60 && f2.x < -60)) return;
+
+  const claro = 0.62 + p.tom*0.3;
+  const cor = c => 'rgb(' + Math.round(c[0]*claro) + ',' + Math.round(c[1]*claro) + ',' + Math.round(c[2]*claro) + ')';
+  const base = [150,156,168];
+
+  // lateral (só a que dá para ver)
+  const xl = eDir ? xa : xb;
+  const l1 = projeta(xl, CHAO, z1), l2 = projeta(xl, CHAO, z2),
+        l3 = projeta(xl, topo, z2), l4 = projeta(xl, topo, z1);
+  if (l1&&l2&&l3&&l4) quadro4(l1,l2,l3,l4, 'rgb(' + Math.round(base[0]*claro*0.66) + ',' +
+        Math.round(base[1]*claro*0.66) + ',' + Math.round(base[2]*claro*0.66) + ')');
+
+  // telhado
+  const t1 = projeta(xa, topo, z1), t2 = projeta(xb, topo, z1),
+        t3 = projeta(xb, topo, z2), t4 = projeta(xa, topo, z2);
+  if (t1&&t2&&t3&&t4) quadro4(t1,t2,t3,t4, 'rgb(' + Math.round(base[0]*claro*1.18) + ',' +
+        Math.round(base[1]*claro*1.18) + ',' + Math.round(base[2]*claro*1.15) + ')');
+
+  quadro4(f1,f2,f3,f4, cor(base));
+
+  // janelas, só quando o prédio está perto o bastante para valer a pena
+  const alturaTela = Math.abs(f1.y - f4.y), largTela = Math.abs(f2.x - f1.x);
+  if (alturaTela > 40 && largTela > 16){
+    const col = Math.max(2, Math.min(6, Math.round(p.w/150)));
+    const lin = Math.max(2, Math.min(12, Math.round(p.h/260)));
+    const jw = largTela/col*0.5, jh = alturaTela/lin*0.45;
+    for (let i=0;i<col;i++) for (let j=0;j<lin;j++){
+      const acesa = ((i*7 + j*13 + Math.round(p.x/97)) % 5) < 2;
+      ctx.fillStyle = acesa ? 'rgba(255,226,150,.75)' : 'rgba(40,52,70,.5)';
+      ctx.fillRect(f1.x + largTela*(i+0.28)/col, f4.y + alturaTela*(j+0.28)/lin, jw, jh);
+    }
+  }
+}
+
+/* --- alvo no chão: depósito de combustível, com marca para achar de longe --- */
+function desenhaAlvo(a){
+  const zr = a.z - distancia;
+  const p = projeta(a.x, CHAO, zr);
+  if (!p) return;
+  const r = a.r * p.s;
+  if (r < 1 || p.x < -r*4 || p.x > W+r*4) return;
+
+  // três tanques cilíndricos
+  for (const dx of [-0.55, 0, 0.55]){
+    const q = projeta(a.x + dx*a.r, CHAO, zr);
+    if (!q) continue;
+    const rw = a.r*0.34*q.s, rh = a.r*0.5*q.s;
+    ctx.fillStyle = '#c94f3d';
+    ctx.fillRect(q.x - rw/2, q.y - rh, rw, rh);
+    ctx.fillStyle = '#e8705c';
+    ctx.beginPath(); ctx.ellipse(q.x, q.y - rh, rw/2, rh*0.16, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.35)';
+    ctx.fillRect(q.x - rw/2, q.y - rh*0.62, rw, rh*0.1);
+  }
+  // marca piscando, para enxergar de longe
+  const pulso = 0.45 + Math.sin(Date.now()/220 + a.fase)*0.35;
+  ctx.strokeStyle = 'rgba(255,90,70,' + pulso.toFixed(2) + ')';
+  ctx.lineWidth = Math.max(1.5, r*0.05);
+  ctx.beginPath(); ctx.arc(p.x, p.y - r*0.3, r*0.95, 0, 7); ctx.stroke();
+  if (r > 14){
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - r*1.6); ctx.lineTo(p.x, p.y - r*1.15); ctx.stroke();
+  }
+}
+
 function desenhaNuvem(n){
-  const p = projeta(n.x, n.y, n.z);
+  const p = projeta(n.x, n.y, n.z - distancia);
   if (!p) return;
   const r = n.r * p.s;
   if (r < 2 || p.x < -r*3 || p.x > W+r*3) return;
-  const perto = Math.min(1, Math.max(0, n.z/2200));
+  const perto = Math.min(1, Math.max(0, (n.z - distancia)/2200));
   ctx.fillStyle = 'rgba(255,255,255,' + (Math.min(0.5, 0.16 + r/(W*1.8)) * perto).toFixed(3) + ')';
   ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r*0.42, 0, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.ellipse(p.x - r*0.5, p.y + r*0.10, r*0.55, r*0.30, 0, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.ellipse(p.x + r*0.55, p.y + r*0.08, r*0.5, r*0.28, 0, 0, 7); ctx.fill();
 }
 
-/* tambor de combustível: amarelo é normal, azul é o turbo */
 function desenhaTambor(t, alvo){
-  const p = projeta(t.x, t.y, t.z);
+  const p = projeta(t.x, t.y, t.z - distancia);
   if (!p) return;
   const r = 125 * p.s;
   if (r < 1.2 || p.x < -r*4 || p.x > W+r*4) return;
-  const dist = 1 - Math.min(1, t.z/ALCANCE);
+  const dist = 1 - Math.min(1, (t.z - distancia)/ALCANCE);
   const corpo = t.azul ? '#3aa0ff' : '#ffb43a';
   const faixa = t.azul ? '#cfeaff' : '#fff0cf';
-
   ctx.save();
   ctx.globalAlpha = Math.max(0.15, dist);
-
-  // halo pulsante, para enxergar de longe
   const pulso = 1 + Math.sin(Date.now()/(t.azul?170:280) + t.giro)*0.16;
   const halo = ctx.createRadialGradient(p.x,p.y,r*0.4, p.x,p.y,r*3.1*pulso);
   halo.addColorStop(0, t.azul ? 'rgba(90,190,255,.55)' : 'rgba(255,190,80,.40)');
   halo.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = halo;
-  ctx.beginPath(); ctx.arc(p.x, p.y, r*3.1*pulso, 0, 7); ctx.fill();
-
-  // o tambor em si, girando devagar
+  ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(p.x, p.y, r*3.1*pulso, 0, 7); ctx.fill();
   const bal = Math.sin(Date.now()/600 + t.giro) * 0.12;
   ctx.translate(p.x, p.y); ctx.rotate(bal);
-  ctx.fillStyle = corpo;
-  ctx.fillRect(-r*0.62, -r, r*1.24, r*2);
+  ctx.fillStyle = corpo; ctx.fillRect(-r*0.62, -r, r*1.24, r*2);
   ctx.fillStyle = faixa;
   ctx.fillRect(-r*0.62, -r*0.46, r*1.24, r*0.30);
   ctx.fillRect(-r*0.62,  r*0.16, r*1.24, r*0.30);
-  ctx.fillStyle = 'rgba(255,255,255,.35)';
-  ctx.fillRect(-r*0.52, -r*0.95, r*0.22, r*1.9);          // brilho lateral
-  ctx.fillStyle = 'rgba(0,0,0,.22)';
-  ctx.fillRect(r*0.34, -r*0.95, r*0.24, r*1.9);           // sombra do outro lado
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(-r*0.52, -r*0.95, r*0.22, r*1.9);
+  ctx.fillStyle = 'rgba(0,0,0,.22)';       ctx.fillRect(r*0.34, -r*0.95, r*0.24, r*1.9);
   ctx.fillStyle = t.azul ? '#0a3e6b' : '#6b4a10';
   ctx.beginPath(); ctx.ellipse(0, -r, r*0.62, r*0.20, 0, 0, 7); ctx.fill();
-
-  // o próximo a pegar ganha um anel, para o jogador saber para onde ir
   if (alvo && r > 3){
     ctx.rotate(-bal);
     ctx.globalAlpha = 0.35 + Math.sin(Date.now()/180)*0.22;
@@ -3177,50 +3307,42 @@ function desenhaTambor(t, alvo){
   ctx.restore();
 }
 
-/* pombo: silhueta escura com as asas batendo */
 function desenhaPombo(o){
-  const p = projeta(o.x, o.y, o.z);
+  const p = projeta(o.x, o.y, o.z - distancia);
   if (!p) return;
   const r = 150 * p.s;
   if (r < 0.8 || p.x < -r*5 || p.x > W+r*5) return;
   const bate = Math.sin(Date.now()/90 + o.fase);
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.globalAlpha = Math.max(0.25, 1 - o.z/ALCANCE);   // some ao longe, aparece ao chegar
+  ctx.save(); ctx.translate(p.x, p.y);
+  ctx.globalAlpha = Math.max(0.25, 1 - (o.z-distancia)/ALCANCE);
   ctx.fillStyle = '#3b4150';
-  ctx.beginPath(); ctx.ellipse(0, 0, r*0.55, r*0.38, 0, 0, 7); ctx.fill();   // corpo
+  ctx.beginPath(); ctx.ellipse(0, 0, r*0.55, r*0.38, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#4a5266';
-  ctx.beginPath();                                                          // asa esquerda
-  ctx.moveTo(-r*0.3, 0);
+  ctx.beginPath(); ctx.moveTo(-r*0.3, 0);
   ctx.quadraticCurveTo(-r*1.5, -r*0.9*bate, -r*2.1, -r*0.25*bate);
-  ctx.quadraticCurveTo(-r*1.4, r*0.1, -r*0.3, r*0.22);
-  ctx.closePath(); ctx.fill();
-  ctx.beginPath();                                                          // asa direita
-  ctx.moveTo(r*0.3, 0);
+  ctx.quadraticCurveTo(-r*1.4, r*0.1, -r*0.3, r*0.22); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(r*0.3, 0);
   ctx.quadraticCurveTo(r*1.5, -r*0.9*bate, r*2.1, -r*0.25*bate);
-  ctx.quadraticCurveTo(r*1.4, r*0.1, r*0.3, r*0.22);
-  ctx.closePath(); ctx.fill();
+  ctx.quadraticCurveTo(r*1.4, r*0.1, r*0.3, r*0.22); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#2b303c';
-  ctx.beginPath(); ctx.ellipse(0, -r*0.30, r*0.26, r*0.24, 0, 0, 7); ctx.fill();  // cabeça
+  ctx.beginPath(); ctx.ellipse(0, -r*0.30, r*0.26, r*0.24, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#e8a33a';
   ctx.beginPath(); ctx.moveTo(0,-r*0.34); ctx.lineTo(r*0.34,-r*0.26); ctx.lineTo(0,-r*0.18);
-  ctx.closePath(); ctx.fill();                                              // bico
+  ctx.closePath(); ctx.fill();
   ctx.restore();
 }
 
-/* avião que vem de frente */
 function desenhaAviaoInimigo(o){
-  const p = projeta(o.x, o.y, o.z);
+  const p = projeta(o.x, o.y, o.z - distancia);
   if (!p) return;
   const r = 420 * p.s;
   if (r < 1 || p.x < -r*3 || p.x > W+r*3) return;
   const bal = Math.sin(Date.now()/700 + o.fase) * 0.10;
-  ctx.save();
-  ctx.translate(p.x, p.y); ctx.rotate(bal);
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(bal);
   ctx.fillStyle = 'rgba(0,0,0,.16)';
   ctx.beginPath(); ctx.ellipse(0, r*0.26, r*1.0, r*0.10, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#b9c3d6';
-  ctx.beginPath();                                                          // asas
+  ctx.beginPath();
   ctx.moveTo(-r*1.05, r*0.04); ctx.lineTo(-r*0.14,-r*0.10);
   ctx.lineTo( r*0.14,-r*0.10); ctx.lineTo( r*1.05, r*0.04);
   ctx.lineTo( r*0.95, r*0.17); ctx.lineTo(-r*0.95, r*0.17);
@@ -3229,42 +3351,94 @@ function desenhaAviaoInimigo(o){
   ctx.fillRect(-r*0.88, r*0.04, r*0.26, r*0.13);
   ctx.fillRect( r*0.62, r*0.04, r*0.26, r*0.13);
   ctx.fillStyle = '#d6deeb';
-  ctx.beginPath(); ctx.ellipse(0, 0, r*0.20, r*0.40, 0, 0, 7); ctx.fill();  // fuselagem
+  ctx.beginPath(); ctx.ellipse(0, 0, r*0.20, r*0.40, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#26354f';
   ctx.beginPath(); ctx.ellipse(0, -r*0.15, r*0.13, r*0.14, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#b9c3d6';
-  ctx.beginPath();                                                          // leme
+  ctx.beginPath();
   ctx.moveTo(-r*0.05, r*0.06); ctx.lineTo(-r*0.05,-r*0.44);
   ctx.lineTo( r*0.05,-r*0.44); ctx.lineTo( r*0.05, r*0.06);
   ctx.closePath(); ctx.fill();
   ctx.restore();
 }
 
+function desenhaBomba(b){
+  const p = projeta(b.x, b.y, b.z - distancia);
+  if (!p) return;
+  const r = Math.max(1, 90 * p.s);
+  ctx.save(); ctx.translate(p.x, p.y);
+  ctx.rotate(Math.atan2(-b.vy, 600) * 0.6);
+  if (b.tipo === 'missil'){
+    ctx.fillStyle = '#ff7a4d';
+    ctx.fillRect(-r*0.22, -r*0.9, r*0.44, r*1.8);
+    ctx.fillStyle = '#ffd257';
+    ctx.beginPath(); ctx.moveTo(0,-r*1.5); ctx.lineTo(r*0.3,-r*0.8); ctx.lineTo(-r*0.3,-r*0.8);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,200,120,' + (0.4+Math.random()*0.4).toFixed(2) + ')';
+    ctx.beginPath(); ctx.ellipse(0, r*1.2, r*0.3, r*0.7, 0, 0, 7); ctx.fill();
+  } else {
+    ctx.fillStyle = '#4a5160';
+    ctx.beginPath(); ctx.ellipse(0, 0, r*0.32, r*0.75, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#2f3542';
+    ctx.beginPath(); ctx.moveTo(0, r*0.9); ctx.lineTo(r*0.4, r*0.4); ctx.lineTo(-r*0.4, r*0.4);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function desenhaTiro(t){
+  const p = projeta(t.x, t.y, t.z - distancia);
+  const q = projeta(t.x, t.y, t.z - distancia - 900);
+  if (!p || !q) return;
+  ctx.strokeStyle = 'rgba(255,236,150,.9)';
+  ctx.lineWidth = Math.max(1, 26*p.s);
+  ctx.beginPath(); ctx.moveTo(q.x,q.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+}
+
 function desenhaParticula(f){
-  const p = projeta(f.x, f.y, f.z);
+  const p = projeta(f.x, f.y, f.z - distancia);
   if (!p) return;
   const r = Math.max(0.6, f.raio * p.s);
   ctx.globalAlpha = Math.max(0, Math.min(1, f.vida));
-  if (f.fumaca){
-    ctx.fillStyle = f.cor;
-    ctx.beginPath(); ctx.arc(p.x, p.y, r*(2.2-f.vida), 0, 7); ctx.fill();
-  } else {
-    ctx.fillStyle = f.cor;
-    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
-  }
+  ctx.fillStyle = f.cor;
+  ctx.beginPath(); ctx.arc(p.x, p.y, f.fumaca ? r*(2.2-f.vida) : r, 0, 7); ctx.fill();
   ctx.globalAlpha = 1;
 }
 
-/* o avião do jogador */
+/* onde a bomba vai cair se for solta agora: queda livre + o quanto o avião anda
+   nesse tempo. Sem esta marca no chão, bombardear é adivinhação. */
+function miraBomba(){
+  const t = Math.sqrt(Math.max(0, 2*(aviaoY - CHAO)/1400));
+  return { x: aviaoX + vx*0.5*t, z: distancia + voo*t, t: t };
+}
+function desenhaMira(){
+  if (caindo || arma !== 'bomba') return;
+  const m = miraBomba();
+  const p = projeta(m.x, CHAO + 20, m.z - distancia);
+  if (!p) return;
+  const r = Math.max(6, 260 * p.s);
+  const perto = alvos.some(a => a.vivo && Math.abs(a.z - m.z) < 700 && Math.abs(a.x - m.x) < 700);
+  ctx.save();
+  ctx.strokeStyle = perto ? 'rgba(120,255,150,.95)' : 'rgba(255,255,255,.6)';
+  ctx.lineWidth = perto ? 3 : 2;
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(p.x - r*1.5, p.y); ctx.lineTo(p.x - r*0.6, p.y);
+  ctx.moveTo(p.x + r*0.6, p.y); ctx.lineTo(p.x + r*1.5, p.y);
+  ctx.moveTo(p.x, p.y - r*1.5); ctx.lineTo(p.x, p.y - r*0.6);
+  ctx.moveTo(p.x, p.y + r*0.6); ctx.lineTo(p.x, p.y + r*1.5);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function desenhaAviao(){
+  if (cockpit) return;                      // de dentro não se vê o próprio avião
   const p = projeta(aviaoX, aviaoY, 0);
   if (!p) return;
   const t = Math.min(W,H) * 0.17;
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(inclinacao * Math.PI/180 + giroQueda);
-
-  // rastro de turbo: dois jatos compridos
   if (turbo > 0){
     for (const lado of [-1, 1]){
       const g = ctx.createLinearGradient(lado*t*0.52, t*0.26, lado*t*0.52, t*1.5);
@@ -3275,31 +3449,75 @@ function desenhaAviao(){
       ctx.lineTo(lado*t*0.54, t*(1.1+Math.random()*0.5)); ctx.closePath(); ctx.fill();
     }
   }
-
-  ctx.fillStyle = '#cfd8e8';                          // asas
+  ctx.fillStyle = '#cfd8e8';
   ctx.beginPath();
   ctx.moveTo(-t*1.05, t*0.10); ctx.lineTo(-t*0.16,-t*0.06);
   ctx.lineTo( t*0.16,-t*0.06); ctx.lineTo( t*1.05, t*0.10);
   ctx.lineTo( t*0.95, t*0.21); ctx.lineTo(-t*0.95, t*0.21);
   ctx.closePath(); ctx.fill();
-  ctx.fillStyle = turbo > 0 ? '#5cc8ff' : '#2d7dff';  // faixas
+  ctx.fillStyle = turbo > 0 ? '#5cc8ff' : '#2d7dff';
   ctx.fillRect(-t*0.86, t*0.10, t*0.26, t*0.11);
   ctx.fillRect( t*0.60, t*0.10, t*0.26, t*0.11);
-  ctx.fillStyle = '#e9eef7';                          // fuselagem
+  ctx.fillStyle = '#e9eef7';
   ctx.beginPath(); ctx.ellipse(0, t*0.02, t*0.19, t*0.36, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#1b2a44';                          // cabine
+  ctx.fillStyle = '#1b2a44';
   ctx.beginPath(); ctx.ellipse(0, -t*0.16, t*0.12, t*0.13, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#cfd8e8';                          // leme
+  ctx.fillStyle = '#cfd8e8';
   ctx.beginPath();
   ctx.moveTo(-t*0.04, t*0.05); ctx.lineTo(-t*0.04,-t*0.40);
   ctx.lineTo( t*0.04,-t*0.40); ctx.lineTo( t*0.04, t*0.05);
   ctx.closePath(); ctx.fill();
-  // motores: fumaça preta quando o tanque está no fim
   const corJato = combustivel < 15 ? 'rgba(70,70,80,' : 'rgba(140,200,255,';
   ctx.fillStyle = corJato + (0.25+Math.random()*0.25).toFixed(2) + ')';
   ctx.beginPath(); ctx.ellipse(-t*0.52, t*0.26, t*0.09, t*0.05, 0, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.ellipse( t*0.52, t*0.26, t*0.09, t*0.05, 0, 0, 7); ctx.fill();
   ctx.restore();
+}
+
+/* --- a moldura da cabine, na visão de dentro --- */
+function desenhaCockpit(){
+  if (!cockpit) return;
+  const rolagem = inclinacao * Math.PI/180 * 0.25 + giroQueda;
+  ctx.save();
+  ctx.translate(W/2, H*0.5); ctx.rotate(rolagem); ctx.translate(-W/2, -H*0.5);
+
+  // painel de baixo
+  const g = ctx.createLinearGradient(0, H*0.72, 0, H);
+  g.addColorStop(0,'#1b2334'); g.addColorStop(1,'#0d1220');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(-W*0.1, H*1.1); ctx.lineTo(-W*0.1, H*0.84);
+  ctx.quadraticCurveTo(W*0.5, H*0.66, W*1.1, H*0.84);
+  ctx.lineTo(W*1.1, H*1.1); ctx.closePath(); ctx.fill();
+  // mostradores no painel
+  for (const [fx, rot] of [[0.3, aviaoY/TETO], [0.7, combustivel/100]]){
+    const cx = W*fx, cy = H*0.90, r = Math.min(W,H)*0.055;
+    ctx.fillStyle = '#0a0f1a'; ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#3a4658'; ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.stroke();
+    const a = -Math.PI*0.75 + Math.max(0,Math.min(1,rot))*Math.PI*1.5;
+    ctx.strokeStyle = '#5cc8ff'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r*0.75, cy+Math.sin(a)*r*0.75); ctx.stroke();
+  }
+  // colunas laterais e travessa de cima
+  ctx.fillStyle = '#141b29';
+  ctx.fillRect(-W*0.05, -H*0.1, W*0.16, H*1.2);
+  ctx.fillRect(W*0.89, -H*0.1, W*0.16, H*1.2);
+  ctx.beginPath();
+  ctx.moveTo(-W*0.1, -H*0.1); ctx.lineTo(W*1.1, -H*0.1);
+  ctx.lineTo(W*1.1, H*0.10); ctx.quadraticCurveTo(W*0.5, H*0.20, -W*0.1, H*0.10);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // mira fixa no centro
+  ctx.strokeStyle = 'rgba(255,210,90,.85)'; ctx.lineWidth = 2;
+  const m = Math.min(W,H)*0.05;
+  ctx.beginPath();
+  ctx.arc(W/2, H*0.46, m, 0, 7);
+  ctx.moveTo(W/2 - m*1.7, H*0.46); ctx.lineTo(W/2 - m*0.5, H*0.46);
+  ctx.moveTo(W/2 + m*0.5, H*0.46); ctx.lineTo(W/2 + m*1.7, H*0.46);
+  ctx.moveTo(W/2, H*0.46 - m*1.7); ctx.lineTo(W/2, H*0.46 - m*0.5);
+  ctx.stroke();
 }
 
 function desenha(){
@@ -3310,34 +3528,50 @@ function desenha(){
   desenhaCeu();
   desenhaChao();
 
-  // tudo que vive no mundo entra numa lista só, ordenada do fundo para a frente
+  // prédios: do fundo para a frente, só a fatia visível (a lista está ordenada)
+  const zIni = distancia - 2000, zFim = distancia + ALCANCE;
+  while (iPredio > 0 && predios[iPredio-1] && predios[iPredio-1].z > zIni) iPredio--;
+  while (iPredio < predios.length && predios[iPredio].z < zIni) iPredio++;
+  const visiveis = [];
+  for (let i = iPredio; i < predios.length && predios[i].z < zFim; i++)
+    if (predios[i].vivo) visiveis.push(predios[i]);
+  for (let i = visiveis.length-1; i >= 0; i--) desenhaPredio(visiveis[i]);
+
+  for (let i = alvos.length-1; i >= 0; i--)
+    if (alvos[i].vivo && alvos[i].z > zIni && alvos[i].z < zFim) desenhaAlvo(alvos[i]);
+
+  // o resto entra numa fila só, ordenada do fundo para a frente
   const fila = [];
   for (const n of nuvens)     fila.push({ z:n.z, o:n, k:'nuvem' });
-  for (const t of tambores)   fila.push({ z:t.z, o:t, k:'tambor' });
-  for (const o of obstaculos) fila.push({ z:o.z, o:o, k:o.tipo });
+  for (const t of tambores)   if (t.z > zIni && t.z < zFim) fila.push({ z:t.z, o:t, k:'tambor' });
+  for (const o of obstaculos) if (o.vivo && o.z > zIni && o.z < zFim) fila.push({ z:o.z, o:o, k:o.tipo });
+  for (const b of bombas)     fila.push({ z:b.z, o:b, k:'bomba' });
+  for (const t of tiros)      fila.push({ z:t.z, o:t, k:'tiro' });
   for (const f of particulas) fila.push({ z:f.z, o:f, k:'part' });
   fila.sort((a,b) => b.z - a.z);
 
-  let alvo = null;
-  for (const t of tambores) if (!t.passou && (alvo===null || t.z < alvo.z)) alvo = t;
+  let alvoT = null;
+  for (const t of tambores) if (!t.passou && t.z > distancia && (alvoT===null || t.z < alvoT.z)) alvoT = t;
 
   for (const it of fila){
     if (it.k === 'nuvem')       desenhaNuvem(it.o);
-    else if (it.k === 'tambor') desenhaTambor(it.o, it.o === alvo);
+    else if (it.k === 'tambor') desenhaTambor(it.o, it.o === alvoT);
     else if (it.k === 'pombo')  desenhaPombo(it.o);
     else if (it.k === 'aviao')  desenhaAviaoInimigo(it.o);
+    else if (it.k === 'bomba')  desenhaBomba(it.o);
+    else if (it.k === 'tiro')   desenhaTiro(it.o);
     else                        desenhaParticula(it.o);
   }
 
+  desenhaMira();
   desenhaAviao();
+  desenhaCockpit();
   ctx.restore();
 
-  // clarão branco/azul quando pega o combustível azul ou quando explode
   if (clarao > 0){
     ctx.fillStyle = 'rgba(150,220,255,' + (clarao*0.55).toFixed(3) + ')';
     ctx.fillRect(0,0,W,H);
   }
-  // riscos de velocidade durante o turbo
   if (turbo > 0){
     ctx.strokeStyle = 'rgba(190,230,255,.5)'; ctx.lineWidth = 2;
     for (let i=0;i<14;i++){
@@ -3382,12 +3616,13 @@ function solta(x, y, z, n, cor, raio, forca, fumaca){
   }
 }
 
-function explode(x, y, z){
-  solta(x, y, z, 34, '#ffd257', 90, 900);
-  solta(x, y, z, 26, '#ff7a2f', 120, 700);
-  solta(x, y, z, 18, '#ff3b2f', 150, 500);
-  solta(x, y, z, 22, 'rgba(60,60,70,.75)', 190, 380, true);
-  tremor = 26; clarao = 0.9;
+function explode(x, y, z, escala){
+  const e = escala || 1;
+  solta(x, y, z, Math.round(34*e), '#ffd257', 90*e, 900);
+  solta(x, y, z, Math.round(26*e), '#ff7a2f', 120*e, 700);
+  solta(x, y, z, Math.round(18*e), '#ff3b2f', 150*e, 500);
+  solta(x, y, z, Math.round(22*e), 'rgba(60,60,70,.75)', 190*e, 380, true);
+  tremor = Math.min(30, 18*e); clarao = Math.min(0.9, 0.4*e);
   estouro();
 }
 
@@ -3396,42 +3631,121 @@ function derruba(motivo){
   caindo = true; motivoQueda = motivo;
   turbo = 0; voo = VOO_BASE;
   mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL!' : 'BATEU!', '#ff8080', 2200);
-  if (motivo !== 'combustivel'){ explode(aviaoX, aviaoY, 0); }
+  if (motivo !== 'combustivel') explode(aviaoX, aviaoY, 0);
   else { bip(160, 0.5, 'sawtooth', 0.10); solta(aviaoX, aviaoY, 0, 16, 'rgba(60,60,70,.7)', 150, 260, true); }
 }
 
-/* a queda: o avião perde o controle, roda e cai até bater no chão */
-function atualizaQueda(dt){
-  giroQueda += dt * 3.4;
-  nariz -= dt * 60; if (nariz < -70) nariz = -70;
-  vy -= dt * 1500;                      // gravidade
-  aviaoY += vy * dt;
-  aviaoX += vx * dt;
-  vx *= 0.985;
-  voo *= 0.985;
-  distancia += voo * dt;
-  andaMundo(voo * dt);
+/* --- armas --------------------------------------------------------------- */
+function trocaArma(nova){
+  if (!ARMAS[nova] || nova === arma) return;
+  arma = nova; recarga = 0;
+  mostraAviso(ARMAS[nova].nome, ARMAS[nova].cor, 700);
+  bip(500, 0.05, 'square', 0.05);
+}
 
-  camX += (aviaoX - camX) * Math.min(1, dt*2.2);
-  camY += ((aviaoY + 240) - camY) * Math.min(1, dt*2.6);
-  horizonte = H*0.38 + nariz*2.2;
+function dispara(){
+  if (caindo || !jogando || recarga > 0) return;
+  if (municao[arma] <= 0){ bip(120, 0.08, 'square', 0.05); mostraAviso('SEM MUNIÇÃO', '#ff8080', 700); return; }
+  municao[arma]--; recarga = ARMAS[arma].recarga;
 
-  if (aviaoY <= CHAO + 120){
-    aviaoY = CHAO + 120;
-    if (motivoQueda === 'combustivel'){ explode(aviaoX, aviaoY, 0); motivoQueda = 'acabou'; }
-    if (tremor < 1){ Motor.desliga(); fim(); }
+  if (arma === 'bomba'){
+    bombas.push({ tipo:'bomba', x:aviaoX, y:aviaoY - 60, z:distancia, vx:vx*0.5, vy:-60, vz:voo });
+    ruido(0.12, 400, 0.12);
+  } else if (arma === 'missil'){
+    bombas.push({ tipo:'missil', x:aviaoX, y:aviaoY, z:distancia, vx:vx*0.3, vy:vy*0.3, vz:voo*3.2, vida:2.4 });
+    ruido(0.25, 2600, 0.18);
+  } else {
+    tiros.push({ x:aviaoX + (Math.random()-0.5)*220, y:aviaoY - 20, z:distancia, vz:voo*6, vida:1.1 });
+    bip(900 + Math.random()*300, 0.04, 'square', 0.045);
+    ruido(0.05, 3000, 0.06);
   }
 }
 
-function andaMundo(avanco){
-  for (const n of nuvens){
-    n.z -= avanco;
-    if (n.z < -900){ n.z += ALCANCE; n.x = (Math.random()-0.5)*15000; n.y = 700+Math.random()*2200; }
+function atingeAlvo(x, z, raio){
+  for (const a of alvos){
+    if (!a.vivo) continue;
+    if (Math.abs(a.z - z) < raio + a.r && Math.abs(a.x - x) < raio + a.r){
+      a.vivo = false; alvosDestruidos++; pontos += 500;
+      explode(a.x, CHAO + 200, a.z - distancia, 2.2);
+      mostraAviso('ALVO DESTRUÍDO! +500', '#ffd257', 1400);
+      bip(300,0.1,'square',0.08); setTimeout(()=>bip(200,0.2,'square',0.07),110);
+      return true;
+    }
   }
-  for (const t of tambores)   t.z -= avanco;
-  for (const o of obstaculos) o.z -= avanco;
-  for (const f of particulas) f.z -= avanco;
-  proximoZ -= avanco;
+  return false;
+}
+
+function atingeAr(x, y, z, raio){
+  for (const o of obstaculos){
+    if (!o.vivo) continue;
+    const r = (o.tipo === 'aviao' ? RAIO_AVIAO : RAIO_POMBO) + raio;
+    if (Math.abs(o.z - z) < r && Math.abs(o.x - x) < r && Math.abs(o.y - y) < r){
+      o.vivo = false;
+      pontos += o.tipo === 'aviao' ? 200 : 50;
+      explode(o.x, o.y, o.z - distancia, o.tipo === 'aviao' ? 1.2 : 0.5);
+      mostraAviso(o.tipo === 'aviao' ? 'AVIÃO ABATIDO! +200' : '+50', '#ffd257', 800);
+      return true;
+    }
+  }
+  return false;
+}
+
+function atualizaTiros(dt){
+  if (recarga > 0) recarga -= dt;
+  if (atirando) dispara();
+
+  for (const b of bombas){
+    b.z += b.vz*dt;
+    b.x += b.vx*dt;
+    if (b.tipo === 'missil'){
+      b.y += b.vy*dt;
+      b.vida -= dt;
+      if (Math.random() < dt*30) solta(b.x, b.y, b.z - distancia, 1, 'rgba(255,190,120,.8)', 40, 60);
+      if (atingeAr(b.x, b.y, b.z, 260) || atingeAlvo(b.x, b.z, 300)) b.morto = true;
+      if (b.vida <= 0) b.morto = true;
+    } else {
+      b.vy -= dt*1400;                       // a bomba cai
+      b.y += b.vy*dt;
+      if (Math.random() < dt*10) solta(b.x, b.y, b.z - distancia, 1, 'rgba(180,180,190,.5)', 30, 40, true);
+      if (b.y <= CHAO){
+        b.morto = true;
+        if (!atingeAlvo(b.x, b.z, 520)){
+          explode(b.x, CHAO + 120, b.z - distancia, 1.1);
+          // derruba prédio que estiver por perto
+          for (const p of predios){
+            if (p.vivo && Math.abs(p.z - b.z) < 700 && Math.abs(p.x - b.x) < 700){
+              p.vivo = false; pontos += 25;
+            }
+          }
+        }
+      }
+    }
+  }
+  bombas = bombas.filter(b => !b.morto && b.z - distancia > -2000 && b.z - distancia < ALCANCE*1.6);
+
+  for (const t of tiros){
+    t.z += t.vz*dt; t.vida -= dt;
+    if (atingeAr(t.x, t.y, t.z, 320)) t.vida = 0;
+  }
+  tiros = tiros.filter(t => t.vida > 0);
+}
+
+function atualizaQueda(dt){
+  giroQueda += dt * 3.4;
+  nariz -= dt * 60; if (nariz < -70) nariz = -70;
+  vy -= dt * 1500;
+  aviaoY += vy * dt;
+  aviaoX += vx * dt;
+  vx *= 0.985; voo *= 0.985;
+  distancia += voo * dt;
+  camX += (aviaoX - camX) * Math.min(1, dt*2.2);
+  camY += ((aviaoY + (cockpit?0:240)) - camY) * Math.min(1, dt*2.6);
+  horizonte = H*0.38 + nariz*2.2;
+  if (aviaoY <= CHAO + 120){
+    aviaoY = CHAO + 120;
+    if (motivoQueda === 'combustivel'){ explode(aviaoX, aviaoY, 0, 1.6); motivoQueda = 'acabou'; }
+    if (tremor < 1){ Motor.desliga(); fim(); }
+  }
 }
 
 function atualiza(dt){
@@ -3448,23 +3762,16 @@ function atualiza(dt){
   if (caindo){ atualizaQueda(dt); return; }
 
   const e = eixos();
-
-  // as asas inclinam de forma suave, e é a inclinação que faz o avião virar
   const alvoInc = e.lat * 42;
   inclinacao += (alvoInc - inclinacao) * Math.min(1, dt*7);
   nariz      += (e.ver*10 - nariz)     * Math.min(1, dt*6);
-
   vx += ((inclinacao/42)*1900 - vx) * Math.min(1, dt*4);
   vy += ((e.ver)*1250          - vy) * Math.min(1, dt*4);
-
   aviaoX += vx*dt;
   aviaoY += vy*dt;
 
-  if (aviaoX < -2600){ aviaoX = -2600; vx = 0; }
-  if (aviaoX >  2600){ aviaoX =  2600; vx = 0; }
-  // Ar rarefeito: perto do teto o avião para de subir aos poucos. Antes havia
-  // uma parede seca lá em cima, e ao bater nela o avião escorregava para baixo
-  // na tela mesmo com o jogador puxando — parecia que ele não subia.
+  if (aviaoX < -6000){ aviaoX = -6000; vx = 0; }
+  if (aviaoX >  6000){ aviaoX =  6000; vx = 0; }
   if (aviaoY > TETO - 1200 && vy > 0){
     const p = Math.min(1, (aviaoY - (TETO-1200)) / 1200);
     vy -= vy * p * Math.min(1, dt*5);
@@ -3476,12 +3783,10 @@ function atualiza(dt){
     mostraAviso('SUBA!', '#ff8080');
   }
 
-  // a câmera acompanha com atraso — é o atraso que dá a sensação de voo
-  camX += (aviaoX - camX)         * Math.min(1, dt*2.2);
-  camY += ((aviaoY + 240) - camY) * Math.min(1, dt*2.6);
+  camX += (aviaoX - camX)                        * Math.min(1, dt*2.2);
+  camY += ((aviaoY + (cockpit?0:240)) - camY)    * Math.min(1, dt*2.6);
   horizonte = H*0.38 + nariz*2.2;
 
-  // turbo e combustível
   if (turbo > 0){
     turbo -= dt;
     if (turbo <= 0){ turbo = 0; mostraAviso('fim do turbo', '#9fd8ff', 900); }
@@ -3491,15 +3796,16 @@ function atualiza(dt){
   if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
   if (combustivel < 18 && Math.random() < dt*2.2) mostraAviso('COMBUSTÍVEL BAIXO', '#ffb86b', 700);
 
-  // o mundo vem vindo
-  const avanco = voo*dt;
-  distancia += avanco;
-  andaMundo(avanco);
+  distancia += voo*dt;
+  atualizaTiros(dt);
+
+  // chegou ao fim do mapa
+  if (distancia >= MISSAO){ venceu = true; Motor.desliga(); fim(); return; }
 
   // pegar combustível
   for (const t of tambores){
     if (t.brilho > 0) t.brilho -= dt*2.2;
-    if (t.passou || t.z > 0) continue;
+    if (t.passou || t.z > distancia) continue;
     t.passou = true;
     const dx = aviaoX - t.x, dy = aviaoY - t.y;
     if (Math.sqrt(dx*dx + dy*dy) < RAIO_PEGA){
@@ -3519,22 +3825,28 @@ function atualiza(dt){
       }
     }
   }
-  tambores = tambores.filter(t => t.z > -1500);
 
-  // bater em pombo ou avião
+  // bater em pombo, avião ou prédio
   for (const o of obstaculos){
+    if (!o.vivo) continue;
     o.fase += dt*2;
-    o.x += Math.sin(o.fase*0.7) * o.deriva * dt;
-    if (o.tipo === 'pombo') o.y += Math.cos(o.fase*1.1) * 90 * dt;
-    if (o.passou || o.z > 0) continue;
+    o.x = o.x0 + Math.sin(o.fase*0.7) * o.deriva;
+    if (o.tipo === 'pombo') o.y = o.y0 + Math.cos(o.fase*1.1) * 220;
+    if (o.passou || o.z > distancia) continue;
     o.passou = true;
     const raio = (o.tipo === 'aviao' ? RAIO_AVIAO : RAIO_POMBO) + 150;
     const dx = aviaoX - o.x, dy = aviaoY - o.y;
     if (Math.sqrt(dx*dx + dy*dy) < raio){ derruba(o.tipo); return; }
   }
-  obstaculos = obstaculos.filter(o => o.z > -1500);
-
-  geraMundo();
+  // varre uma janelinha em volta do avião; começa atrás de iPredio de propósito,
+  // porque quem mexe nesse índice é o desenho, e ele roda depois daqui
+  for (let i = Math.max(0, iPredio - 30); i < predios.length && predios[i].z < distancia + 900; i++){
+    const p = predios[i];
+    if (!p.vivo) continue;
+    if (Math.abs(p.z - distancia) < p.d/2 + 260 &&
+        Math.abs(p.x - aviaoX) < p.w/2 + 260 &&
+        aviaoY < CHAO + p.h + 120){ derruba('predio'); return; }
+  }
 }
 
 let ultimoAviso = 0;
@@ -3553,14 +3865,20 @@ const elDist=document.getElementById('vDist'), elBarra=document.getElementById('
 const elComb=document.getElementById('vComb'), elCComb=document.getElementById('cComb');
 const elRec=document.getElementById('vRec'),   elTurbo=document.getElementById('selTurbo');
 const elSomNivel=document.getElementById('somNivel');
+const elArma=document.getElementById('vArma'), elMun=document.getElementById('vMun');
+const elPontos=document.getElementById('vPontos'), elAlvos=document.getElementById('vAlvos');
+const elProg=document.getElementById('barraProg');
+
 const btSom = document.getElementById('btSom');
 if (btSom){
   btSom.textContent = Motor.mudo ? '🔇' : '🔊';
   btSom.onclick = e => { e.preventDefault(); Motor.alterna(); };
 }
+const btVisao = document.getElementById('btVisao');
+if (btVisao) btVisao.onclick = e => { e.preventDefault(); cockpit = !cockpit; };
+
 function pinta(){
-  const m = Math.round(distancia/20);
-  if (elDist) elDist.textContent = m;
+  if (elDist) elDist.textContent = Math.round(distancia/METRO);
   const pct = Math.max(0, Math.min(100, combustivel));
   if (elBarra){
     elBarra.style.width = pct.toFixed(1) + '%';
@@ -3576,7 +3894,22 @@ function pinta(){
   if (elRec)   elRec.textContent = Math.round(recorde);
   if (elTurbo) elTurbo.classList.toggle('ver', turbo > 0);
   if (elSomNivel) elSomNivel.style.width = (Motor.nivel()*100).toFixed(0) + '%';
+  if (elArma)  elArma.textContent = ARMAS[arma].nome;
+  if (elMun)   elMun.textContent = municao[arma];
+  if (elPontos) elPontos.textContent = pontos;
+  if (elAlvos) elAlvos.textContent = alvosDestruidos + '/' + alvosTotal;
+  if (elProg)  elProg.style.width = Math.min(100, distancia/MISSAO*100).toFixed(1) + '%';
 }
+
+/* teclado das armas: vale em qualquer versão, porque mora no núcleo */
+document.addEventListener('keydown', e => {
+  if (e.key === '1') trocaArma('bomba');
+  if (e.key === '2') trocaArma('missil');
+  if (e.key === '3') trocaArma('metralha');
+  if (e.key === 'v' || e.key === 'V') cockpit = !cockpit;
+  if (e.key === ' '){ atirando = true; e.preventDefault(); }
+});
+document.addEventListener('keyup', e => { if (e.key === ' ') atirando = false; });
 
 let ultimoT=0, sobrando=0;
 const PASSO = 1/60;
@@ -3612,9 +3945,13 @@ function fim(){
   const m = Math.round(distancia/20);
   const novo = m > recorde;
   if (novo){ recorde = m; try { localStorage.setItem('aviao.recorde', String(m)); } catch(e){} }
-  $('fimTit').textContent = novo ? 'Recorde novo!' :
-      (motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível' : 'O avião caiu');
-  $('fimPlacar').innerHTML = 'Distância: <b>' + m + ' m</b> &nbsp;·&nbsp; Recorde: <b>' + recorde + ' m</b>';
+  $('fimTit').textContent =
+      venceu ? 'Missão cumprida!' :
+      (motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível' :
+       motivoQueda === 'predio' ? 'Bateu num prédio' : 'O avião caiu');
+  $('fimPlacar').innerHTML = 'Distância: <b>' + m + '</b> de ' + Math.round(MISSAO/METRO) + ' m &nbsp;·&nbsp; ' +
+                             'Alvos: <b>' + alvosDestruidos + '/' + alvosTotal + '</b> &nbsp;·&nbsp; ' +
+                             'Pontos: <b>' + pontos + '</b> &nbsp;·&nbsp; Recorde: <b>' + recorde + ' m</b>';
   $('fimComo').innerHTML = sozinho ? 'Toque na tela ou aperte <b>Enter</b> para voar de novo.'
                                    : 'Toque em <b>Jogar de novo</b> no celular — ou <b>Enter</b> aqui.';
   $('fimTela').classList.add('ver');
@@ -3699,10 +4036,15 @@ function ligaCanalDaTela(){
       case 'ping':  Canal.envia({ t: 'pong', at: d.at }); break;
       case 'oi':    estado('ok', 'controle conectado — toque em Começar nele'); mandaEstado(); break;
       case 'botao': if (d.b === 'comecar' && !jogando && !pausado) comeca(); break;
+      case 'arma':  trocaArma(d.a); break;
+      case 'fogo':  atirando = !!d.v; break;
+      case 'visao': cockpit = !cockpit; break;
     }
   };
 }
-function mandaEstado(){ Canal.envia({ t: 'estado', jogando, acabou, dist: Math.round(distancia/20), comb: Math.round(combustivel), turbo: turbo > 0 }); }
+function mandaEstado(){ Canal.envia({ t: 'estado', jogando, acabou, dist: Math.round(distancia/METRO), comb: Math.round(combustivel),
+                turbo: turbo > 0, arma, mun: municao[arma], pontos, alvos: alvosDestruidos + '/' + alvosTotal,
+                prog: Math.min(100, Math.round(distancia/MISSAO*100)) }); }
 
 function viraTela(comSala){
   papel = 'tela';
@@ -3789,6 +4131,11 @@ function ligaCanalDoControle(){
     if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
     if (d.t === 'estado'){
       $('pDist').textContent = d.dist;
+      if (d.arma){
+        document.querySelectorAll('.arma').forEach(b => b.classList.toggle('sel', b.dataset.a === d.arma));
+        const m = document.getElementById('m' + d.arma.charAt(0).toUpperCase() + d.arma.slice(1));
+        if (m) m.textContent = d.mun;
+      }
       $('pComb').textContent = d.jogando ? d.comb + '%' : '–';
       $('pComb').style.color = d.jogando && d.comb < 20 ? '#ff6a6a' : '';
       $('btComecar').innerHTML = '<b>' + (d.jogando ? 'Voando…' : (d.acabou ? 'Voar de novo' : 'Começar')) + '</b>';
@@ -4045,6 +4392,30 @@ function pintaGiro(){
     try{ navigator.vibrate && navigator.vibrate(25); }catch(x){}
   };
   setInterval(pintaGiro, 400);
+})();
+
+/* --- armas no controle ---------------------------------------------------- */
+(function(){
+  const fogo = document.getElementById('btFogo');
+  if (!fogo) return;
+  document.querySelectorAll('.arma').forEach(b => {
+    b.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelectorAll('.arma').forEach(o => o.classList.remove('sel'));
+      b.classList.add('sel');
+      Canal.envia({ t:'arma', a:b.dataset.a });
+      try{ navigator.vibrate && navigator.vibrate(20); }catch(x){}
+    });
+  });
+  const puxa = v => e => { e.preventDefault(); Canal.envia({ t:'fogo', v:v });
+                           if (v) try{ navigator.vibrate && navigator.vibrate(15); }catch(x){} };
+  fogo.addEventListener('touchstart', puxa(true),  {passive:false});
+  fogo.addEventListener('touchend',   puxa(false), {passive:false});
+  fogo.addEventListener('touchcancel',puxa(false), {passive:false});
+  fogo.addEventListener('mousedown',  puxa(true));
+  window.addEventListener('mouseup',  puxa(false));
+  const vis = document.getElementById('btVisaoC');
+  if (vis) vis.addEventListener('click', e => { e.preventDefault(); Canal.envia({ t:'visao' }); });
 })();
 </script>
 </body>

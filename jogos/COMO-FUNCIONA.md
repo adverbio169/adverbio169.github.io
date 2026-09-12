@@ -290,3 +290,41 @@ toque em *Avançado* → *Continuar*. Nada sai da sua rede.
 O que **não** funciona por esse caminho é o botão de enviar para a TV: o
 Chromecast não aceita certificado caseiro. Para ele, a página precisa estar num
 endereço https de verdade.
+
+## Versão missão: cidade, alvos e armas
+
+O mapa deixou de ser infinito. Agora tem **15 km e um fim**, e isso mudou a
+arquitetura: todo cenário guarda o seu **z absoluto**, e quem anda é o avião
+(`distancia`). Na hora de desenhar, a posição relativa é `objeto.z - distancia`.
+Antes o mundo vinha vindo e cada objeto tinha o z alterado a cada quadro — não
+dá para fazer isso com uma cidade inteira, e não permitia ter começo e fim.
+
+| coisa | como funciona |
+|---|---|
+| cidade | bairros com quarteirões e ruas, gerados uma vez no começo. Cada prédio é desenhado com três faces (frente, lateral visível e telhado) e ganha janelas quando está perto |
+| alvos | depósitos de combustível, marcados com um círculo piscando. Valem 500 pontos |
+| bomba | cai em queda livre e leva o avanço do avião junto. A **mira no chão** mostra onde vai cair, e fica verde quando está em cima de um alvo |
+| míssil | vai reto e rápido, bom contra avião inimigo |
+| metralhadora | tiro contínuo de curto alcance, bom contra pombo |
+| prédio | bater num derruba o avião, igual a bater num pombo |
+
+No computador: **1 2 3** trocam de arma, **espaço** atira, **V** alterna entre
+ver de fora e ver de dentro da cabine. No celular, o controle ganhou os três
+botões de arma e um botão **FOGO** grande.
+
+### Visão de cabine
+
+É a mesma projeção, com duas diferenças: a câmera vai para dentro do avião
+(`d = z + 60` em vez de `z + 750`), e o avião do jogador deixa de ser desenhado.
+Por cima vem a moldura da cabine, que balança junto com a inclinação das asas.
+
+### Duas armadilhas de CSS que custaram caro aqui
+
+**Especificidade.** `#controle.ver{display:flex}` tem especificidade maior que
+`#controle{display:grid}`, mesmo o segundo estando dentro de uma media query —
+media query não soma especificidade. O layout de duas colunas simplesmente não
+acontecia.
+
+**Estilo em linha.** `elemento.style.display = 'flex'` no JavaScript vence
+qualquer regra de CSS. Trocar por `classList.add('ver')` devolve o controle
+para a folha de estilo.

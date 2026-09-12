@@ -40,6 +40,7 @@
 
   /* ---- a tela de controle: um horizonte artificial ---- */
   #telaControle{display:none}
+  #telaControle.ver{display:flex}
   /* flex-shrink:0 e o limite em vh: sem isso, com o celular deitado o círculo era
      esmagado pela coluna e virava uma elipse */
   #horizonte{--d:min(72vw,46vh,300px);width:var(--d);height:var(--d);flex-shrink:0;
@@ -62,12 +63,40 @@
   #dica{font-size:12px;color:#7d8cab;text-align:center;max-width:36ch;line-height:1.5}
   /* linha de orientação: mostra como o jogo acha que você está segurando o
      aparelho, e deixa corrigir à mão se errar */
+  /* armas e gatilho: é o controle que manda, o jogo fica na outra tela */
+  .armas{display:flex;gap:7px;width:100%;max-width:340px}
+  .arma{flex:1;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#aebbd4;
+        border-radius:10px;padding:7px 4px;font:800 11px/1.1 inherit;letter-spacing:.5px;cursor:pointer}
+  .arma i{display:block;font-style:normal;font-weight:600;font-size:10px;color:#7d8cab;margin-top:3px}
+  .arma.sel{background:#ffc24d;color:#1a1400;border-color:#ffc24d}
+  .arma.sel i{color:#6b5200}
+  #btFogo{width:100%;max-width:340px;border:0;border-radius:14px;padding:16px;cursor:pointer;
+          font:900 19px/1 inherit;letter-spacing:3px;color:#fff;background:#d8422f;
+          box-shadow:0 6px 0 #8f2a1d;user-select:none;-webkit-user-select:none}
+  #btFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
+  @media (max-height:470px){ .arma{padding:5px 3px;font-size:10px} #btFogo{padding:11px;font-size:16px} }
+  /* Celular deitado: em coluna única nada cabe. Vira duas colunas — o horizonte
+     à esquerda, ocupando toda a altura, e os comandos empilhados à direita. */
+  @media (max-height:520px){
+    /* as linhas precisam ser EXPLÍCITAS: com linhas implícitas o
+       grid-row:1/-1 do horizonte não estica, e ele fica numa linha só */
+    #controle.ver,#telaControle.ver{display:grid;grid-template-columns:auto minmax(0,1fr);
+              grid-template-rows:repeat(7,auto);
+              align-content:center;justify-content:center;gap:7px 16px;padding:8px 14px}
+    #controle > *:not(#horizonte),#telaControle.ver > *:not(#horizonte){grid-column:2;width:100%;max-width:360px}
+    #horizonte{grid-column:1;grid-row:1/-1;align-self:center;
+               --d:min(40vw,72vh,240px);width:var(--d);height:var(--d)}
+    #dica{display:none}
+    .placar{gap:14px}
+    .placar .val2{font-size:17px}
+    .estado{padding:6px 10px;font-size:11.5px}
+  }
   #giroLinha{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
              font-size:12px;color:#8fa3c8;text-align:center}
   #giroLinha b{color:#e6edf9;font-weight:700}
-  #btGiro{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.07);color:#dce5f5;
+  #btGiro,#btVisaoC{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.07);color:#dce5f5;
           border-radius:8px;padding:5px 11px;font:700 12px inherit;cursor:pointer}
-  #btGiro:active{background:rgba(255,255,255,.16)}
+  #btGiro:active,#btVisaoC:active{background:rgba(255,255,255,.16)}
 </style>
 </head>
 <body>
@@ -92,12 +121,19 @@
     <div><div class="rot">Combustível</div><div class="val" id="pComb">&ndash;</div></div>
     <div><div class="rot">Atraso</div><div class="val" id="pMs">&ndash;</div></div>
   </div>
+  <div class="armas">
+    <button class="arma sel" data-a="bomba">BOMBA<i id="mBomba">14</i></button>
+    <button class="arma" data-a="missil">MÍSSIL<i id="mMissil">8</i></button>
+    <button class="arma" data-a="metralha">METRA<i id="mMetralha">400</i></button>
+  </div>
+  <button id="btFogo">FOGO</button>
   <div class="linha">
     <button class="bt pri" id="btComecar">Começar</button>
     <button class="bt sec" id="btCalibrar">Zerar</button>
   </div>
   <div id="giroLinha">segurando: <b id="giroTxt">&hellip;</b>
-    <button id="btGiro">girar</button></div>
+    <button id="btGiro">girar</button>
+    <button id="btVisaoC">cabine</button></div>
   <div id="dica">Segure o celular <b>deitado</b>. <b>Zerar</b> torna a posição atual da sua mão o voo reto.
     Girar de lado inclina as asas; puxar a borda de cima levanta o nariz.</div>
 </div>
@@ -251,6 +287,11 @@ function conectar(codigo){
       if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
       if (d.t === 'estado'){
         $('pDist').textContent = d.dist;
+        if (d.arma){
+          document.querySelectorAll('.arma').forEach(b => b.classList.toggle('sel', b.dataset.a === d.arma));
+          const m = document.getElementById('m' + d.arma.charAt(0).toUpperCase() + d.arma.slice(1));
+          if (m) m.textContent = d.mun;
+        }
         $('pComb').textContent = d.jogando ? d.comb + '%' : '–';
         $('pComb').style.color = d.jogando && d.comb < 20 ? '#ff6a6a' : '';
         $('btComecar').textContent = d.jogando ? 'Voando…' : (d.acabou ? 'Voar de novo' : 'Começar');
@@ -319,7 +360,7 @@ $('btConectar').onclick = async () => {
   try { if (!(await Controle.pedirPermissao())) erro('Permissão de movimento negada; dá para jogar arrastando o dedo no horizonte.'); } catch(e){}
   Controle.escutar();
   $('telaCodigo').style.display = 'none';
-  $('telaControle').style.display = 'flex';
+  $('telaControle').classList.add('ver');
   try { const el = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || (()=>{})).call(el); } catch(e){}
   conectar(codigo);
   setTimeout(() => Controle.calibrar(), 600);   // zera na mão, depois que a pessoa se ajeitou
@@ -358,6 +399,31 @@ function pintaGiro(){
     try{ navigator.vibrate && navigator.vibrate(25); }catch(x){}
   };
   setInterval(pintaGiro, 400);
+})();
+function enviaCtl(o){ if (conn && conn.open) conn.send(o); }
+
+/* --- armas no controle ---------------------------------------------------- */
+(function(){
+  const fogo = document.getElementById('btFogo');
+  if (!fogo) return;
+  document.querySelectorAll('.arma').forEach(b => {
+    b.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelectorAll('.arma').forEach(o => o.classList.remove('sel'));
+      b.classList.add('sel');
+      enviaCtl({ t:'arma', a:b.dataset.a });
+      try{ navigator.vibrate && navigator.vibrate(20); }catch(x){}
+    });
+  });
+  const puxa = v => e => { e.preventDefault(); enviaCtl({ t:'fogo', v:v });
+                           if (v) try{ navigator.vibrate && navigator.vibrate(15); }catch(x){} };
+  fogo.addEventListener('touchstart', puxa(true),  {passive:false});
+  fogo.addEventListener('touchend',   puxa(false), {passive:false});
+  fogo.addEventListener('touchcancel',puxa(false), {passive:false});
+  fogo.addEventListener('mousedown',  puxa(true));
+  window.addEventListener('mouseup',  puxa(false));
+  const vis = document.getElementById('btVisaoC');
+  if (vis) vis.addEventListener('click', e => { e.preventDefault(); enviaCtl({ t:'visao' }); });
 })();
 </script>
 </body>
