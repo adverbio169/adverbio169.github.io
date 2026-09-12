@@ -45,6 +45,11 @@
   #btSom{position:absolute;left:calc(14px + env(safe-area-inset-left));bottom:calc(14px + env(safe-area-inset-bottom));pointer-events:auto;cursor:pointer;
          border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.55);border-radius:10px;
          padding:6px 9px;font-size:15px;line-height:1}
+  /* medidor de som: prova visual de que há sinal saindo. Se ele mexe e você
+     não ouve, o problema é volume/aba muda/saída de áudio, não o jogo. */
+  #somBarra{position:absolute;left:calc(58px + env(safe-area-inset-left));bottom:calc(27px + env(safe-area-inset-bottom));width:52px;height:5px;border-radius:99px;
+            background:rgba(255,255,255,.16);overflow:hidden}
+  #somNivel{display:block;height:100%;width:0;background:#5eff9a;border-radius:99px;transition:width .06s linear}
   #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;padding:0 16px;font-size:clamp(19px,5.6vw,30px);font-weight:900;
          letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
 
@@ -126,6 +131,7 @@
   <div id="altimetro"><i id="altMarca"></i></div>
   <div id="altNum"><span id="vAlt">0</span> m</div>
   <button id="btSom" title="som (liga/desliga)">&#128266;</button>
+  <div id="somBarra"><i id="somNivel"></i></div>
   <div id="aviso"></div>
 </div>
 
@@ -426,6 +432,7 @@ function estouro(){
 const Motor = {
   ligado:false, mudo:false, ultimoAjuste:0,
   osc1:null, osc2:null, osc3:null, chiado:null, gAr:null, gRonco:null, mestre:null,
+  analise:null, _buf:null,
 
   liga(){
     if (this.ligado || this.mudo) return;
@@ -436,7 +443,7 @@ const Motor = {
       this.mestre = audio.createGain(); this.mestre.gain.value = 0;
       this.mestre.connect(audio.destination);
 
-      this.gRonco = audio.createGain(); this.gRonco.gain.value = 0.24;
+      this.gRonco = audio.createGain(); this.gRonco.gain.value = 0.38;
       const filtroRonco = audio.createBiquadFilter();
       filtroRonco.type = 'lowpass'; filtroRonco.frequency.value = 3000;
       this.gRonco.connect(filtroRonco); filtroRonco.connect(this.mestre);
@@ -464,6 +471,12 @@ const Motor = {
       this.chiado.connect(filtroAr); filtroAr.connect(this.gAr); this.gAr.connect(this.mestre);
       this.chiado.start();
 
+      // Analisador só para medir: serve de prova visual de que há som saindo.
+      // Se a barrinha mexe e ninguém ouve, o problema é o aparelho, não o jogo.
+      this.analise = audio.createAnalyser(); this.analise.fftSize = 512;
+      this._buf = new Float32Array(this.analise.fftSize);
+      this.mestre.connect(this.analise);
+
       this.mestre.gain.linearRampToValueAtTime(1, audio.currentTime + 0.5);
       this.ligado = true; this.ultimoAjuste = Date.now();
     }catch(e){}
@@ -480,13 +493,23 @@ const Motor = {
       this.osc1.frequency.setTargetAtTime(base,      t, 0.12);
       this.osc2.frequency.setTargetAtTime(base*1.51, t, 0.12);
       this.osc3.frequency.setTargetAtTime(base*6,    t, 0.12);
-      this.gAr.gain.setTargetAtTime(0.07 + acel*0.12, t, 0.2);
+      this.gAr.gain.setTargetAtTime(0.11 + acel*0.16, t, 0.2);
 
       // tanque no fim: o motor engasga; caindo: ele vai morrendo
       let vol = caindo ? 0.35 : 1;
       if (!caindo && combustivel < 15) vol *= (Math.random() < 0.18 ? 0.15 : 1);
       this.mestre.gain.setTargetAtTime(vol, t, 0.05);
     }catch(e){}
+  },
+
+  // quanto sinal está saindo agora, de 0 a 1
+  nivel(){
+    if (!this.ligado || !this.analise) return 0;
+    try{
+      this.analise.getFloatTimeDomainData(this._buf);
+      let s = 0; for (let i=0;i<this._buf.length;i++) s += this._buf[i]*this._buf[i];
+      return Math.min(1, Math.sqrt(s/this._buf.length) * 4);
+    }catch(e){ return 0; }
   },
 
   desliga(){
@@ -1095,6 +1118,7 @@ const elAlt=document.getElementById('vAlt'), elAltMarca=document.getElementById(
 const elDist=document.getElementById('vDist'), elBarra=document.getElementById('barraComb');
 const elComb=document.getElementById('vComb'), elCComb=document.getElementById('cComb');
 const elRec=document.getElementById('vRec'),   elTurbo=document.getElementById('selTurbo');
+const elSomNivel=document.getElementById('somNivel');
 const btSom = document.getElementById('btSom');
 if (btSom){
   btSom.textContent = Motor.mudo ? '🔇' : '🔊';
@@ -1117,6 +1141,7 @@ function pinta(){
   }
   if (elRec)   elRec.textContent = Math.round(recorde);
   if (elTurbo) elTurbo.classList.toggle('ver', turbo > 0);
+  if (elSomNivel) elSomNivel.style.width = (Motor.nivel()*100).toFixed(0) + '%';
 }
 
 let ultimoT=0, sobrando=0;

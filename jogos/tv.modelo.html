@@ -45,6 +45,11 @@
   #btSom{position:absolute;left:18px;bottom:18px;pointer-events:auto;cursor:pointer;
          border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.55);border-radius:10px;
          padding:6px 9px;font-size:15px;line-height:1}
+  /* medidor de som: prova visual de que há sinal saindo. Se ele mexe e você
+     não ouve, o problema é volume/aba muda/saída de áudio, não o jogo. */
+  #somBarra{position:absolute;left:62px;bottom:31px;width:52px;height:5px;border-radius:99px;
+            background:rgba(255,255,255,.16);overflow:hidden}
+  #somNivel{display:block;height:100%;width:0;background:#5eff9a;border-radius:99px;transition:width .06s linear}
   #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;padding:0 16px;font-size:clamp(24px,4.5vw,44px);
          font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
   #sala2{position:absolute;bottom:14px;left:18px;font-size:12px;color:#9fb4d8;letter-spacing:.5px}
@@ -96,6 +101,7 @@
   <div id="altimetro"><i id="altMarca"></i></div>
   <div id="altNum"><span id="vAlt">0</span> m</div>
   <button id="btSom" title="som (liga/desliga)">&#128266;</button>
+  <div id="somBarra"><i id="somNivel"></i></div>
   <div id="aviso"></div>
   <div id="sala2">sala <b id="codigo2">····</b></div>
 </div>
