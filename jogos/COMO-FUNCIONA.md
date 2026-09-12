@@ -156,7 +156,10 @@ compensação, só nascem até 2600 — subir muito é uma escolha que deixa o
 combustível para trás, não um limite do jogo.
 
 O **som do motor** é feito na hora, sem arquivo nenhum: duas ondas graves (o
-ronco) mais ruído filtrado (o ar). A altura do ronco acompanha a velocidade, o
+ronco), **uma terceira voz aguda** e ruído filtrado (o ar). A terceira voz não é
+enfeite: alto-falante de celular e de TV quase não reproduz abaixo de 400 Hz, e
+sem ela o motor fica inaudível fora de um fone. Medindo a energia acima de
+400 Hz, ela dobra o que se escuta (0,032 para 0,071). A altura do ronco acompanha a velocidade, o
 motor engasga quando o tanque está no fim e morre escorregando para o grave na
 queda. O botão 🔊 no canto liga e desliga, e a escolha fica guardada.
 

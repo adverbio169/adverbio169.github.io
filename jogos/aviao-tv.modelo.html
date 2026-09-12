@@ -120,6 +120,14 @@
   .linha{display:flex;gap:10px;width:100%;max-width:310px}
   .linha .bt{flex:1}
   #dica{font-size:12px;color:#7d8cab;text-align:center;max-width:36ch;line-height:1.5}
+  /* linha de orientação: mostra como o jogo acha que você está segurando o
+     aparelho, e deixa corrigir à mão se errar */
+  #giroLinha{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
+             font-size:12px;color:#8fa3c8;text-align:center}
+  #giroLinha b{color:#e6edf9;font-weight:700}
+  #btGiro{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.07);color:#dce5f5;
+          border-radius:8px;padding:5px 11px;font:700 12px inherit;cursor:pointer}
+  #btGiro:active{background:rgba(255,255,255,.16)}
   @media (max-height:470px){ #controle{gap:8px} #dica{display:none} }
   /* celular deitado na tela de escolha: encolhe para os botões caberem sem rolar */
   @media (max-height:480px){
@@ -262,6 +270,8 @@
     <button class="bt azul centro" id="btComecar"><b>Começar</b></button>
     <button class="bt sec centro" id="btCalibrar"><b>Zerar</b></button>
   </div>
+  <div id="giroLinha">segurando: <b id="giroTxt">&hellip;</b>
+    <button id="btGiro">girar</button></div>
   <div id="dica">Segure o celular <b>deitado</b>. <b>Zerar</b> torna a posição atual da sua mão o voo reto.
     Girar de lado inclina as asas; puxar a borda de cima levanta o nariz.</div>
 </div>
@@ -344,6 +354,7 @@ const Sensor = {
   escutar(){
     if (!this.tem() || this.escutando) return;
     window.addEventListener('deviceorientation', this._ler, true);
+    this.ouveGravidade();
     this.escutando = true;
   },
   respondendo(){ return this.recebeu && (Date.now() - this.ultimaLeitura) < 2000; },
@@ -361,8 +372,32 @@ const Sensor = {
     Controle.modo = 'sensor';
   },
   // beta/gamma são medidos em relação ao APARELHO; aqui viram eixos da TELA
+  // Como o aparelho está sendo SEGURADO, descoberto pela gravidade.
+  // screen.orientation.angle só serve quando a rotação automática está ligada:
+  // com ela travada, a tela continua "em pé" mesmo com o celular deitado, e o
+  // controle sai girado 90 graus. A gravidade não mente.
+  fisico: null,
+  giroManual: null,          // escolha do jogador; vence tudo
+  _ouvindoG: false,
+  ouveGravidade(){
+    if (this._ouvindoG || typeof DeviceMotionEvent === 'undefined') return;
+    this._ouvindoG = true;
+    window.addEventListener('devicemotion', e => {
+      const g = e.accelerationIncludingGravity;
+      if (!g || g.x == null) return;
+      const ax = Math.abs(g.x), ay = Math.abs(g.y);
+      if (Math.max(ax, ay) < 3.5) return;        // quase deitado: não dá para saber
+      this.fisico = (ax > ay) ? (g.x > 0 ? 90 : 270) : (g.y > 0 ? 0 : 180);
+    }, true);
+  },
+  anguloDaTela(){
+    if (this.giroManual !== null) return this.giroManual;
+    if (this.fisico !== null)     return this.fisico;
+    return (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  },
+
   eixos(beta, gamma){
-    const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    const ang = this.anguloDaTela();
     switch (ang){
       case 90:            return { volante:  beta,  manche: -gamma };
       case -90: case 270: return { volante: -beta,  manche:  gamma };
@@ -813,6 +848,33 @@ setInterval(() => {
     (location.protocol === 'https:' ? '' : ' <b>Aviso:</b> fora de um endereço https, o sensor de inclinação não liga — sobra o controle por toque.');
   preparaCast();
   $('escolha').classList.add('ver');
+})();
+
+/* --- orientação do controle ------------------------------------------------
+   O jogo descobre sozinho como o aparelho está sendo segurado, pela gravidade.
+   Se errar (acontece se o celular estiver quase na horizontal na hora de
+   começar), este botão gira a referência à mão. O horizonte responde na hora,
+   então dá para conferir sem sair da tela. -------------------------------- */
+const NOMES_GIRO = {0:'em pé', 90:'deitado \u21BA', 180:'de cabeça para baixo', 270:'deitado \u21BB'};
+function pintaGiro(){
+  const g = Sensor;
+  const a = g.anguloDaTela();
+  const el = document.getElementById('giroTxt');
+  if (el) el.textContent = (NOMES_GIRO[a] || a + '\u00B0') + (g.giroManual === null ? ' (sozinho)' : ' (fixo)');
+}
+(function(){
+  const b = document.getElementById('btGiro');
+  if (!b) return;
+  const seq = [0, 90, 270, 180, null];        // null = volta para o automático
+  b.onclick = e => {
+    e.preventDefault();
+    const g = Sensor;
+    g.giroManual = seq[(seq.indexOf(g.giroManual) + 1) % seq.length];
+    g.calibrar();
+    pintaGiro();
+    try{ navigator.vibrate && navigator.vibrate(25); }catch(x){}
+  };
+  setInterval(pintaGiro, 400);
 })();
 </script>
 </body>

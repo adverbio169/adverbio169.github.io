@@ -206,6 +206,7 @@ const Controle = {
   escutar(){
     if (!this.temSensor() || this.escutando) return;
     window.addEventListener('deviceorientation', this._ler, true);
+    this.ouveGravidade();
     this.escutando = true;
   },
 
@@ -258,8 +259,32 @@ const Controle = {
   },
 
   // converte beta/gamma do aparelho para os eixos DA TELA
+  // Como o aparelho está sendo SEGURADO, descoberto pela gravidade.
+  // screen.orientation.angle só serve quando a rotação automática está ligada:
+  // com ela travada, a tela continua "em pé" mesmo com o celular deitado, e o
+  // controle sai girado 90 graus. A gravidade não mente.
+  fisico: null,
+  giroManual: null,          // escolha do jogador; vence tudo
+  _ouvindoG: false,
+  ouveGravidade(){
+    if (this._ouvindoG || typeof DeviceMotionEvent === 'undefined') return;
+    this._ouvindoG = true;
+    window.addEventListener('devicemotion', e => {
+      const g = e.accelerationIncludingGravity;
+      if (!g || g.x == null) return;
+      const ax = Math.abs(g.x), ay = Math.abs(g.y);
+      if (Math.max(ax, ay) < 3.5) return;        // quase deitado: não dá para saber
+      this.fisico = (ax > ay) ? (g.x > 0 ? 90 : 270) : (g.y > 0 ? 0 : 180);
+    }, true);
+  },
+  anguloDaTela(){
+    if (this.giroManual !== null) return this.giroManual;
+    if (this.fisico !== null)     return this.fisico;
+    return (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  },
+
   eixos(beta, gamma){
-    const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    const ang = this.anguloDaTela();
     switch (ang){
       case 90:            return { volante:  beta,  manche: -gamma };
       case -90: case 270: return { volante: -beta,  manche:  gamma };

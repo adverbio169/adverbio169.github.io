@@ -199,6 +199,7 @@ const Controle = {
   escutar(){
     if (!this.temSensor() || this.escutando) return;
     window.addEventListener('deviceorientation', this._ler, true);
+    this.ouveGravidade();
     this.escutando = true;
   },
 
@@ -250,8 +251,32 @@ const Controle = {
     }
   },
 
+  // Como o aparelho está sendo SEGURADO, descoberto pela gravidade.
+  // screen.orientation.angle só serve quando a rotação automática está ligada:
+  // com ela travada, a tela continua "em pé" mesmo com o celular deitado, e o
+  // controle sai girado 90 graus. A gravidade não mente.
+  fisico: null,
+  giroManual: null,          // escolha do jogador; vence tudo
+  _ouvindoG: false,
+  ouveGravidade(){
+    if (this._ouvindoG || typeof DeviceMotionEvent === 'undefined') return;
+    this._ouvindoG = true;
+    window.addEventListener('devicemotion', e => {
+      const g = e.accelerationIncludingGravity;
+      if (!g || g.x == null) return;
+      const ax = Math.abs(g.x), ay = Math.abs(g.y);
+      if (Math.max(ax, ay) < 3.5) return;        // quase deitado: não dá para saber
+      this.fisico = (ax > ay) ? (g.x > 0 ? 90 : 270) : (g.y > 0 ? 0 : 180);
+    }, true);
+  },
+  anguloDaTela(){
+    if (this.giroManual !== null) return this.giroManual;
+    if (this.fisico !== null)     return this.fisico;
+    return (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  },
+
   eixos(beta, gamma){
-    const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    const ang = this.anguloDaTela();
     switch (ang){
       case 90:            return { volante:  beta,  manche: -gamma };
       case -90: case 270: return { volante: -beta,  manche:  gamma };
@@ -383,7 +408,7 @@ function estouro(){
    -------------------------------------------------------------------------- */
 const Motor = {
   ligado:false, mudo:false, ultimoAjuste:0,
-  osc1:null, osc2:null, chiado:null, gAr:null, gRonco:null, mestre:null,
+  osc1:null, osc2:null, osc3:null, chiado:null, gAr:null, gRonco:null, mestre:null,
 
   liga(){
     if (this.ligado || this.mudo) return;
@@ -394,16 +419,22 @@ const Motor = {
       this.mestre = audio.createGain(); this.mestre.gain.value = 0;
       this.mestre.connect(audio.destination);
 
-      this.gRonco = audio.createGain(); this.gRonco.gain.value = 0.16;
+      this.gRonco = audio.createGain(); this.gRonco.gain.value = 0.24;
       const filtroRonco = audio.createBiquadFilter();
-      filtroRonco.type = 'lowpass'; filtroRonco.frequency.value = 700;
+      filtroRonco.type = 'lowpass'; filtroRonco.frequency.value = 3000;
       this.gRonco.connect(filtroRonco); filtroRonco.connect(this.mestre);
 
       this.osc1 = audio.createOscillator(); this.osc1.type = 'sawtooth'; this.osc1.frequency.value = 60;
       this.osc2 = audio.createOscillator(); this.osc2.type = 'square';   this.osc2.frequency.value = 91;
+      // Terceira voz, uma oitava e meia acima: alto-falante de celular e de TV
+      // quase não toca abaixo de 400 Hz, então sem ela o motor fica INAUDÍVEL
+      // fora de um fone. Medido: ela dobra a energia na faixa que se escuta.
+      this.osc3 = audio.createOscillator(); this.osc3.type = 'sawtooth'; this.osc3.frequency.value = 360;
       const g2 = audio.createGain(); g2.gain.value = 0.35;
+      const g3 = audio.createGain(); g3.gain.value = 0.55;
       this.osc1.connect(this.gRonco); this.osc2.connect(g2); g2.connect(this.gRonco);
-      this.osc1.start(); this.osc2.start();
+      this.osc3.connect(g3); g3.connect(this.gRonco);
+      this.osc1.start(); this.osc2.start(); this.osc3.start();
 
       // chiado do ar: ruído branco em laço, passado por um filtro passa-baixa
       const n = audio.sampleRate * 2;
@@ -431,7 +462,8 @@ const Motor = {
       if (caindo) base = Math.max(22, this.osc1.frequency.value * 0.985);
       this.osc1.frequency.setTargetAtTime(base,      t, 0.12);
       this.osc2.frequency.setTargetAtTime(base*1.51, t, 0.12);
-      this.gAr.gain.setTargetAtTime(0.04 + acel*0.10, t, 0.2);
+      this.osc3.frequency.setTargetAtTime(base*6,    t, 0.12);
+      this.gAr.gain.setTargetAtTime(0.07 + acel*0.12, t, 0.2);
 
       // tanque no fim: o motor engasga; caindo: ele vai morrendo
       let vol = caindo ? 0.35 : 1;
@@ -446,8 +478,8 @@ const Motor = {
       const t = audio.currentTime;
       this.mestre.gain.cancelScheduledValues(t);
       this.mestre.gain.setTargetAtTime(0, t, 0.15);
-      const o1=this.osc1, o2=this.osc2, ch=this.chiado;
-      setTimeout(()=>{ try{o1.stop();o2.stop();ch.stop();}catch(e){} }, 700);
+      const o1=this.osc1, o2=this.osc2, o3=this.osc3, ch=this.chiado;
+      setTimeout(()=>{ try{o1.stop();o2.stop();o3.stop();ch.stop();}catch(e){} }, 700);
     }catch(e){}
     this.ligado = false;
   },
