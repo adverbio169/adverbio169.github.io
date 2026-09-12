@@ -64,17 +64,26 @@
   /* linha de orientação: mostra como o jogo acha que você está segurando o
      aparelho, e deixa corrigir à mão se errar */
   /* armas e gatilho: é o controle que manda, o jogo fica na outra tela */
-  .armas{display:flex;gap:7px;width:100%;max-width:340px}
-  .arma{flex:1;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#aebbd4;
-        border-radius:10px;padding:7px 4px;font:800 11px/1.1 inherit;letter-spacing:.5px;cursor:pointer}
-  .arma i{display:block;font-style:normal;font-weight:600;font-size:10px;color:#7d8cab;margin-top:3px}
-  .arma.sel{background:#ffc24d;color:#1a1400;border-color:#ffc24d}
-  .arma.sel i{color:#6b5200}
+  /* ---- seletor de arma por deslize ---- */
+  .armas{position:relative;width:100%;max-width:340px;height:74px;border-radius:14px;
+         border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);
+         overflow:hidden;touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:grab}
+  .armaAtual{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+             justify-content:center;font:900 17px/1.1 inherit;letter-spacing:1.5px;color:#ffc24d}
+  .armaAtual i{font-style:normal;font-weight:700;font-size:12px;color:#9fb0cc;margin-top:4px;letter-spacing:1px}
+  .armaLado{position:absolute;top:0;bottom:0;width:34%;display:flex;align-items:center;
+            font:800 11px/1.1 inherit;color:#5d6b85;letter-spacing:1px;pointer-events:none}
+  #armaAnt{left:8px;justify-content:flex-start}
+  #armaProx{right:8px;justify-content:flex-end}
+  .armaDica{position:absolute;left:0;right:0;bottom:4px;text-align:center;
+            font-size:9.5px;color:#5d6b85;letter-spacing:2px;pointer-events:none}
+  .armas.mexendo{cursor:grabbing}
+  .armas.trocou{background:rgba(255,194,77,.18)}
   #btFogo{width:100%;max-width:340px;border:0;border-radius:14px;padding:16px;cursor:pointer;
           font:900 19px/1 inherit;letter-spacing:3px;color:#fff;background:#d8422f;
           box-shadow:0 6px 0 #8f2a1d;user-select:none;-webkit-user-select:none}
   #btFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
-  @media (max-height:470px){ .arma{padding:5px 3px;font-size:10px} #btFogo{padding:11px;font-size:16px} }
+  @media (max-height:470px){ .armas{height:60px} .armaAtual{font-size:15px} #btFogo{padding:11px;font-size:16px} }
   /* ----------------------------------------------------------------------
      CELULAR DEITADO: ergonomia de polegar.
 
@@ -96,8 +105,8 @@
 
     /* polegar esquerdo */
     .armas{left:calc(10px + env(safe-area-inset-left));bottom:calc(10px + env(safe-area-inset-bottom));
-           flex-direction:column;width:auto;max-width:none;gap:6px}
-    .arma{width:min(24vw,118px);padding:8px 6px;font-size:11.5px}
+           width:min(34vw,190px);max-width:none;height:min(21vw,96px)}
+    .armaAtual{font-size:min(3.6vw,17px)}
 
     /* polegar direito */
     #btFogo{right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));
@@ -142,17 +151,21 @@
     <div><div class="rot">Combustível</div><div class="val" id="pComb">&ndash;</div></div>
     <div><div class="rot">Atraso</div><div class="val" id="pMs">&ndash;</div></div>
   </div>
-  <div class="armas">
-    <button class="arma sel" data-a="bomba">BOMBA<i id="mBomba">14</i></button>
-    <button class="arma" data-a="missil">MÍSSIL<i id="mMissil">8</i></button>
-    <button class="arma" data-a="metralha">METRA<i id="mMetralha">400</i></button>
+  <!-- Seletor de arma por DESLIZE. Botões obrigam a olhar o controle; passar o
+       dedo para o lado, não. E cada arma vibra diferente (1, 2 ou 3 toques),
+       então dá para trocar de arma com os olhos na tela grande. -->
+  <div class="armas" id="seletorArma">
+    <div class="armaLado" id="armaAnt"></div>
+    <div class="armaAtual" id="armaAtual">BOMBA<i id="mArma">14</i></div>
+    <div class="armaLado" id="armaProx"></div>
+    <div class="armaDica">‹ deslize ›</div>
   </div>
   <button id="btFogo">FOGO</button>
   <div class="linha">
     <button class="bt pri" id="btComecar">Começar</button>
     <button class="bt sec" id="btCalibrar">Zerar</button>
   </div>
-  <div id="giroLinha">segurando: <b id="giroTxt">&hellip;</b>
+  <div id="giroLinha">asas: <b id="giroTxt">&hellip;</b>
     <button id="btGiro">girar</button>
     <button id="btVisaoC">cabine</button></div>
   <div id="dica">Segure o celular <b>deitado</b>. <b>Zerar</b> torna a posição atual da sua mão o voo reto.
@@ -185,6 +198,7 @@
 
    A parte do sensor (Controle) é a mesma dos outros jogos.
    ========================================================================== */
+function voltaCurta(g){ while (g > 180) g -= 360; while (g < -180) g += 360; return g; }
 const Controle = {
   modo: 'nenhum', volante: 0, manche: 0, zeroVolante: 0, zeroManche: 0,
   recebeu: false, escutando: false, ultimaLeitura: 0, _volanteBruto: 0, _mancheBruto: 0,
@@ -203,13 +217,19 @@ const Controle = {
     await this.pedeMovimento();            // iOS: a segunda permissão, a do devicemotion
     return r === 'granted';
   },
+  // Vetor "para cima do mundo" visto de dentro do aparelho. Dele saem os dois
+  // eixos sem trava de cardan: a rolagem dá a volta inteira (-180 a 180) e a
+  // arfagem não se mistura com ela. O par beta/gamma cru dobrava para trás
+  // depois de certo ângulo — era o controle "voltando para o outro lado".
   _ler: (e) => {
     if (e.beta === null && e.gamma === null) return;
-    const a = Controle.eixos(e.beta || 0, e.gamma || 0);
-    Controle._volanteBruto = a.volante;
-    Controle._mancheBruto  = a.manche;
-    Controle.volante = a.volante - Controle.zeroVolante;
-    Controle.manche  = a.manche  - Controle.zeroManche;
+    const R = Math.PI/180, G = 180/Math.PI;
+    const b = (e.beta || 0)*R, g = (e.gamma || 0)*R;
+    const ux = -Math.cos(b)*Math.sin(g), uy = Math.sin(b), uz = Math.cos(b)*Math.cos(g);
+    Controle._volanteBruto = -Math.atan2(ux, uy) * G;
+    Controle._mancheBruto  = Math.asin(Math.max(-1, Math.min(1, uz))) * G;
+    Controle.volante = voltaCurta(Controle._volanteBruto - Controle.zeroVolante);
+    Controle.manche  = Controle._mancheBruto - Controle.zeroManche;
     Controle.recebeu = true;
     Controle.ultimaLeitura = Date.now();
     Controle.modo = 'sensor';
@@ -254,15 +274,6 @@ const Controle = {
     return (screen.orientation && screen.orientation.angle) || window.orientation || 0;
   },
 
-  eixos(beta, gamma){
-    const ang = this.anguloDaTela();
-    switch (ang){
-      case 90:            return { volante:  beta,  manche: -gamma };
-      case -90: case 270: return { volante: -beta,  manche:  gamma };
-      case 180:           return { volante: -gamma, manche: -beta  };
-      default:            return { volante:  gamma, manche:  beta  };
-    }
-  },
   calibrar(){
     this.zeroVolante = this._volanteBruto || 0; this.zeroManche = this._mancheBruto || 0;
     this.volante = 0; this.manche = 0;   // vale já, não só na próxima leitura
@@ -316,11 +327,7 @@ function conectar(codigo){
       if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
       if (d.t === 'estado'){
         $('pDist').textContent = d.dist;
-        if (d.arma){
-          document.querySelectorAll('.arma').forEach(b => b.classList.toggle('sel', b.dataset.a === d.arma));
-          const m = document.getElementById('m' + d.arma.charAt(0).toUpperCase() + d.arma.slice(1));
-          if (m) m.textContent = d.mun;
-        }
+        if (d.arma && window.armaDeFora) window.armaDeFora(d.arma, d.mun);
         $('pComb').textContent = d.jogando ? d.comb + '%' : '–';
         $('pComb').style.color = d.jogando && d.comb < 20 ? '#ff6a6a' : '';
         $('btComecar').textContent = d.jogando ? 'Voando…' : (d.acabou ? 'Voar de novo' : 'Começar');
@@ -401,49 +408,97 @@ $('btComecar').onclick  = () => { if (conn && conn.open) conn.send({ t: 'botao',
 const salaUrl = new URLSearchParams(location.search).get('sala');
 if (salaUrl){ elCodigo.value = salaUrl.toUpperCase().slice(0, 4); }
 
-/* --- orientação do controle ------------------------------------------------
-   O jogo descobre sozinho como o aparelho está sendo segurado, pela gravidade.
-   Se errar (acontece se o celular estiver quase na horizontal na hora de
-   começar), este botão gira a referência à mão. O horizonte responde na hora,
-   então dá para conferir sem sair da tela. -------------------------------- */
-const NOMES_GIRO = {0:'em pé', 90:'deitado \u21BA', 180:'de cabeça para baixo', 270:'deitado \u21BB'};
+/* --- referência do controle ------------------------------------------------
+   Com o cálculo novo não é mais preciso adivinhar se o aparelho está em pé ou
+   deitado: a CALIBRAGEM absorve a pegada. Segure como quiser e toque em zerar;
+   aquela posição vira o "asas niveladas". Rodar além disso é rolagem de
+   verdade — dá a volta inteira e não inverte. --------------------------- */
 function pintaGiro(){
-  const g = Controle;
-  const a = g.anguloDaTela();
   const el = document.getElementById('giroTxt');
-  const origem = g.giroManual !== null ? 'fixo'
-               : (g.fisico !== null ? 'sozinho' : 'pela tela');
-  if (el) el.textContent = (NOMES_GIRO[a] || a + '\u00B0') + ' (' + origem + ')';
+  if (!el) return;
+  const v = Math.round(Controle.volante);
+  el.textContent = (Math.abs(v) < 8 ? 'niveladas' : (v > 0 ? v + '\u00B0 para a direita' : (-v) + '\u00B0 para a esquerda'));
 }
 (function(){
   const b = document.getElementById('btGiro');
   if (!b) return;
-  const seq = [0, 90, 270, 180, null];        // null = volta para o automático
+  b.textContent = 'zerar aqui';
   b.onclick = e => {
     e.preventDefault();
-    const g = Controle;
-    g.giroManual = seq[(seq.indexOf(g.giroManual) + 1) % seq.length];
-    g.calibrar();
+    Controle.calibrar();
     pintaGiro();
     try{ navigator.vibrate && navigator.vibrate(25); }catch(x){}
   };
-  setInterval(pintaGiro, 400);
+  setInterval(pintaGiro, 200);
 })();
 function enviaCtl(o){ if (conn && conn.open) conn.send(o); }
 
-/* --- armas no controle ---------------------------------------------------- */
+/* --- armas no controle: DESLIZAR, não apertar -------------------------------
+   O pedido do Brunno: "tem que ser rolando, passando o dedo para o lado, e não
+   apertando, pois força olhar o controle". Então o seletor é uma faixa: o dedo
+   arrasta para o lado e a arma muda. E cada arma vibra com um número diferente
+   de toques — uma, duas, três — para dar para trocar de arma com os olhos
+   fixos na tela grande. ------------------------------------------------- */
 (function(){
   const fogo = document.getElementById('btFogo');
-  if (!fogo) return;
-  document.querySelectorAll('.arma').forEach(b => {
-    b.addEventListener('click', e => {
-      e.preventDefault();
-      document.querySelectorAll('.arma').forEach(o => o.classList.remove('sel'));
-      b.classList.add('sel');
-      enviaCtl({ t:'arma', a:b.dataset.a });
-      try{ navigator.vibrate && navigator.vibrate(20); }catch(x){}
-    });
-  });
+  const sel  = document.getElementById('seletorArma');
+  if (!fogo || !sel) return;
+
+  const ORDEM = ['bomba','missil','metralha'];
+  const NOME  = { bomba:'BOMBA', missil:'MÍSSIL', metralha:'METRA' };
+  const TOQUES= { bomba:[28], missil:[28,60,28], metralha:[28,60,28,60,28] };
+  let iArma = 0, municoes = { bomba:'14', missil:'8', metralha:'400' };
+
+  const elAtual = document.getElementById('armaAtual');
+  const elMun   = document.getElementById('mArma');
+  const elAnt   = document.getElementById('armaAnt');
+  const elProx  = document.getElementById('armaProx');
+
+  function pinta(){
+    const a = ORDEM[iArma];
+    elAtual.childNodes[0].nodeValue = NOME[a];
+    elMun.textContent = municoes[a] !== undefined ? municoes[a] : '';
+    elAnt.textContent  = '‹ ' + NOME[(iArma + ORDEM.length - 1) % ORDEM.length];
+    elProx.textContent = NOME[(iArma + 1) % ORDEM.length] + ' ›';
+  }
+  function vai(passo){
+    iArma = (iArma + passo + ORDEM.length) % ORDEM.length;
+    pinta();
+    enviaCtl({ t:'arma', a:ORDEM[iArma] });
+    try{ navigator.vibrate && navigator.vibrate(TOQUES[ORDEM[iArma]]); }catch(x){}
+    sel.classList.add('trocou');
+    setTimeout(() => sel.classList.remove('trocou'), 160);
+  }
+  // deixa o jogo mandar a arma de volta (troca pelo teclado da TV, por exemplo)
+  window.armaDeFora = (a, mun) => {
+    if (mun !== undefined) municoes[a] = mun;
+    const i = ORDEM.indexOf(a);
+    if (i >= 0 && i !== iArma){ iArma = i; }
+    pinta();
+  };
+  pinta();
+
+  let x0 = null, ultimo = 0, arrastou = 0;
+  const PASSO = 46;                     // pixels de deslize para trocar de arma
+  const pega = x => { x0 = x; ultimo = x; arrastou = 0; sel.classList.add('mexendo'); };
+  const move = x => {
+    if (x0 === null) return;
+    arrastou += Math.abs(x - ultimo);
+    while (x - ultimo >=  PASSO){ vai( 1); ultimo += PASSO; }
+    while (x - ultimo <= -PASSO){ vai(-1); ultimo -= PASSO; }
+  };
+  const solta = () => {
+    if (x0 !== null && arrastou < 10) vai(1);    // toque simples: passa uma
+    x0 = null; sel.classList.remove('mexendo');
+  };
+  sel.addEventListener('touchstart', e => { e.preventDefault(); pega(e.touches[0].clientX); }, {passive:false});
+  sel.addEventListener('touchmove',  e => { e.preventDefault(); move(e.touches[0].clientX); }, {passive:false});
+  sel.addEventListener('touchend',   e => { e.preventDefault(); solta(); }, {passive:false});
+  sel.addEventListener('touchcancel',solta);
+  sel.addEventListener('mousedown', e => { e.preventDefault(); pega(e.clientX); });
+  window.addEventListener('mousemove', e => move(e.clientX));
+  window.addEventListener('mouseup', () => { if (x0 !== null) solta(); });
+
   const puxa = v => e => { e.preventDefault(); enviaCtl({ t:'fogo', v:v });
                            if (v) try{ navigator.vibrate && navigator.vibrate(15); }catch(x){} };
   fogo.addEventListener('touchstart', puxa(true),  {passive:false});

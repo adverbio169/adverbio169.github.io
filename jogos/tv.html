@@ -61,8 +61,20 @@
   #somNivel{display:block;height:100%;width:0;background:#5eff9a;border-radius:99px;transition:width .06s linear}
   #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;padding:0 16px;font-size:clamp(24px,4.5vw,44px);
          font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
-  #sala2{position:absolute;bottom:14px;left:18px;font-size:12px;color:#9fb4d8;letter-spacing:.5px}
-  #sala2 b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;color:#fff;letter-spacing:.2em}
+  /* Fica aberto o jogo inteiro: enquanto o QR estiver na tela, mais gente pode
+     entrar na sala sem parar a partida. Encolhe sozinho depois de um tempo
+     para não atrapalhar, e volta ao tamanho ao passar o rato / tocar. */
+  #convite{position:absolute;bottom:14px;left:18px;display:flex;align-items:center;gap:10px;
+           background:rgba(8,12,26,.55);border:1px solid rgba(255,255,255,.14);border-radius:12px;
+           padding:8px 12px 8px 8px;pointer-events:auto;transition:opacity .4s, transform .3s;
+           transform-origin:left bottom}
+  #convite.discreto{opacity:.42;transform:scale(.72)}
+  #convite:hover{opacity:1;transform:scale(1)}
+  #qrJogo{width:64px;height:64px;background:#fff;border-radius:7px;display:block}
+  #convite .txt2{font-size:12px;color:#9fb4d8;letter-spacing:.5px;line-height:1.5}
+  #convite .txt2 b{display:block;font-family:ui-monospace,Menlo,Consolas,monospace;
+                   font-size:17px;color:#fff;letter-spacing:.22em}
+  @media (max-width:620px){ #qrJogo{width:48px;height:48px} #convite .txt2{font-size:10px} }
 
   /* ---- telas por cima do jogo ---- */
   .veu{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;
@@ -118,7 +130,10 @@
   <button id="btSom" title="som (liga/desliga)">&#128266;</button>
   <div id="somBarra"><i id="somNivel"></i></div>
   <div id="aviso"></div>
-  <div id="sala2">sala <b id="codigo2">····</b></div>
+  <div id="convite" title="outro jogador pode entrar a qualquer momento">
+    <canvas id="qrJogo" width="180" height="180"></canvas>
+    <div class="txt2">entre também<b id="codigo2">····</b></div>
+  </div>
 </div>
 
 <!-- sala de espera -->
@@ -2509,6 +2524,10 @@ function grausParaEixo(graus, maximo, zonaMorta){
    de modo que "para a frente" é sempre o nariz. É uma conta só, e o resto do
    desenho continua igual ao de antes.
    ========================================================================== */
+/* normaliza um ângulo em graus para o intervalo -180..180 — mora aqui dentro
+   de propósito: o núcleo é copiado para as versões de TV, e lá também precisa */
+function voltaCurta(g){ while (g > 180) g -= 360; while (g < -180) g += 360; return g; }
+
 const CAMD     = 750;      // distância da câmera até o avião (visão de fora)
 const CHAO     = -700;     // altura do solo
 const TETO     = 5200;     // altura máxima de voo
@@ -2516,7 +2535,8 @@ const VOO_BASE = 1700;     // velocidade normal, unidades por segundo
 const VOO_TURBO= 3000;     // velocidade com o combustível azul
 const ALCANCE  = 17000;    // até onde se enxerga à frente
 const MAPA     = 60000;    // meio lado do mapa: 120000 u = 6 km de ponta a ponta
-const GIRO     = 0.85;     // rad/s de curva com a asa toda inclinada (~7 s o 360)
+const TAXA_ROL = 3.4;      // rad/s com que o avião acompanha a inclinação da mão
+const TAXA_ARF = 1.5;      // rad/s de cabrada com o manche todo: looping em ~4 s
 const METRO    = 20;       // unidades de mundo por metro no placar
 
 const RAIO_PEGA  = 340;
@@ -2538,7 +2558,7 @@ const ARMAS = {
 
 const tela = document.getElementById('tela');
 const ctx  = tela.getContext('2d');
-let W=0, H=0, dpr=1, F=0, horizonte=0;
+let W=0, H=0, dpr=1, F=0;
 
 function redimensiona(){
   dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -2550,15 +2570,32 @@ function redimensiona(){
   tela.style.height = H+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
   F = H * 0.95;
-  horizonte = H * 0.38;
+  CX = W/2; CY = H * 0.42;
 }
 window.addEventListener('resize', redimensiona);
 window.addEventListener('orientationchange', () => setTimeout(redimensiona, 250));
 
-/* --- estado --- */
-let aviaoX=0, aviaoZ=0, aviaoY=250, vy=0, inclinacao=0, nariz=0;
-let rumo=0, cosR=1, senR=0;          // para onde o nariz aponta (0 = norte)
-let camX=0, camY=0, cockpit=false;
+/* --- estado ---------------------------------------------------------------
+
+   ATITUDE DE VERDADE. Antes o avião tinha só um ângulo de inclinação achatado
+   e um "nariz" que empurrava a linha do horizonte para cima e para baixo. Isso
+   nunca ia deixar dar cambalhota: não havia como representar o avião de ponta-
+   cabeça nem apontando para o céu.
+
+   Agora ele carrega TRÊS VETORES, que são os seus eixos no mundo:
+       eixoF — para onde aponta o nariz
+       eixoC — para onde aponta o teto da cabine
+       eixoD — para onde aponta a asa direita
+   Rolar gira o par (D, C) em volta de F. Cachimbar gira o par (F, C) em volta
+   de D. Como a manobra é sempre em volta dos eixos DO AVIÃO, inclinar e puxar
+   faz curva sozinho — igual a um avião de verdade — e o looping sai de graça.
+--------------------------------------------------------------------------- */
+let aviaoX=0, aviaoZ=0, aviaoY=250;
+let eixoF={x:0,y:0,z:1}, eixoC={x:0,y:1,z:0}, eixoD={x:1,y:0,z:0};
+let camPx=0, camPy=0, camPz=0;               // de onde a câmera olha
+let cosR=1, senR=0, rumo=0;                  // rumo (só para bússola e recorte)
+let inclinacao=0, arfagem=0;                 // ângulos LIDOS da base, para os relógios
+let cockpit=false;
 let tambores=[], obstaculos=[], predios=[], alvos=[], nuvens=[], particulas=[];
 let bombas=[], tiros=[];
 let distancia=0, recorde=0, combustivel=100, turbo=0, voo=VOO_BASE;
@@ -2567,31 +2604,117 @@ let arma='bomba', municao={}, recarga=0, atirando=false;
 let jogando=false, caindo=false, giroQueda=0, tremor=0, clarao=0, motivoQueda='';
 let tecla={esq:false,dir:false,cima:false,baixo:false};
 let toqueX=0, toqueY=0, usandoToque=false;
+let vq=0;                                    // velocidade de queda, só na queda
 
-/* Gira o mapa para o ponto de vista do avião: devolve x (para os lados) e
-   z (para a frente) já no eixo do nariz. É o coração da virada de 360°. */
+/* --- contas de vetor, as poucas que o jogo precisa --- */
+function vsub(a,b){ return {x:a.x-b.x, y:a.y-b.y, z:a.z-b.z}; }
+function vmul(a,k){ return {x:a.x*k, y:a.y*k, z:a.z*k}; }
+function vsoma(a,b){ return {x:a.x+b.x, y:a.y+b.y, z:a.z+b.z}; }
+function vponto(a,b){ return a.x*b.x + a.y*b.y + a.z*b.z; }
+function vcruz(a,b){ return { x:a.y*b.z - a.z*b.y, y:a.z*b.x - a.x*b.z, z:a.x*b.y - a.y*b.x }; }
+function vnorm(a){ const m = Math.hypot(a.x,a.y,a.z) || 1; return {x:a.x/m, y:a.y/m, z:a.z/m}; }
+
+/* gira o par (u,v) em volta do eixo que falta, por `ang` radianos */
+function giraPar(u, v, ang){
+  const c = Math.cos(ang), s = Math.sin(ang);
+  return [ {x:u.x*c + v.x*s, y:u.y*c + v.y*s, z:u.z*c + v.z*s},
+           {x:v.x*c - u.x*s, y:v.y*c - u.y*s, z:v.z*c - u.z*s} ];
+}
+
+/* Depois de muitas rotações os três eixos escorregam e deixam de ser
+   perpendiculares. Isto os endireita a cada quadro — é barato e evita o avião
+   ir "derretendo" depois de uns minutos de manobra. */
+function endireitaEixos(){
+  eixoF = vnorm(eixoF);
+  eixoC = vnorm(vsub(eixoC, vmul(eixoF, vponto(eixoC, eixoF))));
+  eixoD = vcruz(eixoC, eixoF);
+  rumo = Math.atan2(eixoF.x, eixoF.z);
+  cosR = Math.cos(rumo); senR = Math.sin(rumo);
+  arfagem = Math.asin(Math.max(-1, Math.min(1, eixoF.y)));
+  // inclinação = quanto o teto da cabine está torto em relação ao céu
+  inclinacao = Math.atan2(-eixoD.y, eixoC.y) * 180/Math.PI;   // + = asa direita para baixo
+}
+
+/* Onde fica a câmera: atrás do avião, no eixo do próprio avião — assim ela
+   acompanha o rolar e o looping, que é o único jeito de a manobra fazer
+   sentido na tela. */
+function poeCamera(){
+  const tras = cockpit ? 60 : CAMD;
+  camPx = aviaoX - eixoF.x*tras + eixoC.x*(cockpit?0:200);
+  camPy = aviaoY - eixoF.y*tras + eixoC.y*(cockpit?0:200);
+  camPz = aviaoZ - eixoF.z*tras + eixoC.z*(cockpit?0:200);
+}
+
+/* mundo -> eixos do avião */
+function paraCamera3(wx, wy, wz){
+  const dx = wx-camPx, dy = wy-camPy, dz = wz-camPz;
+  return { x: dx*eixoD.x + dy*eixoD.y + dz*eixoD.z,
+           y: dx*eixoC.x + dy*eixoC.y + dz*eixoC.z,
+           z: dx*eixoF.x + dy*eixoF.y + dz*eixoF.z };
+}
+/* recorte grosseiro no plano, pelo rumo — não precisa da atitude toda */
 function paraCamera(wx, wz){
   const dx = wx - aviaoX, dz = wz - aviaoZ;
   return { x: dx*cosR - dz*senR, z: dx*senR + dz*cosR };
 }
-function atualizaRumo(){ cosR = Math.cos(rumo); senR = Math.sin(rumo); }
+/* o quanto uma coisa está à frente do nariz */
+function frente(wx, wy, wz){
+  return (wx-camPx)*eixoF.x + (wy-camPy)*eixoF.y + (wz-camPz)*eixoF.z;
+}
 
-/* projeção: x e z aqui já estão no eixo da CÂMERA (use projetaM para o mapa) */
+/* projeção: agora é uma câmera de furo de verdade, sem o truque de empurrar a
+   linha do horizonte. É o que permite olhar para cima, para baixo e de ponta-
+   cabeça sem a imagem se desmanchar. */
+let CX=0, CY=0;
 function projeta(x, y, z){
-  const d = z + (cockpit ? 60 : CAMD);
-  if (d < 50) return null;
-  const s = F / d;
-  return { x: W/2 + (x - camX)*s, y: horizonte - (y - camY)*s, s: s, d: d };
+  if (z < 60) return null;
+  const s = F / z;
+  return { x: CX + x*s, y: CY - y*s, s: s, d: z };
 }
-/* projeção a partir das coordenadas do MAPA */
 function projetaM(wx, wy, wz){
-  const c = paraCamera(wx, wz);
-  return projeta(c.x, wy, c.z);
+  const c = paraCamera3(wx, wy, wz);
+  return projeta(c.x, c.y, c.z);
 }
-/* distância no plano, do avião até um ponto do mapa */
 function longe(wx, wz){ const dx = wx-aviaoX, dz = wz-aviaoZ; return Math.sqrt(dx*dx + dz*dz); }
-/* ângulo de um ponto do mapa em relação ao nariz: 0 à frente, + à direita */
 function paraOnde(wx, wz){ const c = paraCamera(wx, wz); return Math.atan2(c.x, c.z); }
+
+/* --- a linha do horizonte na tela ------------------------------------------
+   Com o avião podendo estar em qualquer posição, o céu não é mais "a parte de
+   cima da tela". O horizonte é uma reta, e de que lado dela fica o céu sai do
+   vetor "para cima do mundo" visto pela câmera. */
+let cimaC = {x:0,y:1,z:0}, rolTela = 0;
+function atualizaHorizonte(){
+  cimaC = { x: eixoD.y, y: eixoC.y, z: eixoF.y };      // o "cima" do mundo, na câmera
+  rolTela = Math.atan2(cimaC.x, cimaC.y);              // quanto o mundo está torto na tela
+}
+/* > 0 = céu */
+function ladoCeu(sx, sy){
+  return cimaC.x*(sx-CX) + cimaC.y*(CY-sy) + cimaC.z*F;
+}
+/* devolve o polígono gigante de um dos lados do horizonte */
+function meiaTela(ceu){
+  const n = Math.hypot(cimaC.x, cimaC.y);
+  const BIG = (W+H)*3;
+  if (n < 1e-6){                                       // olhando reto para cima/baixo
+    return (cimaC.z > 0) === !!ceu ? [[-BIG,-BIG],[BIG,-BIG],[BIG,BIG],[-BIG,BIG]] : null;
+  }
+  // ponto da reta mais perto do centro da imagem, e a direção dela
+  const t = -cimaC.z*F/(n*n);
+  const px = CX + cimaC.x*t, py = CY - cimaC.y*t;
+  const dx = -cimaC.y/n, dy = -cimaC.x/n;              // ao longo do horizonte
+  const nx = (ceu ? 1 : -1) * cimaC.x/n, ny = (ceu ? -1 : 1) * cimaC.y/n;
+  return [[px - dx*BIG, py - dy*BIG], [px + dx*BIG, py + dy*BIG],
+          [px + dx*BIG + nx*BIG, py + dy*BIG + ny*BIG],
+          [px - dx*BIG + nx*BIG, py - dy*BIG + ny*BIG]];
+}
+function pinta4(pol, estilo){
+  if (!pol) return;
+  ctx.fillStyle = estilo;
+  ctx.beginPath();
+  ctx.moveTo(pol[0][0], pol[0][1]);
+  for (let i=1;i<pol.length;i++) ctx.lineTo(pol[i][0], pol[i][1]);
+  ctx.closePath(); ctx.fill();
+}
 
 try { recorde = parseInt(localStorage.getItem('aviao.recorde') || '0', 10) || 0; } catch(e){}
 
@@ -2821,10 +2944,11 @@ function geraNuvens(){
 function reiniciaMundo(){
   particulas = []; bombas = []; tiros = [];
   distancia = 0;
-  rumo = 0; atualizaRumo();
   montaMapa(); geraNuvens();
-  aviaoX = 0; aviaoZ = 0; aviaoY = 1500; vy = 0; inclinacao = 0; nariz = 0;
-  camX = 0; camY = 1740;
+  aviaoX = 0; aviaoZ = 0; aviaoY = 1500;
+  eixoF = {x:0,y:0,z:1}; eixoC = {x:0,y:1,z:0}; eixoD = {x:1,y:0,z:0};
+  endireitaEixos(); poeCamera(); atualizaHorizonte();
+  vq = 0;
   combustivel = 100; turbo = 0; voo = VOO_BASE;
   pontos = 0; alvosDestruidos = 0; venceu = false;
   arma = 'bomba'; recarga = 0; atirando = false;
@@ -2839,15 +2963,29 @@ function reiniciaMundo(){
 /* Perspectiva aérea: o ar entre você e o objeto tem cor. Quanto mais longe,
    mais a coisa se mistura com o céu do horizonte. É o truque que mais aproxima
    um desenho chapado de uma vista 3D de verdade. */
-const CEU_LONGE = [186, 214, 236];
+const CEU_LONGE = [172, 200, 224];
 function comNevoa(rgb, luz, zr){
   // A curva importa: linear desde perto lavava a cidade inteira de cinza. Com
   // expoente, o que está por perto fica nítido e só o fundo some no céu.
-  const t = Math.min(0.82, Math.pow(Math.max(0, (zr - 2600) / (ALCANCE*0.95)), 1.4));
+  const t = Math.min(0.74, Math.pow(Math.max(0, (zr - 3200) / (ALCANCE*1.05)), 1.5));
   const r = rgb[0]*luz, g = rgb[1]*luz, b = rgb[2]*luz;
   return 'rgb(' + Math.round(r + (CEU_LONGE[0]-r)*t) + ',' +
                   Math.round(g + (CEU_LONGE[1]-g)*t) + ',' +
                   Math.round(b + (CEU_LONGE[2]-b)*t) + ')';
+}
+
+/* Parede com degradê vertical: escura em baixo, clara em cima. É o que mais
+   separa "caixa chapada" de "prédio": na vida real a base recebe menos luz do
+   céu, e o topo pega o sol de raspão. */
+function parede(a,b,c,d, rgb, luz, zr){
+  const g = ctx.createLinearGradient((c.x+d.x)/2, (c.y+d.y)/2, (a.x+b.x)/2, (a.y+b.y)/2);
+  g.addColorStop(0, comNevoa(rgb, luz*1.10, zr));
+  g.addColorStop(0.55, comNevoa(rgb, luz, zr));
+  g.addColorStop(1, comNevoa(rgb, luz*0.74, zr));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.lineTo(d.x,d.y);
+  ctx.closePath(); ctx.fill();
 }
 
 function quadro4(a,b,c,d,cor){
@@ -2857,52 +2995,79 @@ function quadro4(a,b,c,d,cor){
   ctx.closePath(); ctx.fill();
 }
 
-// sobra para os cantos não ficarem vazios quando o mundo roda na visão de cabine
-function margem(){ return cockpit ? Math.max(W,H)*0.75 : 0; }
-
-/* O sol fica num ponto FIXO do mapa (a nordeste). Como o avião gira, ele tem
-   que andar pela tela — se ficasse preso num canto, dar meia-volta não mudava
-   nada e a sensação de estar virando sumia. */
-const SOL_RUMO = 0.9;                    // radianos: nordeste
+/* O sol fica num ponto FIXO do mapa (a nordeste) e é projetado como qualquer
+   outra coisa: assim ele anda pela tela quando se vira, e some quando o avião
+   fica de ponta-cabeça — que é o certo. */
+const SOL_RUMO = 0.9;
 const SOL_DIR  = { x: Math.sin(SOL_RUMO), z: Math.cos(SOL_RUMO) };
+const SOL_ALT  = 0.30;            // seno da altura do sol acima do horizonte
 function anguloCurto(a){ while (a > Math.PI) a -= 6.283185; while (a < -Math.PI) a += 6.283185; return a; }
 
 function desenhaCeu(){
-  const M = margem();
-  const g = ctx.createLinearGradient(0,-M,0,horizonte+2);
-  g.addColorStop(0,'#071b45'); g.addColorStop(0.45,'#2f6fb8'); g.addColorStop(0.8,'#77aede'); g.addColorStop(1,'#bcd9ef');
-  ctx.fillStyle=g; ctx.fillRect(-M,-M,W+M*2,horizonte+2+M);
-
-  const dS = anguloCurto(SOL_RUMO - rumo);
-  if (Math.abs(dS) < 1.25){
-    const sx = W/2 + Math.tan(dS)*F, sy = horizonte*0.34, r = Math.min(W,H)*0.055;
-    const halo = ctx.createRadialGradient(sx,sy,r*0.3, sx,sy,r*5);
-    halo.addColorStop(0,'rgba(255,236,170,.55)'); halo.addColorStop(1,'rgba(255,236,170,0)');
-    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(sx,sy,r*5,0,7); ctx.fill();
-    ctx.fillStyle='rgba(255,246,205,.95)'; ctx.beginPath(); ctx.arc(sx,sy,r,0,7); ctx.fill();
+  atualizaHorizonte();
+  const ceu = meiaTela(true);
+  if (ceu){
+    // o degradê corre perpendicular ao horizonte, não de cima para baixo da
+    // tela — senão, com o avião de lado, o azul escuro aparecia na diagonal
+    const n = Math.hypot(cimaC.x, cimaC.y) || 1;
+    const ux = cimaC.x/n, uy = -cimaC.y/n;
+    const t = -cimaC.z*F/(n*n);
+    const hx = CX + cimaC.x*t, hy = CY - cimaC.y*t;      // ponto do horizonte
+    const L = (W+H);
+    const g = ctx.createLinearGradient(hx + ux*L, hy + uy*L, hx, hy);
+    g.addColorStop(0,'#071b45'); g.addColorStop(0.45,'#2f6fb8');
+    g.addColorStop(0.8,'#77aede'); g.addColorStop(1,'#bcd9ef');
+    pinta4(ceu, g);
   }
-  serra(horizonte, H*0.085, '#3c5f86', 0.0, 3);
-  serra(horizonte, H*0.052, '#4d7396', 1.7, 5);
+  // o sol, projetado como um ponto muito longe
+  const d = { x: SOL_DIR.x*Math.sqrt(1-SOL_ALT*SOL_ALT), y: SOL_ALT, z: SOL_DIR.z*Math.sqrt(1-SOL_ALT*SOL_ALT) };
+  const c = { x: d.x*eixoD.x + d.y*eixoD.y + d.z*eixoD.z,
+              y: d.x*eixoC.x + d.y*eixoC.y + d.z*eixoC.z,
+              z: d.x*eixoF.x + d.y*eixoF.y + d.z*eixoF.z };
+  if (c.z > 0.25){
+    const sx = CX + c.x/c.z*F, sy = CY - c.y/c.z*F, r = Math.min(W,H)*0.055;
+    if (sx > -W && sx < W*2 && sy > -H && sy < H*2){
+      const halo = ctx.createRadialGradient(sx,sy,r*0.3, sx,sy,r*5);
+      halo.addColorStop(0,'rgba(255,236,170,.55)'); halo.addColorStop(1,'rgba(255,236,170,0)');
+      ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(sx,sy,r*5,0,7); ctx.fill();
+      ctx.fillStyle='rgba(255,246,205,.95)'; ctx.beginPath(); ctx.arc(sx,sy,r,0,7); ctx.fill();
+    }
+  }
+  serra(H*0.085, '#3c5f86', 0.0, 3);
+  serra(H*0.052, '#4d7396', 1.7, 5);
 }
 
-/* A serra é desenhada pelo RUMO de cada ponto da tela, e as ondas têm período
-   inteiro — então, girando 360°, as mesmas montanhas voltam ao mesmo lugar. */
-function serra(base, altura, cor, fase, freq){
-  const M = margem();
+/* A serra fica sentada em cima da reta do horizonte: eu giro o desenho para
+   acompanhar a reta. As ondas têm período inteiro em cima do RUMO, então
+   girando 360° as mesmas montanhas voltam ao mesmo lugar. */
+function serra(altura, cor, fase, freq){
+  const n = Math.hypot(cimaC.x, cimaC.y);
+  if (n < 1e-6) return;                       // reto para cima ou para baixo
+  const t = -cimaC.z*F/(n*n);
+  const hx = CX + cimaC.x*t, hy = CY - cimaC.y*t;
+  const L = (W+H)*1.2;
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(rolTela);
   ctx.fillStyle = cor;
-  ctx.beginPath(); ctx.moveTo(-M-10, base+2);
-  for (let x=-M-10; x<=W+M+10; x+=W/40){
-    const k = (rumo + Math.atan((x - W/2)/F)) * freq + fase;
+  ctx.beginPath(); ctx.moveTo(-L, 2);
+  for (let x=-L; x<=L; x+=W/40){
+    const k = (rumo + Math.atan(x/F)) * freq + fase;
     const h = (Math.sin(k)*0.5 + Math.sin(k*3+1.3)*0.3 + Math.sin(k*7)*0.2 + 1) * altura*0.5;
-    ctx.lineTo(x, base + 2 - h);
+    ctx.lineTo(x, 2 - h);
   }
-  ctx.lineTo(W+margem()+10, base+2); ctx.closePath(); ctx.fill();
+  ctx.lineTo(L, 2); ctx.lineTo(L, L); ctx.lineTo(-L, L);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
 }
 
 const PASSO_CH = 2200;
 const VERDES = [[42,92,51],[56,117,74],[36,80,41],[71,137,90],[87,150,79],
                 [107,143,60],[132,160,74],[47,107,62],[63,110,47],[83,127,54]];
-const CINZAS = [[91,95,99],[84,88,92],[96,100,105],[79,83,87]];
+// nem tudo na cidade é asfalto: entram praças e quarteirões de cor diferente,
+// senão o bairro inteiro vira uma chapa cinza
+const CINZAS = [[96,100,105],[86,90,95],[104,107,110],[78,83,88],
+                [74,104,72],[110,104,92],[88,92,98],[99,95,88]];
 function baralha(a,b){ return Math.abs(Math.sin(a*127.1 + b*311.7) * 43758.5453) % 1; }
 function corDoCampo(a,b){ return VERDES[Math.floor(baralha(a,b)*VERDES.length)]; }
 
@@ -2910,20 +3075,24 @@ function corDoCampo(a,b){ return VERDES[Math.floor(baralha(a,b)*VERDES.length)];
    volta do avião, jogo fora as que estão atrás ou fora do campo de visão, e
    desenho da mais longe para a mais perto. */
 function desenhaChao(){
-  const M = margem();
-  ctx.fillStyle = ehCidade(aviaoX, aviaoZ) ? '#55595d' : '#2f6a3f';
-  ctx.fillRect(-M, horizonte, W+M*2, H-horizonte+M);
+  // o fundo do chão é o outro lado da mesma reta do horizonte
+  pinta4(meiaTela(false), ehCidade(aviaoX, aviaoZ) ? '#55595d' : '#2f6a3f');
 
   const i0 = Math.floor((aviaoX - ALCANCE)/PASSO_CH), i1 = Math.ceil((aviaoX + ALCANCE)/PASSO_CH);
   const k0 = Math.floor((aviaoZ - ALCANCE)/PASSO_CH), k1 = Math.ceil((aviaoZ + ALCANCE)/PASSO_CH);
-  const meia = (W/2 + margem()) / F;              // meia abertura da tela, em tangente
+  // o recorte agora usa a atitude toda: voando de lado ou de cabeça para baixo,
+  // "à frente" não é mais a direção do rumo
+  const raio = Math.hypot(W/2, H/2)/F;
   const celulas = [];
   for (let i=i0;i<=i1;i++) for (let k=k0;k<=k1;k++){
-    const c = paraCamera((i+0.5)*PASSO_CH, (k+0.5)*PASSO_CH);
-    const d2 = c.x*c.x + c.z*c.z;
+    const cx = (i+0.5)*PASSO_CH, cz = (k+0.5)*PASSO_CH;
+    const dx = cx-aviaoX, dz = cz-aviaoZ;
+    const d2 = dx*dx + dz*dz;
     if (d2 > ALCANCE*ALCANCE) continue;
-    if (c.z < -PASSO_CH) continue;                                   // atrás
-    if (Math.abs(c.x) > (c.z + CAMD)*meia + PASSO_CH*1.6) continue;  // fora de quadro
+    const c = paraCamera3(cx, CHAO, cz);
+    if (c.z < -PASSO_CH) continue;
+    const lim = Math.max(c.z, 1)*raio + PASSO_CH*2.2;
+    if (Math.abs(c.x) > lim || Math.abs(c.y) > lim) continue;
     celulas.push({ i:i, k:k, d:d2 });
   }
   celulas.sort((a,b) => b.d - a.d);
@@ -2934,21 +3103,64 @@ function desenhaChao(){
     if (!a||!b||!c||!d) continue;
     // a névoa também no chão: sem isso o mapa aberto vira um tabuleiro de
     // xadrez gigante até o horizonte, que foi como ficou na primeira tentativa
-    const rgb = ehCidade(x0+PASSO_CH/2, z0+PASSO_CH/2)
-                  ? CINZAS[Math.floor(baralha(cel.i*1.7, cel.k*2.3)*CINZAS.length)]
-                  : corDoCampo(cel.i, cel.k);
-    quadro4(a,b,c,d, comNevoa(rgb, 1, Math.sqrt(cel.d)));
+    const cidade = ehCidade(x0+PASSO_CH/2, z0+PASSO_CH/2);
+    const zr = Math.sqrt(cel.d);
+    const rgb = cidade ? CINZAS[Math.floor(baralha(cel.i*1.7, cel.k*2.3)*CINZAS.length)]
+                       : corDoCampo(cel.i, cel.k);
+    quadro4(a,b,c,d, comNevoa(rgb, 1, zr));
+    // sebe / meio-fio: uma linha escura na divisa dá relevo ao mosaico, que
+    // sem ela fica com cara de tabuleiro pintado
+    const lado = Math.abs(a.x-b.x) + Math.abs(a.y-d.y);
+    if (lado > 26){
+      ctx.strokeStyle = comNevoa(cidade ? [58,62,66] : [30,56,34], 1, zr);
+      ctx.lineWidth = Math.max(0.7, Math.min(3.5, lado*0.012));
+      ctx.beginPath();
+      ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.lineTo(d.x,d.y);
+      ctx.closePath(); ctx.stroke();
+    }
   }
 
   // rio (norte-sul) e as duas estradas: são as referências do mapa
   fitaZ(rioX, 560, [63,127,168]);
+  brilhoNoRio();
   fitaZ(estradaXv, 150, [107,106,99]);
   fitaX(estradaZ, 150, [107,106,99]);
 
-  const b = ctx.createLinearGradient(0, horizonte - 2, 0, horizonte + H*0.14);
-  b.addColorStop(0,'rgba(188,217,239,.62)'); b.addColorStop(0.35,'rgba(188,217,239,.20)');
-  b.addColorStop(1,'rgba(188,217,239,0)');
-  ctx.fillStyle=b; ctx.fillRect(-M, horizonte - 2, W+M*2, H*0.14);
+  // bruma junto ao horizonte, acompanhando a reta
+  const n = Math.hypot(cimaC.x, cimaC.y);
+  if (n > 1e-6){
+    const t = -cimaC.z*F/(n*n);
+    const hx = CX + cimaC.x*t, hy = CY - cimaC.y*t;
+    const L = (W+H)*1.2, alt = H*0.14;
+    ctx.save();
+    ctx.translate(hx, hy); ctx.rotate(rolTela);
+    const b = ctx.createLinearGradient(0, -2, 0, alt);
+    b.addColorStop(0,'rgba(188,217,239,.62)'); b.addColorStop(0.35,'rgba(188,217,239,.20)');
+    b.addColorStop(1,'rgba(188,217,239,0)');
+    ctx.fillStyle=b; ctx.fillRect(-L, -2, L*2, alt);
+    ctx.restore();
+  }
+}
+
+/* O sol batendo na água. Só aparece no trecho de rio que está na direção do
+   sol — é o detalhe que faz a água parecer água e não uma fita azul. */
+function brilhoNoRio(){
+  const P = 2400, z0 = Math.floor((aviaoZ - ALCANCE*0.5)/P)*P;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let z = z0; z < aviaoZ + ALCANCE*0.5; z += P){
+    const bx = rioX(z);
+    const dir = Math.atan2(bx - aviaoX, z - aviaoZ);
+    const alinhado = Math.cos(anguloCurto(dir - SOL_RUMO));
+    if (alinhado < 0.55) continue;
+    const a = projetaM(bx-300, CHAO+2, z),   b = projetaM(bx+300, CHAO+2, z),
+          c = projetaM(bx+300, CHAO+2, z+P), d = projetaM(bx-300, CHAO+2, z+P);
+    if (!a||!b||!c||!d) continue;
+    ctx.globalAlpha = 0.10 + (alinhado-0.55)*0.42;
+    quadro4(a,b,c,d,'rgb(150,170,140)');
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
 /* faixa que corre ao longo do eixo z (rio, estrada vertical) */
@@ -2983,15 +3195,15 @@ const PAREDES = [                       // [canto a, canto b, normal x, normal z
   [0,1, 0,-1], [1,2, 1,0], [2,3, 0,1], [3,0, -1,0]
 ];
 function desenhaPredio(p){
-  const c = paraCamera(p.x, p.z);
-  if (c.z < -(p.w + p.d)) return;
-  const zr = Math.sqrt(c.x*c.x + c.z*c.z);
   const topo = CHAO + p.h;
+  if (frente(p.x, CHAO + p.h/2, p.z) < -(p.w + p.d)) return;
+  const zr = longe(p.x, p.z);
   const x0 = p.x - p.w/2, x1 = p.x + p.w/2, z0 = p.z - p.d/2, z1 = p.z + p.d/2;
   const cantos = [[x0,z0],[x1,z0],[x1,z1],[x0,z1]];
-  const cc = cantos.map(q => paraCamera(q[0], q[1]));
-  const pb = cc.map(q => projeta(q.x, CHAO, q.z));
-  const pt = cc.map(q => projeta(q.x, topo, q.z));
+  const cc = cantos.map(q => paraCamera3(q[0], CHAO, q[1]));
+  const ct = cantos.map(q => paraCamera3(q[0], topo, q[1]));
+  const pb = cc.map(q => projeta(q.x, q.y, q.z));
+  const pt = ct.map(q => projeta(q.x, q.y, q.z));
   if (pb.some(q=>!q) || pt.some(q=>!q)) return;
   if (pb.every(q => q.x > W+90) || pb.every(q => q.x < -90)) return;
 
@@ -3014,19 +3226,27 @@ function desenhaPredio(p){
                  (f[3] > 0 && cam.z > z1) || (f[3] < 0 && cam.z < z0);
     if (!fora) continue;
     const luz = f[2]*SOL_DIR.x + f[3]*SOL_DIR.z;        // -1 na sombra, +1 no sol
-    const meio = paraCamera((cantos[f[0]][0]+cantos[f[1]][0])/2, (cantos[f[0]][1]+cantos[f[1]][1])/2);
-    visiveis.push({ a:f[0], b:f[1], luz: 0.60 + Math.max(0, luz)*0.55, d: meio.z });
+    const d = frente((cantos[f[0]][0]+cantos[f[1]][0])/2, CHAO, (cantos[f[0]][1]+cantos[f[1]][1])/2);
+    visiveis.push({ a:f[0], b:f[1], luz: 0.60 + Math.max(0, luz)*0.55, d: d });
   }
   visiveis.sort((u,v) => v.d - u.d);      // a parede mais longe primeiro
 
   const alturaTela = Math.abs(pb[0].y - pt[0].y);
   for (const f of visiveis){
-    quadro4(pb[f.a], pb[f.b], pt[f.b], pt[f.a], comNevoa(base, tom*f.luz, zr));
-    if (alturaTela > 40) janelas(cc[f.a], cc[f.b], topo, zr, p);
+    parede(pb[f.a], pb[f.b], pt[f.b], pt[f.a], base, tom*f.luz, zr);
+    if (alturaTela > 40) janelas(cantos[f.a], cantos[f.b], topo, zr, p);
   }
 
-  // telhado, por cima de tudo
+  // telhado, por cima de tudo, com uma pestana clara na beirada
   quadro4(pt[0],pt[1],pt[2],pt[3], comNevoa(base, tom*1.30, zr));
+  if (alturaTela > 26){
+    ctx.strokeStyle = comNevoa(base, tom*1.62, zr);
+    ctx.lineWidth = Math.max(1, alturaTela*0.018);
+    ctx.beginPath();
+    ctx.moveTo(pt[0].x,pt[0].y); ctx.lineTo(pt[1].x,pt[1].y);
+    ctx.lineTo(pt[2].x,pt[2].y); ctx.lineTo(pt[3].x,pt[3].y);
+    ctx.closePath(); ctx.stroke();
+  }
 
   // caixa d'água e antena, só quando vale a pena desenhar
   if (alturaTela > 70 && p.h > 900){
@@ -3046,27 +3266,30 @@ function desenhaPredio(p){
 /* Janelas numa parede qualquer. A parede pode estar de esguelha, então cada
    coluna é projetada no seu próprio lugar; as linhas saem de conta, porque
    numa mesma coluna a profundidade não muda com a altura. */
-function janelas(A, B, topo, zr, p){
+function janelas(Aw, Bw, topo, zr, p){
   const col = Math.max(2, Math.min(5, Math.round(p.w/170)));
   const lin = Math.max(2, Math.min(9, Math.round(p.h/260)));
   const perto = 1 - Math.min(0.85, Math.max(0, (zr-1500)/(ALCANCE*0.8)));
   if (perto < 0.12) return;
   ctx.globalAlpha = perto;
+  const px = (t) => Aw[0] + (Bw[0]-Aw[0])*t, pz = (t) => Aw[1] + (Bw[1]-Aw[1])*t;
   for (let i=0;i<col;i++){
     const t0 = (i+0.22)/col, t1 = (i+0.78)/col;
-    const q0 = projeta(A.x+(B.x-A.x)*t0, CHAO, A.z+(B.z-A.z)*t0);
-    const q1 = projeta(A.x+(B.x-A.x)*t1, CHAO, A.z+(B.z-A.z)*t1);
+    const q0 = projetaM(px(t0), CHAO, pz(t0));
+    const q1 = projetaM(px(t1), CHAO, pz(t1));
     if (!q0||!q1) continue;
     if ((q0.x < -40 && q1.x < -40) || (q0.x > W+40 && q1.x > W+40)) continue;
     for (let j=0;j<lin;j++){
       const yb = CHAO + (topo-CHAO)*(j+0.24)/lin, yt = CHAO + (topo-CHAO)*(j+0.74)/lin;
+      const a0 = projetaM(px(t0), yt, pz(t0));
+      const a1 = projetaM(px(t1), yt, pz(t1));
+      const b0 = projetaM(px(t0), yb, pz(t0));
+      const b1 = projetaM(px(t1), yb, pz(t1));
+      if (!a0||!a1||!b0||!b1) continue;
       const acesa = ((i*7 + j*13 + Math.round(p.x/97) + Math.round(p.z/89)) % 5) < 2;
       ctx.fillStyle = acesa ? 'rgba(255,226,150,.8)' : 'rgba(38,50,70,.55)';
       ctx.beginPath();
-      ctx.moveTo(q0.x, horizonte - (yt-camY)*F/q0.d);
-      ctx.lineTo(q1.x, horizonte - (yt-camY)*F/q1.d);
-      ctx.lineTo(q1.x, horizonte - (yb-camY)*F/q1.d);
-      ctx.lineTo(q0.x, horizonte - (yb-camY)*F/q0.d);
+      ctx.moveTo(a0.x,a0.y); ctx.lineTo(a1.x,a1.y); ctx.lineTo(b1.x,b1.y); ctx.lineTo(b0.x,b0.y);
       ctx.closePath(); ctx.fill();
     }
   }
@@ -3075,8 +3298,7 @@ function janelas(A, B, topo, zr, p){
 
 /* --- alvo no chão: depósito de combustível, com marca para achar de longe --- */
 function desenhaAlvo(a){
-  const c = paraCamera(a.x, a.z);
-  const p = projeta(c.x, CHAO, c.z);
+  const p = projetaM(a.x, CHAO, a.z);
   if (!p) return;
   const r = a.r * p.s;
   if (r < 1 || r > Math.min(W,H)*0.9) return;
@@ -3085,14 +3307,17 @@ function desenhaAlvo(a){
   // três tanques cilíndricos
   for (const dx of [-0.55, 0, 0.55]){
     const q = projetaM(a.x + dx*a.r*cosR, CHAO, a.z - dx*a.r*senR);
+    // (o desvio dx acompanha o rumo para os tanques ficarem lado a lado)
     if (!q) continue;
     const rw = a.r*0.34*q.s, rh = a.r*0.5*q.s;
+    ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(rolTela);
     ctx.fillStyle = '#c94f3d';
-    ctx.fillRect(q.x - rw/2, q.y - rh, rw, rh);
+    ctx.fillRect(-rw/2, -rh, rw, rh);
     ctx.fillStyle = '#e8705c';
-    ctx.beginPath(); ctx.ellipse(q.x, q.y - rh, rw/2, rh*0.16, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, -rh, rw/2, rh*0.16, 0, 0, 7); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,.35)';
-    ctx.fillRect(q.x - rw/2, q.y - rh*0.62, rw, rh*0.1);
+    ctx.fillRect(-rw/2, -rh*0.62, rw, rh*0.1);
+    ctx.restore();
   }
   // marca piscando, para enxergar de longe
   const pulso = 0.45 + Math.sin(Date.now()/220 + a.fase)*0.35;
@@ -3106,26 +3331,36 @@ function desenhaAlvo(a){
 }
 
 function desenhaNuvem(n){
-  const c = paraCamera(n.x, n.z);
-  const p = projeta(c.x, n.y, c.z);
+  const p = projetaM(n.x, n.y, n.z);
   if (!p) return;
   const r = n.r * p.s;
   if (r < 2 || p.x < -r*3 || p.x > W+r*3) return;
-  const perto = Math.min(1, Math.max(0, c.z/2200));
-  ctx.fillStyle = 'rgba(255,255,255,' + (Math.min(0.5, 0.16 + r/(W*1.8)) * perto).toFixed(3) + ')';
-  ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r*0.42, 0, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(p.x - r*0.5, p.y + r*0.10, r*0.55, r*0.30, 0, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(p.x + r*0.55, p.y + r*0.08, r*0.5, r*0.28, 0, 0, 7); ctx.fill();
+  const perto = Math.min(1, Math.max(0, p.d/2200));
+  const al = Math.min(0.55, 0.18 + r/(W*1.6)) * perto;
+  // duas camadas: a de baixo acinzentada, a de cima branca e deslocada para o
+  // lado do sol. Uma nuvem chapada é o que mais denuncia desenho barato.
+  ctx.save();
+  ctx.translate(p.x, p.y); ctx.rotate(rolTela);
+  const sombra = 'rgba(176,196,220,' + (al*0.85).toFixed(3) + ')';
+  const luz    = 'rgba(255,255,255,' + al.toFixed(3) + ')';
+  ctx.fillStyle = sombra;
+  ctx.beginPath(); ctx.ellipse(0, r*0.10, r, r*0.44, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-r*0.5, r*0.20, r*0.58, r*0.32, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse( r*0.55, r*0.18, r*0.52, r*0.30, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = luz;
+  ctx.beginPath(); ctx.ellipse(r*0.06, -r*0.08, r*0.86, r*0.36, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-r*0.38, -r*0.02, r*0.44, r*0.24, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse( r*0.46, -r*0.04, r*0.40, r*0.22, 0, 0, 7); ctx.fill();
+  ctx.restore();
 }
 
 function desenhaTambor(t, alvo){
-  const c = paraCamera(t.x, t.z);
-  const p = projeta(c.x, t.y, c.z);
+  const p = projetaM(t.x, t.y, t.z);
   if (!p) return;
   const r = 125 * p.s;
   if (r < 1.2 || r > Math.min(W,H)*0.40) return;
   if (p.x < -r*4 || p.x > W+r*4) return;
-  const dist = 1 - Math.min(1, c.z/ALCANCE);
+  const dist = 1 - Math.min(1, p.d/ALCANCE);
   const corpo = t.azul ? '#3aa0ff' : '#ffb43a';
   const faixa = t.azul ? '#cfeaff' : '#fff0cf';
   ctx.save();
@@ -3136,7 +3371,7 @@ function desenhaTambor(t, alvo){
   halo.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(p.x, p.y, r*3.1*pulso, 0, 7); ctx.fill();
   const bal = Math.sin(Date.now()/600 + t.giro) * 0.12;
-  ctx.translate(p.x, p.y); ctx.rotate(bal);
+  ctx.translate(p.x, p.y); ctx.rotate(rolTela + bal);
   ctx.fillStyle = corpo; ctx.fillRect(-r*0.62, -r, r*1.24, r*2);
   ctx.fillStyle = faixa;
   ctx.fillRect(-r*0.62, -r*0.46, r*1.24, r*0.30);
@@ -3146,7 +3381,7 @@ function desenhaTambor(t, alvo){
   ctx.fillStyle = t.azul ? '#0a3e6b' : '#6b4a10';
   ctx.beginPath(); ctx.ellipse(0, -r, r*0.62, r*0.20, 0, 0, 7); ctx.fill();
   if (alvo && r > 3){
-    ctx.rotate(-bal);
+    ctx.rotate(-bal - rolTela);
     ctx.globalAlpha = 0.35 + Math.sin(Date.now()/180)*0.22;
     ctx.strokeStyle = t.azul ? '#9ad8ff' : '#ffd98a';
     ctx.lineWidth = Math.max(1.2, r*0.14);
@@ -3156,15 +3391,14 @@ function desenhaTambor(t, alvo){
 }
 
 function desenhaPombo(o){
-  const c = paraCamera(o.x, o.z);
-  const p = projeta(c.x, o.y, c.z);
+  const p = projetaM(o.x, o.y, o.z);
   if (!p) return;
   const r = 150 * p.s;
   if (r < 0.8 || r > Math.min(W,H)*0.42) return;   // colado na câmera: não desenha
   if (p.x < -r*5 || p.x > W+r*5) return;
   const bate = Math.sin(Date.now()/90 + o.fase);
-  ctx.save(); ctx.translate(p.x, p.y);
-  ctx.globalAlpha = Math.max(0.25, 1 - c.z/ALCANCE);
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(rolTela);
+  ctx.globalAlpha = Math.max(0.25, 1 - p.d/ALCANCE);
   ctx.fillStyle = '#3b4150';
   ctx.beginPath(); ctx.ellipse(0, 0, r*0.55, r*0.38, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#4a5266';
@@ -3189,7 +3423,7 @@ function desenhaAviaoInimigo(o){
   if (r < 1 || r > Math.min(W,H)*0.55) return;
   if (p.x < -r*3 || p.x > W+r*3) return;
   const bal = Math.sin(Date.now()/700 + o.fase) * 0.10;
-  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(bal);
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(rolTela + bal);
   ctx.fillStyle = 'rgba(0,0,0,.16)';
   ctx.beginPath(); ctx.ellipse(0, r*0.26, r*1.0, r*0.10, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#b9c3d6';
@@ -3218,7 +3452,7 @@ function desenhaBomba(b){
   if (!p) return;
   const r = Math.max(1, 90 * p.s);
   ctx.save(); ctx.translate(p.x, p.y);
-  ctx.rotate(Math.atan2(-b.vy, 600) * 0.6);
+  ctx.rotate(rolTela + Math.atan2(-b.vy, 600) * 0.6);
   if (b.tipo === 'missil'){
     ctx.fillStyle = '#ff7a4d';
     ctx.fillRect(-r*0.22, -r*0.9, r*0.44, r*1.8);
@@ -3239,7 +3473,7 @@ function desenhaBomba(b){
 
 function desenhaTiro(t){
   const p = projetaM(t.x, t.y, t.z);
-  const q = projetaM(t.x - t.dx*900, t.y, t.z - t.dz*900);
+  const q = projetaM(t.x - t.dx*900, t.y - t.dy*900, t.z - t.dz*900);
   if (!p || !q) return;
   ctx.strokeStyle = 'rgba(255,236,150,.9)';
   ctx.lineWidth = Math.max(1, 26*p.s);
@@ -3258,38 +3492,42 @@ function desenhaParticula(f){
 
 /* onde a bomba vai cair se for solta agora: queda livre + o quanto o avião anda
    nesse tempo. Sem esta marca no chão, bombardear é adivinhação. */
+/* Onde a bomba cai: queda livre a partir da velocidade do avião, que agora
+   tem componente vertical (num mergulho a bomba vai mais para a frente). */
 function miraBomba(){
-  const t = Math.sqrt(Math.max(0, 2*(aviaoY - CHAO)/1400));
-  return { x: aviaoX + senR*voo*t, z: aviaoZ + cosR*voo*t, t: t };
+  const vyb = eixoF.y*voo - 60, h = aviaoY - CHAO;
+  const t = (vyb + Math.sqrt(Math.max(0, vyb*vyb + 2*1400*h))) / 1400;
+  return { x: aviaoX + eixoF.x*voo*t, z: aviaoZ + eixoF.z*voo*t, t: t };
 }
 function desenhaMira(){
   if (caindo || arma !== 'bomba') return;
   const m = miraBomba();
   const p = projetaM(m.x, CHAO + 20, m.z);
   if (!p) return;
-  const r = Math.max(6, 260 * p.s);
+  const r = Math.max(6, Math.min(Math.min(W,H)*0.22, 260 * p.s));   // num mergulho não vira um aro gigante
   const perto = alvos.some(a => a.vivo && Math.hypot(a.z - m.z, a.x - m.x) < 800);
   ctx.save();
+  ctx.translate(p.x, p.y); ctx.rotate(rolTela);
   ctx.strokeStyle = perto ? 'rgba(120,255,150,.95)' : 'rgba(255,255,255,.6)';
   ctx.lineWidth = perto ? 3 : 2;
-  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(p.x - r*1.5, p.y); ctx.lineTo(p.x - r*0.6, p.y);
-  ctx.moveTo(p.x + r*0.6, p.y); ctx.lineTo(p.x + r*1.5, p.y);
-  ctx.moveTo(p.x, p.y - r*1.5); ctx.lineTo(p.x, p.y - r*0.6);
-  ctx.moveTo(p.x, p.y + r*0.6); ctx.lineTo(p.x, p.y + r*1.5);
+  ctx.moveTo(-r*1.5, 0); ctx.lineTo(-r*0.6, 0);
+  ctx.moveTo( r*0.6, 0); ctx.lineTo( r*1.5, 0);
+  ctx.moveTo(0, -r*1.5); ctx.lineTo(0, -r*0.6);
+  ctx.moveTo(0,  r*0.6); ctx.lineTo(0,  r*1.5);
   ctx.stroke();
   ctx.restore();
 }
 
 function desenhaAviao(){
   if (cockpit) return;                      // de dentro não se vê o próprio avião
-  const p = projeta(0, aviaoY, 0);
+  const p = projetaM(aviaoX, aviaoY, aviaoZ);
   if (!p) return;
   const t = Math.min(W,H) * 0.17;
   ctx.save();
   ctx.translate(p.x, p.y);
-  ctx.rotate(inclinacao * Math.PI/180 + giroQueda);
+  ctx.rotate(giroQueda);                    // a câmera já acompanha o rolar
   if (turbo > 0){
     for (const lado of [-1, 1]){
       const g = ctx.createLinearGradient(lado*t*0.52, t*0.26, lado*t*0.52, t*1.5);
@@ -3416,27 +3654,6 @@ function rotuloRelogio(cx, cy, r, rotulo){
   ctx.fillText(rotulo, cx, cy + r*1.52);
 }
 
-function mostradorHorizonte(cx, cy, r){
-  ctx.save();
-  ctx.beginPath(); ctx.arc(cx, cy, r*0.88, 0, 7); ctx.clip();
-  ctx.translate(cx, cy); ctx.rotate(-inclinacao*Math.PI/180);
-  const desl = Math.max(-r, Math.min(r, nariz*1.6));
-  ctx.fillStyle = '#2f6fb8'; ctx.fillRect(-r*2, -r*2 + desl, r*4, r*2);
-  ctx.fillStyle = '#6b5a3a'; ctx.fillRect(-r*2, desl, r*4, r*2);
-  ctx.strokeStyle = '#e8eef7'; ctx.lineWidth = Math.max(1.2, r*0.06);
-  ctx.beginPath(); ctx.moveTo(-r*2, desl); ctx.lineTo(r*2, desl); ctx.stroke();
-  ctx.restore();
-  ctx.strokeStyle = 'rgba(150,170,200,.35)'; ctx.lineWidth = Math.max(1, r*0.05);
-  ctx.beginPath(); ctx.arc(cx, cy, r*0.88, 0, 7); ctx.stroke();
-  ctx.strokeStyle = '#ffc24d'; ctx.lineWidth = Math.max(2, r*0.1);
-  ctx.beginPath();
-  ctx.moveTo(cx-r*0.55, cy); ctx.lineTo(cx-r*0.18, cy);
-  ctx.moveTo(cx+r*0.18, cy); ctx.lineTo(cx+r*0.55, cy);
-  ctx.moveTo(cx, cy-r*0.08); ctx.lineTo(cx, cy+r*0.08);
-  ctx.stroke();
-  rotuloRelogio(cx, cy, r, 'HORIZONTE');
-  ctx.textAlign = 'center';
-}
 
 /* bússola de verdade no painel: a rosa gira, o nariz fica sempre no topo */
 function mostradorBussola(cx, cy, r){
@@ -3477,7 +3694,7 @@ function mostradorHorizonte(cx, cy, r){
   ctx.save();
   ctx.beginPath(); ctx.arc(cx, cy, r*0.88, 0, 7); ctx.clip();
   ctx.translate(cx, cy); ctx.rotate(-inclinacao*Math.PI/180);
-  const desl = Math.max(-r, Math.min(r, nariz*1.6));
+  const desl = Math.max(-r, Math.min(r, arfagem*180/Math.PI*1.6));
   ctx.fillStyle = '#2f6fb8'; ctx.fillRect(-r*2, -r*2 + desl, r*4, r*2);
   ctx.fillStyle = '#6b5a3a'; ctx.fillRect(-r*2, desl, r*4, r*2);
   ctx.strokeStyle = '#e8eef7'; ctx.lineWidth = Math.max(1.2, r*0.06);
@@ -3496,7 +3713,7 @@ function mostradorHorizonte(cx, cy, r){
 
 /* fita vertical: velocidade à esquerda, altitude à direita — como num caça */
 function fita(x, valor, passo, dir, rotulo){
-  const alt = H*0.30, cy = H*0.37;
+  const alt = H*0.30, cy = CY - H*0.05;
   ctx.save();
   // o recorte tem que caber os números, senão sobra só o último dígito
   ctx.beginPath(); ctx.rect(x - W*0.085, cy - alt/2, W*0.17, alt); ctx.clip();
@@ -3528,80 +3745,82 @@ function fita(x, valor, passo, dir, rotulo){
 
 /* escada de arfagem, cruz do canhão e vetor de velocidade */
 function hudCaca(){
-  const cx = W/2, cyFixo = H*0.40;            // a cruz do canhão não se mexe
-  const g = GRAU();
+  const cx = CX, cy = CY;
   ctx.save();
   ctx.strokeStyle = 'rgba(120,255,170,.75)';
   ctx.fillStyle   = 'rgba(120,255,170,.9)';
   ctx.lineWidth = 1.6;
   ctx.font = '700 ' + Math.max(8, H*0.019).toFixed(0) + 'px ui-monospace, monospace';
 
-  // escada: acompanha o horizonte, então rola junto com as asas. As fitas e a
-  // cruz do canhão ficam paradas, porque são presas ao avião.
+  /* A ESCADA DE ARFAGEM, agora feita direito: cada degrau é uma DIREÇÃO do
+     mundo (à frente, naquela altura em graus) projetada pela mesma câmera do
+     resto. Antes eu empilhava linhas a partir de uma "linha do horizonte" que
+     eu mesmo empurrava na tela — e por isso nada disso sobrevivia a um
+     looping. Assim funciona de cabeça para baixo e apontando para o zênite. */
   ctx.save();
-  ctx.beginPath(); ctx.rect(W*0.20, H*0.08, W*0.60, H*0.54); ctx.clip();
-  ctx.translate(cx, cyFixo);
-  ctx.rotate(-inclinacao * Math.PI/180 * 0.9);
-  ctx.translate(-cx, -cyFixo);
-  for (let a = -30; a <= 30; a += 5){
-    const y = horizonte - a*g;
-    if (y < H*0.08 || y > H*0.62) continue;
-    const meio = W*0.052, fora = W*0.115;
+  ctx.beginPath(); ctx.rect(W*0.16, H*0.05, W*0.68, H*0.60); ctx.clip();
+  for (let a = -80; a <= 80; a += 10){
+    const ra = a*Math.PI/180, ca = Math.cos(ra), sa = Math.sin(ra);
+    const d = { x: senR*ca, y: sa, z: cosR*ca };
+    const zc = d.x*eixoF.x + d.y*eixoF.y + d.z*eixoF.z;
+    if (zc < 0.12) continue;
+    const xc = d.x*eixoD.x + d.y*eixoD.y + d.z*eixoD.z;
+    const yc = d.x*eixoC.x + d.y*eixoC.y + d.z*eixoC.z;
+    const px = cx + xc/zc*F, py = cy - yc/zc*F;
+    if (py < -H || py > H*2) continue;
+    ctx.save();
+    ctx.translate(px, py); ctx.rotate(rolTela);
+    const meio = W*0.052, fora = a === 0 ? W*0.172 : W*0.115;
     ctx.setLineDash(a < 0 ? [6,5] : []);
     ctx.lineWidth = a === 0 ? 2.4 : 1.6;
-    const larg = a === 0 ? fora*1.5 : fora;
     ctx.beginPath();
-    ctx.moveTo(cx - larg, y); ctx.lineTo(cx - meio, y);
-    ctx.moveTo(cx + meio, y); ctx.lineTo(cx + larg, y);
-    if (a !== 0){                              // ponta virada para o horizonte
-      ctx.moveTo(cx - meio, y); ctx.lineTo(cx - meio, y + (a>0?6:-6));
-      ctx.moveTo(cx + meio, y); ctx.lineTo(cx + meio, y + (a>0?6:-6));
+    ctx.moveTo(-fora, 0); ctx.lineTo(-meio, 0);
+    ctx.moveTo( meio, 0); ctx.lineTo( fora, 0);
+    if (a !== 0){
+      ctx.moveTo(-meio, 0); ctx.lineTo(-meio, a>0?6:-6);
+      ctx.moveTo( meio, 0); ctx.lineTo( meio, a>0?6:-6);
     }
     ctx.stroke();
+    ctx.setLineDash([]);
     if (a !== 0){
-      ctx.textAlign = 'right'; ctx.fillText(String(Math.abs(a)), cx - larg - 5, y + 4);
-      ctx.textAlign = 'left';  ctx.fillText(String(Math.abs(a)), cx + larg + 5, y + 4);
+      ctx.textAlign = 'right'; ctx.fillText(String(Math.abs(a)), -fora - 5, 4);
+      ctx.textAlign = 'left';  ctx.fillText(String(Math.abs(a)),  fora + 5, 4);
     }
+    ctx.restore();
   }
-  ctx.setLineDash([]);
   ctx.restore();
 
-  // cruz do canhão: fixa, marca para onde o nariz aponta
+  // cruz do canhão: fixa no meio, marca para onde o nariz aponta — e como o
+  // avião voa na direção do nariz, ela também é o vetor de velocidade
   ctx.lineWidth = 2.2;
   ctx.beginPath();
-  ctx.moveTo(cx - W*0.022, cyFixo); ctx.lineTo(cx - W*0.007, cyFixo);
-  ctx.moveTo(cx + W*0.007, cyFixo); ctx.lineTo(cx + W*0.022, cyFixo);
-  ctx.moveTo(cx, cyFixo - H*0.020); ctx.lineTo(cx, cyFixo - H*0.007);
+  ctx.moveTo(cx - W*0.030, cy); ctx.lineTo(cx - W*0.010, cy);
+  ctx.moveTo(cx + W*0.010, cy); ctx.lineTo(cx + W*0.030, cy);
+  ctx.moveTo(cx, cy - H*0.026); ctx.lineTo(cx, cy - H*0.009);
   ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, Math.max(4, H*0.010), 0, 7); ctx.stroke();
 
-  // vetor de velocidade: para onde o avião REALMENTE vai
-  const vvx = cx + (inclinacao/45) * W*0.05;
-  const vvy = horizonte - (vy/voo) * F * 0.5;
-  const r = Math.max(7, H*0.017);
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(vvx, vvy, r, 0, 7);
-  ctx.moveTo(vvx - r, vvy); ctx.lineTo(vvx - r*2.1, vvy);
-  ctx.moveTo(vvx + r, vvy); ctx.lineTo(vvx + r*2.1, vvy);
-  ctx.moveTo(vvx, vvy - r); ctx.lineTo(vvx, vvy - r*1.9);
-  ctx.stroke();
-
-  // escala de inclinação no alto, com o ponteiro girando
+  // escala de inclinação no alto, com o ponteiro girando — agora dá a volta
   const ra = H*0.20;
   ctx.lineWidth = 1.6;
-  for (const a of [-45,-30,-20,-10,0,10,20,30,45]){
+  for (const a of [-90,-60,-45,-30,-20,-10,0,10,20,30,45,60,90]){
     const ang = -Math.PI/2 + a*Math.PI/180;
-    const r1 = ra, r2 = ra + (a===0 ? 11 : 6);
+    const r2 = ra + (a===0 ? 11 : (Math.abs(a)>=45 ? 9 : 6));
     ctx.beginPath();
-    ctx.moveTo(cx+Math.cos(ang)*r1, cyFixo+Math.sin(ang)*r1);
-    ctx.lineTo(cx+Math.cos(ang)*r2, cyFixo+Math.sin(ang)*r2);
+    ctx.moveTo(cx+Math.cos(ang)*ra, cy+Math.sin(ang)*ra);
+    ctx.lineTo(cx+Math.cos(ang)*r2, cy+Math.sin(ang)*r2);
     ctx.stroke();
   }
   const angB = -Math.PI/2 - inclinacao*Math.PI/180;
   ctx.beginPath();
-  ctx.moveTo(cx+Math.cos(angB)*(ra-12), cyFixo+Math.sin(angB)*(ra-12));
-  ctx.lineTo(cx+Math.cos(angB-0.035)*ra, cyFixo+Math.sin(angB-0.035)*ra);
-  ctx.lineTo(cx+Math.cos(angB+0.035)*ra, cyFixo+Math.sin(angB+0.035)*ra);
+  ctx.moveTo(cx+Math.cos(angB)*(ra-12), cy+Math.sin(angB)*(ra-12));
+  ctx.lineTo(cx+Math.cos(angB-0.035)*ra, cy+Math.sin(angB-0.035)*ra);
+  ctx.lineTo(cx+Math.cos(angB+0.035)*ra, cy+Math.sin(angB+0.035)*ra);
   ctx.closePath(); ctx.fill();
+  if (Math.abs(inclinacao) > 100){            // de ponta-cabeça: avisa
+    ctx.textAlign = 'center';
+    ctx.fillText('INVERTIDO', cx, cy - ra - H*0.035);
+  }
 
   fita(W*0.215, Math.round(voo*3.6/METRO), 20, -1, 'VEL km/h');
   fita(W*0.785, Math.round((aviaoY-CHAO)/4), 50, 1, 'ALT m');
@@ -3891,15 +4110,10 @@ function desenha(){
 
   ctx.clearRect(0,0,W,H);
 
-  // Na cabine quem rola é O MUNDO, não a cabine: o piloto e o painel ficam
-  // parados e o horizonte é que se inclina. Eu tinha feito ao contrário, e o
-  // painel saía de quadro quando o avião virava.
-  if (cockpit){
-    ctx.save();
-    ctx.translate(W/2, horizonte);
-    ctx.rotate(-inclinacao * Math.PI/180 * 0.9 - giroQueda);
-    ctx.translate(-W/2, -horizonte);
-  }
+  // Não há mais nenhum giro de tela aqui: o rolar do avião está DENTRO da
+  // transformação da câmera, então o mundo inteiro — céu, chão, prédios,
+  // bichos — já sai virado do jeito certo. É o que permite o looping.
+  poeCamera();
   desenhaCeu();
   desenhaChao();
 
@@ -3957,7 +4171,6 @@ function desenha(){
 
   desenhaMira();
   desenhaAviao();
-  if (cockpit) ctx.restore();      // fecha a rotação do mundo
   desenhaCockpit();
   if (!cockpit) bussola(H*0.175);
   ctx.restore();
@@ -3988,9 +4201,13 @@ function desenha(){
    ========================================================================== */
 function eixos(){
   if (Controle.modo === 'sensor'){
+    // O volante agora vale a VOLTA INTEIRA: o avião copia a inclinação da mão,
+    // até de ponta-cabeça. É o que o Brunno pediu, e é o que o cálculo novo
+    // do sensor permite — o antigo dobrava para trás depois de certo ângulo.
     return {
-      lat: grausParaEixo(Controle.volante, 24, 2.5),
-      ver: grausParaEixo(Controle.manche,  20, 3)
+      lat: Math.max(-1, Math.min(1, voltaCurta(Controle.volante)/180)),
+      ver: grausParaEixo(Controle.manche, 22, 3),
+      absoluto: true
     };
   }
   if (usandoToque) return { lat: toqueX, ver: toqueY };
@@ -4045,20 +4262,19 @@ function dispara(){
   if (municao[arma] <= 0){ bip(120, 0.08, 'square', 0.05); mostraAviso('SEM MUNIÇÃO', '#ff8080', 700); return; }
   municao[arma]--; recarga = ARMAS[arma].recarga;
 
-  // tudo sai na direção do nariz: dx/dz é para onde o avião está apontando
-  const dx = senR, dz = cosR;
+  // tudo sai na direção do nariz, nos três eixos — inclusive num mergulho
   if (arma === 'bomba'){
     bombas.push({ tipo:'bomba', x:aviaoX, y:aviaoY - 60, z:aviaoZ,
-                  vx:dx*voo, vz:dz*voo, vy:-60 });
+                  vx:eixoF.x*voo, vz:eixoF.z*voo, vy:eixoF.y*voo - 60 });
     ruido(0.12, 400, 0.12);
   } else if (arma === 'missil'){
     bombas.push({ tipo:'missil', x:aviaoX, y:aviaoY, z:aviaoZ,
-                  vx:dx*voo*3.2, vz:dz*voo*3.2, vy:vy*0.3, vida:2.4 });
+                  vx:eixoF.x*voo*3.2, vz:eixoF.z*voo*3.2, vy:eixoF.y*voo*3.2, vida:2.4 });
     ruido(0.25, 2600, 0.18);
   } else {
     const lado = (Math.random()-0.5)*220;
-    tiros.push({ x:aviaoX + cosR*lado, y:aviaoY - 20, z:aviaoZ - senR*lado,
-                 dx:dx, dz:dz, v:voo*6, vida:1.1 });
+    tiros.push({ x:aviaoX + eixoD.x*lado, y:aviaoY + eixoD.y*lado, z:aviaoZ + eixoD.z*lado,
+                 dx:eixoF.x, dy:eixoF.y, dz:eixoF.z, v:voo*6, vida:1.1 });
     bip(900 + Math.random()*300, 0.04, 'square', 0.045);
     ruido(0.05, 3000, 0.06);
   }
@@ -4127,24 +4343,25 @@ function atualizaTiros(dt){
   bombas = bombas.filter(b => !b.morto && longe(b.x, b.z) < ALCANCE*1.6);
 
   for (const t of tiros){
-    t.x += t.dx*t.v*dt; t.z += t.dz*t.v*dt; t.vida -= dt;
+    t.x += t.dx*t.v*dt; t.y += t.dy*t.v*dt; t.z += t.dz*t.v*dt; t.vida -= dt;
     if (atingeAr(t.x, t.y, t.z, 320)) t.vida = 0;
   }
   tiros = tiros.filter(t => t.vida > 0);
 }
 
+/* A queda: o avião roda descontrolado e mergulha. Com atitude de verdade isso
+   é só ir girando os eixos e deixar a gravidade puxar o nariz para baixo. */
 function atualizaQueda(dt){
   giroQueda += dt * 3.4;
-  nariz -= dt * 60; if (nariz < -70) nariz = -70;
-  vy -= dt * 1500;
-  aviaoY += vy * dt;
-  aviaoX += senR * voo * dt;
-  aviaoZ += cosR * voo * dt;
+  let r = giraPar(eixoD, eixoC, dt*2.6);  eixoD = r[0]; eixoC = r[1];
+  r = giraPar(eixoF, eixoC, -dt*1.1);     eixoF = r[0]; eixoC = r[1];
+  endireitaEixos();
+  vq -= dt * 1500;                        // velocidade de queda
+  aviaoY += (eixoF.y*voo + vq) * dt;
+  aviaoX += eixoF.x * voo * dt;
+  aviaoZ += eixoF.z * voo * dt;
   voo *= 0.985;
   distancia += voo * dt;
-  camX += (0 - camX) * Math.min(1, dt*2.2);
-  camY += ((aviaoY + (cockpit?0:240)) - camY) * Math.min(1, dt*2.6);
-  horizonte = H*0.38 + nariz*2.2;
   if (aviaoY <= CHAO + 120){
     aviaoY = CHAO + 120;
     if (motivoQueda === 'combustivel'){ explode(aviaoX, aviaoY, aviaoZ, 1.6); motivoQueda = 'acabou'; }
@@ -4166,20 +4383,33 @@ function atualiza(dt){
   if (caindo){ atualizaQueda(dt); return; }
 
   const e = eixos();
-  inclinacao += (e.lat * 45 - inclinacao) * Math.min(1, dt*7);
-  nariz      += (e.ver * 10 - nariz)      * Math.min(1, dt*6);
 
-  // É AQUI que o jogo deixou de ser linear: inclinar não empurra para o lado,
-  // FAZ CURVA. Com a asa toda inclinada o giro completo sai em uns 7 segundos.
-  rumo += (inclinacao/45) * GIRO * dt;
-  if (rumo >  Math.PI) rumo -= 6.283185307;
-  if (rumo < -Math.PI) rumo += 6.283185307;
-  atualizaRumo();
+  /* ---- MANOBRA ----------------------------------------------------------
+     Os dois comandos giram o avião em volta dos EIXOS DELE PRÓPRIO:
+       o volante gira em volta do nariz  -> rolar, volta inteira, sem limite;
+       o manche gira em volta das asas   -> cachimbar, e é o que fecha a curva.
+     Por isso inclinar e puxar faz curva sozinho, como num avião de verdade,
+     e puxar com as asas niveladas faz LOOPING. Nenhum dos dois tem trava. */
+  let rol;
+  if (e.absoluto){                     // celular: o avião COPIA a mão
+    const erro = voltaCurta(e.lat*180 - inclinacao) * Math.PI/180;
+    rol = Math.max(-TAXA_ROL, Math.min(TAXA_ROL, erro * 3.2));
+  } else {                             // tecla ou dedo: rola enquanto segurar
+    rol = e.lat * TAXA_ROL;
+  }
+  let r = giraPar(eixoD, eixoC, -rol*dt);   eixoD = r[0]; eixoC = r[1];
 
-  vy += ((e.ver)*1250 - vy) * Math.min(1, dt*4);
-  aviaoY += vy*dt;
-  aviaoX += senR * voo * dt;
-  aviaoZ += cosR * voo * dt;
+  let cab = e.ver * TAXA_ARF;
+  // ajudinha: com o manche solto e o avião quase nivelado, ele se endireita
+  if (Math.abs(e.ver) < 0.05 && Math.abs(arfagem) < 0.45 && Math.abs(inclinacao) < 30)
+    cab = -arfagem * 0.8;
+  r = giraPar(eixoF, eixoC, cab*dt);        eixoF = r[0]; eixoC = r[1];
+  endireitaEixos();
+
+  // ---- anda para onde o nariz aponta ----
+  aviaoX += eixoF.x * voo * dt;
+  aviaoY += eixoF.y * voo * dt;
+  aviaoZ += eixoF.z * voo * dt;
 
   // a beirada do mapa
   const fora = Math.max(Math.abs(aviaoX), Math.abs(aviaoZ));
@@ -4191,20 +4421,13 @@ function atualiza(dt){
     mostraAviso('beirada do mapa', '#ffb86b', 700);
   }
 
-  if (aviaoY > TETO - 1200 && vy > 0){
-    const p = Math.min(1, (aviaoY - (TETO-1200)) / 1200);
-    vy -= vy * p * Math.min(1, dt*5);
-    if (p > 0.75) mostraAviso('AR RAREFEITO', '#9fd8ff', 900);
-  }
-  if (aviaoY > TETO){ aviaoY = TETO; vy = Math.min(0, vy); }
-  if (aviaoY < CHAO + 260){
-    aviaoY = CHAO + 260; vy = Math.max(0, vy);
+  if (aviaoY > TETO){ aviaoY = TETO; mostraAviso('AR RAREFEITO', '#9fd8ff', 900); }
+  if (aviaoY < CHAO + 240){
+    // mergulho forte no chão é batida; raspar é só susto
+    if (eixoF.y < -0.30){ derruba('chao'); return; }
+    aviaoY = CHAO + 240;
     mostraAviso('SUBA!', '#ff8080');
   }
-
-  camX += (inclinacao*2.2 - camX)                * Math.min(1, dt*2.2);
-  camY += ((aviaoY + (cockpit?0:240)) - camY)    * Math.min(1, dt*2.6);
-  horizonte = H*0.38 + nariz*2.2;
 
   if (turbo > 0){
     turbo -= dt;
@@ -4218,11 +4441,10 @@ function atualiza(dt){
   distancia += voo*dt;
   atualizaTiros(dt);
 
-  // as nuvens que ficaram para trás nascem de novo à frente
   for (const n of nuvens) if (longe(n.x, n.z) > ALCANCE*1.15) recolocaNuvem(n, false);
 
-  // pegar combustível: agora é distância de verdade, nos três eixos, porque
-  // o avião pode chegar no tambor por qualquer lado
+  // pegar combustível: distância nos três eixos, porque dá para chegar no
+  // tambor por qualquer lado — inclusive de ponta-cabeça
   const RP2 = (RAIO_PEGA*1.25) * (RAIO_PEGA*1.25);
   for (const t of tambores){
     if (t.brilho > 0) t.brilho -= dt*2.2;
@@ -4367,7 +4589,7 @@ function fim(){
       venceu ? 'Missão cumprida!' :
       (motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível' :
        motivoQueda === 'predio' ? 'Bateu num prédio' : 'O avião caiu');
-  $('fimPlacar').innerHTML = 'Distância: <span>' + m + '</span> de ' + Math.round(MISSAO/METRO) + ' m &nbsp;·&nbsp; ' +
+  $('fimPlacar').innerHTML = 'Distância: <span>' + m + ' m</span> &nbsp;·&nbsp; ' +
                              'Alvos: <span>' + alvosDestruidos + '/' + alvosTotal + '</span> &nbsp;·&nbsp; ' +
                              'Pontos: <span>' + pontos + '</span> &nbsp;·&nbsp; Recorde: <span>' + recorde + ' m</span>';
   $('fimTela').classList.add('ver');
@@ -4452,6 +4674,14 @@ function abrirSala(){
     $('codigo').textContent = codigo; $('codigo2').textContent = codigo; $('codigo3').textContent = codigo;
     const url = urlDoControle();
     $('url').textContent = url;
+    // o QR pequeno do canto continua desenhado o jogo inteiro: quem chegar
+    // depois aponta a câmera e entra sem ninguém parar a partida
+    if (/^https?:/.test(location.protocol)){
+      desenhaQR($('qrJogo'), url);
+      setTimeout(() => { const c = $('convite'); if (c) c.classList.add('discreto'); }, 25000);
+      const c = $('convite');
+      if (c) c.addEventListener('click', () => c.classList.toggle('discreto'));
+    }
     if (/^https?:/.test(location.protocol)){ desenhaQR($('qr'), url); $('qr').classList.add('ver'); }
     estado('meio', 'esperando o celular…');
   });
@@ -4494,7 +4724,7 @@ function trata(d){
 function mandaEstado(){
   if (conn && conn.open) conn.send({ t: 'estado', jogando, acabou, dist: Math.round(distancia/METRO), comb: Math.round(combustivel),
                           turbo: turbo > 0, arma, mun: municao[arma], pontos, alvos: alvosDestruidos + '/' + alvosTotal,
-                          prog: Math.min(100, Math.round(distancia/MISSAO*100)) });
+                          prog: Math.round(alvosDestruidos/Math.max(1,alvosTotal)*100) });
 }
 setInterval(mandaEstado, 250);
 

@@ -61,8 +61,20 @@
   #somNivel{display:block;height:100%;width:0;background:#5eff9a;border-radius:99px;transition:width .06s linear}
   #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;padding:0 16px;font-size:clamp(24px,4.5vw,44px);
          font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
-  #sala2{position:absolute;bottom:14px;left:18px;font-size:12px;color:#9fb4d8;letter-spacing:.5px}
-  #sala2 b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;color:#fff;letter-spacing:.2em}
+  /* Fica aberto o jogo inteiro: enquanto o QR estiver na tela, mais gente pode
+     entrar na sala sem parar a partida. Encolhe sozinho depois de um tempo
+     para não atrapalhar, e volta ao tamanho ao passar o rato / tocar. */
+  #convite{position:absolute;bottom:14px;left:18px;display:flex;align-items:center;gap:10px;
+           background:rgba(8,12,26,.55);border:1px solid rgba(255,255,255,.14);border-radius:12px;
+           padding:8px 12px 8px 8px;pointer-events:auto;transition:opacity .4s, transform .3s;
+           transform-origin:left bottom}
+  #convite.discreto{opacity:.42;transform:scale(.72)}
+  #convite:hover{opacity:1;transform:scale(1)}
+  #qrJogo{width:64px;height:64px;background:#fff;border-radius:7px;display:block}
+  #convite .txt2{font-size:12px;color:#9fb4d8;letter-spacing:.5px;line-height:1.5}
+  #convite .txt2 b{display:block;font-family:ui-monospace,Menlo,Consolas,monospace;
+                   font-size:17px;color:#fff;letter-spacing:.22em}
+  @media (max-width:620px){ #qrJogo{width:48px;height:48px} #convite .txt2{font-size:10px} }
 
   /* ---- telas por cima do jogo ---- */
   .veu{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;
@@ -118,7 +130,10 @@
   <button id="btSom" title="som (liga/desliga)">&#128266;</button>
   <div id="somBarra"><i id="somNivel"></i></div>
   <div id="aviso"></div>
-  <div id="sala2">sala <b id="codigo2">····</b></div>
+  <div id="convite" title="outro jogador pode entrar a qualquer momento">
+    <canvas id="qrJogo" width="180" height="180"></canvas>
+    <div class="txt2">entre também<b id="codigo2">····</b></div>
+  </div>
 </div>
 
 <!-- sala de espera -->
@@ -210,7 +225,7 @@ function fim(){
       venceu ? 'Missão cumprida!' :
       (motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível' :
        motivoQueda === 'predio' ? 'Bateu num prédio' : 'O avião caiu');
-  $('fimPlacar').innerHTML = 'Distância: <span>' + m + '</span> de ' + Math.round(MISSAO/METRO) + ' m &nbsp;·&nbsp; ' +
+  $('fimPlacar').innerHTML = 'Distância: <span>' + m + ' m</span> &nbsp;·&nbsp; ' +
                              'Alvos: <span>' + alvosDestruidos + '/' + alvosTotal + '</span> &nbsp;·&nbsp; ' +
                              'Pontos: <span>' + pontos + '</span> &nbsp;·&nbsp; Recorde: <span>' + recorde + ' m</span>';
   $('fimTela').classList.add('ver');
@@ -295,6 +310,14 @@ function abrirSala(){
     $('codigo').textContent = codigo; $('codigo2').textContent = codigo; $('codigo3').textContent = codigo;
     const url = urlDoControle();
     $('url').textContent = url;
+    // o QR pequeno do canto continua desenhado o jogo inteiro: quem chegar
+    // depois aponta a câmera e entra sem ninguém parar a partida
+    if (/^https?:/.test(location.protocol)){
+      desenhaQR($('qrJogo'), url);
+      setTimeout(() => { const c = $('convite'); if (c) c.classList.add('discreto'); }, 25000);
+      const c = $('convite');
+      if (c) c.addEventListener('click', () => c.classList.toggle('discreto'));
+    }
     if (/^https?:/.test(location.protocol)){ desenhaQR($('qr'), url); $('qr').classList.add('ver'); }
     estado('meio', 'esperando o celular…');
   });
@@ -337,7 +360,7 @@ function trata(d){
 function mandaEstado(){
   if (conn && conn.open) conn.send({ t: 'estado', jogando, acabou, dist: Math.round(distancia/METRO), comb: Math.round(combustivel),
                           turbo: turbo > 0, arma, mun: municao[arma], pontos, alvos: alvosDestruidos + '/' + alvosTotal,
-                          prog: Math.min(100, Math.round(distancia/MISSAO*100)) });
+                          prog: Math.round(alvosDestruidos/Math.max(1,alvosTotal)*100) });
 }
 setInterval(mandaEstado, 250);
 

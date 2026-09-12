@@ -397,3 +397,63 @@ Fontes que usei: o arranjo do painel em
 [Engineering LibreTexts](https://eng.libretexts.org/Bookshelves/Aerospace_Engineering/Fundamentals_of_Aerospace_Engineering_(Arnedo)/05:_Aircraft_instruments_and_systems/5.01:_Aircraft_instruments/5.1.04:_Instruments_layout)
 e a simbologia do HUD em [Falconpedia](http://falcon4.wikidot.com/avionics:hud)
 e na [documentação do DCS](https://dcs.man-sim.org/en/fa18c/05.hud/).
+
+## Versão caça: cambalhota, e o controle que não inverte mais
+
+O Brunno achou o defeito: *"quanto mais eu giro, após um certo ângulo ele volta
+para o outro lado"*. Era **trava de cardan**. Eu lia `beta` e `gamma` do sensor
+e usava direto, mas `gamma` só vai de -90° a +90° — passando disso a leitura
+**dobra para trás**.
+
+A correção é montar o vetor "para cima do mundo" visto de dentro do aparelho:
+
+```
+u = ( -cos(beta)·sin(gamma) ,  sin(beta) ,  cos(beta)·cos(gamma) )
+
+rolagem = atan2(u.x, u.y)   -> volta inteira, -180° a 180°, sem trava
+arfagem = asin(u.z)         -> o quanto a tela está virada para o céu
+```
+
+Isso resolve três coisas de uma vez: a rolagem **dá a volta completa**, os dois
+eixos **param de se misturar** (girar na mão não mexe no manche), e o jogo
+**deixa de precisar adivinhar** se o celular está em pé ou deitado — a
+calibragem absorve a pegada. O botão "girar" virou **"zerar aqui"**: segure
+como quiser, toque, e aquela posição passa a ser "asas niveladas".
+
+### E o avião ganhou atitude de verdade
+
+Com o controle dando a volta inteira, o modelo de voo antigo não servia mais:
+ele tinha um ângulo de inclinação achatado e um "nariz" que empurrava a linha do
+horizonte na tela. Não havia como representar o avião de ponta-cabeça, nem
+apontando para o zênite.
+
+Agora o avião carrega **três vetores** — para onde aponta o nariz, o teto da
+cabine e a asa direita. Rolar gira um par em volta do nariz; cachimbar gira
+outro par em volta das asas. Como a manobra é sempre em volta dos eixos **do
+avião**, duas coisas saem de graça:
+
+- inclinar e puxar faz **curva**, como num avião de verdade;
+- puxar com as asas niveladas faz **looping**.
+
+A projeção virou uma câmera de furo de verdade (`x/z`, `y/z`), sem o truque de
+empurrar o horizonte. E o céu deixou de ser "a parte de cima da tela": o
+horizonte é uma **reta**, e de que lado dela está o céu sai do vetor "para cima
+do mundo" visto pela câmera. É isso que deixa voar de cabeça para baixo sem a
+imagem se desmanchar.
+
+A escada de arfagem do HUD também foi refeita: cada degrau é uma **direção do
+mundo** projetada pela mesma câmera, em vez de linhas empilhadas a partir de
+uma linha do horizonte inventada. Por isso ela sobrevive ao looping.
+
+### Controle: deslizar em vez de apertar
+
+*"Tem que ser rolando, passando o dedo para o lado, e não apertando, pois força
+olhar o controle."* O seletor de arma virou uma faixa: o dedo arrasta para o
+lado e a arma muda. E cada arma **vibra diferente** — um, dois ou três toques —
+para dar para trocar de arma com os olhos na tela grande.
+
+### O QR fica aberto
+
+O código e o QR continuam num canto durante a partida inteira, encolhidos para
+não atrapalhar. Quem chegar depois aponta a câmera e entra sem ninguém parar o
+jogo.
