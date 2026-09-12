@@ -457,3 +457,38 @@ para dar para trocar de arma com os olhos na tela grande.
 O código e o QR continuam num canto durante a partida inteira, encolhidos para
 não atrapalhar. Quem chegar depois aponta a câmera e entra sem ninguém parar o
 jogo.
+
+## Dois jogadores: piloto e artilheiro
+
+Quando o segundo celular entra, ele **não toma o avião** — ganha um posto.
+
+Antes a tela guardava **uma** conexão e o mais novo derrubava o antigo: quem
+entrasse no meio da partida roubava o avião, e o primeiro via *"a TV
+desconectou"*. Agora existe uma **tripulação**:
+
+| posto | quem é | o que faz |
+|---|---|---|
+| **piloto** | o 1º que entra | a inclinação dele vira a do avião |
+| **artilheiro** | o 2º | a inclinação dele move a **torre**, e é ele quem escolhe a arma e aperta o gatilho |
+| reserva | do 3º em diante | entram como artilheiros e assumem se alguém sair |
+
+A torre é um desvio em relação ao nariz, dentro de um cone de uns 24°. Míssil e
+metralhadora saem **por onde a torre aponta**; a bomba continua saindo do
+ventre, porque bomba quem manda é a gravidade. Na tela grande aparece um
+retículo vermelho separado da cruz do canhão, e ele **fecha e fica verde**
+quando há alvo na linha de tiro — dá para acertar sem ninguém falar nada.
+
+O controle do artilheiro muda de cara: em vez do horizonte artificial, ele vê a
+mira andando dentro do cone.
+
+Detalhe que custou um teste: **fechar a aba do celular não avisa a tela** — o
+PeerJS simplesmente não manda nada. Quem sumiu é descoberto pelo **silêncio**
+(3,5 s sem mensagem). Sem isso o artilheiro nunca assumia o manche quando o
+piloto largava o jogo.
+
+## O manche estava invertido
+
+`asin(uz)` mede "a tela está virada para o céu", e é **empurrar** a borda de
+cima para longe que vira a tela para cima. Sem o sinal negativo, empurrar subia
+e puxar descia. Agora vale o manche de verdade: **puxar a borda de cima levanta
+o nariz**, que é o que o aviso na tela sempre prometeu.

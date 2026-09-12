@@ -322,16 +322,7 @@ function abrirSala(){
     estado('meio', 'esperando o celular…');
   });
 
-  peer.on('connection', c => {
-    // Um controle por vez, e o mais novo manda: se o celular caiu e voltou, a
-    // conexão antiga pode ainda parecer aberta para a TV por alguns segundos.
-    if (conn && conn !== c){ try { conn.close(); } catch(e){} }
-    conn = c;
-    c.on('open', () => { estado('ok', 'celular conectado — toque em Começar lá'); mandaEstado(); });
-    c.on('data', trata);
-    c.on('close', () => { if (conn !== c) return; estado('nao', 'o celular desconectou'); conn = null; pausa(); });
-    c.on('error', () => { estado('nao', 'erro na conexão com o celular'); });
-  });
+  peer.on('connection', c => Tripulacao.entra(c));
 
   peer.on('error', e => {
     if (e.type === 'unavailable-id'){ try { peer.destroy(); } catch(x){} abrirSala(); return; }   // código já em uso: sorteia outro
@@ -341,15 +332,84 @@ function abrirSala(){
   peer.on('disconnected', () => { try { peer.reconnect(); } catch(e){} });
 }
 
+/* =============================================================================
+   TRIPULAÇÃO — mais de um celular na mesma sala
+
+   Antes a TV guardava UMA conexão e o mais novo derrubava o antigo: quem
+   entrasse no meio da partida roubava o avião. Agora cada celular ganha um
+   POSTO: o 1º é o PILOTO (a inclinação dele vira a do avião) e o 2º é o
+   ARTILHEIRO (a inclinação dele move a TORRE, e é ele quem escolhe a arma e
+   aperta o gatilho). Mesma tela, mesmo avião, duas tarefas.
+   ========================================================================== */
+const Tripulacao = {
+  membros: [],
+  entra(c){
+    const m = { c: c, ultimo: Date.now(),
+                papel: this.membros.some(o => o.papel === 'piloto') ? 'artilheiro' : 'piloto' };
+    this.membros.push(m);
+    const pronto = () => { this.avisaPapel(m); this.mostra(); mandaEstado(); };
+    c.on('open', pronto);
+    c.on('close', () => this.sai(c));
+    c.on('error', () => this.sai(c));
+    c.on('data', d => this.recebe(m, d));
+    if (c.open) pronto();
+    if (m.papel === 'piloto') conn = c;
+  },
+  sai(c){
+    const i = this.membros.findIndex(m => m.c === c);
+    if (i < 0) return;
+    const era = this.membros[i].papel;
+    this.membros.splice(i, 1);
+    if (era === 'piloto'){
+      const novo = this.membros[0];
+      if (novo){ novo.papel = 'piloto'; conn = novo.c; this.avisaPapel(novo); }
+      else { conn = null; pausa(); }
+    }
+    this.mostra();
+  },
+  avisaPapel(m){
+    try { m.c.send({ t:'papel', p:m.papel, n:this.membros.length }); } catch(e){}
+    temArtilheiro = this.membros.some(o => o.papel === 'artilheiro');
+    if (!temArtilheiro){ miraX = 0; miraY = 0; }
+  },
+  recebe(m, d){
+    if (!d || !d.t) return;
+    m.ultimo = Date.now();
+    if (d.t === 'eixo'){
+      if (m.papel === 'piloto'){
+        Controle.volante = d.v; Controle.manche = d.m;
+        Controle.modo = 'sensor'; Controle.ultimo = Date.now();
+        if (pausado) retoma();
+      } else {
+        miraX = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (d.v/45) * MIRA_MAX));
+        miraY = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (d.m/30) * MIRA_MAX));
+      }
+      return;
+    }
+    if (d.t === 'ping'){ try { m.c.send({ t:'pong', at:d.at }); } catch(e){} return; }
+    trata(d);
+  },
+  envia(o){ for (const m of this.membros){ try { m.c.send(o); } catch(e){} } },
+  /* Fechar a aba do celular NÃO avisa a TV: o PeerJS não manda nada. Quem
+     sumiu é descoberto pelo silêncio, senão o artilheiro nunca assumia. */
+  varre(){
+    const agora = Date.now();
+    for (const m of this.membros.slice()) if (agora - m.ultimo > 3500) this.sai(m.c);
+  },
+  mostra(){
+    const n = this.membros.length;
+    if (!n) return estado('nao', 'o celular desconectou');
+    const art = this.membros.filter(m => m.papel === 'artilheiro').length;
+    estado('ok', n === 1 ? 'celular conectado — toque em Começar lá'
+                         : 'piloto + ' + art + ' artilheiro' + (art > 1 ? 's' : ''));
+  }
+};
+setInterval(() => Tripulacao.varre(), 1000);
+
 function trata(d){
   if (!d || !d.t) return;
   switch (d.t){
-    case 'eixo':
-      Controle.volante = d.v; Controle.manche = d.m; Controle.modo = 'sensor'; Controle.ultimo = Date.now();
-      if (pausado) retoma();
-      break;
-    case 'ping':  if (conn && conn.open) conn.send({ t: 'pong', at: d.at }); break;
-    case 'oi':    estado('ok', 'celular conectado — toque em Começar lá'); break;
+    case 'oi':    Tripulacao.mostra(); break;
     case 'botao': if (d.b === 'comecar' && !jogando && !pausado) comeca(); break;
     case 'arma':  trocaArma(d.a); break;
     case 'fogo':  atirando = !!d.v; break;
@@ -358,7 +418,7 @@ function trata(d){
 }
 
 function mandaEstado(){
-  if (conn && conn.open) conn.send({ t: 'estado', jogando, acabou, dist: Math.round(distancia/METRO), comb: Math.round(combustivel),
+  Tripulacao.envia({ t: 'estado', jogando, acabou, dist: Math.round(distancia/METRO), comb: Math.round(combustivel),
                           turbo: turbo > 0, arma, mun: municao[arma], pontos, alvos: alvosDestruidos + '/' + alvosTotal,
                           prog: Math.round(alvosDestruidos/Math.max(1,alvosTotal)*100) });
 }

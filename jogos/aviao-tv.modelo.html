@@ -126,6 +126,26 @@
   .estado.nao{color:#ffc9c9;border-color:rgba(255,90,90,.3)} .estado.nao .luz{background:#ff6a6a}
   .estado.meio2{color:#ffe1a8;border-color:rgba(255,194,77,.35)} .estado.meio2 .luz{background:#ffc24d}
 
+  /* ---- posto de cada jogador: piloto ou artilheiro ---- */
+  #posto{display:flex;align-items:center;gap:8px;font:800 12px/1 inherit;letter-spacing:2px;
+         border-radius:99px;padding:7px 14px;background:rgba(92,200,255,.16);color:#9fd8ff;
+         border:1px solid rgba(92,200,255,.35)}
+  body.artilheiro #posto{background:rgba(255,110,90,.16);color:#ffb0a0;border-color:rgba(255,110,90,.4)}
+  /* o artilheiro não vê horizonte: vê a mira da torre */
+  body.artilheiro #horizonte{background:#0d1119;border-color:rgba(255,110,90,.35)}
+  body.artilheiro #ceu{display:none}
+  body.artilheiro #alvoTorre{display:block}
+  #alvoTorre{display:none;position:absolute;left:50%;top:50%;width:26%;height:26%;
+             margin:-13% 0 0 -13%;border:2px solid rgba(255,110,90,.9);border-radius:50%}
+  #alvoTorre::before,#alvoTorre::after{content:'';position:absolute;background:rgba(255,110,90,.9)}
+  #alvoTorre::before{left:50%;top:-46%;width:2px;height:36%;margin-left:-1px}
+  #alvoTorre::after{top:50%;left:-46%;height:2px;width:36%;margin-top:-1px}
+  #gradeTorre{display:none;position:absolute;inset:12%;border:1px dashed rgba(255,110,90,.28);border-radius:12px}
+  body.artilheiro #gradeTorre{display:block}
+  /* com artilheiro a bordo, quem escolhe a arma é ele */
+  body.piloto.acompanhado .armas{opacity:.45;pointer-events:none}
+  body.piloto.acompanhado .armaDica::after{content:' — o artilheiro escolhe'}
+
   /* ================= o controle ================= */
   #controle{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
             gap:12px;padding:calc(12px + env(safe-area-inset-top)) 20px calc(12px + env(safe-area-inset-bottom))}
@@ -156,8 +176,9 @@
   .armaAtual{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
              justify-content:center;font:900 17px/1.1 inherit;letter-spacing:1.5px;color:#ffc24d}
   .armaAtual i{font-style:normal;font-weight:700;font-size:12px;color:#9fb0cc;margin-top:4px;letter-spacing:1px}
-  .armaLado{position:absolute;top:0;bottom:0;width:34%;display:flex;align-items:center;
-            font:800 11px/1.1 inherit;color:#5d6b85;letter-spacing:1px;pointer-events:none}
+  .armaLado{position:absolute;top:0;bottom:0;width:26%;display:flex;align-items:center;
+            font:800 9.5px/1.1 inherit;color:#4e5b73;letter-spacing:.5px;pointer-events:none;
+            overflow:hidden;white-space:nowrap}
   #armaAnt{left:8px;justify-content:flex-start}
   #armaProx{right:8px;justify-content:flex-end}
   .armaDica{position:absolute;left:0;right:0;bottom:4px;text-align:center;
@@ -183,7 +204,8 @@
 
     #horizonte{left:50%;top:44%;transform:translate(-50%,-50%);
                --d:min(30vw,56vh,190px);width:var(--d);height:var(--d)}
-    #estadoRede{top:8px;left:50%;transform:translateX(-50%);width:auto;max-width:52vw}
+    #estadoRede{top:8px;left:50%;transform:translateX(-50%);width:auto;max-width:40vw}
+    #posto{top:8px;right:calc(10px + env(safe-area-inset-right));padding:5px 10px;font-size:10.5px;letter-spacing:1.5px}
     .placar{top:calc(44% + min(15vw,28vh,95px) + 10px);left:50%;transform:translateX(-50%);gap:16px}
     .placar .val2{font-size:16px}
     #giroLinha{bottom:8px;left:50%;transform:translateX(-50%);font-size:11px}
@@ -192,6 +214,11 @@
     .armas{left:calc(10px + env(safe-area-inset-left));bottom:calc(10px + env(safe-area-inset-bottom));
            width:min(34vw,190px);max-width:none;height:min(21vw,96px)}
     .armaAtual{font-size:min(3.6vw,17px)}
+    /* deitado não cabe o nome das armas vizinhas sem passar por cima da do
+       meio; fica só a seta, que é o que interessa para saber que dá para
+       deslizar */
+    .armaLado{width:14%;font-size:0}
+    .armaLado::first-letter{font-size:13px}
 
     /* polegar direito */
     #btFogo{right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));
@@ -354,7 +381,9 @@
 <!-- ============ 5. O CONTROLE ============ -->
 <div id="controle">
   <div class="estado" id="estadoRede" style="max-width:340px;width:100%"><span class="luz"></span><span id="estadoRedeTxt">conectando&hellip;</span></div>
-  <div id="horizonte"><div id="ceu"></div><div id="mira"></div></div>
+  <div id="posto"><span id="postoTxt">PILOTO</span></div>
+  <div id="horizonte"><div id="ceu"></div><div id="gradeTorre"></div>
+       <div id="alvoTorre"></div><div id="mira"></div></div>
   <div class="placar">
     <div><div class="rot">Distância</div><div class="val2" id="pDist">0</div></div>
     <div><div class="rot">Combustível</div><div class="val2" id="pComb">&ndash;</div></div>
@@ -483,7 +512,11 @@ const Sensor = {
     const b = (e.beta || 0)*R, g = (e.gamma || 0)*R;
     const ux = -Math.cos(b)*Math.sin(g), uy = Math.sin(b), uz = Math.cos(b)*Math.cos(g);
     Sensor._v = -Math.atan2(ux, uy) * G;
-    Sensor._m = Math.asin(Math.max(-1, Math.min(1, uz))) * G;
+    // O SINAL DO MANCHE: asin(uz) mede "a tela está virada para o céu", e
+    // empurrar a borda de cima para longe é que vira a tela para cima. Sem o
+    // menos, empurrar subia e puxar descia — invertido, como o Brunno sentiu.
+    // Com ele vale o manche de verdade: PUXAR a borda de cima levanta o nariz.
+    Sensor._m = -Math.asin(Math.max(-1, Math.min(1, uz))) * G;
     Sensor.volante = voltaCurta(Sensor._v - Sensor.zeroVolante);
     Sensor.manche  = Sensor._m - Sensor.zeroManche;
     Sensor.recebeu = true; Sensor.ultimaLeitura = Date.now();
@@ -620,28 +653,128 @@ function desenhaQR(canvas, texto){
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) c2.fillRect(off + c*cel, off + r*cel, cel, cel);
 }
 
+/* =============================================================================
+   TRIPULAÇÃO — mais de um celular na mesma sala
+
+   Antes a tela guardava UMA conexão e o mais novo derrubava o antigo: quem
+   entrasse no meio da partida roubava o avião e o primeiro via "a TV
+   desconectou". Agora cada celular ganha um POSTO:
+
+     o 1º é o PILOTO      — a inclinação dele vira a do avião;
+     o 2º é o ARTILHEIRO  — a inclinação dele move a TORRE, e é ele quem
+                            escolhe a arma e aperta o gatilho;
+     do 3º em diante entram como artilheiros de reserva, e assumem se
+     alguém cair.
+
+   Mesma tela, mesmo avião, duas tarefas — que é o que dá para fazer bem numa
+   TV só, sem dividir a tela.
+   ========================================================================== */
+const Tripulacao = {
+  membros: [],                         // { c, papel }
+
+  entra(c){
+    const m = { c: c, ultimo: Date.now(),
+                papel: this.membros.some(o => o.papel === 'piloto') ? 'artilheiro' : 'piloto' };
+    this.membros.push(m);
+    c.on('open', () => { this.avisaPapel(m); this.mostra(); mandaEstado(); });
+    c.on('close', () => this.sai(c));
+    c.on('error', () => this.sai(c));
+    c.on('data', d => this.recebe(m, d));
+    if (c.open){ this.avisaPapel(m); this.mostra(); mandaEstado(); }
+    // o Canal continua existindo para o Chromecast e para o jogador sozinho
+    if (m.papel === 'piloto') Canal.usarPeer(c);
+  },
+
+  sai(c){
+    const i = this.membros.findIndex(m => m.c === c);
+    if (i < 0) return;
+    const era = this.membros[i].papel;
+    this.membros.splice(i, 1);
+    if (era === 'piloto'){
+      const novo = this.membros[0];      // o artilheiro assume o manche
+      if (novo){ novo.papel = 'piloto'; this.avisaPapel(novo); Canal.usarPeer(novo.c); }
+    }
+    temArtilheiro = this.membros.some(m => m.papel === 'artilheiro');
+    if (!temArtilheiro){ miraX = 0; miraY = 0; }
+    this.mostra();
+  },
+
+  avisaPapel(m){
+    try { m.c.send({ t:'papel', p:m.papel, n:this.membros.length }); } catch(e){}
+    temArtilheiro = this.membros.some(o => o.papel === 'artilheiro');
+    if (!temArtilheiro){ miraX = 0; miraY = 0; }
+  },
+
+  recebe(m, d){
+    if (!d || !d.t) return;
+    m.ultimo = Date.now();
+    if (d.t === 'eixo'){
+      if (m.papel === 'piloto'){
+        Controle.volante = d.v; Controle.manche = d.m;
+        Controle.modo = 'sensor'; Controle.ultimo = Date.now();
+        if (pausado) retoma();
+      } else {
+        // o artilheiro move a TORRE, dentro do cone
+        miraX = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (d.v/45) * MIRA_MAX));
+        miraY = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (d.m/30) * MIRA_MAX));
+      }
+      return;
+    }
+    if (d.t === 'ping'){ try { m.c.send({ t:'pong', at:d.at }); } catch(e){} return; }
+    trataMensagem(d);
+  },
+
+  envia(o){ for (const m of this.membros){ try { m.c.send(o); } catch(e){} } },
+
+  /* Fechar a aba do celular NÃO avisa a tela: o PeerJS não manda nada. Então
+     quem sumiu é descoberto pelo silêncio — sem isto o artilheiro nunca
+     assumia o manche quando o piloto largava o jogo. */
+  varre(){
+    const agora = Date.now();
+    for (const m of this.membros.slice())
+      if (agora - m.ultimo > 3500) this.sai(m.c);
+  },
+  mostra(){
+    const n = this.membros.length;
+    if (!n) return estado('nao', 'nenhum controle conectado');
+    const art = this.membros.filter(m => m.papel === 'artilheiro').length;
+    estado('ok', n === 1 ? 'piloto conectado — toque em Começar nele'
+                         : 'piloto + ' + art + ' artilheiro' + (art > 1 ? 's' : ''));
+  }
+};
+
+/* o que serve para qualquer posto (e para o jogador sozinho) */
+function trataMensagem(d){
+  switch (d.t){
+    case 'oi':    Tripulacao.mostra(); mandaEstado(); break;
+    case 'botao': if (d.b === 'comecar' && !jogando && !pausado) comeca(); break;
+    case 'arma':  trocaArma(d.a); break;
+    case 'fogo':  atirando = !!d.v; break;
+    case 'visao': cockpit = !cockpit; break;
+  }
+}
+
 function ligaCanalDaTela(){
   Canal.aoAbrir = () => { estado('ok', 'controle conectado — toque em Começar nele'); mandaEstado(); };
   Canal.aoFechar = () => { estado('nao', 'o controle desconectou'); pausa(); };
+  // Pelo Chromecast só existe um canal, e ele é o piloto. Pelo PeerJS quem
+  // entrega as mensagens é a Tripulação, e este atalho não chega a ser usado.
   Canal.aoDado = d => {
     if (!d || !d.t) return;
-    switch (d.t){
-      case 'eixo':
-        Controle.volante = d.v; Controle.manche = d.m; Controle.modo = 'sensor'; Controle.ultimo = Date.now();
-        if (pausado) retoma();
-        break;
-      case 'ping':  Canal.envia({ t: 'pong', at: d.at }); break;
-      case 'oi':    estado('ok', 'controle conectado — toque em Começar nele'); mandaEstado(); break;
-      case 'botao': if (d.b === 'comecar' && !jogando && !pausado) comeca(); break;
-      case 'arma':  trocaArma(d.a); break;
-      case 'fogo':  atirando = !!d.v; break;
-      case 'visao': cockpit = !cockpit; break;
+    if (Tripulacao.membros.length) return;        // a sala já cuida disso
+    if (d.t === 'eixo'){
+      Controle.volante = d.v; Controle.manche = d.m; Controle.modo = 'sensor'; Controle.ultimo = Date.now();
+      if (pausado) retoma();
+      return;
     }
+    if (d.t === 'ping'){ Canal.envia({ t: 'pong', at: d.at }); return; }
+    trataMensagem(d);
   };
 }
-function mandaEstado(){ Canal.envia({ t: 'estado', jogando, acabou, dist: Math.round(distancia/METRO), comb: Math.round(combustivel),
+function mandaEstado(){ const pacote = { t: 'estado', jogando, acabou, dist: Math.round(distancia/METRO), comb: Math.round(combustivel),
                 turbo: turbo > 0, arma, mun: municao[arma], pontos, alvos: alvosDestruidos + '/' + alvosTotal,
-                prog: Math.round(alvosDestruidos/Math.max(1,alvosTotal)*100) }); }
+                prog: Math.round(alvosDestruidos/Math.max(1,alvosTotal)*100) };
+  if (Tripulacao.membros.length) Tripulacao.envia(pacote); else Canal.envia(pacote); }
 
 function viraTela(comSala){
   papel = 'tela';
@@ -689,10 +822,7 @@ function abrirSala(){
     if (/^https?:/.test(location.protocol)){ desenhaQR($('qr'), url); $('qr').classList.add('ver'); }
     estado('meio2', 'esperando o controle…');
   });
-  peer.on('connection', c => {
-    if (Canal.conn && Canal.conn !== c) Canal.fecha();
-    Canal.usarPeer(c);
-  });
+  peer.on('connection', c => Tripulacao.entra(c));
   peer.on('error', e => {
     if (e.type === 'unavailable-id'){ try { peer.destroy(); } catch(x){} abrirSala(); return; }
     if (e.type === 'network' || e.type === 'server-error') estado('nao', 'sem acesso ao servidor de sinalização. Esta tela tem internet?');
@@ -716,6 +846,7 @@ setInterval(() => {
   if (papel === 'tela' && jogando && !sozinho && Controle.modo === 'sensor' && Date.now() - Controle.ultimo > 2000) pausa();
 }, 300);
 setInterval(() => { if (papel === 'tela') mandaEstado(); }, 250);
+setInterval(() => { if (papel === 'tela') Tripulacao.varre(); }, 1000);
 
 /* =============================================================================
    MODO CONTROLE
@@ -733,6 +864,7 @@ function ligaCanalDoControle(){
   Canal.aoFechar = () => estadoRede('nao', 'a tela do jogo desconectou');
   Canal.aoDado = d => {
     if (!d || !d.t) return;
+    if (d.t === 'papel'){ assumePosto(d.p, d.n); return; }
     if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
     if (d.t === 'estado'){
       $('pDist').textContent = d.dist;
@@ -772,9 +904,37 @@ setInterval(() => {
   if (ultimoPong && Date.now() - ultimoPong > 4000) estadoRede('nao', 'a tela do jogo parou de responder');
 }, 1000);
 
-// horizonte artificial do controle
+/* --- o posto deste celular -------------------------------------------------
+   O 1º que entra é o piloto; o 2º é o artilheiro, e o desenho do controle muda
+   junto: em vez do horizonte artificial ele passa a ver a MIRA DA TORRE, que
+   anda com a inclinação da mão dentro de um cone. Mesma tela de TV, mesmo
+   avião, tarefas diferentes. */
+let meuPosto = 'piloto';
+const CONE = 45;                              // graus de mão para o cone todo
+function assumePosto(p, quantos){
+  meuPosto = p;
+  document.body.classList.toggle('piloto', p === 'piloto');
+  document.body.classList.toggle('artilheiro', p === 'artilheiro');
+  document.body.classList.toggle('acompanhado', (quantos || 1) > 1);
+  const t = $('postoTxt');
+  if (t) t.textContent = p === 'artilheiro' ? 'ARTILHEIRO \u271B' : 'PILOTO';
+  const g = $('giroLinha');
+  if (g) g.firstChild.nodeValue = p === 'artilheiro' ? 'mira: ' : 'asas: ';
+  vibra(p === 'artilheiro' ? [30,60,30] : 30);
+}
+assumePosto('piloto', 1);
+
+// horizonte artificial (piloto) ou mira da torre (artilheiro)
 (function anima(){
-  if (papel === 'controle') $('ceu').style.transform = 'rotate(' + (-Sensor.volante) + 'deg) translateY(' + (Sensor.manche * 1.4) + '%)';
+  if (papel === 'controle'){
+    if (meuPosto === 'artilheiro'){
+      const x = Math.max(-1, Math.min(1, Sensor.volante/CONE));
+      const y = Math.max(-1, Math.min(1, Sensor.manche/(CONE*0.7)));
+      $('alvoTorre').style.transform = 'translate(' + (x*120).toFixed(1) + '%,' + (-y*120).toFixed(1) + '%)';
+    } else {
+      $('ceu').style.transform = 'rotate(' + (-Sensor.volante) + 'deg) translateY(' + (Sensor.manche * 1.4) + '%)';
+    }
+  }
   requestAnimationFrame(anima);
 })();
 
@@ -975,6 +1135,10 @@ function pintaGiro(){
   const el = document.getElementById('giroTxt');
   if (!el) return;
   const v = Math.round(Sensor.volante);
+  if (typeof meuPosto !== 'undefined' && meuPosto === 'artilheiro'){
+    el.textContent = Math.abs(v) < 6 ? 'no eixo' : (v > 0 ? v + '\u00B0 \u00E0 direita' : (-v) + '\u00B0 \u00E0 esquerda');
+    return;
+  }
   el.textContent = (Math.abs(v) < 8 ? 'niveladas' : (v > 0 ? v + '\u00B0 para a direita' : (-v) + '\u00B0 para a esquerda'));
 }
 (function(){
@@ -1015,8 +1179,10 @@ function pintaGiro(){
     const a = ORDEM[iArma];
     elAtual.childNodes[0].nodeValue = NOME[a];
     elMun.textContent = municoes[a] !== undefined ? municoes[a] : '';
-    elAnt.textContent  = '‹ ' + NOME[(iArma + ORDEM.length - 1) % ORDEM.length];
-    elProx.textContent = NOME[(iArma + 1) % ORDEM.length] + ' ›';
+    // NOME é indexado pelo nome da arma, não pelo número: com o índice cru saía
+    // "undefined" nos dois lados do seletor
+    elAnt.textContent  = '‹ ' + NOME[ORDEM[(iArma + ORDEM.length - 1) % ORDEM.length]];
+    elProx.textContent = NOME[ORDEM[(iArma + 1) % ORDEM.length]] + ' ›';
   }
   function vai(passo){
     iArma = (iArma + passo + ORDEM.length) % ORDEM.length;
