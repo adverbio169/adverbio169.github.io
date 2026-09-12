@@ -150,6 +150,16 @@ O jogo é sobre **combustível**, não sobre pontos:
 | tanque vazio | o motor morre, o nariz cai e o avião despenca — explode ao bater no chão |
 | placar | **distância em metros**; o recorde também |
 
+O **teto** fica em 5200 (uns 1475 m no altímetro) e é macio: perto dele o ar
+rarefaz e o avião para de subir aos poucos, com aviso na tela. Os tambores, em
+compensação, só nascem até 2600 — subir muito é uma escolha que deixa o
+combustível para trás, não um limite do jogo.
+
+O **som do motor** é feito na hora, sem arquivo nenhum: duas ondas graves (o
+ronco) mais ruído filtrado (o ar). A altura do ronco acompanha a velocidade, o
+motor engasga quando o tanque está no fim e morre escorregando para o grave na
+queda. O botão 🔊 no canto liga e desliga, e a escolha fica guardada.
+
 A dificuldade cresce sozinha: quanto mais longe você chega, mais obstáculos
 aparecem, e mais deles são aviões (que são bem maiores que os pombos).
 

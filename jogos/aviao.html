@@ -32,6 +32,19 @@
             display:none;font-size:12px;font-weight:900;letter-spacing:2.4px;color:#0a2233;
             background:#7fd8ff;border-radius:99px;padding:4px 13px;box-shadow:0 0 22px #7fd8ff}
   #selTurbo.ver{display:block}
+  /* altímetro: trilho vertical na direita com uma marca que sobe e desce.
+     Sem ele o jogador não tem como perceber que está subindo. */
+  #altimetro{position:absolute;right:calc(16px + env(safe-area-inset-right));top:50%;transform:translateY(-50%);
+             width:10px;height:min(44vh,240px);border-radius:99px;
+             background:rgba(8,12,26,.5);border:1px solid rgba(255,255,255,.14)}
+  #altMarca{position:absolute;left:50%;margin-left:-9px;bottom:0;width:18px;height:18px;
+            border-radius:50%;background:#5cc8ff;box-shadow:0 0 14px #5cc8ff;
+            transition:bottom .08s linear}
+  #altNum{position:absolute;right:calc(16px + env(safe-area-inset-right));top:calc(50% + min(24vh,140px));
+          font-size:11px;color:#9fb4d8;font-variant-numeric:tabular-nums;text-align:right}
+  #btSom{position:absolute;left:calc(14px + env(safe-area-inset-left));bottom:calc(14px + env(safe-area-inset-bottom));pointer-events:auto;cursor:pointer;
+         border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.55);border-radius:10px;
+         padding:6px 9px;font-size:15px;line-height:1}
   #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;padding:0 16px;font-size:clamp(19px,5.6vw,30px);font-weight:900;
          letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
 
@@ -110,6 +123,9 @@
   </div>
   <div class="caixa" id="cRec"><div class="rot">Recorde</div><div class="val"><span id="vRec">0</span><small>m</small></div></div>
   <div id="selTurbo">TURBO</div>
+  <div id="altimetro"><i id="altMarca"></i></div>
+  <div id="altNum"><span id="vAlt">0</span> m</div>
+  <button id="btSom" title="som (liga/desliga)">&#128266;</button>
   <div id="aviso"></div>
 </div>
 
@@ -271,7 +287,7 @@ function grausParaEixo(graus, maximo, zonaMorta){
    ========================================================================== */
 const CAMD     = 750;      // distância da câmera até o avião
 const CHAO     = -700;     // altura do solo
-const TETO     = 1600;     // altura máxima de voo
+const TETO     = 5200;     // altura máxima de voo (antes era 1600: batia em 1,5 s)
 const VOO_BASE = 1700;     // velocidade normal, unidades por segundo
 const VOO_TURBO= 3000;     // velocidade com o combustível azul
 const ALCANCE  = 16000;    // até onde o mundo é gerado à frente
@@ -320,7 +336,7 @@ let camX=0, camY=0;
 let tambores=[], obstaculos=[], nuvens=[], particulas=[];
 let distancia=0, recorde=0, combustivel=100, turbo=0, voo=VOO_BASE;
 let proximoZ=0, caminhoX=0, caminhoY=250;
-let jogando=false, caindo=false, giroQueda=0, tremor=0, clarao=0;
+let jogando=false, caindo=false, giroQueda=0, tremor=0, clarao=0, motivoQueda='';
 let tecla={esq:false,dir:false,cima:false,baixo:false};
 let toqueX=0, toqueY=0, usandoToque=false;
 
@@ -354,6 +370,100 @@ function estouro(){
   }catch(e){}
 }
 
+/* -----------------------------------------------------------------------------
+   O MOTOR — som contínuo, gerado na hora (nenhum arquivo de áudio)
+
+   São três vozes somadas: duas ondas graves (o ronco) e um chiado filtrado
+   (o ar passando). A altura do ronco acompanha a velocidade, então o turbo
+   se ouve antes de se ver. Com o tanque no fim o motor falha, e na queda ele
+   morre escorregando para o grave.
+
+   Só começa depois de um toque do usuário — navegador nenhum deixa tocar som
+   antes disso.
+   -------------------------------------------------------------------------- */
+const Motor = {
+  ligado:false, mudo:false, ultimoAjuste:0,
+  osc1:null, osc2:null, chiado:null, gAr:null, gRonco:null, mestre:null,
+
+  liga(){
+    if (this.ligado || this.mudo) return;
+    try{
+      if(!audio) audio = new (window.AudioContext||window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+
+      this.mestre = audio.createGain(); this.mestre.gain.value = 0;
+      this.mestre.connect(audio.destination);
+
+      this.gRonco = audio.createGain(); this.gRonco.gain.value = 0.16;
+      const filtroRonco = audio.createBiquadFilter();
+      filtroRonco.type = 'lowpass'; filtroRonco.frequency.value = 700;
+      this.gRonco.connect(filtroRonco); filtroRonco.connect(this.mestre);
+
+      this.osc1 = audio.createOscillator(); this.osc1.type = 'sawtooth'; this.osc1.frequency.value = 60;
+      this.osc2 = audio.createOscillator(); this.osc2.type = 'square';   this.osc2.frequency.value = 91;
+      const g2 = audio.createGain(); g2.gain.value = 0.35;
+      this.osc1.connect(this.gRonco); this.osc2.connect(g2); g2.connect(this.gRonco);
+      this.osc1.start(); this.osc2.start();
+
+      // chiado do ar: ruído branco em laço, passado por um filtro passa-baixa
+      const n = audio.sampleRate * 2;
+      const buf = audio.createBuffer(1, n, audio.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i=0;i<n;i++) d[i] = Math.random()*2-1;
+      this.chiado = audio.createBufferSource(); this.chiado.buffer = buf; this.chiado.loop = true;
+      const filtroAr = audio.createBiquadFilter(); filtroAr.type='lowpass'; filtroAr.frequency.value = 1100;
+      this.gAr = audio.createGain(); this.gAr.gain.value = 0.05;
+      this.chiado.connect(filtroAr); filtroAr.connect(this.gAr); this.gAr.connect(this.mestre);
+      this.chiado.start();
+
+      this.mestre.gain.linearRampToValueAtTime(1, audio.currentTime + 0.5);
+      this.ligado = true; this.ultimoAjuste = Date.now();
+    }catch(e){}
+  },
+
+  ajusta(){
+    this.ultimoAjuste = Date.now();
+    if (!this.ligado) return;
+    try{
+      const t = audio.currentTime;
+      const acel = (voo - VOO_BASE) / (VOO_TURBO - VOO_BASE);         // 0 parado, 1 no turbo
+      let base = 58 + acel*46;
+      if (caindo) base = Math.max(22, this.osc1.frequency.value * 0.985);
+      this.osc1.frequency.setTargetAtTime(base,      t, 0.12);
+      this.osc2.frequency.setTargetAtTime(base*1.51, t, 0.12);
+      this.gAr.gain.setTargetAtTime(0.04 + acel*0.10, t, 0.2);
+
+      // tanque no fim: o motor engasga; caindo: ele vai morrendo
+      let vol = caindo ? 0.35 : 1;
+      if (!caindo && combustivel < 15) vol *= (Math.random() < 0.18 ? 0.15 : 1);
+      this.mestre.gain.setTargetAtTime(vol, t, 0.05);
+    }catch(e){}
+  },
+
+  desliga(){
+    if (!this.ligado) return;
+    try{
+      const t = audio.currentTime;
+      this.mestre.gain.cancelScheduledValues(t);
+      this.mestre.gain.setTargetAtTime(0, t, 0.15);
+      const o1=this.osc1, o2=this.osc2, ch=this.chiado;
+      setTimeout(()=>{ try{o1.stop();o2.stop();ch.stop();}catch(e){} }, 700);
+    }catch(e){}
+    this.ligado = false;
+  },
+
+  alterna(){
+    this.mudo = !this.mudo;
+    const b = document.getElementById('btSom');
+    if (b) b.textContent = this.mudo ? '🔇' : '🔊';
+    try{ localStorage.setItem('aviao.mudo', this.mudo ? '1' : '0'); }catch(e){}
+    if (this.mudo) this.desliga(); else if (jogando) this.liga();
+  }
+};
+// se o jogo parar (pausa, outra aba, fim), o motor cala sozinho
+setInterval(() => { if (Motor.ligado && Date.now() - Motor.ultimoAjuste > 400) Motor.desliga(); }, 200);
+try{ Motor.mudo = localStorage.getItem('aviao.mudo') === '1'; }catch(e){}
+
 /* --- geração do percurso ------------------------------------------------- */
 function geraMundo(){
   while (proximoZ < ALCANCE){
@@ -361,7 +471,7 @@ function geraMundo(){
     caminhoX += (Math.random()-0.5) * 1000;
     caminhoY += (Math.random()-0.5) * 620;
     caminhoX = Math.max(-2200, Math.min(2200, caminhoX));
-    caminhoY = Math.max(CHAO+520, Math.min(TETO-320, caminhoY));
+    caminhoY = Math.max(CHAO+520, Math.min(2600, caminhoY));   // faixa dos tambores, não o teto
 
     const azul = Math.random() < 0.18;     // 1 em cada 5 e pouco é azul
     tambores.push({ x:caminhoX, y:caminhoY, z:proximoZ, azul:azul,
@@ -407,6 +517,8 @@ function reiniciaMundo(){
   camX = 0; camY = 0;
   combustivel = 100; turbo = 0; voo = VOO_BASE;
   caindo = false; giroQueda = 0; tremor = 0; clarao = 0;
+  motivoQueda = '';
+  Motor.liga();
 }
 
 /* =============================================================================
@@ -773,7 +885,6 @@ function explode(x, y, z){
   estouro();
 }
 
-let motivoQueda = '';
 function derruba(motivo){
   if (caindo) return;
   caindo = true; motivoQueda = motivo;
@@ -802,7 +913,7 @@ function atualizaQueda(dt){
   if (aviaoY <= CHAO + 120){
     aviaoY = CHAO + 120;
     if (motivoQueda === 'combustivel'){ explode(aviaoX, aviaoY, 0); motivoQueda = 'acabou'; }
-    if (tremor < 1) fim();
+    if (tremor < 1){ Motor.desliga(); fim(); }
   }
 }
 
@@ -818,6 +929,7 @@ function andaMundo(avanco){
 }
 
 function atualiza(dt){
+  Motor.ajusta();
   if (tremor > 0) tremor = Math.max(0, tremor - dt*40);
   if (clarao > 0) clarao = Math.max(0, clarao - dt*2.2);
 
@@ -844,7 +956,15 @@ function atualiza(dt){
 
   if (aviaoX < -2600){ aviaoX = -2600; vx = 0; }
   if (aviaoX >  2600){ aviaoX =  2600; vx = 0; }
-  if (aviaoY > TETO){ aviaoY = TETO; vy = 0; }
+  // Ar rarefeito: perto do teto o avião para de subir aos poucos. Antes havia
+  // uma parede seca lá em cima, e ao bater nela o avião escorregava para baixo
+  // na tela mesmo com o jogador puxando — parecia que ele não subia.
+  if (aviaoY > TETO - 1200 && vy > 0){
+    const p = Math.min(1, (aviaoY - (TETO-1200)) / 1200);
+    vy -= vy * p * Math.min(1, dt*5);
+    if (p > 0.75) mostraAviso('AR RAREFEITO', '#9fd8ff', 900);
+  }
+  if (aviaoY > TETO){ aviaoY = TETO; vy = Math.min(0, vy); }
   if (aviaoY < CHAO + 260){
     aviaoY = CHAO + 260; vy = Math.max(0, vy);
     mostraAviso('SUBA!', '#ff8080');
@@ -922,9 +1042,15 @@ function mostraAviso(txt, cor, ms){
 }
 
 /* --- painel --- */
+const elAlt=document.getElementById('vAlt'), elAltMarca=document.getElementById('altMarca');
 const elDist=document.getElementById('vDist'), elBarra=document.getElementById('barraComb');
 const elComb=document.getElementById('vComb'), elCComb=document.getElementById('cComb');
 const elRec=document.getElementById('vRec'),   elTurbo=document.getElementById('selTurbo');
+const btSom = document.getElementById('btSom');
+if (btSom){
+  btSom.textContent = Motor.mudo ? '🔇' : '🔊';
+  btSom.onclick = e => { e.preventDefault(); Motor.alterna(); };
+}
 function pinta(){
   const m = Math.round(distancia/20);
   if (elDist) elDist.textContent = m;
@@ -935,6 +1061,11 @@ function pinta(){
   }
   if (elComb)  elComb.textContent = Math.round(pct);
   if (elCComb) elCComb.classList.toggle('pouco', pct < 20);
+  if (elAlt)   elAlt.textContent = Math.round((aviaoY - CHAO)/4);
+  if (elAltMarca){
+    const h = (aviaoY - (CHAO+260)) / (TETO - (CHAO+260));
+    elAltMarca.style.bottom = (Math.max(0, Math.min(1, h))*100).toFixed(1) + '%';
+  }
   if (elRec)   elRec.textContent = Math.round(recorde);
   if (elTurbo) elTurbo.classList.toggle('ver', turbo > 0);
 }

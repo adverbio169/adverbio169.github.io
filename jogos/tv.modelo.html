@@ -32,6 +32,19 @@
             font-size:15px;font-weight:900;letter-spacing:3px;color:#0a2233;background:#7fd8ff;
             border-radius:99px;padding:5px 18px;box-shadow:0 0 30px #7fd8ff}
   #selTurbo.ver{display:block}
+  /* altímetro: trilho vertical na direita com uma marca que sobe e desce.
+     Sem ele o jogador não tem como perceber que está subindo. */
+  #altimetro{position:absolute;right:22px;top:50%;transform:translateY(-50%);
+             width:10px;height:min(44vh,300px);border-radius:99px;
+             background:rgba(8,12,26,.5);border:1px solid rgba(255,255,255,.14)}
+  #altMarca{position:absolute;left:50%;margin-left:-9px;bottom:0;width:18px;height:18px;
+            border-radius:50%;background:#5cc8ff;box-shadow:0 0 14px #5cc8ff;
+            transition:bottom .08s linear}
+  #altNum{position:absolute;right:22px;top:calc(50% + min(24vh,170px));
+          font-size:11px;color:#9fb4d8;font-variant-numeric:tabular-nums;text-align:right}
+  #btSom{position:absolute;left:18px;bottom:18px;pointer-events:auto;cursor:pointer;
+         border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.55);border-radius:10px;
+         padding:6px 9px;font-size:15px;line-height:1}
   #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;padding:0 16px;font-size:clamp(24px,4.5vw,44px);
          font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
   #sala2{position:absolute;bottom:14px;left:18px;font-size:12px;color:#9fb4d8;letter-spacing:.5px}
@@ -80,6 +93,9 @@
   </div>
   <div class="caixa" id="cRec"><div class="rot">Recorde</div><div class="val"><span id="vRec">0</span><small>m</small></div></div>
   <div id="selTurbo">TURBO</div>
+  <div id="altimetro"><i id="altMarca"></i></div>
+  <div id="altNum"><span id="vAlt">0</span> m</div>
+  <button id="btSom" title="som (liga/desliga)">&#128266;</button>
   <div id="aviso"></div>
   <div id="sala2">sala <b id="codigo2">····</b></div>
 </div>
