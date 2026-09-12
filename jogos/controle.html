@@ -75,20 +75,41 @@
           box-shadow:0 6px 0 #8f2a1d;user-select:none;-webkit-user-select:none}
   #btFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
   @media (max-height:470px){ .arma{padding:5px 3px;font-size:10px} #btFogo{padding:11px;font-size:16px} }
-  /* Celular deitado: em coluna única nada cabe. Vira duas colunas — o horizonte
-     à esquerda, ocupando toda a altura, e os comandos empilhados à direita. */
+  /* ----------------------------------------------------------------------
+     CELULAR DEITADO: ergonomia de polegar.
+
+     Segurando com as duas mãos, os polegares alcançam os CANTOS DE BAIXO — e
+     não o meio da tela. Então: armas no canto esquerdo, gatilho redondo e
+     grande no canto direito, e o miolo (horizonte e números) só para olhar,
+     sem nada para tocar.
+     -------------------------------------------------------------------- */
   @media (max-height:520px){
-    /* as linhas precisam ser EXPLÍCITAS: com linhas implícitas o
-       grid-row:1/-1 do horizonte não estica, e ele fica numa linha só */
-    #controle.ver,#telaControle.ver{display:grid;grid-template-columns:auto minmax(0,1fr);
-              grid-template-rows:repeat(7,auto);
-              align-content:center;justify-content:center;gap:7px 16px;padding:8px 14px}
-    #controle > *:not(#horizonte),#telaControle.ver > *:not(#horizonte){grid-column:2;width:100%;max-width:360px}
-    #horizonte{grid-column:1;grid-row:1/-1;align-self:center;
-               --d:min(40vw,72vh,240px);width:var(--d);height:var(--d)}
+    #controle.ver,#telaControle.ver{display:block;padding:0}
+    #controle.ver > *,#telaControle.ver > *{position:absolute}
+
+    #horizonte{left:50%;top:44%;transform:translate(-50%,-50%);
+               --d:min(30vw,56vh,190px);width:var(--d);height:var(--d)}
+    #estadoRede{top:8px;left:50%;transform:translateX(-50%);width:auto;max-width:52vw}
+    .placar{top:calc(44% + min(15vw,28vh,95px) + 10px);left:50%;transform:translateX(-50%);gap:16px}
+    .placar .val2{font-size:16px}
+    #giroLinha{bottom:8px;left:50%;transform:translateX(-50%);font-size:11px}
+
+    /* polegar esquerdo */
+    .armas{left:calc(10px + env(safe-area-inset-left));bottom:calc(10px + env(safe-area-inset-bottom));
+           flex-direction:column;width:auto;max-width:none;gap:6px}
+    .arma{width:min(24vw,118px);padding:8px 6px;font-size:11.5px}
+
+    /* polegar direito */
+    #btFogo{right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));
+            width:min(27vw,132px);height:min(27vw,132px);max-width:none;border-radius:50%;
+            font-size:17px;letter-spacing:2px;box-shadow:0 7px 0 #8f2a1d}
+    #btFogo:active{transform:translateY(5px);box-shadow:0 2px 0 #8f2a1d}
+
+    /* o que se usa pouco fica em cima, longe do polegar */
+    .linha{top:8px;left:calc(10px + env(safe-area-inset-left));width:auto;max-width:none;gap:6px}
+    .linha .bt{flex:0 0 auto;width:auto;padding:7px 12px;font-size:12.5px}
+    .linha .bt b{font-size:12.5px}
     #dica{display:none}
-    .placar{gap:14px}
-    .placar .val2{font-size:17px}
     .estado{padding:6px 10px;font-size:11.5px}
   }
   #giroLinha{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;

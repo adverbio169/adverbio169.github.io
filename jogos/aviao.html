@@ -621,7 +621,7 @@ function montaMapa(){
 function geraNuvens(){
   nuvens = [];
   for (let i=0;i<24;i++) nuvens.push({
-    x:(Math.random()-0.5)*15000, y:900+Math.random()*2400,
+    x:(Math.random()-0.5)*15000, y:2400+Math.random()*2600,   // acima da cidade, não dentro dela
     z: Math.random()*ALCANCE, r:320+Math.random()*560 });
 }
 
@@ -642,6 +642,18 @@ function reiniciaMundo(){
 /* =============================================================================
    PARTE 3 — DESENHO
    ========================================================================== */
+/* Perspectiva aérea: o ar entre você e o objeto tem cor. Quanto mais longe,
+   mais a coisa se mistura com o céu do horizonte. É o truque que mais aproxima
+   um desenho chapado de uma vista 3D de verdade. */
+const CEU_LONGE = [186, 214, 236];
+function comNevoa(rgb, luz, zr){
+  const t = Math.min(0.88, Math.max(0, (zr - 1500) / (ALCANCE*0.8)));
+  const r = rgb[0]*luz, g = rgb[1]*luz, b = rgb[2]*luz;
+  return 'rgb(' + Math.round(r + (CEU_LONGE[0]-r)*t) + ',' +
+                  Math.round(g + (CEU_LONGE[1]-g)*t) + ',' +
+                  Math.round(b + (CEU_LONGE[2]-b)*t) + ')';
+}
+
 function quadro4(a,b,c,d,cor){
   ctx.fillStyle = cor;
   ctx.beginPath();
@@ -716,50 +728,78 @@ function desenhaChao(){
   ctx.fillStyle=b; ctx.fillRect(0, horizonte - 2, W, H*0.09);
 }
 
-/* --- um prédio: face da frente, telhado e uma lateral --- */
+/* --- um prédio: sombra, três faces iluminadas pelo sol e detalhe no telhado --- */
+const SOL_X = 1;          // o sol está à direita, então a face direita é a clara
 function desenhaPredio(p){
   const zr = p.z - distancia;
   const z1 = zr - p.d/2, z2 = zr + p.d/2;
   if (z2 < 60) return;
   const topo = CHAO + p.h;
-  const eDir = p.x > camX;
   const xa = p.x - p.w/2, xb = p.x + p.w/2;
 
   const f1 = projeta(xa, CHAO, z1), f2 = projeta(xb, CHAO, z1),
         f3 = projeta(xb, topo, z1), f4 = projeta(xa, topo, z1);
   if (!f1||!f2||!f3||!f4) return;
-  if ((f1.x > W+60 && f2.x > W+60) || (f1.x < -60 && f2.x < -60)) return;
+  if ((f1.x > W+80 && f2.x > W+80) || (f1.x < -80 && f2.x < -80)) return;
 
-  const claro = 0.62 + p.tom*0.3;
-  const cor = c => 'rgb(' + Math.round(c[0]*claro) + ',' + Math.round(c[1]*claro) + ',' + Math.round(c[2]*claro) + ')';
-  const base = [150,156,168];
+  const base = [156, 162, 174];
+  const tom  = 0.78 + p.tom*0.34;          // cada prédio com o seu concreto
 
-  // lateral (só a que dá para ver)
+  // sombra no chão, jogada para o lado contrário ao sol
+  const sx = -SOL_X * p.h * 0.55;
+  const s1 = projeta(xa + sx, CHAO, z1), s2 = projeta(xb + sx, CHAO, z1),
+        s3 = projeta(xb + sx*0.4, CHAO, z2), s4 = projeta(xa + sx*0.4, CHAO, z2);
+  if (s1&&s2&&s3&&s4){
+    ctx.globalAlpha = 0.20 * (1 - Math.min(1, zr/(ALCANCE*0.7)));
+    quadro4(s1,s2,s3,s4,'#101820');
+    ctx.globalAlpha = 1;
+  }
+
+  // lateral: a que dá para ver. Clara se for a do lado do sol.
+  const eDir = p.x > camX;
   const xl = eDir ? xa : xb;
+  const lateralNoSol = (eDir ? -1 : 1) === SOL_X;
   const l1 = projeta(xl, CHAO, z1), l2 = projeta(xl, CHAO, z2),
         l3 = projeta(xl, topo, z2), l4 = projeta(xl, topo, z1);
-  if (l1&&l2&&l3&&l4) quadro4(l1,l2,l3,l4, 'rgb(' + Math.round(base[0]*claro*0.66) + ',' +
-        Math.round(base[1]*claro*0.66) + ',' + Math.round(base[2]*claro*0.66) + ')');
+  if (l1&&l2&&l3&&l4) quadro4(l1,l2,l3,l4, comNevoa(base, tom*(lateralNoSol?1.12:0.62), zr));
 
   // telhado
   const t1 = projeta(xa, topo, z1), t2 = projeta(xb, topo, z1),
         t3 = projeta(xb, topo, z2), t4 = projeta(xa, topo, z2);
-  if (t1&&t2&&t3&&t4) quadro4(t1,t2,t3,t4, 'rgb(' + Math.round(base[0]*claro*1.18) + ',' +
-        Math.round(base[1]*claro*1.18) + ',' + Math.round(base[2]*claro*1.15) + ')');
+  if (t1&&t2&&t3&&t4) quadro4(t1,t2,t3,t4, comNevoa(base, tom*1.30, zr));
 
-  quadro4(f1,f2,f3,f4, cor(base));
+  // frente
+  quadro4(f1,f2,f3,f4, comNevoa(base, tom*0.92, zr));
 
-  // janelas, só quando o prédio está perto o bastante para valer a pena
   const alturaTela = Math.abs(f1.y - f4.y), largTela = Math.abs(f2.x - f1.x);
+
+  // caixa d'água e antena, só quando vale a pena desenhar
+  if (alturaTela > 70 && p.h > 900){
+    const cw = p.w*0.26, ct = topo + p.h*0.10;
+    const c1 = projeta(p.x-cw, topo, zr), c2 = projeta(p.x+cw, topo, zr),
+          c3 = projeta(p.x+cw, ct, zr),   c4 = projeta(p.x-cw, ct, zr);
+    if (c1&&c2&&c3&&c4) quadro4(c1,c2,c3,c4, comNevoa(base, tom*1.05, zr));
+    const a1 = projeta(p.x, ct, zr), a2 = projeta(p.x, ct + p.h*0.22, zr);
+    if (a1&&a2){
+      ctx.strokeStyle = comNevoa([90,96,110], 1, zr);
+      ctx.lineWidth = Math.max(1, 12*f1.s);
+      ctx.beginPath(); ctx.moveTo(a1.x,a1.y); ctx.lineTo(a2.x,a2.y); ctx.stroke();
+    }
+  }
+
+  // janelas
   if (alturaTela > 40 && largTela > 16){
     const col = Math.max(2, Math.min(6, Math.round(p.w/150)));
     const lin = Math.max(2, Math.min(12, Math.round(p.h/260)));
     const jw = largTela/col*0.5, jh = alturaTela/lin*0.45;
+    const perto = 1 - Math.min(0.85, Math.max(0, (zr-1500)/(ALCANCE*0.8)));
     for (let i=0;i<col;i++) for (let j=0;j<lin;j++){
       const acesa = ((i*7 + j*13 + Math.round(p.x/97)) % 5) < 2;
-      ctx.fillStyle = acesa ? 'rgba(255,226,150,.75)' : 'rgba(40,52,70,.5)';
+      ctx.globalAlpha = perto;
+      ctx.fillStyle = acesa ? 'rgba(255,226,150,.8)' : 'rgba(38,50,70,.55)';
       ctx.fillRect(f1.x + largTela*(i+0.28)/col, f4.y + alturaTela*(j+0.28)/lin, jw, jh);
     }
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -1008,50 +1048,165 @@ function desenhaAviao(){
   ctx.restore();
 }
 
-/* --- a moldura da cabine, na visão de dentro --- */
+/* =============================================================================
+   A CABINE — vista de dentro
+
+   A moldura é desenhada como um recorte: pinta-se a tela inteira com a estrutura
+   e abre-se um buraco no formato da bolha (evenodd). O formato é o de uma bolha
+   de caça — larga e curva em cima, estreitando para o painel — e não um
+   retângulo, que era o que fazia parecer para-brisa de caminhão.
+   ========================================================================== */
+// novo=false quando a bolha é só um SUB-caminho: chamar beginPath aqui apagaria
+// o retângulo de fora, e o recorte evenodd sairia invertido (era esse o bug).
+function caminhoBolha(novo){
+  const L = W*0.10, R = W*0.90, T = H*0.028, B = H*0.665;
+  if (novo !== false) ctx.beginPath();
+  ctx.moveTo(L, T + H*0.10);
+  ctx.quadraticCurveTo(W*0.5, T - H*0.045, R, T + H*0.12);   // arco de cima
+  ctx.lineTo(R, B - H*0.10);
+  ctx.quadraticCurveTo(W*0.5, B + H*0.065, L, B - H*0.12);   // curva do painel
+  ctx.closePath();
+}
+
+function mostrador(cx, cy, r, frac, rotulo, cor){
+  ctx.fillStyle = '#080d16';
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#2c3648'; ctx.lineWidth = Math.max(1.5, r*0.09);
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke();
+  ctx.strokeStyle = 'rgba(150,170,200,.45)'; ctx.lineWidth = Math.max(1, r*0.05);
+  for (let i=0;i<=10;i++){
+    const a = -Math.PI*0.75 + (i/10)*Math.PI*1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*r*0.72, cy+Math.sin(a)*r*0.72);
+    ctx.lineTo(cx+Math.cos(a)*r*0.88, cy+Math.sin(a)*r*0.88);
+    ctx.stroke();
+  }
+  const a = -Math.PI*0.75 + Math.max(0,Math.min(1,frac))*Math.PI*1.5;
+  ctx.strokeStyle = cor; ctx.lineWidth = Math.max(2, r*0.12);
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r*0.74, cy+Math.sin(a)*r*0.74); ctx.stroke();
+  ctx.fillStyle = '#7d8cab';
+  ctx.font = '700 ' + Math.max(7, r*0.3).toFixed(0) + 'px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(rotulo, cx, cy + r*1.34);
+}
+
+/* horizonte artificial: a bolinha que roda junto com as asas */
+function mostradorHorizonte(cx, cy, r){
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.88, 0, 7); ctx.clip();
+  ctx.translate(cx, cy); ctx.rotate(-inclinacao*Math.PI/180);
+  const desl = Math.max(-r, Math.min(r, nariz*1.6));
+  ctx.fillStyle = '#2f6fb8'; ctx.fillRect(-r*2, -r*2 + desl, r*4, r*2);
+  ctx.fillStyle = '#6b5a3a'; ctx.fillRect(-r*2, desl, r*4, r*2);
+  ctx.strokeStyle = '#e8eef7'; ctx.lineWidth = Math.max(1.2, r*0.06);
+  ctx.beginPath(); ctx.moveTo(-r*2, desl); ctx.lineTo(r*2, desl); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = '#2c3648'; ctx.lineWidth = Math.max(1.5, r*0.09);
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.88, 0, 7); ctx.stroke();
+  ctx.strokeStyle = '#ffc24d'; ctx.lineWidth = Math.max(2, r*0.1);
+  ctx.beginPath();
+  ctx.moveTo(cx-r*0.55, cy); ctx.lineTo(cx-r*0.18, cy);
+  ctx.moveTo(cx+r*0.18, cy); ctx.lineTo(cx+r*0.55, cy);
+  ctx.moveTo(cx, cy-r*0.08); ctx.lineTo(cx, cy+r*0.08);
+  ctx.stroke();
+}
+
 function desenhaCockpit(){
   if (!cockpit) return;
-  const rolagem = inclinacao * Math.PI/180 * 0.25 + giroQueda;
-  ctx.save();
-  ctx.translate(W/2, H*0.5); ctx.rotate(rolagem); ctx.translate(-W/2, -H*0.5);
+  const rol = inclinacao * Math.PI/180 * 0.22 + giroQueda;
 
-  // painel de baixo
-  const g = ctx.createLinearGradient(0, H*0.72, 0, H);
-  g.addColorStop(0,'#1b2334'); g.addColorStop(1,'#0d1220');
+  ctx.save();
+  ctx.translate(W/2, H*0.5); ctx.rotate(rol); ctx.translate(-W/2, -H*0.5);
+
+  // ---- a estrutura, com o buraco da bolha ----
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0,   '#1c2433');
+  g.addColorStop(0.55,'#161d2a');
+  g.addColorStop(0.62,'#101723');
+  g.addColorStop(1,   '#070b13');
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.moveTo(-W*0.1, H*1.1); ctx.lineTo(-W*0.1, H*0.84);
-  ctx.quadraticCurveTo(W*0.5, H*0.66, W*1.1, H*0.84);
-  ctx.lineTo(W*1.1, H*1.1); ctx.closePath(); ctx.fill();
-  // mostradores no painel
-  for (const [fx, rot] of [[0.3, aviaoY/TETO], [0.7, combustivel/100]]){
-    const cx = W*fx, cy = H*0.90, r = Math.min(W,H)*0.055;
-    ctx.fillStyle = '#0a0f1a'; ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#3a4658'; ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.stroke();
-    const a = -Math.PI*0.75 + Math.max(0,Math.min(1,rot))*Math.PI*1.5;
-    ctx.strokeStyle = '#5cc8ff'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r*0.75, cy+Math.sin(a)*r*0.75); ctx.stroke();
-  }
-  // colunas laterais e travessa de cima
-  ctx.fillStyle = '#141b29';
-  ctx.fillRect(-W*0.05, -H*0.1, W*0.16, H*1.2);
-  ctx.fillRect(W*0.89, -H*0.1, W*0.16, H*1.2);
-  ctx.beginPath();
-  ctx.moveTo(-W*0.1, -H*0.1); ctx.lineTo(W*1.1, -H*0.1);
-  ctx.lineTo(W*1.1, H*0.10); ctx.quadraticCurveTo(W*0.5, H*0.20, -W*0.1, H*0.10);
-  ctx.closePath(); ctx.fill();
+  ctx.rect(-W*0.6, -H*0.6, W*2.2, H*2.2);
+  caminhoBolha(false);                       // sub-caminho: vira o buraco
+  ctx.fill('evenodd');
+
+  // borda de metal da bolha
+  ctx.save(); caminhoBolha();
+  ctx.strokeStyle = '#39445a'; ctx.lineWidth = Math.max(4, W*0.008); ctx.stroke();
+  ctx.strokeStyle = 'rgba(190,210,240,.30)'; ctx.lineWidth = Math.max(1.5, W*0.002); ctx.stroke();
   ctx.restore();
 
-  // mira fixa no centro
-  ctx.strokeStyle = 'rgba(255,210,90,.85)'; ctx.lineWidth = 2;
-  const m = Math.min(W,H)*0.05;
+  // arco central da bolha (a longarina que todo caça tem)
+  ctx.strokeStyle = '#39445a'; ctx.lineWidth = Math.max(3, W*0.007);
   ctx.beginPath();
-  ctx.arc(W/2, H*0.46, m, 0, 7);
-  ctx.moveTo(W/2 - m*1.7, H*0.46); ctx.lineTo(W/2 - m*0.5, H*0.46);
-  ctx.moveTo(W/2 + m*0.5, H*0.46); ctx.lineTo(W/2 + m*1.7, H*0.46);
-  ctx.moveTo(W/2, H*0.46 - m*1.7); ctx.lineTo(W/2, H*0.46 - m*0.5);
+  ctx.moveTo(W*0.5, H*0.005); ctx.lineTo(W*0.5, H*0.075);
   ctx.stroke();
+
+  // reflexo no vidro
+  ctx.save(); caminhoBolha(); ctx.clip();
+  const r1 = ctx.createLinearGradient(W*0.1, H*0.05, W*0.55, H*0.5);
+  r1.addColorStop(0,'rgba(255,255,255,.16)'); r1.addColorStop(0.5,'rgba(255,255,255,.03)');
+  r1.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = r1; ctx.fillRect(0,0,W,H);
+  ctx.restore();
+
+  // ---- painel ----
+  const pinY = H*0.845, rG = Math.min(W*0.046, H*0.082);
+  ctx.fillStyle = '#0e141f';
+  ctx.beginPath();
+  ctx.moveTo(-W*0.1, H*1.2); ctx.lineTo(-W*0.1, H*0.755);
+  ctx.quadraticCurveTo(W*0.5, H*0.655, W*1.1, H*0.755);
+  ctx.lineTo(W*1.1, H*1.2); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#2a3446'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-W*0.1, H*0.755); ctx.quadraticCurveTo(W*0.5, H*0.655, W*1.1, H*0.755);
+  ctx.stroke();
+
+  mostradorHorizonte(W*0.5, pinY, rG*1.18);
+  mostrador(W*0.5 - rG*3.0, pinY, rG, (aviaoY-CHAO)/(TETO-CHAO), 'ALT', '#5cc8ff');
+  mostrador(W*0.5 - rG*1.6, pinY, rG*0.86, (voo-VOO_BASE*0.5)/(VOO_TURBO-VOO_BASE*0.5), 'VEL', '#a9ecc4');
+  mostrador(W*0.5 + rG*1.6, pinY, rG*0.86, combustivel/100,
+            'COMB', combustivel < 20 ? '#ff6a6a' : '#ffc24d');
+  mostrador(W*0.5 + rG*3.0, pinY, rG, distancia/MISSAO, 'MISSÃO', '#c9a7ff');
+
+  // luzes de aviso
+  const luzes = [['COMB', combustivel < 20, '#ff5a5a'], ['TURBO', turbo > 0, '#5cc8ff'],
+                 [ARMAS[arma].nome.slice(0,5), municao[arma] > 0, ARMAS[arma].cor]];
+  luzes.forEach((l, i) => {
+    const lx = W*0.5 + (i-1)*W*0.105, ly = H*0.723;
+    ctx.fillStyle = l[1] ? l[2] : '#1b2433';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(lx-W*0.042, ly-H*0.026, W*0.084, H*0.036, 5)
+                  : ctx.rect(lx-W*0.042, ly-H*0.026, W*0.084, H*0.036);
+    ctx.fill();
+    ctx.fillStyle = l[1] ? '#0a0f18' : '#46536b';
+    ctx.font = '800 ' + Math.max(7, H*0.019).toFixed(0) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(l[0], lx, ly);
+  });
+  ctx.restore();
+
+  // ---- mira projetada no vidro, sem rodar junto ----
+  const cy = H*0.37, m = Math.min(W,H)*0.055;
+  ctx.strokeStyle = 'rgba(120,255,170,.9)'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(W/2, cy, m, 0, 7);
+  ctx.moveTo(W/2 - m*2.0, cy); ctx.lineTo(W/2 - m*1.2, cy);
+  ctx.moveTo(W/2 + m*1.2, cy); ctx.lineTo(W/2 + m*2.0, cy);
+  ctx.moveTo(W/2, cy - m*2.0); ctx.lineTo(W/2, cy - m*1.2);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(120,255,170,.9)';
+  ctx.beginPath(); ctx.arc(W/2, cy, 2.5, 0, 7); ctx.fill();
+  // escada de arfagem
+  ctx.strokeStyle = 'rgba(120,255,170,.45)'; ctx.lineWidth = 1.5;
+  for (const d of [-2,-1,1,2]){
+    const y = cy - d*m*1.5 - nariz*1.2;
+    ctx.beginPath();
+    ctx.moveTo(W/2 - m*1.9, y); ctx.lineTo(W/2 - m*0.9, y);
+    ctx.moveTo(W/2 + m*0.9, y); ctx.lineTo(W/2 + m*1.9, y);
+    ctx.stroke();
+  }
+  ctx.textAlign = 'left';
 }
 
 function desenha(){
