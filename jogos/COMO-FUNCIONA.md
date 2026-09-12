@@ -136,6 +136,27 @@ você não descobre por quê.
 A "Parte 1" é igual nos dois arquivos de propósito: é o pedaço para copiar no
 próximo jogo.
 
+## As regras do avião
+
+O jogo é sobre **combustível**, não sobre pontos:
+
+| coisa | o que faz |
+|---|---|
+| tanque | começa em 100% e cai **3,3% por segundo** — dá uns 30 s de voo |
+| tambor **amarelo** | devolve **20%** |
+| tambor **azul** | devolve **32%** e liga o **turbo por 5 s**: o avião vai de 1700 para 3000 de velocidade, com clarão, partículas, riscos na tela e um selo TURBO no painel |
+| turbo | enquanto dura, gasta 5%/s em vez de 3,3% — anda muito mais, mas custa caro |
+| **pombo** e **avião** | bater em qualquer um derruba: explosão, o avião roda e cai até o chão |
+| tanque vazio | o motor morre, o nariz cai e o avião despenca — explode ao bater no chão |
+| placar | **distância em metros**; o recorde também |
+
+A dificuldade cresce sozinha: quanto mais longe você chega, mais obstáculos
+aparecem, e mais deles são aviões (que são bem maiores que os pombos).
+
+Os números todos ficam juntos no começo do núcleo, com nome: `GASTO`,
+`DA_NORMAL`, `DA_AZUL`, `TURBO_SEG`, `VOO_BASE`, `VOO_TURBO`, `RAIO_PEGA`.
+Mexer no equilíbrio do jogo é mexer nessas linhas.
+
 ## Ideias de próximo passo
 
 - **Trocar o desenho do carro pelo personagem da sua filha.** No `corrida.html`,

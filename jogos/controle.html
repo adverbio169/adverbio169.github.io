@@ -80,8 +80,8 @@
   <div class="estado" id="estadoRede"><span class="luz"></span><span id="estadoRedeTxt">conectando&hellip;</span></div>
   <div id="horizonte"><div id="ceu"></div><div id="mira"></div></div>
   <div class="placar">
-    <div><div class="rot">Argolas</div><div class="val" id="pArg">0</div></div>
-    <div><div class="rot">Combustível</div><div class="val" id="pTempo">&ndash;</div></div>
+    <div><div class="rot">Distância</div><div class="val" id="pDist">0</div></div>
+    <div><div class="rot">Combustível</div><div class="val" id="pComb">&ndash;</div></div>
     <div><div class="rot">Atraso</div><div class="val" id="pMs">&ndash;</div></div>
   </div>
   <div class="linha">
@@ -186,7 +186,7 @@ function opcoesPeer(){
   return { host, port: parseInt(porta || '9000', 10), path: '/sinal', secure: location.protocol === 'https:', debug: 0 };
 }
 
-let peer = null, conn = null, seq = 0, latencia = null, ultimoPong = 0, pontosAntes = 0;
+let peer = null, conn = null, seq = 0, latencia = null, ultimoPong = 0, combAntes = 100, jogandoAntes = false;
 const $ = id => document.getElementById(id);
 
 function estadoRede(classe, txt){ $('estadoRede').className = 'estado ' + classe; $('estadoRedeTxt').textContent = txt; }
@@ -206,12 +206,14 @@ function conectar(codigo){
       if (!d || !d.t) return;
       if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
       if (d.t === 'estado'){
-        $('pArg').textContent = d.pontos;
-        $('pTempo').textContent = d.jogando ? Math.ceil(d.tempo) + 's' : '–';
-        $('btComecar').textContent = d.jogando ? 'Jogando…' : (d.pontos > 0 || d.acabou ? 'Jogar de novo' : 'Começar');
+        $('pDist').textContent = d.dist;
+        $('pComb').textContent = d.jogando ? d.comb + '%' : '–';
+        $('pComb').style.color = d.jogando && d.comb < 20 ? '#ff6a6a' : '';
+        $('btComecar').textContent = d.jogando ? 'Voando…' : (d.acabou ? 'Voar de novo' : 'Começar');
         $('btComecar').disabled = !!d.jogando;
-        if (d.pontos > pontosAntes) vibra(60);
-        pontosAntes = d.pontos;
+        if (d.comb > combAntes + 4) vibra(d.turbo ? 140 : 60);
+        if (!d.jogando && jogandoAntes) vibra(320);
+        combAntes = d.comb; jogandoAntes = !!d.jogando;
       }
     });
     conn.on('close', () => { estadoRede('nao', 'a TV desconectou'); });

@@ -20,11 +20,21 @@
   .rot{font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#9fb4d8;font-weight:700}
   .val{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
   .val small{font-size:12px;font-weight:600;color:#9fb4d8;margin-left:2px}
-  #cArg{top:14px;left:18px}
-  #cTempo{top:14px;left:50%;transform:translateX(-50%);text-align:center}
-  #cAlt{top:14px;right:18px;text-align:right}
-  #cTempo.pouco .val{color:#ff6a6a}
-  #recorde{position:absolute;top:84px;left:50%;transform:translateX(-50%);font-size:12px;color:#9fb4d8;text-align:center;width:100%}
+  #cDist{top:14px;left:18px}
+  #cComb{top:14px;left:50%;transform:translateX(-50%);text-align:center}
+  #cRec{top:14px;right:18px;text-align:right}
+  #cComb.pouco{border-color:rgba(255,90,90,.55);animation:pisca .7s infinite}
+  #cComb.pouco .val{color:#ff6a6a}
+  @keyframes pisca{50%{background:rgba(70,10,16,.6)}}
+  /* barra de combustível: a largura é o quanto resta, a cor é o quão urgente é */
+  .barra{width:min(22vw,190px);height:11px;border-radius:99px;background:rgba(255,255,255,.16);
+         overflow:hidden;margin:7px auto 5px}
+  .barra i{display:block;height:100%;width:100%;background:#5eff9a;border-radius:99px;
+           transition:width .12s linear, background .25s}
+  #selTurbo{position:absolute;top:104px;left:50%;transform:translateX(-50%);display:none;
+            font-size:15px;font-weight:900;letter-spacing:3px;color:#0a2233;background:#7fd8ff;
+            border-radius:99px;padding:5px 18px;box-shadow:0 0 30px #7fd8ff}
+  #selTurbo.ver{display:block}
   #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;padding:0 16px;font-size:clamp(22px,4.5vw,44px);
          font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
   #sala2{position:absolute;bottom:14px;left:18px;font-size:12px;color:#9fb4d8;letter-spacing:.5px}
@@ -121,10 +131,14 @@
 <canvas id="tela"></canvas>
 
 <div id="hud">
-  <div class="caixa" id="cArg"><div class="rot">Argolas</div><div class="val" id="vArg">0</div></div>
-  <div class="caixa" id="cTempo"><div class="rot">Combustível</div><div class="val"><span id="vTempo">30</span><small>s</small></div></div>
-  <div class="caixa" id="cAlt"><div class="rot">Altitude</div><div class="val"><span id="vAlt">0</span><small>m</small></div></div>
-  <div id="recorde">recorde: <b id="vRec">0</b> argolas</div>
+  <div class="caixa" id="cDist"><div class="rot">Distância</div><div class="val"><span id="vDist">0</span><small>m</small></div></div>
+  <div class="caixa" id="cComb">
+    <div class="rot">Combustível</div>
+    <div class="barra"><i id="barraComb"></i></div>
+    <div class="val"><span id="vComb">100</span><small>%</small></div>
+  </div>
+  <div class="caixa" id="cRec"><div class="rot">Recorde</div><div class="val"><span id="vRec">0</span><small>m</small></div></div>
+  <div id="selTurbo">TURBO</div>
   <div id="aviso"></div>
   <div id="sala2">sala <b id="codigo2">····</b></div>
 </div>
@@ -224,8 +238,8 @@
   <div class="estado" id="estadoRede" style="max-width:340px;width:100%"><span class="luz"></span><span id="estadoRedeTxt">conectando&hellip;</span></div>
   <div id="horizonte"><div id="ceu"></div><div id="mira"></div></div>
   <div class="placar">
-    <div><div class="rot">Argolas</div><div class="val2" id="pArg">0</div></div>
-    <div><div class="rot">Combustível</div><div class="val2" id="pTempo">&ndash;</div></div>
+    <div><div class="rot">Distância</div><div class="val2" id="pDist">0</div></div>
+    <div><div class="rot">Combustível</div><div class="val2" id="pComb">&ndash;</div></div>
     <div><div class="rot">Atraso</div><div class="val2" id="pMs">&ndash;</div></div>
   </div>
   <div class="linha">
@@ -364,11 +378,7 @@ __NUCLEO__
 let acabou = false, pausado = false, papel = null, sozinho = false;
 
 function comeca(){
-  argolas = []; nuvens = []; faiscas = [];
-  proximoZ = 2600; caminhoX = 0; caminhoY = 250;
-  geraArgolas(); geraNuvens();
-  aviaoX = 0; aviaoY = 250; vx = 0; vy = 0; inclinacao = 0; nariz = 0;
-  camX = 0; camY = 0; distancia = 0; pontos = 0; tempo = 30;
+  reiniciaMundo();                     // o reset do mundo mora no núcleo do jogo
   acabou = false; pausado = false; jogando = true;
   if (sozinho) Sensor.calibrar();
   $('sala').classList.remove('ver'); $('fimTela').classList.remove('ver'); $('pausa').classList.remove('ver');
@@ -380,11 +390,12 @@ function comeca(){
 
 function fim(){
   jogando = false; acabou = true;
-  const novo = pontos > recorde;
-  if (novo){ recorde = pontos; try { localStorage.setItem('aviao.recorde', String(pontos)); } catch(e){} }
-  $('fimTit').textContent = novo ? 'Recorde novo!' : 'Acabou o combustível';
-  $('fimPlacar').innerHTML = 'Argolas: <b>' + pontos + '</b> &nbsp;·&nbsp; Distância: <b>' +
-                             Math.round(distancia/20) + ' m</b> &nbsp;·&nbsp; Recorde: <b>' + recorde + '</b>';
+  const m = Math.round(distancia/20);
+  const novo = m > recorde;
+  if (novo){ recorde = m; try { localStorage.setItem('aviao.recorde', String(m)); } catch(e){} }
+  $('fimTit').textContent = novo ? 'Recorde novo!' :
+      (motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível' : 'O avião caiu');
+  $('fimPlacar').innerHTML = 'Distância: <b>' + m + ' m</b> &nbsp;·&nbsp; Recorde: <b>' + recorde + ' m</b>';
   $('fimComo').innerHTML = sozinho ? 'Toque na tela ou aperte <b>Enter</b> para voar de novo.'
                                    : 'Toque em <b>Jogar de novo</b> no celular — ou <b>Enter</b> aqui.';
   $('fimTela').classList.add('ver');
@@ -472,7 +483,7 @@ function ligaCanalDaTela(){
     }
   };
 }
-function mandaEstado(){ Canal.envia({ t: 'estado', jogando, pontos, tempo, acabou }); }
+function mandaEstado(){ Canal.envia({ t: 'estado', jogando, acabou, dist: Math.round(distancia/20), comb: Math.round(combustivel), turbo: turbo > 0 }); }
 
 function viraTela(comSala){
   papel = 'tela';
@@ -543,7 +554,7 @@ setInterval(() => { if (papel === 'tela') mandaEstado(); }, 250);
 /* =============================================================================
    MODO CONTROLE
    ========================================================================== */
-let seq = 0, latencia = null, ultimoPong = 0, pontosAntes = 0;
+let seq = 0, latencia = null, ultimoPong = 0, combAntes = 100, jogandoAntes = false;
 function estadoRede(classe, txt){ $('estadoRede').className = 'estado ' + classe; $('estadoRedeTxt').textContent = txt; }
 function vibra(ms){ try { navigator.vibrate && navigator.vibrate(ms); } catch(e){} }
 
@@ -558,12 +569,15 @@ function ligaCanalDoControle(){
     if (!d || !d.t) return;
     if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
     if (d.t === 'estado'){
-      $('pArg').textContent = d.pontos;
-      $('pTempo').textContent = d.jogando ? Math.ceil(d.tempo) + 's' : '–';
-      $('btComecar').innerHTML = '<b>' + (d.jogando ? 'Jogando…' : (d.pontos > 0 || d.acabou ? 'Jogar de novo' : 'Começar')) + '</b>';
+      $('pDist').textContent = d.dist;
+      $('pComb').textContent = d.jogando ? d.comb + '%' : '–';
+      $('pComb').style.color = d.jogando && d.comb < 20 ? '#ff6a6a' : '';
+      $('btComecar').innerHTML = '<b>' + (d.jogando ? 'Voando…' : (d.acabou ? 'Voar de novo' : 'Começar')) + '</b>';
       $('btComecar').disabled = !!d.jogando;
-      if (d.pontos > pontosAntes) vibra(60);
-      pontosAntes = d.pontos;
+      // vibra quando o combustível sobe (pegou um tambor) e no fim do voo
+      if (d.comb > combAntes + 4) vibra(d.turbo ? 140 : 60);
+      if (!d.jogando && jogandoAntes) vibra(320);
+      combAntes = d.comb; jogandoAntes = !!d.jogando;
     }
   };
 }

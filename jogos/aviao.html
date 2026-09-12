@@ -17,12 +17,21 @@
   .rot{font-size:9.5px;letter-spacing:1.6px;text-transform:uppercase;color:#9fb4d8;font-weight:700}
   .val{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
   .val small{font-size:11px;font-weight:600;color:#9fb4d8;margin-left:2px}
-  #cArg{top:calc(10px + env(safe-area-inset-top));left:14px}
-  #cTempo{top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);text-align:center}
-  #cAlt{top:calc(10px + env(safe-area-inset-top));right:14px;text-align:right}
-  #cTempo.pouco .val{color:#ff6a6a}
-  #recorde{position:absolute;top:calc(74px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
-           font-size:11px;color:#9fb4d8;text-align:center;width:100%}
+  #cDist{top:calc(10px + env(safe-area-inset-top));left:14px}
+  #cComb{top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);text-align:center}
+  #cRec{top:calc(10px + env(safe-area-inset-top));right:14px;text-align:right}
+  #cComb.pouco{border-color:rgba(255,90,90,.55);animation:pisca .7s infinite}
+  #cComb.pouco .val{color:#ff6a6a}
+  @keyframes pisca{50%{background:rgba(70,10,16,.6)}}
+  /* a barra de combustível: a largura é o quanto resta, a cor é o quão urgente é */
+  .barra{width:min(34vw,130px);height:8px;border-radius:99px;background:rgba(255,255,255,.16);
+         overflow:hidden;margin:6px auto 4px}
+  .barra i{display:block;height:100%;width:100%;background:#5eff9a;border-radius:99px;
+           transition:width .12s linear, background .25s}
+  #selTurbo{position:absolute;top:calc(92px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+            display:none;font-size:12px;font-weight:900;letter-spacing:2.4px;color:#0a2233;
+            background:#7fd8ff;border-radius:99px;padding:4px 13px;box-shadow:0 0 22px #7fd8ff}
+  #selTurbo.ver{display:block}
   #aviso{position:absolute;top:40%;left:0;right:0;text-align:center;padding:0 16px;font-size:clamp(19px,5.6vw,30px);font-weight:900;
          letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s}
 
@@ -93,10 +102,14 @@
 <canvas id="tela"></canvas>
 
 <div id="hud">
-  <div class="caixa" id="cArg"><div class="rot">Argolas</div><div class="val" id="vArg">0</div></div>
-  <div class="caixa" id="cTempo"><div class="rot">Combustível</div><div class="val"><span id="vTempo">30</span><small>s</small></div></div>
-  <div class="caixa" id="cAlt"><div class="rot">Altitude</div><div class="val"><span id="vAlt">0</span><small>m</small></div></div>
-  <div id="recorde">recorde: <b id="vRec">0</b> argolas</div>
+  <div class="caixa" id="cDist"><div class="rot">Distância</div><div class="val"><span id="vDist">0</span><small>m</small></div></div>
+  <div class="caixa" id="cComb">
+    <div class="rot">Combustível</div>
+    <div class="barra"><i id="barraComb"></i></div>
+    <div class="val"><span id="vComb">100</span><small>%</small></div>
+  </div>
+  <div class="caixa" id="cRec"><div class="rot">Recorde</div><div class="val"><span id="vRec">0</span><small>m</small></div></div>
+  <div id="selTurbo">TURBO</div>
   <div id="aviso"></div>
 </div>
 
@@ -249,16 +262,30 @@ function grausParaEixo(graus, maximo, zonaMorta){
    PARTE 2 — O MUNDO
 
    Coordenadas: x para a direita, y para cima, z para a frente.
-   A câmera fica parada atrás do avião; quem anda é o mundo, que vem vindo na
-   direção do avião (as argolas têm o z diminuído a cada quadro).
+   A câmera fica atrás do avião; quem anda é o mundo, que vem vindo na direção
+   dele (todo objeto tem o z diminuído a cada quadro).
+
+   O jogo agora é sobre COMBUSTÍVEL: ele só cai, e quando acaba o avião cai de
+   verdade. Pelo caminho há dois tipos de tambor para pegar e dois tipos de
+   obstáculo para desviar.
    ========================================================================== */
-const CAMD   = 750;      // distância da câmera até o avião
-const CHAO   = -700;     // altura do solo
-const TETO   = 1500;     // altura máxima de voo
-const VOO    = 1750;     // velocidade para a frente, unidades por segundo
-const RAIO   = 380;      // raio das argolas
-const VAO    = 1650;     // distância entre uma argola e a seguinte
-const ALCANCE= 14000;    // até onde o mundo é gerado à frente
+const CAMD     = 750;      // distância da câmera até o avião
+const CHAO     = -700;     // altura do solo
+const TETO     = 1600;     // altura máxima de voo
+const VOO_BASE = 1700;     // velocidade normal, unidades por segundo
+const VOO_TURBO= 3000;     // velocidade com o combustível azul
+const ALCANCE  = 16000;    // até onde o mundo é gerado à frente
+const VAO      = 1650;     // distância entre um tambor e o seguinte
+
+const RAIO_PEGA  = 340;    // o quanto o avião pode passar longe e ainda pegar
+const GASTO      = 3.3;    // % de combustível gasto por segundo
+const GASTO_TURBO= 5.0;    // gasta mais rápido enquanto acelera
+const DA_NORMAL  = 20;     // % que um tambor amarelo devolve
+const DA_AZUL    = 32;     // % que um tambor azul devolve
+const TURBO_SEG  = 5;      // segundos de turbo por tambor azul
+
+const RAIO_POMBO = 170;    // tamanho de colisão dos obstáculos
+const RAIO_AVIAO = 430;
 
 const tela = document.getElementById('tela');
 const ctx  = tela.getContext('2d');
@@ -288,11 +315,12 @@ function projeta(x, y, z){
 }
 
 /* --- estado --- */
-let aviaoX=0, aviaoY=200, vx=0, vy=0, inclinacao=0, nariz=0;
+let aviaoX=0, aviaoY=250, vx=0, vy=0, inclinacao=0, nariz=0;
 let camX=0, camY=0;
-let argolas=[], nuvens=[], faiscas=[];
-let distancia=0, pontos=0, tempo=0, recorde=0;
-let proximoZ=0, jogando=false;
+let tambores=[], obstaculos=[], nuvens=[], particulas=[];
+let distancia=0, recorde=0, combustivel=100, turbo=0, voo=VOO_BASE;
+let proximoZ=0, caminhoX=0, caminhoY=250;
+let jogando=false, caindo=false, giroQueda=0, tremor=0, clarao=0;
 let tecla={esq:false,dir:false,cima:false,baixo:false};
 let toqueX=0, toqueY=0, usandoToque=false;
 
@@ -310,141 +338,325 @@ function bip(freq, dur, tipo, vol){
     o.start(); o.stop(audio.currentTime+dur);
   }catch(e){}
 }
+// barulho de explosão: ruído branco curto, feito na hora
+function estouro(){
+  try{
+    if(!audio) audio = new (window.AudioContext||window.webkitAudioContext)();
+    const n = audio.sampleRate * 0.55;
+    const buf = audio.createBuffer(1, n, audio.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/n, 2.2);
+    const src = audio.createBufferSource(); src.buffer = buf;
+    const f = audio.createBiquadFilter(); f.type='lowpass'; f.frequency.value=900;
+    const g = audio.createGain(); g.gain.value = 0.35;
+    src.connect(f); f.connect(g); g.connect(audio.destination);
+    src.start();
+  }catch(e){}
+}
 
-/* --- geração do percurso: as argolas passeiam devagar de um lado para o outro --- */
-let caminhoX=0, caminhoY=250;
-function geraArgolas(){
+/* --- geração do percurso ------------------------------------------------- */
+function geraMundo(){
   while (proximoZ < ALCANCE){
-    caminhoX += (Math.random()-0.5) * 1000;   // quanto maior, mais o percurso serpenteia
+    // o caminho dos tambores passeia devagar de um lado para o outro
+    caminhoX += (Math.random()-0.5) * 1000;
     caminhoY += (Math.random()-0.5) * 620;
     caminhoX = Math.max(-2200, Math.min(2200, caminhoX));
     caminhoY = Math.max(CHAO+520, Math.min(TETO-320, caminhoY));
-    argolas.push({ x:caminhoX, y:caminhoY, z:proximoZ, passou:false, acerto:false, brilho:0 });
+
+    const azul = Math.random() < 0.18;     // 1 em cada 5 e pouco é azul
+    tambores.push({ x:caminhoX, y:caminhoY, z:proximoZ, azul:azul,
+                    passou:false, brilho:0, giro:Math.random()*6.28 });
+
+    // quanto mais longe o jogador chega, mais obstáculo aparece
+    const dificuldade = Math.min(1, distancia/140000);
+    const quantos = (Math.random() < 0.45 + dificuldade*0.45) ? 1 : 0;
+    for (let i=0;i<quantos;i++){
+      const ehAviao = Math.random() < 0.28 + dificuldade*0.22;
+      obstaculos.push({
+        tipo: ehAviao ? 'aviao' : 'pombo',
+        // fica ao lado do caminho dos tambores, para obrigar a desviar
+        x: caminhoX + (Math.random()<0.5?-1:1) * (500 + Math.random()*1500),
+        y: caminhoY + (Math.random()-0.5) * 800,
+        z: proximoZ + VAO*0.45 + Math.random()*VAO*0.45,
+        fase: Math.random()*6.28,
+        deriva: (Math.random()-0.5) * 300,
+        passou: false
+      });
+    }
     proximoZ += VAO + Math.random()*500;
   }
 }
 function geraNuvens(){
-  while (nuvens.length < 18){
+  while (nuvens.length < 22){
     nuvens.push({
-      x: (Math.random()-0.5)*14000,
-      y: 700 + Math.random()*2000,
+      x: (Math.random()-0.5)*15000,
+      y: 700 + Math.random()*2200,
       z: Math.random()*ALCANCE,
-      r: 320 + Math.random()*520
+      r: 320 + Math.random()*560
     });
   }
+}
+
+/* reinicia o mundo inteiro — chamado pelo comeca() de cada versão do jogo */
+function reiniciaMundo(){
+  tambores = []; obstaculos = []; nuvens = []; particulas = [];
+  proximoZ = 2600; caminhoX = 0; caminhoY = 250;
+  distancia = 0;
+  geraMundo(); geraNuvens();
+  aviaoX = 0; aviaoY = 250; vx = 0; vy = 0; inclinacao = 0; nariz = 0;
+  camX = 0; camY = 0;
+  combustivel = 100; turbo = 0; voo = VOO_BASE;
+  caindo = false; giroQueda = 0; tremor = 0; clarao = 0;
 }
 
 /* =============================================================================
    PARTE 3 — DESENHO
    ========================================================================== */
+function quadro4(a,b,c,d,cor){
+  ctx.fillStyle = cor;
+  ctx.beginPath();
+  ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.lineTo(d.x,d.y);
+  ctx.closePath(); ctx.fill();
+}
+
+/* --- céu: gradiente, sol e duas serras ao fundo --- */
 function desenhaCeu(){
   const g = ctx.createLinearGradient(0,0,0,horizonte+2);
-  g.addColorStop(0,'#0e2a5c'); g.addColorStop(0.6,'#3d7cc0'); g.addColorStop(1,'#a9cbe8');
+  g.addColorStop(0,'#071b45'); g.addColorStop(0.45,'#2f6fb8'); g.addColorStop(0.8,'#77aede'); g.addColorStop(1,'#bcd9ef');
   ctx.fillStyle=g; ctx.fillRect(0,0,W,horizonte+2);
-  ctx.fillStyle='rgba(255,240,190,.9)';
-  ctx.beginPath(); ctx.arc(W*0.78, horizonte*0.35, Math.min(W,H)*0.07, 0, 7); ctx.fill();
-  ctx.fillStyle='#2f6a3f'; ctx.fillRect(0, horizonte, W, H-horizonte);
-  // bruma: o chão longe desbota para a cor do céu, senão o horizonte vira um corte seco
-  const b = ctx.createLinearGradient(0, horizonte, 0, horizonte + H*0.22);
-  b.addColorStop(0,'rgba(169,203,232,.85)'); b.addColorStop(1,'rgba(169,203,232,0)');
-  ctx.fillStyle=b; ctx.fillRect(0, horizonte, W, H*0.22);
+
+  // sol com brilho
+  const sx = W*0.76, sy = horizonte*0.34, r = Math.min(W,H)*0.055;
+  const halo = ctx.createRadialGradient(sx,sy,r*0.3, sx,sy,r*5);
+  halo.addColorStop(0,'rgba(255,236,170,.55)'); halo.addColorStop(1,'rgba(255,236,170,0)');
+  ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(sx,sy,r*5,0,7); ctx.fill();
+  ctx.fillStyle='rgba(255,246,205,.95)'; ctx.beginPath(); ctx.arc(sx,sy,r,0,7); ctx.fill();
+
+  // serras: duas camadas, com deslocamento diferente conforme o avião anda de lado
+  serra(horizonte, H*0.085, '#3c5f86', camX*0.020, 0.9);
+  serra(horizonte, H*0.052, '#4d7396', camX*0.038, 1.7);
+}
+function serra(base, altura, cor, desloc, freq){
+  ctx.fillStyle = cor;
+  ctx.beginPath();
+  ctx.moveTo(-10, base+2);
+  for (let x=-10; x<=W+10; x+=W/26){
+    const k = (x + desloc)/W * 7 * freq;
+    const h = (Math.sin(k)*0.5 + Math.sin(k*2.7+1.3)*0.3 + Math.sin(k*5.1)*0.2 + 1) * altura*0.5;
+    ctx.lineTo(x, base + 2 - h);
+  }
+  ctx.lineTo(W+10, base+2); ctx.closePath(); ctx.fill();
 }
 
-/* o chão é uma grade: linhas atravessadas (que vêm vindo) e linhas compridas */
+/* --- chão: campos, rio, estrada e bruma --- */
+const PASSO_Z = 900, PASSO_X = 1500;
+const VERDES = ['#2a5c33','#38754a','#245029','#47895a','#57964f','#6b8f3c','#84a04a','#2f6b3e','#3f6e2f','#537f36'];
+function corDoCampo(a,b){
+  const h = Math.abs(Math.sin(a*127.1 + b*311.7) * 43758.5453) % 1;
+  return VERDES[Math.floor(h*VERDES.length)];
+}
+const rioX     = z => Math.sin((distancia+z)/5200)*2600 + Math.sin((distancia+z)/1700)*500;
+const estradaX = z => -3400 + Math.sin((distancia+z)/9000)*1100;
+
 function desenhaChao(){
-  const passo = 900;
-  const desl  = distancia % passo;
-  ctx.lineWidth = 1;
-  for (let i=1;i<=22;i++){
-    const z = i*passo - desl;
-    const a = projeta(-9000, CHAO, z), b = projeta(9000, CHAO, z);
-    if (!a || !b) continue;
-    ctx.strokeStyle = 'rgba(255,255,255,' + (0.30*(1 - i/22)).toFixed(3) + ')';
-    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
-  }
-  for (let k=-7;k<=7;k++){
-    const x = k*1200;
-    const a = projeta(x, CHAO, 150), b = projeta(x, CHAO, 19000);
-    if (!a || !b) continue;
-    ctx.strokeStyle = 'rgba(255,255,255,.13)';
-    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
-  }
-}
+  ctx.fillStyle = '#2f6a3f';
+  ctx.fillRect(0, horizonte, W, H-horizonte);
 
-function desenhaNuvens(){
-  const lista = nuvens.slice().sort((a,b)=>b.z-a.z);
-  for (const n of lista){
-    const p = projeta(n.x, n.y, n.z);
-    if (!p) continue;
-    const r = n.r * p.s;
-    if (r < 2 || p.x < -r*3 || p.x > W+r*3) continue;
-    // nuvem muito perto some aos poucos, senão vira um borrão branco na cara
-    const perto = Math.min(1, Math.max(0, n.z/2200));
-    ctx.fillStyle = 'rgba(255,255,255,' + (Math.min(0.5, 0.16 + r/(W*1.8)) * perto).toFixed(3) + ')';
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y, r, r*0.42, 0, 0, 7); ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(p.x - r*0.5, p.y + r*0.10, r*0.55, r*0.30, 0, 0, 7); ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(p.x + r*0.55, p.y + r*0.08, r*0.5, r*0.28, 0, 0, 7); ctx.fill();
-  }
-}
+  const desl  = distancia % PASSO_Z;
+  const baseK = Math.floor(distancia / PASSO_Z);
+  const j0 = Math.floor((camX - 10000)/PASSO_X), j1 = Math.ceil((camX + 10000)/PASSO_X);
 
-function desenhaArgolas(){
-  const lista = argolas.slice().sort((a,b)=>b.z-a.z);
-  let alvo = null;
-  for (const a of argolas) if (!a.passou && (alvo===null || a.z < alvo.z)) alvo = a;
+  // do fundo para a frente, para o que está perto cobrir o que está longe
+  for (let i = 15; i >= 0; i--){
+    const z1 = i*PASSO_Z - desl, z2 = z1 + PASSO_Z;
+    if (z2 < 140) continue;
 
-  for (const a of lista){
-    const p = projeta(a.x, a.y, a.z);
-    if (!p) continue;
-    const r = RAIO * p.s;
-    if (r < 1.5) continue;
-    if (p.x < -r-80 || p.x > W+r+80) continue;
-
-    const dist = 1 - Math.min(1, a.z/ALCANCE);
-    let cor;
-    if (a.brilho > 0)      cor = a.acerto ? '#67ff9a' : '#ff7b7b';
-    else if (a === alvo)   cor = '#ffd24d';
-    else                   cor = '#8fd4ff';
-
-    ctx.save();
-    ctx.globalAlpha = Math.max(0.12, dist);
-    ctx.strokeStyle = cor;
-    ctx.lineWidth = Math.max(1.5, r*0.13);
-    ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r*0.94, 0, 0, 7); ctx.stroke();
-    ctx.globalAlpha = Math.max(0.06, dist*0.45);
-    ctx.lineWidth = Math.max(1, r*0.05);
-    ctx.beginPath(); ctx.ellipse(p.x, p.y, r*0.80, r*0.75, 0, 0, 7); ctx.stroke();
-    if (a === alvo && a.brilho <= 0){
-      ctx.globalAlpha = 0.45 + Math.sin(Date.now()/180)*0.25;
-      ctx.lineWidth = Math.max(1, r*0.05);
-      ctx.beginPath(); ctx.ellipse(p.x, p.y, r*1.16, r*1.10, 0, 0, 7); ctx.stroke();
+    for (let j = j0; j <= j1; j++){
+      const a = projeta(j*PASSO_X, CHAO, z1), b = projeta((j+1)*PASSO_X, CHAO, z1),
+            c = projeta((j+1)*PASSO_X, CHAO, z2), d = projeta(j*PASSO_X, CHAO, z2);
+      if (!a||!b||!c||!d) continue;
+      if (a.x > W+40 && d.x > W+40) continue;
+      if (b.x < -40 && c.x < -40) continue;
+      quadro4(a,b,c,d, corDoCampo(j, baseK + i));
     }
-    ctx.restore();
+
+    // estrada e rio acompanham o terreno, serpenteando
+    const e1 = estradaX(z1), e2 = estradaX(z2);
+    const ea = projeta(e1-150, CHAO, z1), eb = projeta(e1+150, CHAO, z1),
+          ec = projeta(e2+150, CHAO, z2), ed = projeta(e2-150, CHAO, z2);
+    if (ea&&eb&&ec&&ed) quadro4(ea,eb,ec,ed,'#6b6a63');
+
+    const r1 = rioX(z1), r2 = rioX(z2);
+    const ra = projeta(r1-520, CHAO, z1), rb = projeta(r1+520, CHAO, z1),
+          rc = projeta(r2+520, CHAO, z2), rd = projeta(r2-520, CHAO, z2);
+    if (ra&&rb&&rc&&rd) quadro4(ra,rb,rc,rd,'#3f7fa8');
   }
+
+  // bruma: o chão longe desbota para a cor do céu
+  const b = ctx.createLinearGradient(0, horizonte - 2, 0, horizonte + H*0.13);
+  b.addColorStop(0,'rgba(188,217,239,.82)'); b.addColorStop(0.45,'rgba(188,217,239,.30)');
+  b.addColorStop(1,'rgba(188,217,239,0)');
+  ctx.fillStyle=b; ctx.fillRect(0, horizonte - 2, W, H*0.13);
 }
 
-function desenhaFaiscas(){
-  for (const f of faiscas){
-    const p = projeta(f.x, f.y, f.z);
-    if (!p) continue;
-    ctx.globalAlpha = Math.max(0, f.vida);
+/* --- os objetos do mundo, desenhados do mais longe para o mais perto ------ */
+function desenhaNuvem(n){
+  const p = projeta(n.x, n.y, n.z);
+  if (!p) return;
+  const r = n.r * p.s;
+  if (r < 2 || p.x < -r*3 || p.x > W+r*3) return;
+  const perto = Math.min(1, Math.max(0, n.z/2200));
+  ctx.fillStyle = 'rgba(255,255,255,' + (Math.min(0.5, 0.16 + r/(W*1.8)) * perto).toFixed(3) + ')';
+  ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r*0.42, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(p.x - r*0.5, p.y + r*0.10, r*0.55, r*0.30, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(p.x + r*0.55, p.y + r*0.08, r*0.5, r*0.28, 0, 0, 7); ctx.fill();
+}
+
+/* tambor de combustível: amarelo é normal, azul é o turbo */
+function desenhaTambor(t, alvo){
+  const p = projeta(t.x, t.y, t.z);
+  if (!p) return;
+  const r = 125 * p.s;
+  if (r < 1.2 || p.x < -r*4 || p.x > W+r*4) return;
+  const dist = 1 - Math.min(1, t.z/ALCANCE);
+  const corpo = t.azul ? '#3aa0ff' : '#ffb43a';
+  const faixa = t.azul ? '#cfeaff' : '#fff0cf';
+
+  ctx.save();
+  ctx.globalAlpha = Math.max(0.15, dist);
+
+  // halo pulsante, para enxergar de longe
+  const pulso = 1 + Math.sin(Date.now()/(t.azul?170:280) + t.giro)*0.16;
+  const halo = ctx.createRadialGradient(p.x,p.y,r*0.4, p.x,p.y,r*3.1*pulso);
+  halo.addColorStop(0, t.azul ? 'rgba(90,190,255,.55)' : 'rgba(255,190,80,.40)');
+  halo.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(p.x, p.y, r*3.1*pulso, 0, 7); ctx.fill();
+
+  // o tambor em si, girando devagar
+  const bal = Math.sin(Date.now()/600 + t.giro) * 0.12;
+  ctx.translate(p.x, p.y); ctx.rotate(bal);
+  ctx.fillStyle = corpo;
+  ctx.fillRect(-r*0.62, -r, r*1.24, r*2);
+  ctx.fillStyle = faixa;
+  ctx.fillRect(-r*0.62, -r*0.46, r*1.24, r*0.30);
+  ctx.fillRect(-r*0.62,  r*0.16, r*1.24, r*0.30);
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  ctx.fillRect(-r*0.52, -r*0.95, r*0.22, r*1.9);          // brilho lateral
+  ctx.fillStyle = 'rgba(0,0,0,.22)';
+  ctx.fillRect(r*0.34, -r*0.95, r*0.24, r*1.9);           // sombra do outro lado
+  ctx.fillStyle = t.azul ? '#0a3e6b' : '#6b4a10';
+  ctx.beginPath(); ctx.ellipse(0, -r, r*0.62, r*0.20, 0, 0, 7); ctx.fill();
+
+  // o próximo a pegar ganha um anel, para o jogador saber para onde ir
+  if (alvo && r > 3){
+    ctx.rotate(-bal);
+    ctx.globalAlpha = 0.35 + Math.sin(Date.now()/180)*0.22;
+    ctx.strokeStyle = t.azul ? '#9ad8ff' : '#ffd98a';
+    ctx.lineWidth = Math.max(1.2, r*0.14);
+    ctx.beginPath(); ctx.arc(0, 0, r*2.5, 0, 7); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* pombo: silhueta escura com as asas batendo */
+function desenhaPombo(o){
+  const p = projeta(o.x, o.y, o.z);
+  if (!p) return;
+  const r = 150 * p.s;
+  if (r < 0.8 || p.x < -r*5 || p.x > W+r*5) return;
+  const bate = Math.sin(Date.now()/90 + o.fase);
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.globalAlpha = Math.max(0.25, 1 - o.z/ALCANCE);   // some ao longe, aparece ao chegar
+  ctx.fillStyle = '#3b4150';
+  ctx.beginPath(); ctx.ellipse(0, 0, r*0.55, r*0.38, 0, 0, 7); ctx.fill();   // corpo
+  ctx.fillStyle = '#4a5266';
+  ctx.beginPath();                                                          // asa esquerda
+  ctx.moveTo(-r*0.3, 0);
+  ctx.quadraticCurveTo(-r*1.5, -r*0.9*bate, -r*2.1, -r*0.25*bate);
+  ctx.quadraticCurveTo(-r*1.4, r*0.1, -r*0.3, r*0.22);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();                                                          // asa direita
+  ctx.moveTo(r*0.3, 0);
+  ctx.quadraticCurveTo(r*1.5, -r*0.9*bate, r*2.1, -r*0.25*bate);
+  ctx.quadraticCurveTo(r*1.4, r*0.1, r*0.3, r*0.22);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2b303c';
+  ctx.beginPath(); ctx.ellipse(0, -r*0.30, r*0.26, r*0.24, 0, 0, 7); ctx.fill();  // cabeça
+  ctx.fillStyle = '#e8a33a';
+  ctx.beginPath(); ctx.moveTo(0,-r*0.34); ctx.lineTo(r*0.34,-r*0.26); ctx.lineTo(0,-r*0.18);
+  ctx.closePath(); ctx.fill();                                              // bico
+  ctx.restore();
+}
+
+/* avião que vem de frente */
+function desenhaAviaoInimigo(o){
+  const p = projeta(o.x, o.y, o.z);
+  if (!p) return;
+  const r = 420 * p.s;
+  if (r < 1 || p.x < -r*3 || p.x > W+r*3) return;
+  const bal = Math.sin(Date.now()/700 + o.fase) * 0.10;
+  ctx.save();
+  ctx.translate(p.x, p.y); ctx.rotate(bal);
+  ctx.fillStyle = 'rgba(0,0,0,.16)';
+  ctx.beginPath(); ctx.ellipse(0, r*0.26, r*1.0, r*0.10, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#b9c3d6';
+  ctx.beginPath();                                                          // asas
+  ctx.moveTo(-r*1.05, r*0.04); ctx.lineTo(-r*0.14,-r*0.10);
+  ctx.lineTo( r*0.14,-r*0.10); ctx.lineTo( r*1.05, r*0.04);
+  ctx.lineTo( r*0.95, r*0.17); ctx.lineTo(-r*0.95, r*0.17);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e05b4a';
+  ctx.fillRect(-r*0.88, r*0.04, r*0.26, r*0.13);
+  ctx.fillRect( r*0.62, r*0.04, r*0.26, r*0.13);
+  ctx.fillStyle = '#d6deeb';
+  ctx.beginPath(); ctx.ellipse(0, 0, r*0.20, r*0.40, 0, 0, 7); ctx.fill();  // fuselagem
+  ctx.fillStyle = '#26354f';
+  ctx.beginPath(); ctx.ellipse(0, -r*0.15, r*0.13, r*0.14, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#b9c3d6';
+  ctx.beginPath();                                                          // leme
+  ctx.moveTo(-r*0.05, r*0.06); ctx.lineTo(-r*0.05,-r*0.44);
+  ctx.lineTo( r*0.05,-r*0.44); ctx.lineTo( r*0.05, r*0.06);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function desenhaParticula(f){
+  const p = projeta(f.x, f.y, f.z);
+  if (!p) return;
+  const r = Math.max(0.6, f.raio * p.s);
+  ctx.globalAlpha = Math.max(0, Math.min(1, f.vida));
+  if (f.fumaca){
     ctx.fillStyle = f.cor;
-    const r = Math.max(1, 26*p.s);
+    ctx.beginPath(); ctx.arc(p.x, p.y, r*(2.2-f.vida), 0, 7); ctx.fill();
+  } else {
+    ctx.fillStyle = f.cor;
     ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
   }
   ctx.globalAlpha = 1;
 }
 
-/* avião visto de trás, desenhado na hora */
+/* o avião do jogador */
 function desenhaAviao(){
   const p = projeta(aviaoX, aviaoY, 0);
   if (!p) return;
   const t = Math.min(W,H) * 0.17;
   ctx.save();
   ctx.translate(p.x, p.y);
-  ctx.rotate(inclinacao * Math.PI/180);
+  ctx.rotate(inclinacao * Math.PI/180 + giroQueda);
+
+  // rastro de turbo: dois jatos compridos
+  if (turbo > 0){
+    for (const lado of [-1, 1]){
+      const g = ctx.createLinearGradient(lado*t*0.52, t*0.26, lado*t*0.52, t*1.5);
+      g.addColorStop(0,'rgba(120,200,255,.75)'); g.addColorStop(1,'rgba(120,200,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(lado*t*0.42, t*0.26); ctx.lineTo(lado*t*0.62, t*0.26);
+      ctx.lineTo(lado*t*0.54, t*(1.1+Math.random()*0.5)); ctx.closePath(); ctx.fill();
+    }
+  }
 
   ctx.fillStyle = '#cfd8e8';                          // asas
   ctx.beginPath();
@@ -452,7 +664,7 @@ function desenhaAviao(){
   ctx.lineTo( t*0.16,-t*0.06); ctx.lineTo( t*1.05, t*0.10);
   ctx.lineTo( t*0.95, t*0.21); ctx.lineTo(-t*0.95, t*0.21);
   ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#2d7dff';                          // faixas
+  ctx.fillStyle = turbo > 0 ? '#5cc8ff' : '#2d7dff';  // faixas
   ctx.fillRect(-t*0.86, t*0.10, t*0.26, t*0.11);
   ctx.fillRect( t*0.60, t*0.10, t*0.26, t*0.11);
   ctx.fillStyle = '#e9eef7';                          // fuselagem
@@ -464,21 +676,61 @@ function desenhaAviao(){
   ctx.moveTo(-t*0.04, t*0.05); ctx.lineTo(-t*0.04,-t*0.40);
   ctx.lineTo( t*0.04,-t*0.40); ctx.lineTo( t*0.04, t*0.05);
   ctx.closePath(); ctx.fill();
-  // rastro dos motores
-  ctx.fillStyle = 'rgba(140,200,255,' + (0.25+Math.random()*0.25).toFixed(2) + ')';
+  // motores: fumaça preta quando o tanque está no fim
+  const corJato = combustivel < 15 ? 'rgba(70,70,80,' : 'rgba(140,200,255,';
+  ctx.fillStyle = corJato + (0.25+Math.random()*0.25).toFixed(2) + ')';
   ctx.beginPath(); ctx.ellipse(-t*0.52, t*0.26, t*0.09, t*0.05, 0, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.ellipse( t*0.52, t*0.26, t*0.09, t*0.05, 0, 0, 7); ctx.fill();
   ctx.restore();
 }
 
 function desenha(){
+  ctx.save();
+  if (tremor > 0.2) ctx.translate((Math.random()-0.5)*tremor, (Math.random()-0.5)*tremor);
+
   ctx.clearRect(0,0,W,H);
   desenhaCeu();
   desenhaChao();
-  desenhaNuvens();
-  desenhaArgolas();
-  desenhaFaiscas();
+
+  // tudo que vive no mundo entra numa lista só, ordenada do fundo para a frente
+  const fila = [];
+  for (const n of nuvens)     fila.push({ z:n.z, o:n, k:'nuvem' });
+  for (const t of tambores)   fila.push({ z:t.z, o:t, k:'tambor' });
+  for (const o of obstaculos) fila.push({ z:o.z, o:o, k:o.tipo });
+  for (const f of particulas) fila.push({ z:f.z, o:f, k:'part' });
+  fila.sort((a,b) => b.z - a.z);
+
+  let alvo = null;
+  for (const t of tambores) if (!t.passou && (alvo===null || t.z < alvo.z)) alvo = t;
+
+  for (const it of fila){
+    if (it.k === 'nuvem')       desenhaNuvem(it.o);
+    else if (it.k === 'tambor') desenhaTambor(it.o, it.o === alvo);
+    else if (it.k === 'pombo')  desenhaPombo(it.o);
+    else if (it.k === 'aviao')  desenhaAviaoInimigo(it.o);
+    else                        desenhaParticula(it.o);
+  }
+
   desenhaAviao();
+  ctx.restore();
+
+  // clarão branco/azul quando pega o combustível azul ou quando explode
+  if (clarao > 0){
+    ctx.fillStyle = 'rgba(150,220,255,' + (clarao*0.55).toFixed(3) + ')';
+    ctx.fillRect(0,0,W,H);
+  }
+  // riscos de velocidade durante o turbo
+  if (turbo > 0){
+    ctx.strokeStyle = 'rgba(190,230,255,.5)'; ctx.lineWidth = 2;
+    for (let i=0;i<14;i++){
+      const a = (i/14)*Math.PI*2 + Date.now()/900;
+      const d0 = Math.min(W,H)*0.30, d1 = d0 + Math.min(W,H)*(0.12+Math.random()*0.16);
+      ctx.beginPath();
+      ctx.moveTo(W/2+Math.cos(a)*d0, H*0.55+Math.sin(a)*d0);
+      ctx.lineTo(W/2+Math.cos(a)*d1, H*0.55+Math.sin(a)*d1);
+      ctx.stroke();
+    }
+  }
 }
 
 
@@ -499,7 +751,84 @@ function eixos(){
   };
 }
 
+function solta(x, y, z, n, cor, raio, forca, fumaca){
+  for (let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, b = Math.random()*Math.PI*2;
+    particulas.push({
+      x:x, y:y, z:z,
+      vx: Math.cos(a)*forca*(0.3+Math.random()),
+      vy: Math.sin(b)*forca*(0.3+Math.random()),
+      vz: (Math.random()-0.3)*forca,
+      vida: 1, raio: raio*(0.5+Math.random()), cor: cor, fumaca: !!fumaca
+    });
+  }
+}
+
+function explode(x, y, z){
+  solta(x, y, z, 34, '#ffd257', 90, 900);
+  solta(x, y, z, 26, '#ff7a2f', 120, 700);
+  solta(x, y, z, 18, '#ff3b2f', 150, 500);
+  solta(x, y, z, 22, 'rgba(60,60,70,.75)', 190, 380, true);
+  tremor = 26; clarao = 0.9;
+  estouro();
+}
+
+let motivoQueda = '';
+function derruba(motivo){
+  if (caindo) return;
+  caindo = true; motivoQueda = motivo;
+  turbo = 0; voo = VOO_BASE;
+  mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL!' : 'BATEU!', '#ff8080', 2200);
+  if (motivo !== 'combustivel'){ explode(aviaoX, aviaoY, 0); }
+  else { bip(160, 0.5, 'sawtooth', 0.10); solta(aviaoX, aviaoY, 0, 16, 'rgba(60,60,70,.7)', 150, 260, true); }
+}
+
+/* a queda: o avião perde o controle, roda e cai até bater no chão */
+function atualizaQueda(dt){
+  giroQueda += dt * 3.4;
+  nariz -= dt * 60; if (nariz < -70) nariz = -70;
+  vy -= dt * 1500;                      // gravidade
+  aviaoY += vy * dt;
+  aviaoX += vx * dt;
+  vx *= 0.985;
+  voo *= 0.985;
+  distancia += voo * dt;
+  andaMundo(voo * dt);
+
+  camX += (aviaoX - camX) * Math.min(1, dt*2.2);
+  camY += ((aviaoY + 240) - camY) * Math.min(1, dt*2.6);
+  horizonte = H*0.38 + nariz*2.2;
+
+  if (aviaoY <= CHAO + 120){
+    aviaoY = CHAO + 120;
+    if (motivoQueda === 'combustivel'){ explode(aviaoX, aviaoY, 0); motivoQueda = 'acabou'; }
+    if (tremor < 1) fim();
+  }
+}
+
+function andaMundo(avanco){
+  for (const n of nuvens){
+    n.z -= avanco;
+    if (n.z < -900){ n.z += ALCANCE; n.x = (Math.random()-0.5)*15000; n.y = 700+Math.random()*2200; }
+  }
+  for (const t of tambores)   t.z -= avanco;
+  for (const o of obstaculos) o.z -= avanco;
+  for (const f of particulas) f.z -= avanco;
+  proximoZ -= avanco;
+}
+
 function atualiza(dt){
+  if (tremor > 0) tremor = Math.max(0, tremor - dt*40);
+  if (clarao > 0) clarao = Math.max(0, clarao - dt*2.2);
+
+  for (const f of particulas){
+    f.x += f.vx*dt; f.y += f.vy*dt; f.z += f.vz*dt;
+    f.vy -= dt*220; f.vida -= dt*(f.fumaca ? 0.6 : 1.25);
+  }
+  particulas = particulas.filter(f => f.vida > 0);
+
+  if (caindo){ atualizaQueda(dt); return; }
+
   const e = eixos();
 
   // as asas inclinam de forma suave, e é a inclinação que faz o avião virar
@@ -521,54 +850,65 @@ function atualiza(dt){
     mostraAviso('SUBA!', '#ff8080');
   }
 
-  // A câmera segue o avião por inteiro, mas com ATRASO — é o atraso que dá a
-  // sensação de voo: numa virada o avião escorrega para o lado da tela e
-  // depois volta para o meio. ALTURA fica 240 unidades acima do avião, para
-  // ele aparecer na parte de baixo da tela, com o horizonte lá em cima.
-  camX += (aviaoX - camX)           * Math.min(1, dt*2.2);
-  camY += ((aviaoY + 240) - camY)   * Math.min(1, dt*2.6);
+  // a câmera acompanha com atraso — é o atraso que dá a sensação de voo
+  camX += (aviaoX - camX)         * Math.min(1, dt*2.2);
+  camY += ((aviaoY + 240) - camY) * Math.min(1, dt*2.6);
   horizonte = H*0.38 + nariz*2.2;
 
-  // o mundo vem vindo
-  const avanco = VOO*dt;
-  distancia += avanco;
-  for (const n of nuvens){
-    n.z -= avanco;
-    if (n.z < -900){ n.z += ALCANCE; n.x = (Math.random()-0.5)*14000; n.y = 700+Math.random()*2000; }
+  // turbo e combustível
+  if (turbo > 0){
+    turbo -= dt;
+    if (turbo <= 0){ turbo = 0; mostraAviso('fim do turbo', '#9fd8ff', 900); }
   }
-  for (const a of argolas){
-    const antes = a.z;
-    a.z -= avanco;
-    if (a.brilho > 0) a.brilho -= dt*2.2;
-    if (!a.passou && antes > 0 && a.z <= 0){
-      a.passou = true;
-      const dx = aviaoX - a.x, dy = aviaoY - a.y;
-      if (Math.sqrt(dx*dx + dy*dy) < RAIO){
-        a.acerto = true; a.brilho = 1;
-        pontos++; tempo += 3.2;
-        mostraAviso('+3 s', '#7dffb0');
-        bip(760, 0.08, 'sine', 0.07);
-        setTimeout(()=>bip(1140, 0.10, 'sine', 0.06), 80);
-        for (let i=0;i<14;i++){
-          const ang = Math.random()*Math.PI*2, r = RAIO*(0.6+Math.random()*0.5);
-          faiscas.push({ x: a.x+Math.cos(ang)*r, y: a.y+Math.sin(ang)*r, z: 60,
-                         vz: 260+Math.random()*300, vida: 1, cor:'#9dffc4' });
-        }
+  voo += ((turbo > 0 ? VOO_TURBO : VOO_BASE) - voo) * Math.min(1, dt*2.5);
+  combustivel -= dt * (turbo > 0 ? GASTO_TURBO : GASTO);
+  if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
+  if (combustivel < 18 && Math.random() < dt*2.2) mostraAviso('COMBUSTÍVEL BAIXO', '#ffb86b', 700);
+
+  // o mundo vem vindo
+  const avanco = voo*dt;
+  distancia += avanco;
+  andaMundo(avanco);
+
+  // pegar combustível
+  for (const t of tambores){
+    if (t.brilho > 0) t.brilho -= dt*2.2;
+    if (t.passou || t.z > 0) continue;
+    t.passou = true;
+    const dx = aviaoX - t.x, dy = aviaoY - t.y;
+    if (Math.sqrt(dx*dx + dy*dy) < RAIO_PEGA){
+      t.brilho = 1;
+      combustivel = Math.min(100, combustivel + (t.azul ? DA_AZUL : DA_NORMAL));
+      if (t.azul){
+        turbo = TURBO_SEG; clarao = 0.8; tremor = 8;
+        mostraAviso('TURBO AZUL!', '#7fd8ff', 1600);
+        solta(t.x, t.y, 40, 40, '#7fd8ff', 70, 700);
+        solta(t.x, t.y, 40, 18, '#ffffff', 50, 500);
+        bip(520,0.09,'sine',0.07); setTimeout(()=>bip(780,0.09,'sine',0.07),80);
+        setTimeout(()=>bip(1180,0.16,'sine',0.07),165);
       } else {
-        a.acerto = false; a.brilho = 1;
-        bip(150, 0.12, 'triangle', 0.05);
+        mostraAviso('+' + DA_NORMAL + '%', '#ffd257', 800);
+        solta(t.x, t.y, 40, 16, '#ffd257', 55, 420);
+        bip(700,0.07,'sine',0.06); setTimeout(()=>bip(1000,0.09,'sine',0.05),70);
       }
     }
   }
-  argolas = argolas.filter(a => a.z > -1200);
-  proximoZ -= avanco;
-  geraArgolas();
+  tambores = tambores.filter(t => t.z > -1500);
 
-  for (const f of faiscas){ f.z += f.vz*dt; f.vida -= dt*1.5; }
-  faiscas = faiscas.filter(f => f.vida > 0);
+  // bater em pombo ou avião
+  for (const o of obstaculos){
+    o.fase += dt*2;
+    o.x += Math.sin(o.fase*0.7) * o.deriva * dt;
+    if (o.tipo === 'pombo') o.y += Math.cos(o.fase*1.1) * 90 * dt;
+    if (o.passou || o.z > 0) continue;
+    o.passou = true;
+    const raio = (o.tipo === 'aviao' ? RAIO_AVIAO : RAIO_POMBO) + 150;
+    const dx = aviaoX - o.x, dy = aviaoY - o.y;
+    if (Math.sqrt(dx*dx + dy*dy) < raio){ derruba(o.tipo); return; }
+  }
+  obstaculos = obstaculos.filter(o => o.z > -1500);
 
-  tempo -= dt;
-  if (tempo <= 0){ tempo = 0; fim(); }
+  geraMundo();
 }
 
 let ultimoAviso = 0;
@@ -581,15 +921,22 @@ function mostraAviso(txt, cor, ms){
   setTimeout(()=>{ if (Date.now()-ultimoAviso >= dur-60) el.style.opacity = 0; }, dur);
 }
 
-const elArg=document.getElementById('vArg'), elTempo=document.getElementById('vTempo');
-const elAlt=document.getElementById('vAlt'), elRec=document.getElementById('vRec');
-const elCTempo=document.getElementById('cTempo');
+/* --- painel --- */
+const elDist=document.getElementById('vDist'), elBarra=document.getElementById('barraComb');
+const elComb=document.getElementById('vComb'), elCComb=document.getElementById('cComb');
+const elRec=document.getElementById('vRec'),   elTurbo=document.getElementById('selTurbo');
 function pinta(){
-  elArg.textContent   = pontos;
-  elTempo.textContent = Math.ceil(tempo);
-  elAlt.textContent   = Math.round((aviaoY - CHAO)/4);
-  elRec.textContent   = recorde;
-  elCTempo.classList.toggle('pouco', tempo < 8);
+  const m = Math.round(distancia/20);
+  if (elDist) elDist.textContent = m;
+  const pct = Math.max(0, Math.min(100, combustivel));
+  if (elBarra){
+    elBarra.style.width = pct.toFixed(1) + '%';
+    elBarra.style.background = pct < 20 ? '#ff5a5a' : pct < 45 ? '#ffc24d' : '#5eff9a';
+  }
+  if (elComb)  elComb.textContent = Math.round(pct);
+  if (elCComb) elCComb.classList.toggle('pouco', pct < 20);
+  if (elRec)   elRec.textContent = Math.round(recorde);
+  if (elTurbo) elTurbo.classList.toggle('ver', turbo > 0);
 }
 
 let ultimoT=0, sobrando=0;
@@ -603,7 +950,6 @@ function quadro(t){
   desenha(); pinta();
   requestAnimationFrame(quadro);
 }
-
 
 /* =============================================================================
    ENTRADA DO USUÁRIO
@@ -672,11 +1018,7 @@ function telaCheia(){
 }
 
 function comeca(){
-  argolas = []; nuvens = []; faiscas = [];
-  proximoZ = 2600; caminhoX = 0; caminhoY = 250;
-  geraArgolas(); geraNuvens();
-  aviaoX=0; aviaoY=250; vx=0; vy=0; inclinacao=0; nariz=0;
-  camX=0; camY=0; distancia=0; pontos=0; tempo=30;
+  reiniciaMundo();
   jogando = true;
   capa.style.display='none';
   redimensiona();
@@ -686,16 +1028,17 @@ function comeca(){
 
 function fim(){
   jogando=false;
-  const novo = pontos > recorde;
-  if (novo){ recorde = pontos; try{ localStorage.setItem('aviao.recorde', String(pontos)); }catch(e){} }
-  document.getElementById('tit').textContent = novo ? 'Recorde novo!' : 'Acabou o combustível';
+  const m = Math.round(distancia/20);
+  const novo = m > recorde;
+  if (novo){ recorde = m; try{ localStorage.setItem('aviao.recorde', String(m)); }catch(e){} }
+  document.getElementById('tit').textContent = novo ? 'Recorde novo!' :
+      (motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível' : 'O avião caiu');
   document.getElementById('expl').style.display='none';
   document.getElementById('pe').style.display='none';
   const p = document.getElementById('placar');
   p.style.display='block';
-  p.innerHTML = 'Argolas: <span>' + pontos + '</span><br>' +
-                'Distância: <span>' + Math.round(distancia/20) + ' m</span><br>' +
-                'Recorde: <span>' + recorde + ' argolas</span>';
+  p.innerHTML = 'Distância: <span>' + m + ' m</span><br>' +
+                'Recorde: <span>' + recorde + ' m</span>';
   const btDeNovo = document.getElementById('btSensor');
   const btOutro  = document.getElementById('btToque');
 
