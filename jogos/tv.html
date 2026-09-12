@@ -2666,19 +2666,55 @@ function endireitaEixos(){
 /* Onde fica a câmera: atrás do avião, no eixo do próprio avião — assim ela
    acompanha o rolar e o looping, que é o único jeito de a manobra fazer
    sentido na tela. */
-function poeCamera(){
-  const tras = cockpit ? 60 : CAMD;
-  camPx = aviaoX - eixoF.x*tras + eixoC.x*(cockpit?0:200);
-  camPy = aviaoY - eixoF.y*tras + eixoC.y*(cockpit?0:200);
-  camPz = aviaoZ - eixoF.z*tras + eixoC.z*(cockpit?0:200);
+/* --- A CÂMERA TEM EIXOS PRÓPRIOS ------------------------------------------
+   Antes ela era parafusada no avião: a base da câmera ERA a base do avião, e
+   por isso o avião ficava cravado no meio da tela, sempre na mesma pose, e
+   quem girava era o mundo inteiro. Agora a câmera PERSEGUE o avião com atraso
+   — e é o avião que se mexe dentro do quadro: inclina, sobe, escorrega para o
+   lado e volta para o meio. Na cabine não há atraso nenhum: lá a câmera é o
+   próprio piloto. */
+let camF={x:0,y:0,z:1}, camC={x:0,y:1,z:0}, camD={x:1,y:0,z:0};
+
+function poeCamera(dt){
+  if (cockpit){
+    camF = eixoF; camC = eixoC; camD = eixoD;
+    camPx = aviaoX - camF.x*60; camPy = aviaoY - camF.y*60; camPz = aviaoZ - camF.z*60;
+    return;
+  }
+  const k = dt ? Math.min(1, dt*3.0) : 1;       // o quanto a câmera alcança por quadro
+  camF = vnorm({ x: camF.x + (eixoF.x-camF.x)*k,
+                 y: camF.y + (eixoF.y-camF.y)*k,
+                 z: camF.z + (eixoF.z-camF.z)*k });
+  // O teto da câmera persegue o do avião só EM PARTE, e o resto puxa para o
+  // céu. Assim ela não rola junto até o fim, e a inclinação das asas aparece
+  // no avião — que é exatamente o que estava faltando.
+  const kc = dt ? Math.min(1, dt*1.8) : 1;
+  const alvoC = { x: eixoC.x*0.5, y: eixoC.y*0.5 + 0.5, z: eixoC.z*0.5 };
+  camC = { x: camC.x + (alvoC.x-camC.x)*kc,
+           y: camC.y + (alvoC.y-camC.y)*kc,
+           z: camC.z + (alvoC.z-camC.z)*kc };
+  camC = vnorm(vsub(camC, vmul(camF, vponto(camC, camF))));
+  if (!isFinite(camC.x) || Math.hypot(camC.x,camC.y,camC.z) < 0.5){   // degenerou: reendireita
+    camC = vnorm(vsub({x:0,y:1,z:0}, vmul(camF, camF.y)));
+    if (!isFinite(camC.x)) camC = {x:0,y:0,z:1};
+  }
+  camD = vcruz(camC, camF);
+
+  const alvo = { x: aviaoX - eixoF.x*CAMD + eixoC.x*200,
+                 y: aviaoY - eixoF.y*CAMD + eixoC.y*200,
+                 z: aviaoZ - eixoF.z*CAMD + eixoC.z*200 };
+  const kp = dt ? Math.min(1, dt*4.5) : 1;
+  camPx += (alvo.x - camPx)*kp;
+  camPy += (alvo.y - camPy)*kp;
+  camPz += (alvo.z - camPz)*kp;
 }
 
-/* mundo -> eixos do avião */
+/* mundo -> eixos da CÂMERA */
 function paraCamera3(wx, wy, wz){
   const dx = wx-camPx, dy = wy-camPy, dz = wz-camPz;
-  return { x: dx*eixoD.x + dy*eixoD.y + dz*eixoD.z,
-           y: dx*eixoC.x + dy*eixoC.y + dz*eixoC.z,
-           z: dx*eixoF.x + dy*eixoF.y + dz*eixoF.z };
+  return { x: dx*camD.x + dy*camD.y + dz*camD.z,
+           y: dx*camC.x + dy*camC.y + dz*camC.z,
+           z: dx*camF.x + dy*camF.y + dz*camF.z };
 }
 /* recorte grosseiro no plano, pelo rumo — não precisa da atitude toda */
 function paraCamera(wx, wz){
@@ -2687,7 +2723,7 @@ function paraCamera(wx, wz){
 }
 /* o quanto uma coisa está à frente do nariz */
 function frente(wx, wy, wz){
-  return (wx-camPx)*eixoF.x + (wy-camPy)*eixoF.y + (wz-camPz)*eixoF.z;
+  return (wx-camPx)*camF.x + (wy-camPy)*camF.y + (wz-camPz)*camF.z;
 }
 
 /* projeção: agora é uma câmera de furo de verdade, sem o truque de empurrar a
@@ -2712,7 +2748,7 @@ function paraOnde(wx, wz){ const c = paraCamera(wx, wz); return Math.atan2(c.x, 
    vetor "para cima do mundo" visto pela câmera. */
 let cimaC = {x:0,y:1,z:0}, rolTela = 0;
 function atualizaHorizonte(){
-  cimaC = { x: eixoD.y, y: eixoC.y, z: eixoF.y };      // o "cima" do mundo, na câmera
+  cimaC = { x: camD.y, y: camC.y, z: camF.y };        // o "cima" do mundo, na câmera
   rolTela = Math.atan2(cimaC.x, cimaC.y);              // quanto o mundo está torto na tela
 }
 /* > 0 = céu */
@@ -2915,6 +2951,7 @@ function montaMapa(){
           y: 900 + Math.random()*2200,
           z: tz + (Math.random()-0.5)*3000,
           fase: Math.random()*6.28, deriva:(Math.random()-0.5)*300,
+          rumo: Math.random()*6.283,            // para onde o bicho está virado
           x0:0, y0:0, vivo:true
         });
       }
@@ -3050,9 +3087,9 @@ function desenhaCeu(){
   }
   // o sol, projetado como um ponto muito longe
   const d = { x: SOL_DIR.x*Math.sqrt(1-SOL_ALT*SOL_ALT), y: SOL_ALT, z: SOL_DIR.z*Math.sqrt(1-SOL_ALT*SOL_ALT) };
-  const c = { x: d.x*eixoD.x + d.y*eixoD.y + d.z*eixoD.z,
-              y: d.x*eixoC.x + d.y*eixoC.y + d.z*eixoC.z,
-              z: d.x*eixoF.x + d.y*eixoF.y + d.z*eixoF.z };
+  const c = { x: d.x*camD.x + d.y*camD.y + d.z*camD.z,
+              y: d.x*camC.x + d.y*camC.y + d.z*camC.z,
+              z: d.x*camF.x + d.y*camF.y + d.z*camF.z };
   if (c.z > 0.25){
     const sx = CX + c.x/c.z*F, sy = CY - c.y/c.z*F, r = Math.min(W,H)*0.055;
     if (sx > -W && sx < W*2 && sy > -H && sy < H*2){
@@ -3216,10 +3253,7 @@ function fitaX(fn, meia, cor){
    lateral": depende de onde a câmera está. Então eu vejo, para cada uma das
    quatro paredes, se a câmera está do lado de fora dela — essas são as que
    aparecem — e ilumino cada uma conforme o lado em que o sol está. */
-function camMundo(){
-  const d = cockpit ? 60 : CAMD;
-  return { x: aviaoX - senR*d, z: aviaoZ - cosR*d };
-}
+function camMundo(){ return { x: camPx, z: camPz }; }
 const PAREDES = [                       // [canto a, canto b, normal x, normal z]
   [0,1, 0,-1], [1,2, 1,0], [2,3, 0,1], [3,0, -1,0]
 ];
@@ -3446,34 +3480,30 @@ function desenhaPombo(o){
 }
 
 function desenhaAviaoInimigo(o){
+  const d = frente(o.x, o.y, o.z);
+  if (d < -600) return;
   const p = projetaM(o.x, o.y, o.z);
   if (!p) return;
-  const r = 420 * p.s;
-  if (r < 1 || r > Math.min(W,H)*0.55) return;
-  if (p.x < -r*3 || p.x > W+r*3) return;
-  const bal = Math.sin(Date.now()/700 + o.fase) * 0.10;
-  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(rolTela + bal);
-  ctx.fillStyle = 'rgba(0,0,0,.16)';
-  ctx.beginPath(); ctx.ellipse(0, r*0.26, r*1.0, r*0.10, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#b9c3d6';
-  ctx.beginPath();
-  ctx.moveTo(-r*1.05, r*0.04); ctx.lineTo(-r*0.14,-r*0.10);
-  ctx.lineTo( r*0.14,-r*0.10); ctx.lineTo( r*1.05, r*0.04);
-  ctx.lineTo( r*0.95, r*0.17); ctx.lineTo(-r*0.95, r*0.17);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#e05b4a';
-  ctx.fillRect(-r*0.88, r*0.04, r*0.26, r*0.13);
-  ctx.fillRect( r*0.62, r*0.04, r*0.26, r*0.13);
-  ctx.fillStyle = '#d6deeb';
-  ctx.beginPath(); ctx.ellipse(0, 0, r*0.20, r*0.40, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#26354f';
-  ctx.beginPath(); ctx.ellipse(0, -r*0.15, r*0.13, r*0.14, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#b9c3d6';
-  ctx.beginPath();
-  ctx.moveTo(-r*0.05, r*0.06); ctx.lineTo(-r*0.05,-r*0.44);
-  ctx.lineTo( r*0.05,-r*0.44); ctx.lineTo( r*0.05, r*0.06);
-  ctx.closePath(); ctx.fill();
-  ctx.restore();
+  const tam = 420 * p.s;
+  if (tam < 1.2 || tam > Math.min(W,H)*0.55) return;
+  if (p.x < -tam*3 || p.x > W+tam*3) return;
+
+  // o inimigo é o MESMO avião, pintado de outra cor e virado para o rumo dele
+  const r = o.rumo || 0, bal = Math.sin(Date.now()/900 + o.fase)*0.22;
+  const Fr = { x: Math.sin(r), y: Math.sin(bal)*0.10, z: Math.cos(r) };
+  const Dd = { x: Math.cos(r), y: Math.sin(bal)*0.5, z: -Math.sin(r) };
+  const Cc = vcruz(Fr, Dd);
+  const som = projetaM(o.x, CHAO + 20, o.z);
+  if (som && som.s > 0){
+    const rs = 200 * som.s;
+    if (rs > 0.8){
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = '#101820';
+      ctx.beginPath(); ctx.ellipse(som.x, som.y, rs, rs*0.32, rolTela, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+  desenhaMalha(AVIAO3D, o.x, o.y, o.z, Dd, Cc, Fr, 1.35, 1, [196, 92, 74]);
 }
 
 function desenhaBomba(b){
@@ -3647,12 +3677,12 @@ function miraBomba(){
    alvo, ela fecha e fica verde — dá para acertar sem falar nada. */
 function desenhaTorre(){
   if (!temArtilheiro || caindo) return;
+  // a mira é um ponto do MUNDO lá na frente: assim vale igual na cabine e na
+  // visão de fora, onde a câmera não está mais colada no avião
   const d = direcaoDaMira();
-  const xc = d.x*eixoD.x + d.y*eixoD.y + d.z*eixoD.z;
-  const yc = d.x*eixoC.x + d.y*eixoC.y + d.z*eixoC.z;
-  const zc = d.x*eixoF.x + d.y*eixoF.y + d.z*eixoF.z;
-  if (zc < 0.2) return;
-  const px = CX + xc/zc*F, py = CY - yc/zc*F;
+  const alvoP = projetaM(aviaoX + d.x*9000, aviaoY + d.y*9000, aviaoZ + d.z*9000);
+  if (!alvoP) return;
+  const px = alvoP.x, py = alvoP.y;
 
   // tem alguma coisa na linha de tiro?
   let pego = null;
@@ -3707,112 +3737,223 @@ function desenhaMira(){
   ctx.restore();
 }
 
+/* =============================================================================
+   O AVIÃO EM 3D DE VERDADE
+
+   Era um desenho chapado: um recorte de papel que girava na tela. Com a câmera
+   solta isso não se sustenta — de qualquer ângulo que não fosse exatamente por
+   trás, a mentira aparecia.
+
+   Agora ele é uma MALHA: uma lista de vértices no sistema do próprio avião e
+   uma lista de faces. A cada quadro cada vértice vai para o mundo pela base do
+   avião (asa direita, teto, nariz), de lá para a câmera, e daí para a tela. As
+   faces que dão as costas para a câmera são descartadas, o resto é ordenado do
+   fundo para a frente, e cada uma recebe a luz do sol pela sua normal. É o que
+   se faria num programa de modelagem, só que a malha mora aqui dentro — assim
+   o jogo continua sendo UM arquivo, que é o que faz ele abrir na TV.
+   ========================================================================== */
+const AVIAO3D = (function(){
+  const V = [], F = [];
+  const pt = (x,y,z) => { V.push([x,y,z]); return V.length-1; };
+  const face = (ind, cor) => F.push({ i:ind, cor:cor });
+
+  // caixa com os oito cantos, para asas, empenas e leme
+  function caixa(x0,x1, y0,y1, z0,z1, cor){
+    const a = pt(x0,y0,z0), b = pt(x1,y0,z0), c = pt(x1,y1,z0), d = pt(x0,y1,z0);
+    const e = pt(x0,y0,z1), f = pt(x1,y0,z1), g = pt(x1,y1,z1), h = pt(x0,y1,z1);
+    face([a,b,c,d], cor); face([f,e,h,g], cor);
+    face([e,f,b,a], cor); face([d,c,g,h], cor);
+    face([e,a,d,h], cor); face([b,f,g,c], cor);
+  }
+  // quadrilátero com espessura, para a asa em flecha
+  function chapa(cantos, esp, cor){
+    const baixo = cantos.map(c => pt(c[0], c[1]-esp, c[2]));
+    const cima  = cantos.map(c => pt(c[0], c[1]+esp, c[2]));
+    face(cima, cor);
+    face(baixo.slice().reverse(), cor);
+    for (let i=0;i<cantos.length;i++){
+      const j = (i+1)%cantos.length;
+      face([baixo[i], baixo[j], cima[j], cima[i]], cor);
+    }
+  }
+  // tubo de seção hexagonal: fuselagem e motores
+  function tubo(estacoes, cor, tampaFim){
+    const aneis = estacoes.map(e => {
+      const anel = [];
+      for (let k=0;k<6;k++){
+        const a = (k/6)*Math.PI*2 + Math.PI/6;
+        anel.push(pt(e.x + Math.cos(a)*e.r, e.y + Math.sin(a)*e.r*e.ay, e.z));
+      }
+      return anel;
+    });
+    for (let s=0;s<aneis.length-1;s++)
+      for (let k=0;k<6;k++){
+        const j = (k+1)%6;
+        face([aneis[s][k], aneis[s][j], aneis[s+1][j], aneis[s+1][k]], cor);
+      }
+    if (tampaFim) face(aneis[aneis.length-1].slice().reverse(), tampaFim);
+    return aneis;
+  }
+
+  const CLARO = [232,238,248], MEIO = [196,206,222], ESCURO = [140,151,170];
+  const AZUL  = [45,125,255],  VIDRO = [30,48,80],   FOGO = [62,70,86];
+
+  // fuselagem: nariz fino, barriga cheia no meio, afunila na cauda
+  const aneis = tubo([
+    {x:0,y:0,z: 182, r: 5,  ay:1},
+    {x:0,y:2,z: 140, r:17,  ay:0.95},
+    {x:0,y:3,z:  70, r:27,  ay:0.92},
+    {x:0,y:2,z:   0, r:29,  ay:0.92},
+    {x:0,y:0,z:-100, r:23,  ay:0.95},
+    {x:0,y:0,z:-165, r:16,  ay:1}
+  ], MEIO, FOGO);
+  // bico
+  for (let k=0;k<6;k++) face([aneis[0][k], aneis[0][(k+1)%6], aneis[1][(k+1)%6], aneis[1][k]], CLARO);
+
+  // asa em flecha, ponta cortada
+  chapa([[ 24,0, 62], [178,0,-28], [178,0,-66], [ 24,0,-58]], 4, CLARO);
+  chapa([[-24,0, 62], [-24,0,-58], [-178,0,-66], [-178,0,-28]], 4, CLARO);
+  // faixas azuis nas pontas
+  caixa( 120, 172, 3.5, 5.5, -60, -34, AZUL);
+  caixa(-172,-120, 3.5, 5.5, -60, -34, AZUL);
+
+  // empenas horizontais
+  chapa([[ 20,0,-120], [ 86,0,-150], [ 86,0,-172], [ 20,0,-164]], 3, MEIO);
+  chapa([[-20,0,-120], [-20,0,-164], [-86,0,-172], [-86,0,-150]], 3, MEIO);
+
+  // derivas duplas, inclinadas para fora
+  chapa([[ 30, 0,-104], [ 46, 66,-132], [ 46, 66,-160], [ 30, 0,-168]], 3, MEIO);
+  chapa([[-30, 0,-104], [-30, 0,-168], [-46, 66,-160], [-46, 66,-132]], 3, MEIO);
+
+  // dois motores colados na fuselagem
+  for (const lado of [-1, 1]){
+    tubo([
+      {x:lado*42, y:-6, z:  44, r:13, ay:1},
+      {x:lado*42, y:-6, z: -60, r:19, ay:1},
+      {x:lado*42, y:-6, z:-168, r:17, ay:1}
+    ], ESCURO, FOGO);
+  }
+
+  // canopy: cinco faces, com o vidro escuro
+  const c1 = pt(  0, 27,  86), c2 = pt( 12, 19,  56), c3 = pt( 11, 18,   4),
+        c4 = pt(  0, 24,  -6), c5 = pt(-11, 18,   4), c6 = pt(-12, 19,  56);
+  face([c1,c2,c3,c4], VIDRO); face([c1,c4,c5,c6], [58,86,130]);
+  face([c2,c6,c5,c3], [96,132,180]);
+
+  return { V:V, F:F };
+})();
+
+/* pinta a malha num ponto do mundo, com a base (D, C, F) que quiser */
+function desenhaMalha(malha, px, py, pz, D, C, Fr, escala, luzExtra, tinta){
+  const n = malha.V.length;
+  const mundo = new Array(n), tela = new Array(n);
+  for (let i=0;i<n;i++){
+    const v = malha.V[i], x = v[0]*escala, y = v[1]*escala, z = v[2]*escala;
+    const wx = px + D.x*x + C.x*y + Fr.x*z;
+    const wy = py + D.y*x + C.y*y + Fr.y*z;
+    const wz = pz + D.z*x + C.z*y + Fr.z*z;
+    mundo[i] = [wx, wy, wz];
+    tela[i] = projetaM(wx, wy, wz);
+  }
+  const visiveis = [];
+  for (const f of malha.F){
+    const idx = f.i;
+    let fora = false, prof = 0;
+    for (const k of idx){ if (!tela[k]){ fora = true; break; } prof += tela[k].d; }
+    if (fora) continue;
+    const A = mundo[idx[0]], B = mundo[idx[1]], Cc = mundo[idx[2]];
+    const u = [B[0]-A[0], B[1]-A[1], B[2]-A[2]];
+    const w = [Cc[0]-A[0], Cc[1]-A[1], Cc[2]-A[2]];
+    const nx = u[1]*w[2]-u[2]*w[1], ny = u[2]*w[0]-u[0]*w[2], nz = u[0]*w[1]-u[1]*w[0];
+    // a face dá as costas para a câmera? então nem desenha
+    const vx = A[0]-camPx, vy = A[1]-camPy, vz = A[2]-camPz;
+    if (nx*vx + ny*vy + nz*vz > 0) continue;
+    const m = Math.hypot(nx, ny, nz) || 1;
+    const luz = 0.56 + Math.max(0, (nx*SOL_DIR.x + ny*SOL_ALT + nz*SOL_DIR.z)/m) * 0.58
+                     + Math.max(0, ny/m) * 0.10;        // um tanto de luz do céu
+    let cor = f.cor;
+    if (tinta) cor = [ cor[0] + (tinta[0]-cor[0])*0.45,
+                       cor[1] + (tinta[1]-cor[1])*0.45,
+                       cor[2] + (tinta[2]-cor[2])*0.45 ];
+    visiveis.push({ idx:idx, d: prof/idx.length, cor: cor, luz: luz*(luzExtra||1) });
+  }
+  visiveis.sort((a,b) => b.d - a.d);
+  const zr = longe(px, pz);
+  const traco = tela[0] ? Math.min(2.2, Math.max(0.5, 90*tela[0].s)) : 1;
+  for (const f of visiveis){
+    ctx.fillStyle = comNevoa(f.cor, f.luz, zr);
+    ctx.beginPath();
+    const p0 = tela[f.idx[0]];
+    ctx.moveTo(p0.x, p0.y);
+    for (let k=1;k<f.idx.length;k++) ctx.lineTo(tela[f.idx[k]].x, tela[f.idx[k]].y);
+    ctx.closePath(); ctx.fill();
+    // o fio escuro no contorno é o que separa uma face da outra quando o
+    // avião fica pequeno; sem ele a malha vira uma mancha só
+    ctx.strokeStyle = comNevoa(f.cor, f.luz*0.62, zr);
+    ctx.lineWidth = traco; ctx.stroke();
+  }
+  return tela;
+}
+
 function desenhaAviao(){
   if (cockpit) return;                      // de dentro não se vê o próprio avião
   const p = projetaM(aviaoX, aviaoY, aviaoZ);
   if (!p) return;
-  const t = Math.min(W,H) * 0.19;
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.rotate(giroQueda);
 
-  /* Um caça mais encorpado: fuselagem grossa com ogiva, asa em flecha com
-     ponta cortada, dois motores aparentes e deriva dupla. O antigo era um
-     risco fino com dois retângulos — de longe sumia, e de perto parecia papel
-     recortado. Tudo aqui é pintado com degradê, que é o que dá volume. */
-  const sombra = (dx, dy) => { ctx.save(); ctx.translate(dx, dy); };
-
-  // rastro dos motores
-  if (turbo > 0){
-    for (const lado of [-1, 1]){
-      const g = ctx.createLinearGradient(lado*t*0.30, t*0.42, lado*t*0.30, t*1.6);
-      g.addColorStop(0,'rgba(150,215,255,.85)'); g.addColorStop(0.35,'rgba(120,200,255,.5)');
-      g.addColorStop(1,'rgba(120,200,255,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.moveTo(lado*t*0.20, t*0.42); ctx.lineTo(lado*t*0.40, t*0.42);
-      ctx.lineTo(lado*t*0.31, t*(1.2+Math.random()*0.5)); ctx.closePath(); ctx.fill();
+  // sombra no chão, debaixo do avião: é ela que diz a altura de verdade
+  const som = projetaM(aviaoX, CHAO + 20, aviaoZ);
+  if (som && aviaoY - CHAO < 9000){
+    const r = 230 * som.s;
+    if (r > 0.8){
+      ctx.globalAlpha = 0.26 * (1 - Math.min(1, (aviaoY-CHAO)/9000));
+      ctx.fillStyle = '#101820';
+      ctx.beginPath(); ctx.ellipse(som.x, som.y, r, r*0.34, rolTela, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
 
-  // ASA: em flecha, grossa na raiz e fina na ponta
-  const asa = ctx.createLinearGradient(0, -t*0.20, 0, t*0.30);
-  asa.addColorStop(0, '#eef3fb'); asa.addColorStop(0.55, '#c3ceE0'.replace('E','e'));
-  asa.addColorStop(1, '#8e9ab0');
-  ctx.fillStyle = asa;
-  ctx.beginPath();
-  ctx.moveTo(-t*0.10, -t*0.16);          // raiz, à frente
-  ctx.lineTo(-t*1.02,  t*0.16);          // bordo de ataque até a ponta
-  ctx.lineTo(-t*1.02,  t*0.27);          // ponta cortada
-  ctx.lineTo(-t*0.26,  t*0.30);          // bordo de fuga
-  ctx.lineTo( t*0.26,  t*0.30);
-  ctx.lineTo( t*1.02,  t*0.27);
-  ctx.lineTo( t*1.02,  t*0.16);
-  ctx.lineTo( t*0.10, -t*0.16);
-  ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = 'rgba(40,52,72,.35)'; ctx.lineWidth = Math.max(1, t*0.012); ctx.stroke();
-
-  // marcas nas asas
-  ctx.fillStyle = turbo > 0 ? '#5cc8ff' : '#2d7dff';
-  ctx.fillRect(-t*0.86, t*0.17, t*0.30, t*0.10);
-  ctx.fillRect( t*0.56, t*0.17, t*0.30, t*0.10);
-
-  // MOTORES: dois casulos grossos colados na fuselagem
-  for (const lado of [-1, 1]){
-    const mx = lado*t*0.30;
-    const gm = ctx.createLinearGradient(mx - t*0.13, 0, mx + t*0.13, 0);
-    gm.addColorStop(0, '#7d879b'); gm.addColorStop(0.45, '#dbe3f0'); gm.addColorStop(1, '#6f7a8e');
-    ctx.fillStyle = gm;
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(mx - t*0.13, -t*0.22, t*0.26, t*0.66, t*0.12);
-    else ctx.rect(mx - t*0.13, -t*0.22, t*0.26, t*0.66);
-    ctx.fill();
-    ctx.fillStyle = '#121821';
-    ctx.beginPath(); ctx.ellipse(mx, t*0.42, t*0.115, t*0.055, 0, 0, 7); ctx.fill();
-    const brasa = combustivel < 15 && !infinito ? 'rgba(90,90,100,' : 'rgba(150,205,255,';
-    ctx.fillStyle = brasa + (0.35+Math.random()*0.3).toFixed(2) + ')';
-    ctx.beginPath(); ctx.ellipse(mx, t*0.42, t*0.075, t*0.034, 0, 0, 7); ctx.fill();
+  // o rastro dos motores, antes da malha para ficar por baixo
+  if (turbo > 0){
+    for (const lado of [-1, 1]){
+      const ex = lado*65, ez = 260;
+      const a = projetaM(aviaoX + eixoD.x*ex - eixoF.x*ez,
+                         aviaoY + eixoD.y*ex - eixoF.y*ez,
+                         aviaoZ + eixoD.z*ex - eixoF.z*ez);
+      const fim2 = 560 + Math.random()*260;
+      const b = projetaM(aviaoX + eixoD.x*ex - eixoF.x*fim2,
+                         aviaoY + eixoD.y*ex - eixoF.y*fim2,
+                         aviaoZ + eixoD.z*ex - eixoF.z*fim2);
+      if (!a || !b) continue;
+      const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+      g.addColorStop(0,'rgba(170,225,255,.9)'); g.addColorStop(1,'rgba(120,200,255,0)');
+      ctx.strokeStyle = g; ctx.lineWidth = Math.max(2, 30*a.s);
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+      ctx.lineCap = 'butt';
+    }
   }
 
-  // DERIVA DUPLA, inclinada para fora
-  for (const lado of [-1, 1]){
-    ctx.fillStyle = '#aab5c8';
-    ctx.beginPath();
-    ctx.moveTo(lado*t*0.17,  t*0.10);
-    ctx.lineTo(lado*t*0.30, -t*0.30);
-    ctx.lineTo(lado*t*0.24, -t*0.34);
-    ctx.lineTo(lado*t*0.09,  t*0.06);
-    ctx.closePath(); ctx.fill();
+  // e a malha, na atitude do avião
+  let D = eixoD, C = eixoC, Fr = eixoF;
+  if (giroQueda){                           // caindo: rodopia em volta do nariz
+    const c = Math.cos(giroQueda), s2 = Math.sin(giroQueda);
+    D = { x: eixoD.x*c + eixoC.x*s2, y: eixoD.y*c + eixoC.y*s2, z: eixoD.z*c + eixoC.z*s2 };
+    C = { x: eixoC.x*c - eixoD.x*s2, y: eixoC.y*c - eixoD.y*s2, z: eixoC.z*c - eixoD.z*s2 };
   }
+  desenhaMalha(AVIAO3D, aviaoX, aviaoY, aviaoZ, D, C, Fr, 1.55, 1);
 
-  // FUSELAGEM: grossa, com ogiva à frente
-  const fus = ctx.createLinearGradient(-t*0.22, 0, t*0.22, 0);
-  fus.addColorStop(0, '#7f8a9e'); fus.addColorStop(0.38, '#f2f6fc');
-  fus.addColorStop(0.72, '#cdd6e6'); fus.addColorStop(1, '#727d92');
-  ctx.fillStyle = fus;
-  ctx.beginPath();
-  ctx.moveTo(0, -t*0.60);                                  // ponta do nariz
-  ctx.quadraticCurveTo( t*0.20, -t*0.42,  t*0.215, -t*0.10);
-  ctx.lineTo( t*0.20,  t*0.36);
-  ctx.quadraticCurveTo( t*0.12,  t*0.50,  0, t*0.50);
-  ctx.quadraticCurveTo(-t*0.12,  t*0.50, -t*0.20, t*0.36);
-  ctx.lineTo(-t*0.215, -t*0.10);
-  ctx.quadraticCurveTo(-t*0.20, -t*0.42,  0, -t*0.60);
-  ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = 'rgba(40,52,72,.30)'; ctx.lineWidth = Math.max(1, t*0.012); ctx.stroke();
-
-  // canopy
-  const cab = ctx.createLinearGradient(0, -t*0.34, 0, -t*0.02);
-  cab.addColorStop(0, '#4e6f9e'); cab.addColorStop(0.5, '#1b2a44'); cab.addColorStop(1, '#0e1626');
-  ctx.fillStyle = cab;
-  ctx.beginPath(); ctx.ellipse(0, -t*0.20, t*0.115, t*0.19, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,.22)';
-  ctx.beginPath(); ctx.ellipse(-t*0.04, -t*0.26, t*0.045, t*0.09, 0, 0, 7); ctx.fill();
-
-  // faixa da barriga, só para o olho pegar a direção
-  ctx.fillStyle = 'rgba(45,125,255,.55)';
-  ctx.fillRect(-t*0.035, -t*0.02, t*0.07, t*0.34);
-  ctx.restore();
+  // brasa nos escapes
+  const brasa = (combustivel < 15 && !infinito) ? 'rgba(90,90,100,' : 'rgba(150,205,255,';
+  for (const lado of [-1, 1]){
+    const q = projetaM(aviaoX + eixoD.x*lado*65 - eixoF.x*260,
+                       aviaoY + eixoD.y*lado*65 - eixoF.y*260,
+                       aviaoZ + eixoD.z*lado*65 - eixoF.z*260);
+    if (!q) continue;
+    const r = 13 * q.s;
+    if (r < 0.6) continue;
+    ctx.fillStyle = brasa + ((turbo>0?0.55:0.3) + Math.random()*0.25).toFixed(2) + ')';
+    ctx.beginPath(); ctx.arc(q.x, q.y, r*(turbo>0?1.7:1), 0, 7); ctx.fill();
+  }
 }
 
 /* =============================================================================
@@ -4027,10 +4168,10 @@ function hudCaca(){
   for (let a = -80; a <= 80; a += 10){
     const ra = a*Math.PI/180, ca = Math.cos(ra), sa = Math.sin(ra);
     const d = { x: senR*ca, y: sa, z: cosR*ca };
-    const zc = d.x*eixoF.x + d.y*eixoF.y + d.z*eixoF.z;
+    const zc = d.x*camF.x + d.y*camF.y + d.z*camF.z;
     if (zc < 0.12) continue;
-    const xc = d.x*eixoD.x + d.y*eixoD.y + d.z*eixoD.z;
-    const yc = d.x*eixoC.x + d.y*eixoC.y + d.z*eixoC.z;
+    const xc = d.x*camD.x + d.y*camD.y + d.z*camD.z;
+    const yc = d.x*camC.x + d.y*camC.y + d.z*camC.z;
     const px = cx + xc/zc*F, py = cy - yc/zc*F;
     if (py < -H || py > H*2) continue;
     ctx.save();
@@ -4387,7 +4528,6 @@ function desenha(){
   // Não há mais nenhum giro de tela aqui: o rolar do avião está DENTRO da
   // transformação da câmera, então o mundo inteiro — céu, chão, prédios,
   // bichos — já sai virado do jeito certo. É o que permite o looping.
-  poeCamera();
   desenhaCeu();
   desenhaChao();
 
@@ -4719,6 +4859,7 @@ function atualizaQueda(dt){
   aviaoZ += eixoF.z * voo * dt;
   voo *= 0.985;
   distancia += voo * dt;
+  poeCamera(dt);
   if (aviaoY <= CHAO + 120){
     aviaoY = CHAO + 120;
     if (motivoQueda === 'combustivel'){ explode(aviaoX, aviaoY, aviaoZ, 1.6); motivoQueda = 'acabou'; }
@@ -4810,6 +4951,7 @@ function atualiza(dt){
   if (combustivel < 18 && Math.random() < dt*2.2) mostraAviso('COMBUSTÍVEL BAIXO', '#ffb86b', 700);
 
   distancia += voo*dt;
+  poeCamera(dt);
   atualizaTiros(dt);
 
   for (const n of nuvens) if (longe(n.x, n.z) > ALCANCE*1.15) recolocaNuvem(n, false);

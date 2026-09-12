@@ -542,3 +542,38 @@ quando o navegador não deixa — é o caso do Safari do iPhone —, a página �
 Para isso a `@media (max-height:520px)` do controle virou **classe**: com o giro
 por CSS o navegador continua achando que a tela é alta, a media query não casava
 e o controle saía montado em coluna, transbordando para fora da área visível.
+
+## A câmera solta e o avião em 3D de verdade
+
+São duas coisas que só funcionam juntas.
+
+**A câmera** era parafusada no avião: a base dela *era* a base do avião. Por
+isso o avião ficava cravado no meio da tela, sempre na mesma pose, e quem
+girava era o mundo inteiro. Agora ela **persegue** o avião com atraso — e é o
+avião que se mexe dentro do quadro: inclina, sobe, escorrega para o lado e
+volta para o meio. O teto da câmera persegue o do avião **só em parte** (metade
+puxa para o céu), senão ela rolaria junto até o fim e a inclinação das asas
+não apareceria em lugar nenhum. Na cabine não há atraso: lá a câmera é o
+piloto.
+
+**O avião** era um desenho chapado — um recorte de papel que girava na tela.
+Com a câmera solta isso não se sustenta: de qualquer ângulo que não fosse
+exatamente por trás, a mentira aparecia.
+
+Agora ele é uma **malha**: uma lista de vértices no sistema do próprio avião e
+uma lista de faces. A cada quadro cada vértice vai para o mundo pela base do
+avião (asa direita, teto, nariz), de lá para a câmera, e daí para a tela. As
+faces que dão as costas para a câmera são descartadas, o resto é ordenado do
+fundo para a frente, e cada uma recebe a luz do sol pela sua **normal**. São
+114 faces e 142 vértices — fuselagem de seção hexagonal, asa em flecha de ponta
+cortada, empenas, derivas duplas, dois motores e canopy.
+
+Sobre modelar num programa de modelagem: seria o caminho natural, mas um
+modelo exportado vira **arquivo externo**, e o jogo deixaria de ser um HTML só
+— que é justamente o que faz ele abrir no navegador da TV e funcionar sem
+servidor. A malha mora dentro do arquivo, escrita como código.
+
+Dois detalhes que fizeram diferença: um **fio escuro** no contorno de cada
+face (sem ele, com o avião pequeno na tela, a malha vira uma mancha só) e a
+**sombra no chão**, que é o que diz a altura de verdade. O avião inimigo usa a
+mesma malha, pintada de vermelho e virada para o rumo dele.
