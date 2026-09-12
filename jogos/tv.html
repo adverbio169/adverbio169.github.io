@@ -2537,6 +2537,9 @@ const ALCANCE  = 17000;    // até onde se enxerga à frente
 const MAPA     = 60000;    // meio lado do mapa: 120000 u = 6 km de ponta a ponta
 const TAXA_ROL = 3.4;      // rad/s com que o avião acompanha a inclinação da mão
 const TAXA_ARF = 1.5;      // rad/s de cabrada com o manche todo: looping em ~4 s
+const TAXA_LEME= 0.55;     // rad/s de guinada com o leme todo
+const LEME_MIN = 1.3;      // m/s²: abaixo disso é tremor de mão, não deslize
+const LEME_MAX = 7.0;      // m/s²: empurrão forte = leme todo
 const METRO    = 20;       // unidades de mundo por metro no placar
 
 const RAIO_PEGA  = 340;
@@ -2602,7 +2605,8 @@ let distancia=0, recorde=0, combustivel=100, turbo=0, voo=VOO_BASE;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
 let jogando=false, caindo=false, giroQueda=0, tremor=0, clarao=0, motivoQueda='';
-let tecla={esq:false,dir:false,cima:false,baixo:false};
+let tecla={esq:false,dir:false,cima:false,baixo:false,lemeE:false,lemeD:false};
+let leme=0;                                  // posição do leme, -1 a 1
 let toqueX=0, toqueY=0, usandoToque=false;
 let vq=0;                                    // velocidade de queda, só na queda
 
@@ -2968,7 +2972,7 @@ function reiniciaMundo(){
   combustivel = 100; turbo = 0; voo = VOO_BASE;
   pontos = 0; alvosDestruidos = 0; venceu = false;
   arma = 'bomba'; recarga = 0; atirando = false;
-  miraX = 0; miraY = 0;
+  miraX = 0; miraY = 0; leme = 0;
   municao = {}; for (const k in ARMAS) municao[k] = ARMAS[k].municao;
   caindo = false; giroQueda = 0; tremor = 0; clarao = 0; motivoQueda = '';
   Motor.liga();
@@ -3769,7 +3773,20 @@ function mostradorHorizonte(cx, cy, r){
   ctx.moveTo(cx+r*0.18, cy); ctx.lineTo(cx+r*0.55, cy);
   ctx.moveTo(cx, cy-r*0.08); ctx.lineTo(cx, cy+r*0.08);
   ctx.stroke();
+  // a bolinha de derrapagem: é onde o leme aparece, embaixo do horizonte,
+  // como no instrumento de verdade. Bola no meio = voo coordenado.
+  const by = cy + r*0.66, bl = r*0.32;
+  ctx.strokeStyle = 'rgba(150,170,200,.5)'; ctx.lineWidth = Math.max(1, r*0.05);
+  ctx.beginPath();
+  ctx.moveTo(cx-r*0.13, by-r*0.07); ctx.lineTo(cx-r*0.13, by+r*0.10);
+  ctx.moveTo(cx+r*0.13, by-r*0.07); ctx.lineTo(cx+r*0.13, by+r*0.10);
+  ctx.stroke();
+  ctx.fillStyle = Math.abs(leme) > 0.25 ? '#ffc24d' : '#dbe6f7';
+  ctx.beginPath(); ctx.arc(cx + leme*bl, by + r*0.02, r*0.095, 0, 7); ctx.fill();
+  ctx.fillStyle = '#8d9aae';
+  ctx.font = '800 ' + Math.max(8, r*0.30).toFixed(0) + 'px system-ui, sans-serif';
   ctx.textAlign = 'center';
+  ctx.fillText('HORIZONTE', cx, cy + r*1.52);
 }
 
 /* fita vertical: velocidade à esquerda, altitude à direita — como num caça */
@@ -3860,6 +3877,15 @@ function hudCaca(){
   ctx.moveTo(cx, cy - H*0.026); ctx.lineTo(cx, cy - H*0.009);
   ctx.stroke();
   ctx.beginPath(); ctx.arc(cx, cy, Math.max(4, H*0.010), 0, 7); ctx.stroke();
+  if (Math.abs(leme) > 0.05){          // leme fora do centro: marca embaixo da cruz
+    const ly = cy + H*0.055, lx = cx + leme*W*0.055;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - W*0.06, ly); ctx.lineTo(cx + W*0.06, ly); ctx.stroke();
+    ctx.fillStyle = 'rgba(120,255,170,.95)';
+    ctx.beginPath();
+    ctx.moveTo(lx, ly - H*0.016); ctx.lineTo(lx - W*0.009, ly - H*0.003);
+    ctx.lineTo(lx + W*0.009, ly - H*0.003); ctx.closePath(); ctx.fill();
+  }
 
   // escala de inclinação no alto, com o ponteiro girando — agora dá a volta
   const ra = H*0.20;
@@ -4269,15 +4295,20 @@ function eixos(){
     return {
       lat: Math.max(-1, Math.min(1, voltaCurta(Controle.volante)/180)),
       ver: grausParaEixo(Controle.manche, 22, 3),
+      leme: Controle.leme || 0,
       absoluto: true
     };
   }
-  if (usandoToque) return { lat: toqueX, ver: toqueY };
+  if (usandoToque) return { lat: toqueX, ver: toqueY, leme: lemeTecla() };
   return {
     lat: (tecla.esq?-1:0) + (tecla.dir?1:0),
-    ver: (tecla.cima?1:0) + (tecla.baixo?-1:0)
+    ver: (tecla.cima?1:0) + (tecla.baixo?-1:0),
+    leme: lemeTecla()
   };
 }
+
+/* no computador o leme é A e D, que ficam do lado das setas */
+function lemeTecla(){ return (tecla.lemeE?-1:0) + (tecla.lemeD?1:0); }
 
 function solta(x, y, z, n, cor, raio, forca, fumaca){
   for (let i=0;i<n;i++){
@@ -4468,6 +4499,18 @@ function atualiza(dt){
   if (Math.abs(e.ver) < 0.05 && Math.abs(arfagem) < 0.45 && Math.abs(inclinacao) < 30)
     cab = -arfagem * 0.8;
   r = giraPar(eixoF, eixoC, cab*dt);        eixoF = r[0]; eixoC = r[1];
+
+  /* O LEME: guina o nariz em volta do teto da cabine, sem inclinar as asas.
+     É o que serve para acertar a pontaria de raspão e para tirar a derrapagem
+     numa curva — coisa que nem o volante nem o manche fazem. */
+  // sem notícia do acelerômetro, o leme volta ao meio: é o estado seguro
+  if (Controle.modo === 'sensor' && Date.now() - (Controle.ultimoMov||0) > 200){
+    Controle._chute *= 0.90; Controle.leme = Controle._chute;
+  }
+  leme += ((e.leme || 0) - leme) * Math.min(1, dt*9);
+  if (Math.abs(leme) > 0.002){
+    r = giraPar(eixoF, eixoD, leme*TAXA_LEME*dt);  eixoF = r[0]; eixoD = r[1];
+  }
   endireitaEixos();
 
   // ---- anda para onde o nariz aponta ----
@@ -4805,8 +4848,9 @@ const Tripulacao = {
     m.ultimo = Date.now();
     if (d.t === 'eixo'){
       if (m.papel === 'piloto'){
-        Controle.volante = d.v; Controle.manche = d.m;
+        Controle.volante = d.v; Controle.manche = d.m; Controle.leme = d.r || 0;
         Controle.modo = 'sensor'; Controle.ultimo = Date.now();
+        Controle.ultimoMov = Date.now();      // o leme vem pronto: não centra sozinho
         if (pausado) retoma();
       } else {
         miraX = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (d.v/45) * MIRA_MAX));

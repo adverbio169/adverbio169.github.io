@@ -38,6 +38,24 @@
   .estado.nao{color:#ffc9c9;border-color:rgba(255,90,90,.3)} .estado.nao .luz{background:#ff6a6a}
   .estado.meio{color:#ffe1a8;border-color:rgba(255,194,77,.35)} .estado.meio .luz{background:#ffc24d}
 
+  /* ----------------------------------------------------------------------
+     PRESO DEITADO
+
+     Girando o celular, a página se reorganizava para "em pé" e o controle
+     mudava de lugar na mão — não dá. Primeiro tenta-se a trava de verdade
+     (screen.orientation.lock), que precisa de tela cheia e não existe no
+     Safari do iPhone. Quando ela não vale, entra o plano B: a página é
+     GIRADA por CSS, de modo que o desenho continua deitado mesmo com o
+     aparelho em pé. Os toques acompanham a transformação sozinhos.
+     -------------------------------------------------------------------- */
+  body.deitar{overflow:hidden}
+  body.deitar #giroAviso{display:flex}
+  /* o aviso também gira, senão fica atravessado no meio do resto */
+  body.deitar #giroAviso{left:auto;right:10px;bottom:50%;
+                         transform:translateY(50%) rotate(90deg);transform-origin:center}
+  #giroAviso{display:none;position:fixed;z-index:60;left:50%;bottom:14px;transform:translateX(-50%);
+             background:rgba(8,12,26,.8);border:1px solid rgba(255,255,255,.16);border-radius:99px;
+             padding:7px 14px;font-size:11.5px;color:#9fb4d8;letter-spacing:.5px;align-items:center;gap:8px}
   /* ---- posto: piloto ou artilheiro ---- */
   #posto{display:flex;align-items:center;gap:8px;font:800 12px/1 inherit;letter-spacing:2px;
          border-radius:99px;padding:7px 14px;background:rgba(92,200,255,.16);color:#9fd8ff;
@@ -111,41 +129,47 @@
      grande no canto direito, e o miolo (horizonte e números) só para olhar,
      sem nada para tocar.
      -------------------------------------------------------------------- */
-  @media (max-height:520px){
-    #controle.ver,#telaControle.ver{display:block;padding:0}
-    #controle.ver > *,#telaControle.ver > *{position:absolute}
+    /* ----------------------------------------------------------------------
+     CELULAR DEITADO: ergonomia de polegar.
 
-    #horizonte{left:50%;top:44%;transform:translate(-50%,-50%);
+     Isto era uma @media (max-height:520px). Virou CLASSE porque, quando o
+     celular está preso deitado por giro de CSS, a tela continua sendo alta
+     para o navegador — a media query não casava e o controle saía montado
+     em coluna, transbordando para fora. Agora quem decide é o JS, que sabe
+     qual é a altura DE VERDADE depois do giro.
+     -------------------------------------------------------------------- */
+body.paisagem #controle.ver,
+  body.paisagem #telaControle.ver{display:block;padding:0}
+  body.paisagem #controle.ver > *,
+  body.paisagem #telaControle.ver > *{position:absolute}
+  body.paisagem #horizonte{left:50%;top:44%;transform:translate(-50%,-50%);
                --d:min(30vw,56vh,190px);width:var(--d);height:var(--d)}
-    #estadoRede{top:8px;left:50%;transform:translateX(-50%);width:auto;max-width:40vw}
-    #posto{top:8px;right:calc(10px + env(safe-area-inset-right));padding:5px 10px;font-size:10.5px;letter-spacing:1.5px}
-    .placar{top:calc(44% + min(15vw,28vh,95px) + 10px);left:50%;transform:translateX(-50%);gap:16px}
-    .placar .val2{font-size:16px}
-    #giroLinha{bottom:8px;left:50%;transform:translateX(-50%);font-size:11px}
-
-    /* polegar esquerdo */
-    .armas{left:calc(10px + env(safe-area-inset-left));bottom:calc(10px + env(safe-area-inset-bottom));
+  body.paisagem #estadoRede{top:8px;left:50%;transform:translateX(-50%);width:auto;max-width:40vw}
+  body.paisagem #posto{top:8px;right:calc(10px + env(safe-area-inset-right));padding:5px 10px;font-size:10.5px;letter-spacing:1.5px}
+  body.paisagem .placar{top:calc(44% + min(15vw,28vh,95px) + 10px);left:50%;transform:translateX(-50%);gap:16px}
+  body.paisagem .placar .val2{font-size:16px}
+  body.paisagem #giroLinha{bottom:8px;left:50%;transform:translateX(-50%);font-size:11px}
+  /* polegar esquerdo */
+  body.paisagem .armas{left:calc(10px + env(safe-area-inset-left));bottom:calc(10px + env(safe-area-inset-bottom));
            width:min(34vw,190px);max-width:none;height:min(21vw,96px)}
-    .armaAtual{font-size:min(3.6vw,17px)}
-    /* deitado não cabe o nome das armas vizinhas sem passar por cima da do
+  body.paisagem .armaAtual{font-size:min(3.6vw,17px)}
+  /* deitado não cabe o nome das armas vizinhas sem passar por cima da do
        meio; fica só a seta, que é o que interessa para saber que dá para
        deslizar */
-    .armaLado{width:14%;font-size:0}
-    .armaLado::first-letter{font-size:13px}
-
-    /* polegar direito */
-    #btFogo{right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));
+  body.paisagem .armaLado{width:14%;font-size:0}
+  body.paisagem .armaLado::first-letter{font-size:13px}
+  /* polegar direito */
+  body.paisagem #btFogo{right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));
             width:min(27vw,132px);height:min(27vw,132px);max-width:none;border-radius:50%;
             font-size:17px;letter-spacing:2px;box-shadow:0 7px 0 #8f2a1d}
-    #btFogo:active{transform:translateY(5px);box-shadow:0 2px 0 #8f2a1d}
-
-    /* o que se usa pouco fica em cima, longe do polegar */
-    .linha{top:8px;left:calc(10px + env(safe-area-inset-left));width:auto;max-width:none;gap:6px}
-    .linha .bt{flex:0 0 auto;width:auto;padding:7px 12px;font-size:12.5px}
-    .linha .bt b{font-size:12.5px}
-    #dica{display:none}
-    .estado{padding:6px 10px;font-size:11.5px}
-  }
+  body.paisagem #btFogo:active{transform:translateY(5px);box-shadow:0 2px 0 #8f2a1d}
+  /* o que se usa pouco fica em cima, longe do polegar */
+  body.paisagem .linha{top:8px;left:calc(10px + env(safe-area-inset-left));width:auto;max-width:none;gap:6px}
+  body.paisagem .linha .bt{flex:0 0 auto;width:auto;padding:7px 12px;font-size:12.5px}
+  body.paisagem .linha .bt b{font-size:12.5px}
+  body.paisagem #dica{display:none}
+  body.paisagem .estado{padding:6px 10px;font-size:11.5px}
+  
   #giroLinha{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
              font-size:12px;color:#8fa3c8;text-align:center}
   #giroLinha b{color:#e6edf9;font-weight:700}
@@ -155,6 +179,8 @@
 </style>
 </head>
 <body>
+  <div id="giroAviso">🔒 preso deitado</div>
+
 
 <!-- ============ TELA 1: entrar na sala ============ -->
 <div class="tela" id="telaCodigo">
@@ -226,7 +252,7 @@ const Controle = {
   escutar(){
     if (!this.temSensor() || this.escutando) return;
     window.addEventListener('deviceorientation', this._ler, true);
-    this.ouveGravidade();
+    this.ouveMovimento();
     this.escutando = true;
   },
   respondendo(){ return this.recebeu && (Date.now() - this.ultimaLeitura) < 2000; },
@@ -245,6 +271,7 @@ const Controle = {
     const R = Math.PI/180, G = 180/Math.PI;
     const b = (e.beta || 0)*R, g = (e.gamma || 0)*R;
     const ux = -Math.cos(b)*Math.sin(g), uy = Math.sin(b), uz = Math.cos(b)*Math.cos(g);
+    Controle._cima = { x: ux, y: uy, z: uz };
     Controle._volanteBruto = -Math.atan2(ux, uy) * G;
     // O SINAL DO MANCHE: asin(uz) mede "a tela está virada para o céu", e
     // empurrar a borda de cima para longe é que vira a tela para cima. Sem o
@@ -273,28 +300,76 @@ const Controle = {
     if (this.permMovimento) this.ouveGravidade();
     return this.permMovimento;
   },
-  // Como o aparelho está sendo SEGURADO, descoberto pela gravidade.
-  // screen.orientation.angle só serve quando a rotação automática está ligada:
-  // com ela travada, a tela continua "em pé" mesmo com o celular deitado, e o
-  // controle sai girado 90 graus. A gravidade não mente.
-  fisico: null,
-  giroManual: null,          // escolha do jogador; vence tudo
-  _ouvindoG: false,
-  ouveGravidade(){
-    if (this._ouvindoG || typeof DeviceMotionEvent === 'undefined') return;
-    this._ouvindoG = true;
-    window.addEventListener('devicemotion', e => {
-      const g = e.accelerationIncludingGravity;
-      if (!g || g.x == null) return;
-      const ax = Math.abs(g.x), ay = Math.abs(g.y);
-      if (Math.max(ax, ay) < 3.5) return;        // quase deitado: não dá para saber
-      this.fisico = (ax > ay) ? (g.x > 0 ? 90 : 270) : (g.y > 0 ? 0 : 180);
-    }, true);
+  ouveGravidade(){ this.ouveMovimento(); },
+  giroManual: null,
+  anguloDaTela(){ return 0; },
+  /* ---------------------------------------------------------------------
+     O LEME, pelo MOVIMENTO do aparelho para os lados.
+
+     Os outros dois eixos vêm da INCLINAÇÃO. O leme vem de DESLOCAR o celular
+     para o lado — e aí tem um limite físico que vale dizer: acelerômetro não
+     sente POSIÇÃO, só mudança de movimento. Deslocar e segurar parado na
+     esquerda é, para ele, igual a estar parado no meio. O que dá para medir é
+     o DESLIZAR, e é isso que vira chute de leme.
+
+     O truque para separar o empurrão da freada (que vem logo atrás, de sinal
+     contrário) é o SILÊNCIO ANTES: empurrão começa com a mão parada; freada
+     vem colada, sem sossego no meio.
+     ------------------------------------------------------------------ */
+  _cima: {x:0,y:1,z:0}, _g:{x:0,y:0,z:0}, _temG:false, _ouvindoMov:false,
+  _aFiltro:0, _chute:0, _quieto:1, _janela:0, _dir:0, ultimoMov:0,
+  LEME_MIN: 1.3, LEME_MAX: 7.0,
+
+  ouveMovimento(){
+    if (this._ouvindoMov || typeof DeviceMotionEvent === 'undefined') return;
+    this._ouvindoMov = true;
+    const eu = this;
+    window.addEventListener('devicemotion', e => eu._movimento(e), true);
   },
-  anguloDaTela(){
-    if (this.giroManual !== null) return this.giroManual;
-    if (this.fisico !== null)     return this.fisico;
-    return (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+
+  _movimento(e){
+    const lin = e.acceleration, tot = e.accelerationIncludingGravity;
+    const dt = Math.min(0.08, Math.max(0.004, (e.interval || 16)/1000));
+    let ax, ay;
+    if (lin && lin.x != null && (lin.x || lin.y || lin.z)){ ax = lin.x; ay = lin.y; }
+    else if (tot && tot.x != null){
+      if (!this._temG){ this._g = {x:tot.x, y:tot.y, z:tot.z}; this._temG = true; }
+      this._g.x += (tot.x - this._g.x)*0.05;
+      this._g.y += (tot.y - this._g.y)*0.05;
+      this._g.z += (tot.z - this._g.z)*0.05;
+      ax = tot.x - this._g.x; ay = tot.y - this._g.y;
+    } else return;
+
+    const agora = Date.now();
+    const dtReal = Math.min(0.6, Math.max(dt, (agora - (this.ultimoMov || agora))/1000));
+    this.ultimoMov = agora;
+    if (dtReal > 0.1) this._aFiltro *= Math.pow(0.15, dtReal);
+    if (dtReal > 0.08) this._quieto += dtReal;
+
+    const u = this._cima;                 // eixo lateral = cima × tela
+    const sx = -u.y, sy = u.x;
+    const n = Math.hypot(sx, sy);
+    if (n < 0.15) return;
+    const a = (ax*sx + ay*sy)/n;
+    this._aFiltro += (a - this._aFiltro) * 0.4;
+    const af = this._aFiltro;
+
+    this._janela = Math.max(0, this._janela - dtReal);
+    if (Math.abs(af) > this.LEME_MIN){
+      const dir = af > 0 ? 1 : -1;
+      const forca = Math.min(1, (Math.abs(af) - this.LEME_MIN) / (this.LEME_MAX - this.LEME_MIN));
+      if (this._quieto >= 0.09){
+        this._dir = dir; this._chute = dir*forca; this._janela = 0.13;
+      } else if (this._janela > 0 && dir === this._dir && forca > Math.abs(this._chute)){
+        this._chute = dir*forca;
+      }
+      this._quieto = 0;
+    } else {
+      this._quieto += dtReal;
+    }
+    this._chute *= Math.pow(0.5, dtReal/0.5);
+    if (Math.abs(this._chute) < 0.02) this._chute = 0;
+    this.leme = this._chute;
   },
 
   calibrar(){
@@ -380,7 +455,8 @@ function vibra(ms){ try { navigator.vibrate && navigator.vibrate(ms); } catch(e)
 // 30 vezes por segundo: os ângulos já calibrados. Uma vez por segundo: ping.
 setInterval(() => {
   if (!conn || !conn.open) return;
-  conn.send({ t: 'eixo', v: +Controle.volante.toFixed(1), m: +Controle.manche.toFixed(1), s: seq++ });
+  conn.send({ t: 'eixo', v: +Controle.volante.toFixed(1), m: +Controle.manche.toFixed(1),
+              r: +(Controle.leme || 0).toFixed(2), s: seq++ });
 }, 33);
 setInterval(() => {
   if (!conn || !conn.open) return;
@@ -451,7 +527,8 @@ $('btConectar').onclick = async () => {
   setTimeout(() => Controle.calibrar(), 600);   // zera na mão, depois que a pessoa se ajeitou
 };
 $('btCalibrar').onclick = () => { Controle.calibrar(); vibra(30); };
-$('btComecar').onclick  = () => { if (conn && conn.open) conn.send({ t: 'botao', b: 'comecar' }); Controle.calibrar(); };
+$('btComecar').onclick  = () => { if (conn && conn.open) conn.send({ t: 'botao', b: 'comecar' });
+                                  Controle.calibrar(); tentaTravarDeitado(); };
 
 // código vindo pelo endereço (?sala=ABCD), por exemplo lendo o QR da TV
 const salaUrl = new URLSearchParams(location.search).get('sala');
@@ -564,6 +641,54 @@ function enviaCtl(o){ if (conn && conn.open) conn.send(o); }
   const vis = document.getElementById('btVisaoC');
   if (vis) vis.addEventListener('click', e => { e.preventDefault(); enviaCtl({ t:'visao' }); });
 })();
+
+/* --- preso deitado ---------------------------------------------------------
+   Tenta travar de verdade; se o navegador não deixar (é o caso do iPhone),
+   gira a página por CSS para ela continuar deitada. */
+function tentaTravarDeitado(){
+  try{
+    const el = document.documentElement;
+    const p = (el.requestFullscreen || el.webkitRequestFullscreen || (()=>{})).call(el);
+    const trava = () => {
+      try{
+        const t = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape');
+        if (t && t.then) t.then(() => { travouDeVerdade = true; ajeitaDeitado(); })
+                          .catch(() => ajeitaDeitado());
+        else ajeitaDeitado();
+      }catch(e){ ajeitaDeitado(); }
+    };
+    if (p && p.then) p.then(trava).catch(trava); else trava();
+  }catch(e){ ajeitaDeitado(); }
+}
+let travouDeVerdade = false;
+/* Quem manda no desenho "deitado" é o JS, não a media query: com o giro por
+   CSS o navegador continua achando que a tela é alta. */
+function medeDeitado(){
+  const gira = document.body.classList.contains('deitar');
+  const alt = gira ? window.innerWidth : window.innerHeight;
+  document.body.classList.toggle('paisagem', alt <= 520);
+}
+
+function ajeitaDeitado(){
+  const emPe = window.innerHeight > window.innerWidth;
+  const gira = emPe && !travouDeVerdade;
+  document.body.classList.toggle('deitar', gira);
+  const alvos = document.querySelectorAll('.tela, .veu, #controle, #telaControle');
+  for (const el of alvos){
+    if (gira){
+      el.style.width = window.innerHeight + 'px';
+      el.style.height = window.innerWidth + 'px';
+      el.style.transformOrigin = 'top left';
+      el.style.transform = 'rotate(90deg) translateY(-' + window.innerWidth + 'px)';
+    } else {
+      el.style.width = el.style.height = el.style.transform = el.style.transformOrigin = '';
+    }
+  }
+  medeDeitado();
+}
+window.addEventListener('resize', ajeitaDeitado);
+window.addEventListener('orientationchange', () => setTimeout(ajeitaDeitado, 250));
+ajeitaDeitado();
 </script>
 </body>
 </html>

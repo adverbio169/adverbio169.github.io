@@ -377,8 +377,9 @@ const Tripulacao = {
     m.ultimo = Date.now();
     if (d.t === 'eixo'){
       if (m.papel === 'piloto'){
-        Controle.volante = d.v; Controle.manche = d.m;
+        Controle.volante = d.v; Controle.manche = d.m; Controle.leme = d.r || 0;
         Controle.modo = 'sensor'; Controle.ultimo = Date.now();
+        Controle.ultimoMov = Date.now();      // o leme vem pronto: não centra sozinho
         if (pausado) retoma();
       } else {
         miraX = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (d.v/45) * MIRA_MAX));

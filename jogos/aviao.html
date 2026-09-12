@@ -205,13 +205,16 @@
    ========================================================================== */
 const Controle = {
   modo: 'nenhum',
-  volante: 0, manche: 0,
+  volante: 0, manche: 0, leme: 0,
   zeroVolante: 0, zeroManche: 0,
   recebeu: false,
   escutando: false,
   ultimaLeitura: 0,
   esperandoSensor: false,
   _volanteBruto: 0, _mancheBruto: 0,
+  _cima: {x:0, y:1, z:0},        // "para cima do mundo" visto pelo aparelho
+  _g: {x:0, y:0, z:0}, _temG: false, _ouvindoMov: false,
+  _aFiltro: 0, _chute: 0, _quieto: 1, _janela: 0, _dir: 0, ultimoMov: 0,
 
   temSensor(){ return typeof DeviceOrientationEvent !== 'undefined'; },
   precisaPermissao(){
@@ -223,7 +226,7 @@ const Controle = {
   escutar(){
     if (!this.temSensor() || this.escutando) return;
     window.addEventListener('deviceorientation', this._ler, true);
-    this.ouveGravidade();
+    this.ouveMovimento();
     this.escutando = true;
   },
 
@@ -277,6 +280,7 @@ const Controle = {
     const R = Math.PI/180, G = 180/Math.PI;
     const b = (e.beta || 0)*R, g = (e.gamma || 0)*R;
     const ux = -Math.cos(b)*Math.sin(g), uy = Math.sin(b), uz = Math.cos(b)*Math.cos(g);
+    Controle._cima = { x: ux, y: uy, z: uz };
     Controle._volanteBruto = -Math.atan2(ux, uy) * G;
     // O SINAL DO MANCHE: asin(uz) mede "a tela está virada para o céu", e
     // empurrar a borda de cima para longe é que vira a tela para cima. Sem o
@@ -304,14 +308,107 @@ const Controle = {
       else
         this.permMovimento = true;
     }catch(e){ this.permMovimento = false; }
+    if (this.permMovimento) this.ouveMovimento();
     return this.permMovimento;
   },
-  ouveGravidade(){},          // não é mais preciso: a calibragem resolve a pegada
   giroManual: null,
+
+  /* ---------------------------------------------------------------------
+     O LEME, pelo MOVIMENTO do aparelho para os lados
+
+     Os outros dois eixos vêm da INCLINAÇÃO, que o sensor mede direto. O leme
+     não: ele vem de DESLOCAR o celular para o lado. E aí tem um limite físico
+     que vale dizer — acelerômetro não sente POSIÇÃO, só mudança de movimento.
+     Deslocar e segurar parado na esquerda é, para ele, idêntico a estar parado
+     no meio. O que dá para medir é o DESLIZAR.
+
+     Então: tira a gravidade da leitura (por média lenta, porque nem todo
+     aparelho entrega a aceleração já limpa), projeta o que sobra no eixo
+     "para os lados" — que é perpendicular ao "para cima do mundo" e à tela,
+     então vale para qualquer pegada — e integra com vazamento. O resultado é
+     uma estimativa de velocidade lateral que sobe enquanto se desliza e volta
+     sozinha ao centro quando se para. Igual a pedal de leme: dá chute, não
+     posição fixa.
+     ------------------------------------------------------------------ */
+  ouveMovimento(){
+    if (this._ouvindoMov || typeof DeviceMotionEvent === 'undefined') return;
+    this._ouvindoMov = true;
+    window.addEventListener('devicemotion', e => Controle._movimento(e), true);
+  },
+  ouveGravidade(){ this.ouveMovimento(); },
+
+  _movimento(e){
+    const lin = e.acceleration, tot = e.accelerationIncludingGravity;
+    const dt = Math.min(0.08, Math.max(0.004, (e.interval || 16)/1000));
+    let ax, ay;
+    if (lin && lin.x != null && (lin.x || lin.y || lin.z)){
+      ax = lin.x; ay = lin.y;                    // já vem sem a gravidade
+    } else if (tot && tot.x != null){
+      if (!this._temG){ this._g = { x:tot.x, y:tot.y, z:tot.z }; this._temG = true; }
+      this._g.x += (tot.x - this._g.x)*0.05;     // média lenta = a gravidade
+      this._g.y += (tot.y - this._g.y)*0.05;
+      this._g.z += (tot.z - this._g.z)*0.05;
+      ax = tot.x - this._g.x; ay = tot.y - this._g.y;
+    } else return;
+    // o tempo tem que ser o do RELÓGIO, não o do sensor: se os avisos param de
+    // chegar (tela apagada, aba atrás), o intervalo real é maior, e sem isso a
+    // trava do gesto anterior engolia o começo do gesto seguinte
+    const agora = Date.now();
+    const dtReal = Math.min(0.6, Math.max(dt, (agora - (this.ultimoMov || agora))/1000));
+    this.ultimoMov = agora;
+
+    // eixo "para os lados": perpendicular ao "para cima do mundo" e à tela.
+    // Sai do vetor que a leitura de inclinação já calcula, então vale para
+    // qualquer pegada, sem precisar saber se o celular está em pé ou deitado.
+    const u = this._cima;
+    const sx = -u.y, sy = u.x;
+    const n = Math.hypot(sx, sy);
+    if (n < 0.15) return;                        // aparelho deitado: sem eixo lateral
+    const a = (ax*sx + ay*sy)/n;
+    // se houve um buraco entre as leituras, o filtro está velho: um gesto
+    // antigo guardado nele dispararia o leme para o lado errado no começo do
+    // gesto novo
+    if (dtReal > 0.1) this._aFiltro *= Math.pow(0.15, dtReal);
+    // buraco entre leituras conta como sossego: se o aparelho parou de mandar
+    // notícia, o próximo empurrão é gesto novo
+    if (dtReal > 0.08) this._quieto += dtReal;
+    this._aFiltro += (a - this._aFiltro) * 0.4;  // tira o tremor da mão
+    const af = this._aFiltro;
+
+    /* Por que DETECTAR O EMPURRÃO em vez de integrar a velocidade: todo
+       deslize termina com uma freada, de sinal contrário. Integrando, o leme
+       ia para o lado certo e VOLTAVA para o lado errado no fim do gesto.
+       Aqui o primeiro empurrão manda, e por um terço de segundo tudo que vier
+       no sentido contrário é ignorado — que é justamente a freada. */
+    /* COMO SEPARAR O EMPURRÃO DA FREADA. Tentei primeiro uma trava de tempo
+       depois de cada gesto, e não serve: deslizando várias vezes seguidas, a
+       freada de um deslize caía fora da trava e era lida como gesto novo — o
+       leme ia para o lado contrário. O que distingue de verdade os dois é o
+       SILÊNCIO ANTES: um empurrão começa depois de a mão estar parada; a
+       freada vem colada no empurrão, sem sossego nenhum no meio. */
+    this._janela = Math.max(0, this._janela - dtReal);
+    if (Math.abs(af) > LEME_MIN){
+      const dir = af > 0 ? 1 : -1;
+      const forca = Math.min(1, (Math.abs(af) - LEME_MIN) / (LEME_MAX - LEME_MIN));
+      if (this._quieto >= 0.09){          // vinha de mão parada: é gesto novo
+        this._dir = dir; this._chute = dir*forca;
+        this._janela = 0.13;              // ainda dá para pegar o pico dele
+      } else if (this._janela > 0 && dir === this._dir && forca > Math.abs(this._chute)){
+        this._chute = dir*forca;
+      }
+      this._quieto = 0;
+    } else {
+      this._quieto += dtReal;
+    }
+    this._chute *= Math.pow(0.5, dtReal/0.5);    // o chute vai sumindo sozinho
+    if (Math.abs(this._chute) < 0.02) this._chute = 0;
+    this.leme = this._chute;
+  },
 
   calibrar(){
     this.zeroVolante = this._volanteBruto || 0;
     this.zeroManche  = this._mancheBruto  || 0;
+    this._aFiltro = 0; this._chute = 0; this._quieto = 1; this._janela = 0; this.leme = 0;
     this.volante = 0; this.manche = 0;   // vale já, não só na próxima leitura
   }
 };
@@ -352,6 +449,9 @@ const ALCANCE  = 17000;    // até onde se enxerga à frente
 const MAPA     = 60000;    // meio lado do mapa: 120000 u = 6 km de ponta a ponta
 const TAXA_ROL = 3.4;      // rad/s com que o avião acompanha a inclinação da mão
 const TAXA_ARF = 1.5;      // rad/s de cabrada com o manche todo: looping em ~4 s
+const TAXA_LEME= 0.55;     // rad/s de guinada com o leme todo
+const LEME_MIN = 1.3;      // m/s²: abaixo disso é tremor de mão, não deslize
+const LEME_MAX = 7.0;      // m/s²: empurrão forte = leme todo
 const METRO    = 20;       // unidades de mundo por metro no placar
 
 const RAIO_PEGA  = 340;
@@ -417,7 +517,8 @@ let distancia=0, recorde=0, combustivel=100, turbo=0, voo=VOO_BASE;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
 let jogando=false, caindo=false, giroQueda=0, tremor=0, clarao=0, motivoQueda='';
-let tecla={esq:false,dir:false,cima:false,baixo:false};
+let tecla={esq:false,dir:false,cima:false,baixo:false,lemeE:false,lemeD:false};
+let leme=0;                                  // posição do leme, -1 a 1
 let toqueX=0, toqueY=0, usandoToque=false;
 let vq=0;                                    // velocidade de queda, só na queda
 
@@ -783,7 +884,7 @@ function reiniciaMundo(){
   combustivel = 100; turbo = 0; voo = VOO_BASE;
   pontos = 0; alvosDestruidos = 0; venceu = false;
   arma = 'bomba'; recarga = 0; atirando = false;
-  miraX = 0; miraY = 0;
+  miraX = 0; miraY = 0; leme = 0;
   municao = {}; for (const k in ARMAS) municao[k] = ARMAS[k].municao;
   caindo = false; giroQueda = 0; tremor = 0; clarao = 0; motivoQueda = '';
   Motor.liga();
@@ -1584,7 +1685,20 @@ function mostradorHorizonte(cx, cy, r){
   ctx.moveTo(cx+r*0.18, cy); ctx.lineTo(cx+r*0.55, cy);
   ctx.moveTo(cx, cy-r*0.08); ctx.lineTo(cx, cy+r*0.08);
   ctx.stroke();
+  // a bolinha de derrapagem: é onde o leme aparece, embaixo do horizonte,
+  // como no instrumento de verdade. Bola no meio = voo coordenado.
+  const by = cy + r*0.66, bl = r*0.32;
+  ctx.strokeStyle = 'rgba(150,170,200,.5)'; ctx.lineWidth = Math.max(1, r*0.05);
+  ctx.beginPath();
+  ctx.moveTo(cx-r*0.13, by-r*0.07); ctx.lineTo(cx-r*0.13, by+r*0.10);
+  ctx.moveTo(cx+r*0.13, by-r*0.07); ctx.lineTo(cx+r*0.13, by+r*0.10);
+  ctx.stroke();
+  ctx.fillStyle = Math.abs(leme) > 0.25 ? '#ffc24d' : '#dbe6f7';
+  ctx.beginPath(); ctx.arc(cx + leme*bl, by + r*0.02, r*0.095, 0, 7); ctx.fill();
+  ctx.fillStyle = '#8d9aae';
+  ctx.font = '800 ' + Math.max(8, r*0.30).toFixed(0) + 'px system-ui, sans-serif';
   ctx.textAlign = 'center';
+  ctx.fillText('HORIZONTE', cx, cy + r*1.52);
 }
 
 /* fita vertical: velocidade à esquerda, altitude à direita — como num caça */
@@ -1675,6 +1789,15 @@ function hudCaca(){
   ctx.moveTo(cx, cy - H*0.026); ctx.lineTo(cx, cy - H*0.009);
   ctx.stroke();
   ctx.beginPath(); ctx.arc(cx, cy, Math.max(4, H*0.010), 0, 7); ctx.stroke();
+  if (Math.abs(leme) > 0.05){          // leme fora do centro: marca embaixo da cruz
+    const ly = cy + H*0.055, lx = cx + leme*W*0.055;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - W*0.06, ly); ctx.lineTo(cx + W*0.06, ly); ctx.stroke();
+    ctx.fillStyle = 'rgba(120,255,170,.95)';
+    ctx.beginPath();
+    ctx.moveTo(lx, ly - H*0.016); ctx.lineTo(lx - W*0.009, ly - H*0.003);
+    ctx.lineTo(lx + W*0.009, ly - H*0.003); ctx.closePath(); ctx.fill();
+  }
 
   // escala de inclinação no alto, com o ponteiro girando — agora dá a volta
   const ra = H*0.20;
@@ -2084,15 +2207,20 @@ function eixos(){
     return {
       lat: Math.max(-1, Math.min(1, voltaCurta(Controle.volante)/180)),
       ver: grausParaEixo(Controle.manche, 22, 3),
+      leme: Controle.leme || 0,
       absoluto: true
     };
   }
-  if (usandoToque) return { lat: toqueX, ver: toqueY };
+  if (usandoToque) return { lat: toqueX, ver: toqueY, leme: lemeTecla() };
   return {
     lat: (tecla.esq?-1:0) + (tecla.dir?1:0),
-    ver: (tecla.cima?1:0) + (tecla.baixo?-1:0)
+    ver: (tecla.cima?1:0) + (tecla.baixo?-1:0),
+    leme: lemeTecla()
   };
 }
+
+/* no computador o leme é A e D, que ficam do lado das setas */
+function lemeTecla(){ return (tecla.lemeE?-1:0) + (tecla.lemeD?1:0); }
 
 function solta(x, y, z, n, cor, raio, forca, fumaca){
   for (let i=0;i<n;i++){
@@ -2283,6 +2411,18 @@ function atualiza(dt){
   if (Math.abs(e.ver) < 0.05 && Math.abs(arfagem) < 0.45 && Math.abs(inclinacao) < 30)
     cab = -arfagem * 0.8;
   r = giraPar(eixoF, eixoC, cab*dt);        eixoF = r[0]; eixoC = r[1];
+
+  /* O LEME: guina o nariz em volta do teto da cabine, sem inclinar as asas.
+     É o que serve para acertar a pontaria de raspão e para tirar a derrapagem
+     numa curva — coisa que nem o volante nem o manche fazem. */
+  // sem notícia do acelerômetro, o leme volta ao meio: é o estado seguro
+  if (Controle.modo === 'sensor' && Date.now() - (Controle.ultimoMov||0) > 200){
+    Controle._chute *= 0.90; Controle.leme = Controle._chute;
+  }
+  leme += ((e.leme || 0) - leme) * Math.min(1, dt*9);
+  if (Math.abs(leme) > 0.002){
+    r = giraPar(eixoF, eixoD, leme*TAXA_LEME*dt);  eixoF = r[0]; eixoD = r[1];
+  }
   endireitaEixos();
 
   // ---- anda para onde o nariz aponta ----
@@ -2451,12 +2591,16 @@ document.addEventListener('keydown', e => {
   if (e.key==='ArrowRight') tecla.dir=true;
   if (e.key==='ArrowUp')   { tecla.cima=true;  e.preventDefault(); }
   if (e.key==='ArrowDown') { tecla.baixo=true; e.preventDefault(); }
+  if (e.key==='a'||e.key==='A') tecla.lemeE=true;      // leme, no computador
+  if (e.key==='d'||e.key==='D') tecla.lemeD=true;
 });
 document.addEventListener('keyup', e => {
   if (e.key==='ArrowLeft')  tecla.esq=false;
   if (e.key==='ArrowRight') tecla.dir=false;
   if (e.key==='ArrowUp')    tecla.cima=false;
   if (e.key==='ArrowDown')  tecla.baixo=false;
+  if (e.key==='a'||e.key==='A') tecla.lemeE=false;
+  if (e.key==='d'||e.key==='D') tecla.lemeD=false;
 });
 
 let toqueIni = null;
