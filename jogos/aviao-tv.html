@@ -2664,8 +2664,12 @@ const Sensor = {
   },
   respondendo(){ return this.recebeu && (Date.now() - this.ultimaLeitura) < 2000; },
   async pedirPermissao(){
-    if (!this.precisaPermissao()) return true;
-    try { return (await DeviceOrientationEvent.requestPermission()) === 'granted'; } catch(e){ return false; }
+    if (!this.precisaPermissao()){ await this.pedeMovimento(); return true; }
+    try {
+      const ok = (await DeviceOrientationEvent.requestPermission()) === 'granted';
+      await this.pedeMovimento();          // iOS: a segunda permissão, a do devicemotion
+      return ok;
+    } catch(e){ return false; }
   },
   _ler: e => {
     if (e.beta === null && e.gamma === null) return;
@@ -2677,6 +2681,22 @@ const Sensor = {
     Controle.modo = 'sensor';
   },
   // beta/gamma são medidos em relação ao APARELHO; aqui viram eixos da TELA
+  // iOS pede permissão SEPARADA para orientação e para movimento. Sem a de
+  // movimento o evento devicemotion nunca dispara, a gravidade não chega e o
+  // controle volta a se guiar pela tela — que no iPhone com rotação travada
+  // fica "em pé" mesmo com o aparelho deitado. Pedimos a de orientação
+  // primeiro, que é a essencial, e a de movimento logo atrás.
+  permMovimento: null,
+  async pedeMovimento(){
+    try{
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function')
+        this.permMovimento = (await DeviceMotionEvent.requestPermission()) === 'granted';
+      else
+        this.permMovimento = true;
+    }catch(e){ this.permMovimento = false; }
+    if (this.permMovimento) this.ouveGravidade();
+    return this.permMovimento;
+  },
   // Como o aparelho está sendo SEGURADO, descoberto pela gravidade.
   // screen.orientation.angle só serve quando a rotação automática está ligada:
   // com ela travada, a tela continua "em pé" mesmo com o celular deitado, e o
@@ -3983,7 +4003,9 @@ function pintaGiro(){
   const g = Sensor;
   const a = g.anguloDaTela();
   const el = document.getElementById('giroTxt');
-  if (el) el.textContent = (NOMES_GIRO[a] || a + '\u00B0') + (g.giroManual === null ? ' (sozinho)' : ' (fixo)');
+  const origem = g.giroManual !== null ? 'fixo'
+               : (g.fisico !== null ? 'sozinho' : 'pela tela');
+  if (el) el.textContent = (NOMES_GIRO[a] || a + '\u00B0') + ' (' + origem + ')';
 }
 (function(){
   const b = document.getElementById('btGiro');

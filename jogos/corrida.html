@@ -218,6 +218,7 @@ const Controle = {
     if (this.precisaPermissao()){
       const r = await DeviceOrientationEvent.requestPermission();
       if (r !== 'granted') throw new Error('Permissão de movimento negada. Em Ajustes ▸ Safari, ligue "Movimento e orientação".');
+      await this.pedeMovimento();          // iOS: a segunda permissão, a do devicemotion
     }
     this.escutar();
 
@@ -259,6 +260,22 @@ const Controle = {
   },
 
   // converte beta/gamma do aparelho para os eixos DA TELA
+  // iOS pede permissão SEPARADA para orientação e para movimento. Sem a de
+  // movimento o evento devicemotion nunca dispara, a gravidade não chega e o
+  // controle volta a se guiar pela tela — que no iPhone com rotação travada
+  // fica "em pé" mesmo com o aparelho deitado. Pedimos a de orientação
+  // primeiro, que é a essencial, e a de movimento logo atrás.
+  permMovimento: null,
+  async pedeMovimento(){
+    try{
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function')
+        this.permMovimento = (await DeviceMotionEvent.requestPermission()) === 'granted';
+      else
+        this.permMovimento = true;
+    }catch(e){ this.permMovimento = false; }
+    if (this.permMovimento) this.ouveGravidade();
+    return this.permMovimento;
+  },
   // Como o aparelho está sendo SEGURADO, descoberto pela gravidade.
   // screen.orientation.angle só serve quando a rotação automática está ligada:
   // com ela travada, a tela continua "em pé" mesmo com o celular deitado, e o

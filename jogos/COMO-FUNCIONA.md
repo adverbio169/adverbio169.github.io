@@ -22,8 +22,8 @@ Três regras que economizam muita dor de cabeça:
    varia de aparelho para aparelho. Volante de verdade se faz com `beta`/`gamma`.
 2. **Só funciona em `https`** (ou em `localhost`, ou em arquivo aberto
    localmente). No GitHub Pages funciona, porque o Pages é https.
-3. **No iPhone e iPad é preciso pedir permissão**, e o pedido só é aceito se
-   sair de um toque do usuário — por isso o pedido fica dentro do clique do
+3. **No iPhone e iPad são DUAS permissões**, e as duas só são aceitas se o
+   pedido sair de um toque do usuário — por isso o pedido fica dentro do clique do
    botão "Jogar", nunca no carregamento da página:
 
 ```js
@@ -31,7 +31,16 @@ if (typeof DeviceOrientationEvent.requestPermission === 'function') {
   const r = await DeviceOrientationEvent.requestPermission();
   if (r !== 'granted') { /* cai para o controle por toque */ }
 }
+// A SEGUNDA, fácil de esquecer: sem ela o evento devicemotion nunca dispara,
+// e é dele que sai a gravidade que descobre se o celular está deitado.
+if (typeof DeviceMotionEvent !== 'undefined' &&
+    typeof DeviceMotionEvent.requestPermission === 'function') {
+  await DeviceMotionEvent.requestPermission();
+}
 ```
+
+No Android as duas vêm liberadas juntas, então o esquecimento não aparece —
+só no iPhone, e só quando a rotação da tela está travada.
 
 ## A pegadinha principal: beta e gamma trocam de lugar
 
