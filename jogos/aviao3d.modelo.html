@@ -579,7 +579,10 @@ function montaMapa(){
     if (perto_da_pista(ax, az)) continue;
     if (alvos.some(a => Math.hypot(a.x-ax, a.z-az) < 9000)) continue;
     if (Math.hypot(ax, az) < 6000) continue;
-    alvos.push({ x:ax, z:az, r:520, vivo:true });
+    // tipoAlvo marca quem NÃO tem altura própria: o buscador e o míssil
+    // precisam saber que a altura destes é o chão, senão o `y` vem indefinido
+    // e a perseguição inteira vira NaN
+    alvos.push({ x:ax, z:az, r:520, vivo:true, tipoAlvo:'chao' });
   }
   alvosTotal = alvos.length;
   predios = predios.filter(p => !alvos.some(a => Math.hypot(a.x-p.x, a.z-p.z) < 1400));
@@ -1117,9 +1120,21 @@ function poeCamera(dt){
                aviaoY + eixoF.y*40 + eixoC.y*26,
                aviaoZ + eixoF.z*40 + eixoC.z*26);
   } else {
-    const k = Math.min(1, dt*3.0);
+    /* ------------------------------------------------------------------
+       A CÂMERA ERA O ATRASO.
+
+       Estes números foram escolhidos quando a rolagem era ABSOLUTA e lenta.
+       Com o aileron por velocidade o avião gira até 195°/s, e uma câmera que
+       persegue com constante de 1/3 de segundo fica um terço de volta para
+       trás — o comando responde na hora, mas o que se VÊ chega depois. É o
+       "delayzinho" que o Brunno sentiu.
+
+       Apertados para uns 140 ms: ainda é câmera solta (não gruda no avião,
+       que é o que dá a sensação de peso), mas acompanha.
+       ------------------------------------------------------------------ */
+    const k = Math.min(1, dt*7.0);
     camF = vnorm({ x: camF.x + (eixoF.x-camF.x)*k, y: camF.y + (eixoF.y-camF.y)*k, z: camF.z + (eixoF.z-camF.z)*k });
-    const kc = Math.min(1, dt*1.8);
+    const kc = Math.min(1, dt*4.2);
     const alvoC = { x: eixoC.x*0.5, y: eixoC.y*0.5 + 0.5, z: eixoC.z*0.5 };
     camC = { x: camC.x + (alvoC.x-camC.x)*kc, y: camC.y + (alvoC.y-camC.y)*kc, z: camC.z + (alvoC.z-camC.z)*kc };
     camC = vnorm(vsub(camC, vmul(camF, vponto(camC, camF))));
@@ -1128,7 +1143,7 @@ function poeCamera(dt){
     const alvo = new THREE.Vector3(aviaoX - eixoF.x*CAMD + eixoC.x*210,
                                    aviaoY - eixoF.y*CAMD + eixoC.y*210,
                                    aviaoZ - eixoF.z*CAMD + eixoC.z*210);
-    camPos.lerp(alvo, Math.min(1, dt*7));
+    camPos.lerp(alvo, Math.min(1, dt*12));
   }
   cam.position.copy(camPos);
   /* A câmera do three.js olha pelo -Z dela. Montar a matriz na mão com
@@ -1200,6 +1215,114 @@ function bip(freq, dur, tipo, vol){
   g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
   o.connect(g); g.connect(audio.destination); o.start(); o.stop(audio.currentTime + dur);
 }
+/* --- RUÍDO, que é do que quase todo som seco é feito -----------------------
+   Um estouro, um tiro e um chiado são ruído filtrado com envelope. Guardo um
+   segundo de ruído branco e reaproveito, em vez de gerar buffer por tiro —
+   com a metralhadora a 14 tiros por segundo isso pesava. */
+let bufRuido = null;
+function ruido(){
+  if (!audio) return null;
+  if (!bufRuido){
+    const n = audio.sampleRate;
+    bufRuido = audio.createBuffer(1, n, audio.sampleRate);
+    const d = bufRuido.getChannelData(0);
+    for (let i=0;i<n;i++) d[i] = Math.random()*2-1;
+  }
+  const f = audio.createBufferSource();
+  f.buffer = bufRuido; f.loop = true;
+  f.playbackRate.value = 0.8 + Math.random()*0.4;
+  return f;
+}
+
+/* --- METRALHADORA ---------------------------------------------------------
+   O som antigo era um `bip` de onda quadrada: saía um apito, não um tiro.
+   Tiro é estalo, e estalo é RUÍDO seco com um tapa grave por baixo:
+
+     · ruído por um passa-alta, 45 ms, caindo rápido  -> o estalo
+     · seno de 150 Hz que despenca para 60, 9 ms      -> o tapa no peito
+     · cada tiro sai com o tom um pouco diferente     -> não vira sirene
+   ------------------------------------------------------------------------ */
+function somTiro(){
+  if (!audio) return;
+  try{
+    const t0 = audio.currentTime;
+    const f = ruido(); if (!f) return;
+    const bp = audio.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 1500 + Math.random()*900; bp.Q.value = 0.8;
+    const hp = audio.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 380;
+    const g = audio.createGain();
+    g.gain.setValueAtTime(0.13, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.045);
+    f.connect(bp); bp.connect(hp); hp.connect(g); g.connect(audio.destination);
+    f.start(t0); f.stop(t0 + 0.05);
+    const o = audio.createOscillator(), go = audio.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150 + Math.random()*40, t0);
+    o.frequency.exponentialRampToValueAtTime(58, t0 + 0.05);
+    go.gain.setValueAtTime(0.10, t0);
+    go.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.055);
+    o.connect(go); go.connect(audio.destination); o.start(t0); o.stop(t0 + 0.06);
+  }catch(e){}
+}
+
+/* --- MÍSSIL: o sopro da saída, e o motor que fica --------------------------- */
+function somMissil(){
+  if (!audio) return;
+  try{
+    const t0 = audio.currentTime;
+    const f = ruido(); if (!f) return;
+    const bp = audio.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(2600, t0);
+    bp.frequency.exponentialRampToValueAtTime(260, t0 + 1.1);
+    const g = audio.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.3);
+    f.connect(bp); bp.connect(g); g.connect(audio.destination);
+    f.start(t0); f.stop(t0 + 1.35);
+  }catch(e){}
+}
+
+/* --- O BUSCADOR: procurando, e travado -------------------------------------
+   Dois sons bem diferentes de propósito, para dar para saber de ouvido, sem
+   tirar os olhos do alvo:
+     PROCURANDO: um pulso curto e baixo, repetido, que acelera quando o alvo
+                 está mais centrado — igual ao "tec... tec.. tec. tectectec"
+                 dos caças.
+     TRAVADO:    um tom contínuo, agudo e firme. Não pisca mais.
+   ------------------------------------------------------------------------ */
+function somProcura(){
+  if (!audio) return;
+  try{
+    const t0 = audio.currentTime;
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = 'square'; o.frequency.value = 620;
+    g.gain.setValueAtTime(0.045, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05);
+    o.connect(g); g.connect(audio.destination); o.start(t0); o.stop(t0 + 0.06);
+  }catch(e){}
+}
+let tomTravado = null;
+function somTravado(liga){
+  if (!audio) return;
+  try{
+    if (liga && !tomTravado){
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = 'square'; o.frequency.value = 1180;
+      g.gain.setValueAtTime(0.0001, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.055, audio.currentTime + 0.03);
+      o.connect(g); g.connect(audio.destination); o.start();
+      tomTravado = { o, g };
+    } else if (!liga && tomTravado){
+      const { o, g } = tomTravado; tomTravado = null;
+      g.gain.setTargetAtTime(0.0001, audio.currentTime, 0.04);
+      o.stop(audio.currentTime + 0.25);
+    }
+  }catch(e){ tomTravado = null; }
+}
+
 function somNuclear(){
   if (!audio) return;
   try{
@@ -1237,6 +1360,28 @@ function solta(x, y, z, n, cor, raio, forca){
                    vz:(Math.random()-0.3)*forca, vida:1 });
   }
 }
+/* rastro do míssil: bolinhas que crescem e somem. Materiais separados por
+   partícula seriam caros — uma só, e a opacidade vai na escala e na vida. */
+let fumos = [];
+const matFumo = new THREE.MeshBasicMaterial({ color: 0xd8dee8, transparent: true,
+                                              opacity: 0.5, depthWrite: false, fog: true });
+function fumacinha(x, y, z){
+  if (fumos.length > 220) return;
+  const m = new THREE.Mesh(geoBola, matFumo.clone());
+  m.position.set(x, y, z); m.scale.setScalar(16);
+  m.userData.sombra = false; m.castShadow = false;
+  cena.add(m);
+  fumos.push({ no:m, vida:1 });
+}
+function passoFumo(dt){
+  for (const f of fumos){
+    f.vida -= dt*0.75;
+    f.no.scale.multiplyScalar(1 + dt*2.2);
+    f.no.material.opacity = Math.max(0, f.vida*0.42);
+  }
+  fumos = fumos.filter(f => { if (f.vida <= 0){ cena.remove(f.no); f.no.material.dispose(); return false; } return true; });
+}
+
 function explode(x, y, z, e){
   solta(x,y,z, Math.round(26*e), 0xffd257, 90*e, 900);
   solta(x,y,z, Math.round(20*e), 0xff7a2f, 120*e, 700);
@@ -1293,11 +1438,131 @@ const geoBomba = new THREE.CapsuleGeometry(26, 70, 4, 8);
 const matBomba = new THREE.MeshLambertMaterial({ color: 0x4a5160 });
 const geoTiro = new THREE.CylinderGeometry(9, 9, 420, 6);
 const matTiro = new THREE.MeshBasicMaterial({ color: 0xffec96, fog: false });
+
+/* --- O MÍSSIL ------------------------------------------------------------
+   Era a mesma cápsula da bomba pintada de laranja: uma bola comprida. Míssil
+   tem silhueta própria — corpo fino e comprido, ogiva em cone, quatro
+   aletinhas atrás e o fogo saindo do bocal. Montado apontando para +z, que é
+   o nariz, para o `lookAt` do voo servir sem conserto. */
+function montaMissil(){
+  const g = new THREE.Group();
+  const matCorpo = new THREE.MeshPhongMaterial({ color: 0xd8dde6, shininess: 70, specular: 0xaab4c4 });
+  const matOgiva = new THREE.MeshPhongMaterial({ color: 0xc4452f, shininess: 60 });
+  const matAleta = new THREE.MeshPhongMaterial({ color: 0x8b97ab, shininess: 30 });
+
+  const corpo = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 150, 12), matCorpo);
+  corpo.rotation.x = Math.PI/2; corpo.castShadow = true; g.add(corpo);
+
+  const ogiva = new THREE.Mesh(new THREE.ConeGeometry(11, 46, 12), matOgiva);
+  ogiva.rotation.x = Math.PI/2; ogiva.position.z = 98; g.add(ogiva);
+
+  // quatro aletas atrás, em cruz
+  for (let k = 0; k < 4; k++){
+    const a2 = new THREE.Mesh(new THREE.BoxGeometry(3, 30, 40), matAleta);
+    a2.position.set(0, 18, -58);
+    const eixo = new THREE.Group();
+    eixo.add(a2); eixo.rotation.z = k*Math.PI/2;
+    g.add(eixo);
+  }
+  // duas canards na frente, que é o que dá cara de perseguidor
+  for (const lado of [-1, 1]){
+    const c = new THREE.Mesh(new THREE.BoxGeometry(26, 3, 18), matAleta);
+    c.position.set(lado*16, 0, 52); g.add(c);
+  }
+  // o fogo do foguete
+  const fogo = new THREE.Mesh(new THREE.ConeGeometry(10, 90, 10, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffc46a, transparent: true, opacity: 0.85,
+                                  fog: false, depthWrite: false, side: THREE.DoubleSide }));
+  fogo.rotation.x = -Math.PI/2; fogo.position.z = -120;
+  g.add(fogo);
+  g.userData.fogo = fogo;
+  return g;
+}
 function trocaArma(nova){
   if (!ARMAS[nova] || arma === nova) return;
   arma = nova; recarga = 0.2;
+  if (arma !== 'missil') Mira.solta();
   bip(700, 0.05, 'square', 0.05);
 }
+
+/* =============================================================================
+   O BUSCADOR DO MÍSSIL
+
+   Escolhido o míssil, o avião passa a VARRER o que está na frente. O alvo
+   candidato é o que estiver mais centrado dentro de um cone à frente e dentro
+   do alcance. Enquanto ele estiver lá, o travamento carrega; saindo do cone,
+   descarrega — mas com uma folga de meio segundo, senão um solavanco de
+   turbulência derrubava a trava toda hora.
+
+   Os dois sons são diferentes de propósito, para dar para saber de ouvido sem
+   tirar os olhos do alvo: PROCURANDO é um pulso curto que acelera quanto mais
+   centrado estiver o alvo; TRAVADO é um tom contínuo, que não pisca mais.
+   ========================================================================== */
+const MIRA_CONE = 0.965;          // cosseno do meio-ângulo: uns 15°
+const MIRA_LONGE = 26000, MIRA_PERTO = 500;
+const TRAVA_SEG = 0.9;            // quanto tempo centrado para travar
+const Mira = {
+  alvo: null, carga: 0, travado: false, _pulso: 0, _perdeu: 0,
+  solta(){
+    if (this.travado) somTravado(false);
+    this.alvo = null; this.carga = 0; this.travado = false; this._perdeu = 0;
+  },
+  /* o melhor candidato: vivo, na frente, dentro do cone e do alcance */
+  procura(){
+    const d = direcaoDaMira();
+    let melhor = null, melhorCos = MIRA_CONE;
+    const olha = (o, x, y, z) => {
+      const vx = x-aviaoX, vy = y-aviaoY, vz = z-aviaoZ;
+      const dist = Math.hypot(vx, vy, vz);
+      if (dist < MIRA_PERTO || dist > MIRA_LONGE) return;
+      const c = (vx*d.x + vy*d.y + vz*d.z)/dist;
+      if (c > melhorCos){ melhorCos = c; melhor = o; }
+    };
+    for (const o of obstaculos) if (o.vivo && o.tipo === 'aviao') olha(o, o.x, o.y, o.z);
+    for (const o of inimigosRede()) olha(o, o.x, o.y, o.z);
+    for (const a of alvos) if (a.vivo) olha(a, a.x, CHAO + 300, a.z);
+    return { alvo: melhor, cos: melhorCos };
+  },
+  posicaoDe(o){
+    const semAltura = o.tipoAlvo === 'chao' || typeof o.y !== 'number';
+    return { x:o.x, y: semAltura ? CHAO+300 : o.y, z:o.z };
+  },
+  vivo(o){ return o && o.vivo !== false; },
+  passo(dt){
+    if (arma !== 'missil' || !jogando || caindo){ this.solta(); return; }
+    const r = this.procura();
+    // continua valendo o alvo de antes, se ele ainda está no cone
+    if (this.alvo && !this.vivo(this.alvo)) this.solta();
+    if (r.alvo && r.alvo !== this.alvo){
+      // só troca de alvo se ainda não travou, ou se o antigo sumiu do cone
+      if (!this.travado || !this.alvo) { this.alvo = r.alvo; this.carga = 0; }
+    }
+    const temAlvo = !!r.alvo && (r.alvo === this.alvo || !this.alvo);
+    if (temAlvo){
+      this._perdeu = 0;
+      this.carga = Math.min(TRAVA_SEG, this.carga + dt);
+      if (!this.travado && this.carga >= TRAVA_SEG){
+        this.travado = true; somTravado(true);
+        mostraAviso('TRAVADO', '#7fffa8', 700);
+      }
+      if (!this.travado){
+        // o pulso acelera conforme o alvo vai centrando
+        this._pulso -= dt;
+        if (this._pulso <= 0){
+          somProcura();
+          const centro = Math.max(0, (r.cos - MIRA_CONE)/(1 - MIRA_CONE));
+          this._pulso = 0.34 - centro*0.24;
+        }
+      }
+    } else {
+      // folga antes de largar: turbulência não pode derrubar a trava
+      this._perdeu += dt;
+      if (this._perdeu > 0.5) this.solta();
+    }
+  }
+};
+/* preenchido pela parte de rede; sem sala, não há inimigo de rede nenhum */
+function inimigosRede(){ return []; }
 function dispara(){
   if (caindo || !jogando || recarga > 0) return;
   if (municao[arma] <= 0){ bip(120,0.08,'square',0.05); mostraAviso('SEM MUNIÇÃO', '#ff8080', 700); return; }
@@ -1308,18 +1573,24 @@ function dispara(){
                   vx:eixoF.x*voo, vy:eixoF.y*voo - 60, vz:eixoF.z*voo });
     bip(150, 0.12, 'sawtooth', 0.1);
   } else if (arma === 'missil'){
-    const m = new THREE.Mesh(geoBomba, new THREE.MeshLambertMaterial({ color: 0xff7a4d })); cena.add(m);
+    const m = montaMissil(); cena.add(m);
     const T = direcaoDaMira();
+    const vel = voo*2.6;
+    const perseguido = Mira.travado ? Mira.alvo : null;
     bombas.push({ no:m, tipo:'missil', x:aviaoX, y:aviaoY, z:aviaoZ,
-                  vx:T.x*voo*3.2, vy:T.y*voo*3.2, vz:T.z*voo*3.2, vida:2.4 });
-    bip(900, 0.2, 'sawtooth', 0.08);
+                  vx:T.x*vel, vy:T.y*vel, vz:T.z*vel, vida:6.0,
+                  segue: perseguido, fumaca: 0 });
+    somMissil();
+    if (perseguido) mostraAviso('MÍSSIL A CAMINHO', '#ff9a6b', 900);
+    // trava gasta: um míssil, um alvo
+    Mira.solta();
   } else {
     const lado = (Math.random()-0.5)*220;
     const m = new THREE.Mesh(geoTiro, matTiro); cena.add(m);
     const T = direcaoDaMira();
     tiros.push({ no:m, x:aviaoX + eixoD.x*lado, y:aviaoY + eixoD.y*lado, z:aviaoZ + eixoD.z*lado,
                  dx:T.x, dy:T.y, dz:T.z, v:voo*6, vida:1.1 });
-    bip(900 + Math.random()*300, 0.04, 'square', 0.04);
+    somTiro();
   }
 }
 function atingeAlvo(x, z, raio){
@@ -1352,13 +1623,44 @@ function atingeAr(x, y, z, raio){
 }
 function atualizaTiros(dt){
   if (recarga > 0) recarga -= dt;
+  Mira.passo(dt);
   if (atirando) dispara();
   for (const b of bombas){
     b.x += b.vx*dt; b.z += b.vz*dt;
     if (b.tipo === 'missil'){
       b.y += b.vy*dt; b.vida -= dt;
+      /* PERSEGUIÇÃO. O míssil não "vira na direção do alvo" de uma vez — ele
+         tem uma taxa de curva, como tudo que voa. Sem esse limite ele
+         grudava no alvo e nunca errava, o que tira a graça; com ele, alvo
+         que manobra a tempo escapa. */
+      if (b.segue){
+        if (b.segue.vivo === false){ b.segue = null; }
+        else {
+          const q = Mira.posicaoDe(b.segue);
+          const ax = q.x, ay = q.y, az = q.z;
+          const dx = ax-b.x, dy = ay-b.y, dz = az-b.z;
+          const dist = Math.hypot(dx,dy,dz) || 1;
+          const v = Math.hypot(b.vx,b.vy,b.vz) || 1;
+          const qx = dx/dist, qy = dy/dist, qz = dz/dist;
+          const k = Math.min(1, dt*2.6);          // ~2,6 rad/s de taxa de curva
+          let nx = b.vx/v + (qx - b.vx/v)*k;
+          let ny = b.vy/v + (qy - b.vy/v)*k;
+          let nz = b.vz/v + (qz - b.vz/v)*k;
+          const n = Math.hypot(nx,ny,nz) || 1;
+          b.vx = nx/n*v; b.vy = ny/n*v; b.vz = nz/n*v;
+        }
+      }
+      // rastro de fumaça
+      b.fumaca -= dt;
+      if (b.fumaca <= 0){ b.fumaca = 0.035; fumacinha(b.x, b.y, b.z); }
+      if (b.no.userData.fogo){
+        const f = b.no.userData.fogo;
+        f.scale.set(1, 0.8 + Math.random()*0.5, 1);
+        f.material.opacity = 0.6 + Math.random()*0.35;
+      }
       if (atingeAr(b.x,b.y,b.z,260) || atingeAlvo(b.x,b.z,300)) b.morto = true;
       if (b.vida <= 0) b.morto = true;
+      if (b.morto) explode(b.x, b.y, b.z, 0.9);
     } else {
       b.vy -= dt*1400; b.y += b.vy*dt;
       if (b.y <= CHAO){ b.morto = true; explode(b.x, CHAO+200, b.z, 2.4); nuclear(b.x, b.z); }
@@ -1376,6 +1678,7 @@ function atualizaTiros(dt){
     t.no.rotateX(Math.PI/2);
   }
   tiros = tiros.filter(t => { if (t.vida <= 0){ cena.remove(t.no); return false; } return true; });
+  passoFumo(dt);
 }
 
 /* --- A QUEDA E O PASSO DO JOGO ------------------------------------------- */
@@ -1447,7 +1750,7 @@ function rolaNoChao(dt, e){
     eixoC = { x: 0, y: 1, z: 0 };
     endireitaEixos();
   }
-  leme += ((e.leme || 0) - leme) * Math.min(1, dt*9);
+  leme += ((e.leme || 0) - leme) * Math.min(1, dt*22);
 
   if (tecla.mais)  motor = Math.min(1, motor + dt*0.65);
   if (tecla.menos) motor = Math.max(0, motor - dt*0.65);
@@ -1604,7 +1907,10 @@ function atualiza(dt){
   if (Math.abs(e.ver) < 0.05 && Math.abs(arfagem) < 0.45 && Math.abs(inclinacao) < 30) cab = -arfagem*0.8;
   r = giraPar(eixoF, eixoC, cab*dt); eixoF = r[0]; eixoC = r[1];
 
-  leme += ((e.leme || 0) - leme) * Math.min(1, dt*9);
+  /* 1/9 de segundo de filtro fazia sentido quando o leme era um CHUTE que
+     morria sozinho — era ele que dava corpo ao gesto. Agora o leme chega como
+     posição firme, e o filtro virou só atraso. */
+  leme += ((e.leme || 0) - leme) * Math.min(1, dt*22);
   if (Math.abs(leme) > 0.002){ r = giraPar(eixoF, eixoD, leme*TAXA_LEME*dt); eixoF = r[0]; eixoD = r[1]; }
   endireitaEixos();
 
@@ -1969,6 +2275,40 @@ function desenhaHUD(){
     regua('NIT  ' + Math.round(nitroCarga), nitroCarga/100, nitroBotao && nitroCarga > 0, 1);
   }
 
+  /* --- A CAIXA DO BUSCADOR ------------------------------------------------
+     Enquanto procura, um quadrado aberto que se fecha conforme a trava
+     carrega — a barra é o próprio tamanho do quadrado, sem número nenhum.
+     Travado, ele pisca e ganha as pontas fechadas. */
+  if (Mira.alvo && jogando && !caindo){
+    const q = Mira.posicaoDe(Mira.alvo);
+    const v = new THREE.Vector3(q.x, q.y, q.z).project(cam);
+    if (v.z < 1){
+      const x = (v.x*0.5+0.5)*W, y = (-v.y*0.5+0.5)*H;
+      const frac = Mira.carga/TRAVA_SEG;
+      const r = Math.min(W,H) * (0.075 - 0.035*frac);
+      const pisca = Mira.travado ? (Math.sin(Date.now()/90) > -0.4) : true;
+      h2.save(); h2.translate(x, y);
+      h2.strokeStyle = Mira.travado ? (pisca ? 'rgba(130,255,170,.98)' : 'rgba(130,255,170,.35)')
+                                    : 'rgba(255,205,90,.85)';
+      h2.lineWidth = Mira.travado ? 3 : 2;
+      // quatro cantos: quanto mais travado, mais longos
+      const c = r*(Mira.travado ? 0.55 : 0.34);
+      for (const sx of [-1,1]) for (const sy of [-1,1]){
+        h2.beginPath();
+        h2.moveTo(sx*r, sy*r - sy*c); h2.lineTo(sx*r, sy*r); h2.lineTo(sx*r - sx*c, sy*r);
+        h2.stroke();
+      }
+      h2.font = '800 ' + Math.max(9, H*0.020).toFixed(0) + 'px ui-monospace, monospace';
+      h2.textAlign = 'center';
+      h2.fillStyle = h2.strokeStyle;
+      h2.fillText(Mira.travado ? 'TRAVADO' : 'PROCURANDO', 0, -r - 8);
+      const dist = Math.round(Math.hypot(q.x-aviaoX, q.y-aviaoY, q.z-aviaoZ)/METRO);
+      h2.font = '700 ' + Math.max(8, H*0.016).toFixed(0) + 'px ui-monospace, monospace';
+      h2.fillText(dist + 'm', 0, r + 16);
+      h2.restore(); h2.textAlign = 'left';
+    }
+  }
+
   /* o retículo do artilheiro: um ponto do mundo lá na frente, projetado pela
      mesma câmera do three.js. Fecha e fica verde quando há bicho na linha. */
   if (temArtilheiro && jogando && !caindo){
@@ -2168,6 +2508,8 @@ function reinicia(){
   for (const t of tiros) cena.remove(t.no); tiros = [];
   for (const f of faiscas) cena.remove(f.no); faiscas = [];
   for (const c of cogumelos) cena.remove(c.no); cogumelos = [];
+  for (const f of fumos) cena.remove(f.no); fumos = [];
+  Mira.solta();
   montaMapa(); montaChao(); montaPista(); montaCidade(); montaTambores(); montaAlvos();
   montaInimigos(); montaPombos(); montaNuvens();
   poeCamera(1);

@@ -342,7 +342,7 @@ function grausParaEixo(graus, maximo, zonaMorta){
   return s * Math.min(1, (v - zonaMorta) / (maximo - zonaMorta));
 }
 const Controle = {
-  modo: 'nenhum', volante: 0, manche: 0, zeroVolante: 0, zeroManche: 0,
+  modo: 'nenhum', volante: 0, manche: 0, zeroVolante: 0, zeroManche: 0, aoLer: null,
   recebeu: false, escutando: false, ultimaLeitura: 0, _volanteBruto: 0, _mancheBruto: 0,
   temSensor(){ return typeof DeviceOrientationEvent !== 'undefined'; },
   precisaPermissao(){ return this.temSensor() && typeof DeviceOrientationEvent.requestPermission === 'function'; },
@@ -381,6 +381,7 @@ const Controle = {
     Controle.recebeu = true;
     Controle.ultimaLeitura = Date.now();
     Controle.modo = 'sensor';
+    if (Controle.aoLer) Controle.aoLer();
   },
 
   /* -------------------------------------------------------------------------
@@ -618,13 +619,25 @@ function conectar(codigo){
 
 function vibra(ms){ try { navigator.vibrate && navigator.vibrate(ms); } catch(e){} }
 
-// 30 vezes por segundo: os ângulos já calibrados. Uma vez por segundo: ping.
-setInterval(() => {
+/* --- MANDAR NA HORA DA LEITURA, não de 33 em 33 ms -------------------------
+   O relógio de 33 ms somava até 33 ms de espera entre a mão mexer e o pacote
+   sair — metade disso em média, e de graça, porque o sensor já avisa quando
+   tem leitura nova. Agora o envio sai COLADO na leitura, com um piso de 12 ms
+   para nenhum aparelho muito falante entupir o canal, e um batimento de
+   100 ms para a TV saber que o celular continua vivo mesmo com a mão parada. */
+const ENVIO_MIN = 12;
+let ultimoEnvio = 0;
+function mandaEixos(){
   if (!conn || !conn.open) return;
+  const agora = Date.now();
+  if (agora - ultimoEnvio < ENVIO_MIN) return;
+  ultimoEnvio = agora;
   conn.send({ t: 'eixo', v: +Controle.volante.toFixed(1), m: +Controle.manche.toFixed(1),
               r: +(Controle.leme || 0).toFixed(2),
               p: +Motor.potencia.toFixed(2), n: Motor.nitro ? 1 : 0, s: seq++ });
-}, 33);
+}
+Controle.aoLer = mandaEixos;
+setInterval(mandaEixos, 100);          // batimento, para a mão parada
 setInterval(() => {
   if (!conn || !conn.open) return;
   conn.send({ t: 'ping', at: Date.now() });
