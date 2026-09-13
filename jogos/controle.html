@@ -795,22 +795,22 @@ const Tremor = (function(){
      esta parou de precisar.
      ---------------------------------------------------------------------- */
   const PADROES = {
-    missil:  [70, 40, 180],
-    bomba:   [260],
-    travou:  [40, 50, 40, 50, 70],
-    levou:   [130, 60, 150],
-    explode: [95, 45, 180],
-    bateu:   [400, 90, 260, 90, 520],
-    tocou:   [110, 55, 160],
-    pegou:   [60],
-    alvo:    [65, 45, 65, 45, 130]
+    missil:  [130, 35, 320],
+    bomba:   [500],
+    travou:  [80, 40, 80, 40, 150],
+    levou:   [240, 45, 280],
+    explode: [180, 35, 340],
+    bateu:   [700, 70, 460, 70, 900],
+    tocou:   [200, 45, 300],
+    pegou:   [110],
+    alvo:    [120, 35, 120, 35, 240]
   };
   const CONTINUO = {
-    metralha: { padrao: [42, 30], ciclo: 72,  vezes: 7 },   // ~14 estalos por segundo
+    metralha: { padrao: [80, 18], ciclo: 98,  vezes: 6 },   // 82% do tempo ligado
     // o tremor aerodinâmico: rápido e miúdo, como a asa reclamando. Diferente
     // do estol, que é lento e pesado, para dar para saber qual é qual na mão
-    buffet:   { padrao: [32, 26], ciclo: 58,  vezes: 8 },
-    estol:    { padrao: [190, 110], ciclo: 300, vezes: 3 }
+    buffet:   { padrao: [70, 18], ciclo: 88,  vezes: 6 },
+    estol:    { padrao: [340, 90], ciclo: 430, vezes: 3 }
   };
   const T = {};
   const relogios = {};
@@ -834,7 +834,7 @@ const Tremor = (function(){
     const p = d.p || PADROES[a];
     if (p) vibra(p);
   };
-  T.testa = () => vibra([220, 120, 220, 120, 420]);   // longo de propósito: é para SENTIR
+  T.testa = () => vibra([420, 90, 420, 90, 800]);   // longo de propósito: é para SENTIR
   T.calaTudo = () => { for (const k in relogios) paraContinuo(k); };
   // a aba sumiu com o dedo no gatilho: não deixa o celular tremendo para sempre
   document.addEventListener('visibilitychange', () => { if (document.hidden) T.calaTudo(); });

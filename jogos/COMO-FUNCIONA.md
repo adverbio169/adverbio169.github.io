@@ -2575,3 +2575,84 @@ um tiro de metralhadora: dá para ver a arma cuspindo ............ ✔
 0,66 s depois o clarão apagou .................................. ✔
 o pedido de vibração continua saindo ............................ ✔
 ```
+
+---
+
+## O dobro da velocidade, e o tremor mais forte
+
+### "Aumenta a intensidade"
+
+**Não existe intensidade.** A API de vibração da web só aceita **tempos** —
+ligado, desligado, ligado — e nada de amplitude; o `navigator.vibrate` não tem
+onde receber "mais forte". Quem manda na força é o sistema.
+
+O que dá para mexer é o que o corpo **lê** como força, e são duas coisas:
+
+1. **Pulso mais longo.** O vibrador é um solenoide: leva uns 20 ms para pegar
+   embalo e só depois chega à amplitude cheia. Um pulso de 40 ms passa a vida
+   inteira acelerando e morre antes de chegar lá; um de 130 ms fica a maior
+   parte do tempo no máximo. O mesmo motor, o dobro de sensação.
+2. **Menos buraco entre os pulsos.** Pausa longa deixa o solenoide parar por
+   completo, e o pulso seguinte recomeça do zero.
+
+| | antes | agora |
+|---|---|---|
+| míssil (tempo ligado) | 250 ms | **450 ms** |
+| travar a mira | 150 ms | **310 ms** |
+| metralhadora, por pulso | 42 ms | **80 ms** |
+| metralhadora, tempo ligado | 58% | **82%** |
+
+Na mão, 82% contra 58% é a diferença entre um cutucão ritmado e uma arma
+tremendo de verdade.
+
+### O dobro da velocidade
+
+Dobrar velocidade não é mexer num número: é mexer em **doze**, e todos têm de
+andar juntos. Dobrando só a velocidade de cruzeiro, o avião passaria a voar
+sempre acima do teto do trem de pouso, o estol nunca mais aconteceria, a corrida
+de decolagem acabaria em meio segundo e todo pouso estouraria o limite de toque.
+O jogo inteiro se desmancharia por um número.
+
+Então existe **um fator só** — `VEL = 2` — e a família toda o multiplica: as
+quatro velocidades de voo, os três estóis, os três tetos de flape, o teto do
+trem, os limites de toque, a aceleração e o freio no chão. Trocar `VEL` volta o
+jogo à velocidade antiga sem procurar nada.
+
+O que **não** multiplica, de propósito:
+
+- **as taxas de rolagem, arfagem e leme** — são graus por segundo. Mantê-las
+  iguais com o dobro de velocidade **alarga a curva**, e curva larga em
+  velocidade alta é exatamente a sensação de avião rápido;
+- **o gasto de combustível** — assim um tanque dura os mesmos minutos e rende o
+  dobro de mapa;
+- **o mundo**, que continua do mesmo tamanho. É por isso que dobra a emoção: a
+  cidade passa duas vezes mais depressa.
+
+A física roda em **passo fixo**, então nem numa máquina lenta o avião pula por
+cima de um prédio: a 6.000 são 100 por passo, contra prédios e aviões de
+centenas de raio.
+
+```
+corrida até a rotação: 6,0 s, 3.881 de pista (era 1.940), precisa de 1.274  ✔
+decolou usando 4.777 de 22.000 de pista ................................... ✔
+subiu para 5.892, voo 4.400 ............................................... ✔
+pousou na pista, freando em 2,5 s e 2.036 de pista ........................ ✔
+os quatro jeitos errados de pousar continuam batendo ...................... ✔
+```
+
+### Os testes tinham a escala velha escrita na mão
+
+Dois quebraram, e nenhum era defeito do jogo:
+
+**"descendo como pedra" passou a pousar.** O teste fixava `voo = 1200` e um
+ângulo — números da escala antiga. Com o jogo dobrado, aquela mesma descida
+virou uma aproximação mansa. Agora ele pede o que quer dizer: *descer 1,4 vez
+mais depressa do que o trem aguenta*, e calcula o ângulo a partir disso.
+
+**O estresse aerodinâmico deu 1,00 em tudo.** A sonda ia de 1200 a 640, que
+antes era "de bem acima do estol até encostar nele" — e virou uma lista inteira
+**abaixo** do novo estol de 1280. Agora ela é escrita em múltiplos do estol:
+1,9× · 1,4× · 1,25× … 1,0×, e acompanha qualquer escala.
+
+É o mesmo erro nas duas: **o teste guardava o número em vez da intenção.**
+Enquanto a escala não muda, os dois jeitos parecem iguais.

@@ -7279,7 +7279,35 @@ function endireitaEixos(){
    PARTE 2 — O MUNDO (os mesmos números do jogo em 2D, para o voo ficar igual)
    ========================================================================== */
 const CHAO = -700, TETO = 5200;
-const VOO_BASE = 1700, VOO_TURBO = 3000;
+/* ===========================================================================
+   O MULTIPLICADOR DE VELOCIDADE
+
+   "Dobra a velocidade do avião, ele está muito lento, tem que dar mais
+   emoção." Dobrar velocidade não é mexer num número: é mexer em DOZE, e todos
+   têm de andar juntos. Se eu dobrasse só a velocidade de cruzeiro, o avião
+   passaria a voar sempre acima do teto do trem de pouso, o estol nunca mais
+   aconteceria, a corrida de decolagem acabaria em meio segundo e todo pouso
+   estouraria o limite de toque. O jogo inteiro se desmancharia por um número.
+
+   Então existe um fator só, e a família toda o multiplica. Trocar `VEL` volta
+   o jogo à velocidade antiga sem procurar nada, e é impossível esquecer
+   metade da lista.
+
+   O que NÃO multiplica, de propósito:
+   · as taxas de rolagem, arfagem e leme — são graus por segundo. Mantê-las
+     iguais com o dobro de velocidade alarga a curva, e curva larga em
+     velocidade alta é exatamente a sensação de avião rápido;
+   · o gasto de combustível — assim um tanque dura os mesmos minutos e rende
+     o dobro de mapa;
+   · o mundo, que continua do mesmo tamanho. É por isso que dobra a emoção:
+     a cidade passa duas vezes mais depressa.
+
+   A física roda em passo fixo (`while (sobrando > PASSO)`), então nem numa
+   máquina lenta o avião pula por cima de um prédio: a 6.000 são 100 por
+   passo, contra prédios e aviões de centenas de raio.
+   ======================================================================== */
+const VEL = 2;
+const VOO_BASE = 1700*VEL, VOO_TURBO = 3000*VEL;
 /* ACELERADOR: a potência do controle escolhe a velocidade de cruzeiro entre
    marcha lenta e potência militar. 0,67 dá exatamente os 1700 de antes, que é
    onde o acelerador começa — quem não tiver celular voa igual ao de sempre.
@@ -7291,7 +7319,7 @@ const VOO_BASE = 1700, VOO_TURBO = 3000;
    é exatamente para o que os flapes existem.
    A potência padrão subiu de 0,67 para 0,70 só para a velocidade de cruzeiro
    continuar sendo os mesmos ~1700 de sempre. */
-const VOO_MIN = 520, VOO_MAX = 2200, MOTOR_PADRAO = 0.70;
+const VOO_MIN = 520*VEL, VOO_MAX = 2200*VEL, MOTOR_PADRAO = 0.70;
 const NITRO_GASTO = 26, NITRO_ENCHE = 8.5;
 const MAPA = 60000, METRO = 20;
 const TAXA_ROL = 3.4, TAXA_ARF = 1.5, TAXA_LEME = 0.55;
@@ -7318,22 +7346,22 @@ const PISTA_Y = CHAO + 8;                     // o asfalto, um palmo acima do ca
 const RODA = 158;                             // altura do centro do avião, apoiado
 /* Velocidade mínima para o ar sustentar o avião. Os flapes a derrubam: é para
    isso que eles existem, poder chegar devagar sem cair. */
-const ESTOL = [640, 540, 450];                // sem flape, flape 1, flape 2
-const FLAP_TETO = [2400, 1500, 1150];         // o quanto cada flape deixa correr
-const TREM_TETO = 1400;                       // com o trem fora, o avião não corre
+const ESTOL = [640*VEL, 540*VEL, 450*VEL];    // sem flape, flape 1, flape 2
+const FLAP_TETO = [2400*VEL, 1500*VEL, 1150*VEL];  // o quanto cada flape deixa correr
+const TREM_TETO = 1400*VEL;                   // com o trem fora, o avião não corre
 const DECOLA = 1.18;                          // margem sobre o estol para sair do chão
 /* O limite de velocidade no toque fica ABAIXO do teto do trem (1400): assim
    chegar com a manete aberta e sem flape realmente estoura o pouso, e é
    preciso reduzir ou baixar flape. Com 1500 a conta era impossível de
    estourar — o arrasto do trem já segurava antes. */
-const POUSO_VEL = 1250, POUSO_BANCO = 22, POUSO_QUEDA = 620;   // limites do toque
+const POUSO_VEL = 1250*VEL, POUSO_BANCO = 22, POUSO_QUEDA = 620*VEL;   // limites do toque
 const TAXA_ESTERCA = 0.85;                    // o leme esterça no chão
 /* No chão a velocidade ganha e perde POR SEGUNDO, não "perseguindo o alvo"
    como no ar. Com a fórmula do ar a corrida de decolagem durava meio segundo
    — o avião saltava para a velocidade de rotação antes de a pista começar a
    passar. Assim dá uns 6 s de corrida, que é o bastante para parecer uma
    decolagem sem virar espera. */
-const ACEL_CHAO = 86, FREIO_CHAO = 330;
+const ACEL_CHAO = 86*VEL, FREIO_CHAO = 330*VEL;
 /* uma tarja folgada em volta do asfalto, onde não nasce prédio nem alvo */
 function perto_da_pista(x, z){
   return Math.abs(x) < PISTA_MEIA + 2600 && z > PISTA_Z0 - 3000 && z < PISTA_Z1 + 3000;
@@ -11177,8 +11205,8 @@ function caminhoTremor(){
 $('btTestaTremor').onclick = () => {
   /* Longo de propósito: um pulso de jogo tem de ser curto para caber no ritmo,
      este aqui tem é de ser SENTIDO. Se este não passa, nenhum passa. */
-  tremeAqui([220, 120, 220, 120, 420]);
-  Controles.manda({ t:'tremer', a:'prova', p:[220, 120, 220, 120, 420] });
+  tremeAqui([420, 90, 420, 90, 800]);
+  Controles.manda({ t:'tremer', a:'prova', p:[420, 90, 420, 90, 800] });
   $('tremorComo').textContent = caminhoTremor() + ' — ' + Vibra.ultimo;
   const d = $('diagTremor'); if (d){ d.textContent = diagTremor(); d.style.display = 'block'; }
 };
@@ -11357,21 +11385,45 @@ const Controles = {
      manda no que se sente é o tempo ligado, não a pausa. O ritmo de cada um
      continua o mesmo, que é o que faz dar para reconhecer na mão qual é qual.
      --------------------------------------------------------------------- */
+  /* --- "VIBRA POUCO. AUMENTA A INTENSIDADE" -----------------------------------
+     Não existe intensidade. A API de vibração da web só aceita TEMPOS — ligado,
+     desligado, ligado — e nada de amplitude; o `navigator.vibrate` não tem onde
+     receber "mais forte". Quem manda na força é o sistema.
+
+     O que dá para mexer é o que o corpo lê como força, e são duas coisas:
+
+     1. PULSO MAIS LONGO. O vibrador é um solenoide: leva uns 20 ms para pegar
+        embalo e só depois chega à amplitude cheia. Um pulso de 40 ms passa a
+        vida inteira acelerando e morre antes de chegar lá; um de 90 ms fica
+        metade do tempo no máximo. O MESMO motor, o dobro de sensação.
+
+     2. MENOS BURACO ENTRE OS PULSOS. Pausa longa deixa o solenoide parar por
+        completo, e o pulso seguinte recomeça do zero. Encostando os pulsos,
+        o motor nunca desacelera de todo e a vibração vira contínua em vez de
+        picotada — que é o que se sente como "forte".
+
+     Então tudo o que é "ligado" subiu de novo (perto do dobro) e as pausas
+     encolheram. O ritmo de cada evento continua reconhecível, que é o que
+     deixa saber na mão o que aconteceu sem olhar.
+     ---------------------------------------------------------------------- */
   PADROES: {
-    missil:  [70, 40, 180],
-    bomba:   [260],
-    travou:  [40, 50, 40, 50, 70],
-    levou:   [130, 60, 150],
-    explode: [95, 45, 180],
-    bateu:   [400, 90, 260, 90, 520],
-    tocou:   [110, 55, 160],
-    pegou:   [60],
-    alvo:    [65, 45, 65, 45, 130]
+    missil:  [130, 35, 320],
+    bomba:   [500],
+    travou:  [80, 40, 80, 40, 150],
+    levou:   [240, 45, 280],
+    explode: [180, 35, 340],
+    bateu:   [700, 70, 460, 70, 900],
+    tocou:   [200, 45, 300],
+    pegou:   [110],
+    alvo:    [120, 35, 120, 35, 240]
   },
   CONTINUO: {
-    metralha: { padrao:[42, 30],  ciclo:72,  vezes:7  },
-    buffet:   { padrao:[32, 26],  ciclo:58,  vezes:8  },
-    estol:    { padrao:[190,110], ciclo:300, vezes:3  }
+    /* nos contínuos o ganho é ainda maior: a metralhadora passa de 42 ligado
+       com 30 de pausa (58% do tempo) para 80 com 18 (82%), o que na mão é a
+       diferença entre um cutucão ritmado e uma arma tremendo de verdade */
+    metralha: { padrao:[80, 18],  ciclo:98,  vezes:6  },
+    buffet:   { padrao:[70, 18],  ciclo:88,  vezes:6  },
+    estol:    { padrao:[340, 90], ciclo:430, vezes:3  }
   },
   vibraAqui(p){ tremeAqui(p); },
   paraAqui(qual){
