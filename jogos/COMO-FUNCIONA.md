@@ -3702,3 +3702,43 @@ projeção da câmera, já contém o giro, e continua desenhada na tela crua.
 a cruz do canhão, a 25° de cabeça: 49 px no meio da tela
                                   e 234 px em cima do nariz   ✔ foi com o vidro
 ```
+
+---
+
+## A duplicata das duas miras, e o vazamento que ela desenterrou
+
+> *"Sobre a mira da metralhadora: só com o 'olhar com a cabeça' é que libera a
+> segunda mira?"*
+
+Não libera nada. O que havia era **duplicata**, e a pergunta a encontrou. Medido
+na cabine:
+
+```
+olhar desligado     cruz em 450, anel em 450   ->  0 px de distância
+olhar ligado a  0°  cruz em 450, anel em 450   ->  0 px
+olhar ligado a 15°  cruz em 590, anel em 590   ->  0 px
+```
+
+Sempre no mesmo pixel, e não por acaso: as duas marcam **a mesma coisa** — para
+onde o nariz aponta. Uma é a cruz antiga da cabine, a outra é o anel novo da
+metralhadora, que ainda traz o alcance escrito embaixo.
+
+Com a metralhadora na mão, agora só existe o anel. Com o míssil e com a nuclear,
+que não têm anel, a cruz continua: é ela que diz onde é o meio.
+
+### E o teto do vidro estava aberto
+
+A prova de contar pixels no meio do vidro achou algo pior de tabela: na cabine,
+com a cabeça a 15°, o anel **sumia**. Ele não sumia — estava sendo desenhado
+140 px adiante do lugar.
+
+O `presoNaTela()` que fecha o vidro depois das réguas do motor tinha caído no
+lugar errado do arquivo, quarenta linhas abaixo, no meio do bloco das marcas dos
+outros aviões. Tudo o que era desenhado entre um ponto e outro saía deslocado
+duas vezes: o anel, a caixa do buscador, as marcas dos outros jogadores — tudo o
+que já vinha projetado pela câmera.
+
+Vale a lição: transformação de canvas é **estado global**, e estado global que se
+abre num lugar e se fecha em outro é uma armadilha silenciosa — nada quebra, tudo
+só aparece um pouco fora do lugar. A prova que mede *"quantos pixels verdes há
+onde eu espero"* pega isso; ler o código não pegava.

@@ -5036,16 +5036,36 @@ function desenhaHUD(){
 
        A escada de arfagem, logo abaixo, é o contrário: vem da câmera, já
        contém o giro, e por isso é desenhada na tela crua. */
-    presoNoAviao();
-    const cx = W/2, cy = H/2;
-    h2.strokeStyle = 'rgba(120,255,170,.8)'; h2.lineWidth = 2.2;
-    h2.beginPath();
-    h2.moveTo(cx - W*0.030, cy); h2.lineTo(cx - W*0.010, cy);
-    h2.moveTo(cx + W*0.010, cy); h2.lineTo(cx + W*0.030, cy);
-    h2.moveTo(cx, cy - H*0.026); h2.lineTo(cx, cy - H*0.009);
-    h2.stroke();
-    h2.beginPath(); h2.arc(cx, cy, Math.max(4, H*0.010), 0, 7); h2.stroke();
-    presoNaTela();
+    /* --- E COM A METRALHADORA ELA NÃO É DESENHADA ---------------------------
+       "Só com o olhar com a cabeça é que libera a segunda mira?"
+
+       Não libera nada — o que havia era DUPLICATA, e a pergunta a desenterrou.
+       Medido, na cabine:
+
+           olhar desligado    cruz em 450, anel em 450   ->  0 px de distância
+           olhar ligado a  0° cruz em 450, anel em 450   ->  0 px
+           olhar ligado a 15° cruz em 590, anel em 590   ->  0 px
+
+       Sempre no mesmo pixel, e não é coincidência: as duas marcam a mesma
+       coisa — para onde o nariz aponta. Uma é a cruz antiga da cabine, a
+       outra é o anel da metralhadora, que ainda por cima traz o alcance
+       escrito embaixo.
+
+       Então com a metralhadora na mão só existe o anel. Com o míssil e com a
+       nuclear, que não têm anel, a cruz continua: é ela que diz onde é o
+       meio. */
+    if (arma !== 'metralha'){
+      presoNoAviao();
+      const cx = W/2, cy = H/2;
+      h2.strokeStyle = 'rgba(120,255,170,.8)'; h2.lineWidth = 2.2;
+      h2.beginPath();
+      h2.moveTo(cx - W*0.030, cy); h2.lineTo(cx - W*0.010, cy);
+      h2.moveTo(cx + W*0.010, cy); h2.lineTo(cx + W*0.030, cy);
+      h2.moveTo(cx, cy - H*0.026); h2.lineTo(cx, cy - H*0.009);
+      h2.stroke();
+      h2.beginPath(); h2.arc(cx, cy, Math.max(4, H*0.010), 0, 7); h2.stroke();
+      presoNaTela();
+    }
     /* ---------------------------------------------------------------------
        A ESCADA DE ARFAGEM tem de ficar PARALELA AO HORIZONTE.
 
@@ -5134,6 +5154,7 @@ function desenhaHUD(){
     };
     regua(turbinando ? 'PWR  MAX' : 'PWR  ' + Math.round(motor*100), turbinando ? 1 : motor, turbinando, 0);
     regua('NIT  ' + Math.round(nitroCarga), nitroCarga/100, nitroBotao && nitroCarga > 0, 1);
+    presoNaTela();      // fecha o vidro AQUI: o que vem depois já vem projetado
 
   }
 
@@ -5177,7 +5198,6 @@ function desenhaHUD(){
       h2.font = '700 ' + Math.max(8, H*0.014).toFixed(0) + 'px system-ui, sans-serif';
       h2.fillText(o.nome + '  ' + Math.round(d/METRO) + 'm', x, y - r - 5);
     }
-    presoNaTela();
     h2.textAlign = 'left';
   }
 
