@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Corrida da Vitória</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nothing+You+Could+Do&family=Outfit:wght@400;600;700&display=swap">
+<style>
+  :root{
+    --papel:#FDFCF8; --tinta:#18181C; --ceu:#CFE7F2; --vermelho:#DE1C1C;
+    --rosa:#E94C6A; --grama:#8FC98A; --sombra:rgba(60,55,45,.22);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; overflow:hidden; background:var(--ceu); color:var(--tinta);
+    font-family:"Outfit",system-ui,-apple-system,Segoe UI,Arial,sans-serif;
+    -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;
+    touch-action:none; overscroll-behavior:none;
+  }
+  #cena{position:fixed; inset:0; display:block; width:100%; height:100%}
+
+  /* ---------- HUD ---------- */
+  #hud{
+    position:fixed; inset:0; pointer-events:none;
+    padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right))
+            max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
+    display:flex; flex-direction:column; gap:10px; opacity:0; transition:opacity .3s;
+  }
+  #hud.ativo{opacity:1}
+  .linha{display:flex; align-items:flex-start; justify-content:space-between; gap:10px}
+  .pilula{
+    background:var(--papel); border:2px solid var(--tinta); border-radius:999px;
+    padding:7px 15px; display:flex; align-items:center; gap:9px;
+    box-shadow:0 3px 0 var(--tinta); font-weight:700; font-size:clamp(15px,4.2vw,19px);
+    font-variant-numeric:tabular-nums;
+  }
+  .pilula small{font-weight:600; font-size:.72em; opacity:.55; letter-spacing:.04em; text-transform:uppercase}
+  #vidas{display:flex; gap:5px}
+  #vidas span{width:19px; height:19px; display:block; transition:transform .2s, opacity .2s}
+  #vidas span.perdida{opacity:.18; transform:scale(.7)}
+  #som{
+    pointer-events:auto; cursor:pointer; background:var(--papel); border:2px solid var(--tinta);
+    border-radius:999px; width:44px; height:44px; font-size:19px; line-height:1;
+    box-shadow:0 3px 0 var(--tinta); color:var(--tinta);
+  }
+  #som:active{transform:translateY(3px); box-shadow:none}
+  #aviso{
+    align-self:center; margin-top:auto; margin-bottom:6px; background:var(--papel);
+    border:2px dashed var(--tinta); border-radius:14px; padding:7px 14px;
+    font-size:14px; font-weight:600; opacity:.9; text-align:center; max-width:min(92vw,420px);
+  }
+  #aviso:empty{display:none}
+
+  /* ---------- telas (folha de papel) ---------- */
+  .tela{
+    position:fixed; inset:0; display:none; padding:20px;
+    background:linear-gradient(180deg,rgba(207,231,242,.25) 0%,rgba(207,231,242,.66) 45%,rgba(207,231,242,.86) 100%);
+  }
+  .tela.on{display:flex; flex-direction:column; align-items:center; overflow-y:auto}
+  .folha{
+    margin-top:auto; margin-bottom:min(6vh,48px); flex:0 0 auto;
+    background:var(--papel); border-radius:20px; box-shadow:0 14px 34px var(--sombra);
+    padding:clamp(24px,6vw,38px) clamp(20px,6vw,40px); text-align:center;
+    width:min(94vw,430px); display:flex; flex-direction:column; align-items:center; gap:16px;
+    border:1px solid rgba(24,24,28,.08);
+  }
+  h1{
+    font-family:"Nothing You Could Do",cursive; font-weight:400; margin:0;
+    font-size:clamp(34px,10vw,50px); line-height:1.08; text-wrap:balance;
+  }
+  h2{
+    font-family:"Nothing You Could Do",cursive; font-weight:400; margin:0;
+    font-size:clamp(28px,8vw,40px); line-height:1.1;
+  }
+  .instr{margin:0; font-size:clamp(14px,3.9vw,16px); line-height:1.55; color:#4a4852; text-wrap:balance}
+  .instr b{color:var(--tinta)}
+  .chaves{display:flex; flex-direction:column; gap:9px; width:100%; margin:2px 0}
+  .chave{display:flex; align-items:center; gap:11px; text-align:left; font-size:clamp(13px,3.6vw,15px); line-height:1.35}
+  .icone{
+    flex:0 0 auto; width:38px; height:38px; border:2px solid var(--tinta); border-radius:11px;
+    display:grid; place-items:center; font-size:19px; background:#fff;
+  }
+  button.jogar{
+    pointer-events:auto; cursor:pointer; font-family:"Outfit",sans-serif; font-weight:700;
+    font-size:clamp(17px,4.6vw,20px); color:var(--papel); background:var(--rosa);
+    border:2px solid var(--tinta); border-radius:999px; padding:14px 40px;
+    box-shadow:0 5px 0 var(--tinta); transition:transform .08s, box-shadow .08s;
+  }
+  button.jogar:active{transform:translateY(5px); box-shadow:0 0 0 var(--tinta)}
+  button.jogar:focus-visible{outline:3px solid var(--vermelho); outline-offset:3px}
+  .placar{display:flex; gap:26px; justify-content:center; font-variant-numeric:tabular-nums}
+  .placar div{display:flex; flex-direction:column; gap:1px}
+  .placar strong{font-size:clamp(26px,7.5vw,34px); line-height:1}
+  .placar span{font-size:11px; text-transform:uppercase; letter-spacing:.09em; opacity:.55; font-weight:600}
+  .rodape{font-size:12.5px; opacity:.6; margin:0}
+  #recordeNovo{color:var(--rosa); font-weight:700; font-size:14px; margin:0}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="cena"></canvas>
+
+<div id="hud">
+  <div class="linha">
+    <div class="pilula"><span id="vidas"></span></div>
+    <div class="pilula"><small>corações</small><span id="corac">0</span></div>
+  </div>
+  <div class="linha">
+    <button id="som" type="button" aria-label="Ligar ou desligar o som">🔊</button>
+    <div class="pilula"><small>metros</small><span id="dist">0</span></div>
+  </div>
+  <p id="aviso"></p>
+</div>
+
+<div class="tela on" id="telaInicio">
+  <div class="folha">
+    <h1>Corrida da Vitória</h1>
+    <p class="instr">O desenho da Vitória saiu do papel e foi correr.<br>Pegue os corações e desvie dos blocos vermelhos.</p>
+    <div class="chaves">
+      <div class="chave"><span class="icone">📱</span><span><b>Incline o celular</b> para os lados para desviar</span></div>
+      <div class="chave"><span class="icone">👆</span><span><b>Toque na tela</b> para pular</span></div>
+      <div class="chave"><span class="icone">⌨️</span><span>No computador: <b>← →</b> para desviar e <b>espaço</b> para pular</span></div>
+    </div>
+    <button class="jogar" id="btnComecar" type="button">Começar</button>
+    <p class="rodape">Melhor até agora: <b id="recordeInicio">0 m</b></p>
+  </div>
+</div>
+
+<div class="tela" id="telaFim">
+  <div class="folha">
+    <h2 id="tituloFim">Fim de jogo</h2>
+    <div class="placar">
+      <div><strong id="fimDist">0</strong><span>metros</span></div>
+      <div><strong id="fimCorac">0</strong><span>corações</span></div>
+    </div>
+    <p id="recordeNovo"></p>
+    <button class="jogar" id="btnDeNovo" type="button">Jogar de novo</button>
+    <p class="rodape">Recorde: <b id="recordeFim">0 m</b></p>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------------------
+   Corrida da Vitória — endless runner 3D feito a partir do desenho da Vitória.
+   Mundo em "papel": tudo branco com traço preto, como no desenho original.
+--------------------------------------------------------------------------- */
+(function () {
+  "use strict";
+
+  var FONTES = [
+    "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+    "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js",
+    "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"
+  ];
+
+  function carregarThree(i) {
+    if (window.THREE) { iniciar(); return; }
+    if (i >= FONTES.length) {
+      document.getElementById("telaInicio").querySelector(".instr").textContent =
+        "Não consegui carregar o motor 3D. Verifique a conexão e recarregue a página.";
+      return;
+    }
+    var s = document.createElement("script");
+    s.src = FONTES[i];
+    s.onload = function () { iniciar(); };
+    s.onerror = function () { carregarThree(i + 1); };
+    document.head.appendChild(s);
+  }
+
+  /* ============================ constantes ============================ */
+  var COR = {
+    papel: 0xFDFCF8, tinta: 0x18181C, ceu: 0xCFE7F2, ceuBaixo: 0xFDF3E3,
+    vermelho: 0xDE1C1C, grama: 0x8FC98A, gramaEsc: 0x7BB878, tronco: 0xB98A5E,
+    mola: 0xF7C948
+  };
+  var CORACOES = [0xE94C6A, 0xF79A3C, 0x5EB0D6, 0x7EC474, 0xC476D0];
+
+  var PISTA = 4.6;          // meia largura da pista
+  var LIMITE = 3.95;        // até onde a personagem pode ir
+  var FAIXAS = [-3, 0, 3];
+  var GRAV = 34;
+  var PULO = 12.6;
+  var MOLA = 20.5;
+  var VEL0 = 15, VELMAX = 30, ACEL = 0.3;
+  var LATERAL = 9.5;
+  var ESPELHO = -1;          // a camera olha para +Z, entao a tela espelha o eixo X
+  var VISTA = 165;
+
+  /* ============================== estado ============================== */
+  var cena, camera, render3d, relogio;
+  var heroi, sombra, pernaE, pernaD, bracoE, bracoD, corpoTodo;
+  var chaos = [], decors = [], obstaculos = [], coracoes = [], molas = [];
+  var jogador = { x: 0, y: 0, vx: 0, vy: 0, z: 0, giro: 0, girando: false, passo: 0 };
+  var estado = "menu";      // menu | jogando | fim
+  var vel = VEL0, dist = 0, pontos = 0, vidas = 3;
+  var invencivel = 0, tremor = 0, proxZ = 0, tempo = 0;
+  var inclinacao = 0, neutro = null, temSensor = false;
+  var toqueAtivo = false, toqueX = 0, toqueMoveu = false, alvoToque = null;
+  var teclas = { esq: false, dir: false };
+  var recorde = 0;
+
+  var el = {
+    hud: document.getElementById("hud"),
+    vidas: document.getElementById("vidas"),
+    corac: document.getElementById("corac"),
+    dist: document.getElementById("dist"),
+    aviso: document.getElementById("aviso"),
+    som: document.getElementById("som"),
+    inicio: document.getElementById("telaInicio"),
+    fim: document.getElementById("telaFim"),
+    fimDist: document.getElementById("fimDist"),
+    fimCorac: document.getElementById("fimCorac"),
+    tituloFim: document.getElementById("tituloFim"),
+    recordeNovo: document.getElementById("recordeNovo"),
+    recordeInicio: document.getElementById("recordeInicio"),
+    recordeFim: document.getElementById("recordeFim")
+  };
+
+  /* =============================== som =============================== */
+  var Som = (function () {
+    var ctx = null, master = null, mudo = false, tocando = false, proxNota = 0, passo = 0, timer = null;
+    var BPM = 132, SPB = 60 / BPM;
+    // mesma melodia da trilha do vídeo, em batidas: [batida, duração, semitom relativo a C5]
+    var MEL = [
+      [0,1,7],[1,1,4],[2,1,2],[3,1,0],[4,1,2],[5,1,4],[6,2,2],
+      [8,.5,0],[8.5,.5,4],[9,1,9],[10,1,7],[11,1,4],
+      [12,1,5],[13,1,4],[14,2,2],
+      [16,.5,4],[16.5,.5,7],[17,1,12],[18,.5,11],[18.5,.5,9],[19,1,7],
+      [20,.5,9],[20.5,.5,5],[21,1,9],[22,1,7],[23,1,5],
+      [24,.5,7],[24.5,.5,11],[25,1,14],[26,1,12],[27,1,11],
+      [28,1,12],[29,1,9],[30,.5,7],[30.5,.5,4],[31,1,7]
+    ];
+    var BAIXO = [0,-5,-3,-7,0,-7,-3,0];   // um por compasso, relativo a C3
+    var TOTAL = 32;                        // batidas do loop
+
+    function nota(semi, oitavaBase) {
+      return 523.25 * Math.pow(2, (semi + (oitavaBase || 0) * 12) / 12);
+    }
+    function ligar() {
+      if (ctx) return;
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = mudo ? 0 : 0.85;
+      master.connect(ctx.destination);
+    }
+    function sino(f, t, dur, vol) {
+      var g = ctx.createGain();
+      g.connect(master);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      [[1, 1], [2, 0.34], [3.01, 0.16], [4.2, 0.07]].forEach(function (h) {
+        var o = ctx.createOscillator();
+        o.type = "sine"; o.frequency.value = f * h[0];
+        var gg = ctx.createGain(); gg.gain.value = h[1];
+        o.connect(gg); gg.connect(g); o.start(t); o.stop(t + dur + 0.02);
+      });
+    }
+    function grave(f, t, dur) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.02);
+    }
+    function agendar() {
+      if (!ctx) return;
+      while (proxNota < ctx.currentTime + 0.35) {
+        var b = passo % TOTAL, t = proxNota;
+        MEL.forEach(function (n) {
+          if (Math.abs(n[0] - b) < 1e-6) sino(nota(n[2]), t, n[1] * SPB * 1.7, 0.17);
+        });
+        if (b % 4 === 0) grave(nota(BAIXO[(b / 4) | 0], -2), t, SPB * 1.6);
+        passo++; proxNota += SPB;
+      }
+    }
+    return {
+      ligar: ligar,
+      musica: function (v) {
+        ligar(); if (!ctx) return;
+        if (ctx.state === "suspended") ctx.resume();
+        if (v && !tocando) {
+          tocando = true; passo = 0; proxNota = ctx.currentTime + 0.1;
+          timer = setInterval(agendar, 100); agendar();
+        } else if (!v && tocando) {
+          tocando = false; clearInterval(timer);
+        }
+      },
+      mudo: function (v) { mudo = v; if (master) master.gain.value = v ? 0 : 0.85; },
+      efeito: function (tipo) {
+        if (!ctx || mudo) return;
+        var t = ctx.currentTime;
+        if (tipo === "coracao") { sino(1046.5, t, 0.22, 0.22); sino(1568, t + 0.055, 0.3, 0.18); }
+        else if (tipo === "pulo") varre(t, 320, 760, 0.16, "square", 0.12);
+        else if (tipo === "mola") varre(t, 260, 1300, 0.3, "square", 0.15);
+        else if (tipo === "batida") varre(t, 380, 70, 0.35, "sawtooth", 0.2);
+        else if (tipo === "fim") { sino(523.25, t, .5, .2); sino(415.3, t + .18, .5, .2); sino(349.23, t + .36, 1.1, .22); }
+      }
+    };
+    function varre(t, f0, f1, dur, tipo, vol) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = tipo;
+      o.frequency.setValueAtTime(f0, t);
+      o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.02);
+    }
+  })();
+
+  /* ========================= peças do cenário ========================= */
+  function matPapel(cor) { return new THREE.MeshLambertMaterial({ color: cor === undefined ? COR.papel : cor }); }
+
+  function comTraco(malha, cor) {
+    var linhas = new THREE.LineSegments(
+      new THREE.EdgesGeometry(malha.geometry, 25),
+      new THREE.LineBasicMaterial({ color: cor === undefined ? COR.tinta : cor })
+    );
+    malha.add(linhas);
+    return malha;
+  }
+
+  function contorno(malha, esp) {
+    var casca = new THREE.Mesh(
+      malha.geometry,
+      new THREE.MeshBasicMaterial({ color: COR.tinta, side: THREE.BackSide })
+    );
+    casca.scale.setScalar(esp || 1.06);
+    malha.add(casca);
+    return malha;
+  }
+
+  function peca(geo, cor, x, y, z, tracado) {
+    var m = new THREE.Mesh(geo, matPapel(cor));
+    m.position.set(x || 0, y || 0, z || 0);
+    if (tracado !== false) comTraco(m);
+    return m;
+  }
+
+  function geoCoracao() {
+    var s = new THREE.Shape();
+    s.moveTo(0, -0.52);
+    s.bezierCurveTo(0.62, -0.08, 0.56, 0.48, 0.2, 0.48);
+    s.quadraticCurveTo(0.06, 0.48, 0, 0.3);
+    s.quadraticCurveTo(-0.06, 0.48, -0.2, 0.48);
+    s.bezierCurveTo(-0.56, 0.48, -0.62, -0.08, 0, -0.52);
+    var g = new THREE.ExtrudeGeometry(s, { depth: 0.2, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, bevelSegments: 2, curveSegments: 14 });
+    g.center();
+    return g;
+  }
+  var GEO_CORACAO = null;
+
+  /* ===================== a Vitória (do desenho) ====================== */
+  function criarHeroi() {
+    var g = new THREE.Group();
+    corpoTodo = new THREE.Group();
+    g.add(corpoTodo);
+
+    // corpo (o retângulo do desenho)
+    corpoTodo.add(peca(new THREE.BoxGeometry(0.95, 1.15, 0.55), COR.papel, 0, 1.32, 0));
+    // saia (o triângulo)
+    var saia = peca(new THREE.ConeGeometry(0.78, 0.85, 20), COR.papel, 0, 0.92, 0);
+    corpoTodo.add(saia);
+    // cabeça (o círculo) + olhinhos quadrados
+    var cabeca = peca(new THREE.SphereGeometry(0.52, 18, 14), COR.papel, 0, 2.32, 0, false);
+    contorno(cabeca, 1.09);
+    cabeca.scale.set(1, 0.94, 0.9);
+    corpoTodo.add(cabeca);
+    var olho = new THREE.BoxGeometry(0.12, 0.14, 0.06);
+    var matOlho = new THREE.MeshLambertMaterial({ color: COR.tinta });
+    var oE = new THREE.Mesh(olho, matOlho); oE.position.set(-0.17, 2.33, 0.47); corpoTodo.add(oE);
+    var oD = new THREE.Mesh(olho, matOlho); oD.position.set(0.17, 2.33, 0.47); corpoTodo.add(oD);
+    // chapéu: aba redonda + triângulo vermelho
+    corpoTodo.add(peca(new THREE.CylinderGeometry(0.76, 0.76, 0.12, 22), COR.papel, 0, 2.72, 0));
+    corpoTodo.add(peca(new THREE.ConeGeometry(0.5, 0.62, 20), COR.vermelho, 0, 3.08, 0));
+    // braços (pivô no ombro)
+    bracoE = new THREE.Group(); bracoE.position.set(-0.52, 1.72, 0); corpoTodo.add(bracoE);
+    bracoD = new THREE.Group(); bracoD.position.set(0.52, 1.72, 0); corpoTodo.add(bracoD);
+    [bracoE, bracoD].forEach(function (b, i) {
+      var braco = peca(new THREE.CylinderGeometry(0.14, 0.13, 0.72, 10), COR.papel, 0, -0.34, 0);
+      b.add(braco);
+      b.add(contorno(peca(new THREE.SphereGeometry(0.15, 10, 8), COR.papel, 0, -0.7, 0, false), 1.14));
+      b.rotation.z = i === 0 ? 0.25 : -0.25;
+    });
+    // pernas (pivô no quadril)
+    pernaE = new THREE.Group(); pernaE.position.set(-0.24, 0.78, 0); corpoTodo.add(pernaE);
+    pernaD = new THREE.Group(); pernaD.position.set(0.24, 0.78, 0); corpoTodo.add(pernaD);
+    [pernaE, pernaD].forEach(function (p) {
+      p.add(peca(new THREE.CylinderGeometry(0.15, 0.14, 0.68, 10), COR.papel, 0, -0.34, 0));
+      p.add(contorno(peca(new THREE.SphereGeometry(0.16, 10, 8), COR.papel, 0, -0.68, 0.04, false), 1.13));
+    });
+
+    // sombrinha no chão
+    sombra = new THREE.Mesh(
+      new THREE.CircleGeometry(0.62, 20),
+      new THREE.MeshBasicMaterial({ color: 0x2a2a30, transparent: true, opacity: 0.2 })
+    );
+    sombra.rotation.x = -Math.PI / 2;
+    sombra.position.y = 0.02;
+    g.add(sombra);
+
+    cena.add(g);
+    return g;
+  }
+
+  /* ========================== chão e enfeites ========================= */
+  var CHAO_LEN = 30, N_CHAOS = 8;
+
+  function criarChao() {
+    var g = new THREE.Group();
+    var pista = new THREE.Mesh(new THREE.PlaneGeometry(PISTA * 2, CHAO_LEN), matPapel(COR.papel));
+    pista.rotation.x = -Math.PI / 2;
+    g.add(pista);
+    [-1, 1].forEach(function (s) {
+      var grama = new THREE.Mesh(new THREE.PlaneGeometry(34, CHAO_LEN), matPapel(COR.grama));
+      grama.rotation.x = -Math.PI / 2;
+      grama.position.set(s * (PISTA + 17), -0.06, 0);
+      g.add(grama);
+      var borda = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, CHAO_LEN), new THREE.MeshBasicMaterial({ color: COR.tinta }));
+      borda.position.set(s * PISTA, 0.05, 0);
+      g.add(borda);
+    });
+    // tracinhos do meio da pista
+    for (var i = 0; i < 5; i++) {
+      [-1.5, 1.5].forEach(function (x) {
+        var t = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 2.4), new THREE.MeshBasicMaterial({ color: 0xCFCEC8 }));
+        t.rotation.x = -Math.PI / 2;
+        t.position.set(x, 0.02, -CHAO_LEN / 2 + 3 + i * 6);
+        g.add(t);
+      });
+    }
+    cena.add(g);
+    return g;
+  }
+
+  function criarArvore() {
+    var g = new THREE.Group();
+    g.add(peca(new THREE.CylinderGeometry(0.2, 0.26, 1.5, 8), COR.tronco, 0, 0.75, 0));
+    g.add(peca(new THREE.ConeGeometry(1.05, 2.1, 12), COR.gramaEsc, 0, 2.35, 0));
+    g.add(peca(new THREE.ConeGeometry(0.8, 1.6, 12), COR.grama, 0, 3.2, 0));
+    cena.add(g);
+    return g;
+  }
+
+  function criarNuvem() {
+    var g = new THREE.Group();
+    var mat = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+    [[0, 0, 0, 1.5], [1.5, -0.3, 0.2, 1.1], [-1.4, -0.25, -0.2, 1.2], [0.5, 0.55, 0.1, 1]].forEach(function (b) {
+      var m = new THREE.Mesh(new THREE.SphereGeometry(b[3], 10, 8), mat);
+      m.position.set(b[0], b[1], b[2]);
+      g.add(m);
+    });
+    cena.add(g);
+    return g;
+  }
+
+  /* ============================ montagem ============================= */
+  function iniciar() {
+    var canvas = document.getElementById("cena");
+    render3d = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    render3d.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    render3d.setSize(window.innerWidth, window.innerHeight);
+
+    cena = new THREE.Scene();
+    cena.background = ceuGradiente();
+    cena.fog = new THREE.Fog(0xDDEEF6, 55, VISTA);
+
+    camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 400);
+    camera.position.set(0, 4.85, -10.2);
+
+    cena.add(new THREE.HemisphereLight(0xFFFFFF, 0xBFD9C8, 0.95));
+    var sol = new THREE.DirectionalLight(0xFFF6E2, 0.65);
+    sol.position.set(-8, 16, -6);
+    cena.add(sol);
+
+    GEO_CORACAO = geoCoracao();
+    relogio = new THREE.Clock();
+    heroi = criarHeroi();
+
+    for (var i = 0; i < N_CHAOS; i++) chaos.push(criarChao());
+    for (var j = 0; j < 16; j++) { var a = criarArvore(); a.visible = false; decors.push({ obj: a, tipo: "arvore" }); }
+    for (var k = 0; k < 8; k++) { var n = criarNuvem(); n.visible = false; decors.push({ obj: n, tipo: "nuvem" }); }
+
+    for (var o = 0; o < 34; o++) {
+      var bloco = contorno(peca(new THREE.BoxGeometry(1.7, 1.15, 1.1), COR.vermelho, 0, 0.58, 0), 1.05);
+      bloco.visible = false; cena.add(bloco);
+      obstaculos.push({ obj: bloco, ativo: false });
+    }
+    for (var c = 0; c < 90; c++) {
+      var cm = new THREE.Mesh(GEO_CORACAO, new THREE.MeshLambertMaterial({ color: CORACOES[c % CORACOES.length] }));
+      cm.scale.setScalar(0.85);
+      cm.visible = false; cena.add(cm);
+      coracoes.push({ obj: cm, ativo: false });
+    }
+    for (var m = 0; m < 8; m++) {
+      var mola = peca(new THREE.CylinderGeometry(0.75, 0.85, 0.3, 16), COR.mola, 0, 0.16, 0);
+      mola.visible = false; cena.add(mola);
+      molas.push({ obj: mola, ativo: false });
+    }
+
+    try { recorde = parseInt(localStorage.getItem("vitoria.recorde") || "0", 10) || 0; } catch (e) { recorde = 0; }
+    el.recordeInicio.textContent = recorde + " m";
+    el.recordeFim.textContent = recorde + " m";
+
+    ligarControles();
+    window.addEventListener("resize", aoRedimensionar);
+    prepararMundo();
+    requestAnimationFrame(quadro);
+  }
+
+  function ceuGradiente() {
+    var c = document.createElement("canvas");
+    c.width = 4; c.height = 256;
+    var g = c.getContext("2d");
+    var grd = g.createLinearGradient(0, 0, 0, 256);
+    grd.addColorStop(0, "#BEDFF0");
+    grd.addColorStop(0.55, "#DDEEF6");
+    grd.addColorStop(1, "#FDF3E3");
+    g.fillStyle = grd; g.fillRect(0, 0, 4, 256);
+    return new THREE.CanvasTexture(c);
+  }
+
+  function aoRedimensionar() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    render3d.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  /* ======================= geração do caminho ======================== */
+  function livre(lista) { for (var i = 0; i < lista.length; i++) if (!lista[i].ativo) return lista[i]; return null; }
+
+  function porObstaculo(x, z) {
+    var o = livre(obstaculos); if (!o) return;
+    o.ativo = true; o.obj.visible = true; o.obj.position.set(x, 0.58, z);
+  }
+  function porCoracao(x, y, z) {
+    var c = livre(coracoes); if (!c) return;
+    c.ativo = true; c.obj.visible = true; c.obj.position.set(x, y, z);
+    c.obj.rotation.set(0, Math.random() * 6.28, 0);
+  }
+  function porMola(x, z) {
+    var m = livre(molas); if (!m) return;
+    m.ativo = true; m.obj.visible = true; m.obj.position.set(x, 0.16, z);
+  }
+
+  function gerarTrecho(z) {
+    var dif = Math.min(1, dist / 900);                 // 0 → 1 conforme avança
+    var r = Math.random();
+    var faixa = FAIXAS[(Math.random() * 3) | 0];
+
+    if (r < 0.12 + dif * 0.05) {                        // mola + corações no ar
+      porMola(faixa, z);
+      for (var a = 0; a < 6; a++) porCoracao(faixa, 1.4 + Math.sin(a / 5 * Math.PI) * 3.4, z + 4 + a * 2.6);
+      return 26;
+    }
+    if (r < 0.5 + dif * 0.22) {                         // blocos para desviar
+      var quantos = Math.random() < 0.35 + dif * 0.3 ? 2 : 1;
+      var usadas = [];
+      for (var i = 0; i < quantos; i++) {
+        var f;
+        do { f = (Math.random() * 3) | 0; } while (usadas.indexOf(f) >= 0);
+        usadas.push(f);
+        porObstaculo(FAIXAS[f], z);
+      }
+      var sobra = [0, 1, 2].filter(function (f2) { return usadas.indexOf(f2) < 0; });
+      var facil = FAIXAS[sobra[(Math.random() * sobra.length) | 0]];
+      for (var h = 0; h < 3; h++) porCoracao(facil, 1.1, z + 3 + h * 2.2);
+      return 14 - dif * 3;
+    }
+    if (r < 0.86) {                                     // fileira de corações
+      var n = 5 + ((Math.random() * 3) | 0);
+      for (var k = 0; k < n; k++) porCoracao(faixa, 1.1, z + k * 2.3);
+      return 12 + n * 2.3;
+    }
+    return 11;                                          // respiro
+  }
+
+  function limparMundo() {
+    [obstaculos, coracoes, molas].forEach(function (lista) {
+      lista.forEach(function (it) { it.ativo = false; it.obj.visible = false; });
+    });
+    decors.forEach(function (d) { d.obj.visible = false; });
+  }
+
+  function prepararMundo() {
+    limparMundo();
+    chaos.forEach(function (c, i) { c.position.z = i * CHAO_LEN - CHAO_LEN; });
+    decors.forEach(function (d, i) {
+      d.obj.visible = true;
+      reposicionarDecor(d, (i / decors.length) * VISTA);
+    });
+    proxZ = 40;
+    while (proxZ < VISTA) proxZ += gerarTrecho(proxZ);
+  }
+
+  function reposicionarDecor(d, z) {
+    var lado = Math.random() < 0.5 ? -1 : 1;
+    if (d.tipo === "arvore") {
+      var e = 0.7 + Math.random() * 0.7;
+      d.obj.scale.set(e, e, e);
+      d.obj.position.set(lado * (PISTA + 2.5 + Math.random() * 13), 0, z);
+      d.obj.rotation.y = Math.random() * 6.28;
+    } else {
+      var e2 = 0.9 + Math.random() * 1.1;
+      d.obj.scale.set(e2, e2, e2);
+      d.obj.position.set(lado * (6 + Math.random() * 22), 11 + Math.random() * 8, z);
+    }
+  }
+
+  /* ============================ controles ============================ */
+  function ligarControles() {
+    window.addEventListener("keydown", function (e) {
+      if (e.code === "ArrowLeft" || e.code === "KeyA") teclas.esq = true;
+      if (e.code === "ArrowRight" || e.code === "KeyD") teclas.dir = true;
+      if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") { pular(); e.preventDefault(); }
+      if (e.code === "Enter" && estado !== "jogando") comecar();
+    });
+    window.addEventListener("keyup", function (e) {
+      if (e.code === "ArrowLeft" || e.code === "KeyA") teclas.esq = false;
+      if (e.code === "ArrowRight" || e.code === "KeyD") teclas.dir = false;
+    });
+
+    var canvas = document.getElementById("cena");
+    canvas.addEventListener("pointerdown", function (e) {
+      toqueAtivo = true; toqueMoveu = false; toqueX = e.clientX;
+      if (!temSensor) alvoToque = jogador.x;
+      canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
+    });
+    canvas.addEventListener("pointermove", function (e) {
+      if (!toqueAtivo) return;
+      var d = e.clientX - toqueX;
+      if (Math.abs(d) > 12) toqueMoveu = true;
+      if (!temSensor && toqueMoveu && alvoToque !== null) {
+        alvoToque = clamp(alvoToque + ESPELHO * d / (window.innerWidth * 0.13), -LIMITE, LIMITE);
+      }
+      toqueX = e.clientX;
+    });
+    canvas.addEventListener("pointerup", function () {
+      if (toqueAtivo && !toqueMoveu) pular();
+      toqueAtivo = false;
+      alvoToque = null;
+    });
+    canvas.addEventListener("pointercancel", function () { toqueAtivo = false; });
+
+    document.getElementById("btnComecar").addEventListener("click", pedirSensorEComecar);
+    document.getElementById("btnDeNovo").addEventListener("click", comecar);
+    el.som.addEventListener("click", function () {
+      var mudo = el.som.textContent === "🔊";
+      Som.mudo(mudo);
+      el.som.textContent = mudo ? "🔇" : "🔊";
+      try { localStorage.setItem("vitoria.mudo", mudo ? "1" : "0"); } catch (e) {}
+    });
+    try {
+      if (localStorage.getItem("vitoria.mudo") === "1") { Som.mudo(true); el.som.textContent = "🔇"; }
+    } catch (e) {}
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden && estado === "jogando") Som.musica(false);
+      else if (!document.hidden && estado === "jogando") Som.musica(true);
+    });
+  }
+
+  function aoInclinar(e) {
+    if (e.gamma === null || e.gamma === undefined) return;
+    var ang = 0;
+    if (window.screen && screen.orientation && typeof screen.orientation.angle === "number") ang = screen.orientation.angle;
+    else if (typeof window.orientation === "number") ang = window.orientation;
+    var t;
+    if (ang === 90) t = -e.beta;
+    else if (ang === 270 || ang === -90) t = e.beta;
+    else if (ang === 180) t = -e.gamma;
+    else t = e.gamma;
+    if (neutro === null) neutro = t;
+    inclinacao = t - neutro;
+    temSensor = true;
+  }
+
+  function pedirSensorEComecar() {
+    Som.ligar();                      // o AudioContext precisa nascer no toque (iOS)
+    var D = window.DeviceOrientationEvent;
+    if (D && typeof D.requestPermission === "function") {
+      D.requestPermission().then(function (r) {
+        if (r === "granted") window.addEventListener("deviceorientation", aoInclinar);
+        comecar();
+      }).catch(function () { comecar(); });
+    } else {
+      if (D) window.addEventListener("deviceorientation", aoInclinar);
+      comecar();
+    }
+  }
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  /* =========================== fluxo do jogo ========================= */
+  function comecar() {
+    estado = "jogando";
+    vel = VEL0; dist = 0; pontos = 0; vidas = 3; invencivel = 0; tremor = 0; tempo = 0;
+    jogador.x = 0; jogador.y = 0; jogador.vx = 0; jogador.vy = 0; jogador.z = 0;
+    jogador.giro = 0; jogador.girando = false; jogador.passo = 0;
+    neutro = null; inclinacao = 0; alvoToque = null;
+    heroi.position.set(0, 0, 0);
+    camera.position.set(0, 4.85, -10.2);
+    prepararMundo();
+    atualizarVidas(); atualizarHud();
+    el.inicio.classList.remove("on");
+    el.fim.classList.remove("on");
+    el.hud.classList.add("ativo");
+    el.aviso.textContent = temSensor ? "" : "Incline o celular ou arraste o dedo para os lados";
+    setTimeout(function () { if (estado === "jogando") el.aviso.textContent = ""; }, 4200);
+    Som.ligar(); Som.musica(true);
+  }
+
+  function terminar() {
+    estado = "fim";
+    Som.musica(false); Som.efeito("fim");
+    var m = Math.floor(dist);
+    el.fimDist.textContent = m;
+    el.fimCorac.textContent = pontos;
+    var novo = m > recorde;
+    if (novo) {
+      recorde = m;
+      try { localStorage.setItem("vitoria.recorde", String(m)); } catch (e) {}
+    }
+    el.tituloFim.textContent = novo ? "Novo recorde!" : "Fim de jogo";
+    el.recordeNovo.textContent = novo ? "A Vitória nunca correu tanto!" : "";
+    el.recordeInicio.textContent = recorde + " m";
+    el.recordeFim.textContent = recorde + " m";
+    el.hud.classList.remove("ativo");
+    el.fim.classList.add("on");
+  }
+
+  function pular() {
+    if (estado !== "jogando") return;
+    if (jogador.y <= 0.01) {
+      jogador.vy = PULO;
+      jogador.girando = true; jogador.giro = 0;
+      Som.efeito("pulo");
+    }
+  }
+
+  function perderVida() {
+    vidas--;
+    invencivel = 1.5;
+    tremor = 0.5;
+    vel = Math.max(VEL0, vel - 5);
+    Som.efeito("batida");
+    atualizarVidas();
+    if (vidas <= 0) terminar();
+  }
+
+  function atualizarVidas() {
+    var h = "";
+    for (var i = 0; i < 3; i++) {
+      h += '<span class="' + (i < vidas ? "" : "perdida") + '">' +
+        '<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">' +
+        '<path d="M12 21S3.5 14.6 3.5 8.9A4.9 4.9 0 0 1 12 5.9a4.9 4.9 0 0 1 8.5 3c0 5.7-8.5 12.1-8.5 12.1z" fill="#E94C6A"/></svg></span>';
+    }
+    el.vidas.innerHTML = h;
+    el.vidas.setAttribute("aria-label", vidas + " vidas");
+  }
+
+  var ultCorac = -1, ultDist = -1;
+  function atualizarHud() {
+    if (pontos !== ultCorac) { el.corac.textContent = pontos; ultCorac = pontos; }
+    var m = Math.floor(dist);
+    if (m !== ultDist) { el.dist.textContent = m; ultDist = m; }
+  }
+
+  /* ============================== quadro ============================= */
+  function quadro() {
+    requestAnimationFrame(quadro);
+    var dt = Math.min(relogio.getDelta(), 0.05);
+    if (estado === "jogando") passo(dt);
+    else ocioso(dt);
+    render3d.render(cena, camera);
+  }
+
+  function ocioso(dt) {
+    tempo = (tempo || 0) + dt;
+    heroi.rotation.y = Math.sin(tempo * 0.8) * 0.5;
+    heroi.position.y = Math.abs(Math.sin(tempo * 2.2)) * 0.12;
+    sombra.position.y = 0.02 - heroi.position.y;
+    animarCorrida(dt, 6);
+    camera.position.set(Math.sin(tempo * 0.25) * 1.2, 4.2, -11);
+    camera.lookAt(0, -1.5, 1);
+  }
+
+  function passo(dt) {
+    tempo += dt;
+    vel = Math.min(VELMAX, vel + ACEL * dt);
+
+    // ---- direção: sensor, dedo ou teclado
+    var alvoVx = 0;
+    if (temSensor && alvoToque === null) {
+      var t = clamp(inclinacao, -26, 26);
+      if (Math.abs(t) < 2.5) t = 0;
+      alvoVx = ESPELHO * clamp(t / 20, -1, 1) * LATERAL;
+    }
+    if (teclas.esq) alvoVx = -ESPELHO * LATERAL;
+    if (teclas.dir) alvoVx = ESPELHO * LATERAL;
+    if (alvoToque !== null) alvoVx = clamp((alvoToque - jogador.x) * 7, -LATERAL, LATERAL);
+    jogador.vx += (alvoVx - jogador.vx) * Math.min(1, dt * 11);
+    jogador.x = clamp(jogador.x + jogador.vx * dt, -LIMITE, LIMITE);
+
+    // ---- pulo
+    jogador.vy -= GRAV * dt;
+    jogador.y += jogador.vy * dt;
+    if (jogador.y <= 0) { jogador.y = 0; jogador.vy = 0; jogador.girando = false; jogador.giro = 0; }
+
+    // ---- avanço
+    var avanco = vel * dt;
+    jogador.z += avanco;
+    dist += avanco * 0.7;
+    if (invencivel > 0) invencivel -= dt;
+    if (tremor > 0) tremor -= dt;
+
+    heroi.position.set(jogador.x, jogador.y, jogador.z);
+    heroi.rotation.y = jogador.vx * 0.045;
+    heroi.rotation.z = -jogador.vx * 0.02;
+    if (jogador.girando) {           // pirueta: a silhueta do desenho continua legivel
+      jogador.giro = Math.min(Math.PI * 2, jogador.giro + dt * 8.5);
+      corpoTodo.rotation.y = jogador.giro;
+      corpoTodo.rotation.x = Math.sin(jogador.giro) * 0.18;
+      if (jogador.giro >= Math.PI * 2) { jogador.girando = false; jogador.giro = 0; }
+    } else {
+      corpoTodo.rotation.y += (0 - corpoTodo.rotation.y) * Math.min(1, dt * 12);
+      corpoTodo.rotation.x += (0 - corpoTodo.rotation.x) * Math.min(1, dt * 12);
+    }
+    sombra.position.y = 0.02 - jogador.y;
+    sombra.scale.setScalar(clamp(1 - jogador.y * 0.11, 0.45, 1));
+    corpoTodo.visible = !(invencivel > 0 && Math.floor(tempo * 14) % 2 === 0);
+
+    animarCorrida(dt, jogador.y > 0.05 ? 0 : vel);
+    moverMundo();
+    checarColisoes();
+    posicionarCamera(dt);
+    atualizarHud();
+  }
+
+  function animarCorrida(dt, v) {
+    if (v > 0) {
+      jogador.passo += dt * v * 0.62;
+      var s = Math.sin(jogador.passo);
+      pernaE.rotation.x = s * 0.85;
+      pernaD.rotation.x = -s * 0.85;
+      bracoE.rotation.x = -s * 0.6;
+      bracoD.rotation.x = s * 0.6;
+    } else {
+      pernaE.rotation.x = -0.4; pernaD.rotation.x = 0.55;
+      bracoE.rotation.x = -1.1; bracoD.rotation.x = -1.1;
+    }
+  }
+
+  function moverMundo() {
+    var z = jogador.z;
+    chaos.forEach(function (c) {
+      if (c.position.z < z - CHAO_LEN * 1.5) c.position.z += CHAO_LEN * N_CHAOS;
+    });
+    decors.forEach(function (d) {
+      if (d.obj.position.z < z - 25) reposicionarDecor(d, z + VISTA);
+    });
+    while (proxZ < z + VISTA) proxZ += gerarTrecho(proxZ);
+
+    coracoes.forEach(function (c) {
+      if (!c.ativo) return;
+      c.obj.rotation.y += 2.6 * 0.016;
+      if (c.obj.position.z < z - 12) { c.ativo = false; c.obj.visible = false; }
+    });
+    obstaculos.forEach(function (o) {
+      if (o.ativo && o.obj.position.z < z - 12) { o.ativo = false; o.obj.visible = false; }
+    });
+    molas.forEach(function (m) {
+      if (!m.ativo) return;
+      m.obj.scale.y = 1 + Math.sin(tempo * 6 + m.obj.position.z) * 0.12;
+      if (m.obj.position.z < z - 12) { m.ativo = false; m.obj.visible = false; }
+    });
+  }
+
+  function checarColisoes() {
+    var px = jogador.x, py = jogador.y, pz = jogador.z;
+
+    coracoes.forEach(function (c) {
+      if (!c.ativo) return;
+      var p = c.obj.position;
+      if (Math.abs(p.z - pz) < 1.1 && Math.abs(p.x - px) < 1.05 && Math.abs(p.y - (py + 1.2)) < 1.5) {
+        c.ativo = false; c.obj.visible = false;
+        pontos++; Som.efeito("coracao");
+      }
+    });
+
+    molas.forEach(function (m) {
+      if (!m.ativo) return;
+      var p = m.obj.position;
+      if (Math.abs(p.z - pz) < 1.1 && Math.abs(p.x - px) < 1.0 && py < 0.7 && jogador.vy <= 0.1) {
+        jogador.vy = MOLA; jogador.girando = true; jogador.giro = 0;
+        Som.efeito("mola");
+      }
+    });
+
+    if (invencivel > 0) return;
+    for (var i = 0; i < obstaculos.length; i++) {
+      var o = obstaculos[i];
+      if (!o.ativo) continue;
+      var p = o.obj.position;
+      if (Math.abs(p.z - pz) < 1.0 && Math.abs(p.x - px) < 1.28 && py < 1.15) {
+        perderVida();
+        return;
+      }
+    }
+  }
+
+  function posicionarCamera(dt) {
+    var alvoX = jogador.x * 0.68;
+    var alvoY = 4.85 + jogador.y * 0.28;
+    var alvoZ = jogador.z - 10.2;
+    var k = Math.min(1, dt * 6);
+    camera.position.x += (alvoX - camera.position.x) * k;
+    camera.position.y += (alvoY - camera.position.y) * k;
+    camera.position.z += (alvoZ - camera.position.z) * Math.min(1, dt * 14);
+    if (tremor > 0) {
+      camera.position.x += (Math.random() - 0.5) * tremor * 0.7;
+      camera.position.y += (Math.random() - 0.5) * tremor * 0.5;
+    }
+    camera.fov = 62 + (vel - VEL0) * 0.32;
+    camera.updateProjectionMatrix();
+    camera.lookAt(jogador.x * 0.58, 1.95 + jogador.y * 0.22, jogador.z + 9.5);
+  }
+
+  carregarThree(0);
+})();
+</script>
+</body>
+</html>

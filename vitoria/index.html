@@ -19,6 +19,13 @@
     box-shadow: 0 10px 30px rgba(60, 55, 45, .22);
   }
   a { color: #b3223f; }
+  .jogo {
+    display: inline-flex; align-items: center; gap: 9px; margin-top: 4px;
+    text-decoration: none; color: #fff; background: #E94C6A; border: 2px solid #18181c;
+    border-radius: 999px; padding: 12px 26px; font-weight: 700; font-size: 1rem;
+    box-shadow: 0 4px 0 #18181c;
+  }
+  .jogo:active { transform: translateY(4px); box-shadow: none; }
 </style>
 </head>
 <body>
@@ -27,6 +34,7 @@
     <source src="desenho-da-vitoria.mp4" type="video/mp4">
     Seu navegador não reproduz vídeo. <a href="desenho-da-vitoria.mp4">Baixe o vídeo</a>.
   </video>
+  <a class="jogo" href="jogo/">🎮 Jogar a Corrida da Vitória</a>
   <p>O desenho sendo feito traço a traço — e depois ganhando vida, com musiquinha.<br>
      <a href="desenho-da-vitoria.mp4" download>Baixar o vídeo (MP4)</a></p>
 </body>
