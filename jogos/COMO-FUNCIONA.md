@@ -1308,3 +1308,73 @@ vale para todos: uma mensagem por *mudança*.
 Medido com um celular de verdade ligado: 3 segundos dentro do tremor
 aerodinâmico geram **2 pedidos** ao vibrador. Mandando por quadro seriam 180
 mensagens e mais de cem pedidos.
+
+---
+
+## Jogando DIRETO no celular
+
+O Brunno foi testar o 3D abrindo o jogo no próprio celular, em vez de usar o
+celular como controle de uma tela grande. Aí apareceram duas faltas que eu não
+tinha visto, porque nunca tinha exercitado esse caminho.
+
+### O leme velho ainda estava lá
+
+O leme por **apontar** eu tinha escrito só no `controle.html`. Jogando direto
+no aparelho, quem lê o sensor é a página do jogo — e ela continuava com o leme
+antigo, o de deslizar, que nunca funcionou. A mesma conta foi para o
+`aviao3d`, com o deslize de novo como plano B para aparelho que não dê `alpha`.
+
+É o preço de ter dois lugares lendo o mesmo sensor. Ficou anotado: **toda
+mudança no sensor tem de ir nos dois**.
+
+### Não havia manete, nem nitro, nem trem, nem flapes
+
+Esses comandos moram no `controle.html`. Sem um segundo aparelho, o avião voava
+sempre na mesma potência — não decolava e não pousava, que são justamente as
+duas coisas novas.
+
+Então a tela do jogo ganhou os mesmos comandos, **nos mesmos lugares**, porque
+a mão já aprendeu onde eles ficam: nitro na borda esquerda, manete na direita,
+gatilho no canto direito de baixo, armas por deslize no canto esquerdo, e
+trem/flapes/zerar numa fileira em cima.
+
+Eles só aparecem quando **não** há um celular separado fazendo de controle —
+com controle seriam dois donos do mesmo avião. E se um controle entrar no meio
+do voo, os botões sumem sozinhos.
+
+### Toque e mouse contavam o mesmo gesto duas vezes
+
+Num aparelho de toque o navegador ainda dispara eventos de mouse **depois** do
+toque, por compatibilidade com páginas antigas. Sem tratar, cada gesto valia
+duas vezes — um toque no seletor pulava duas armas. A trava é simples: gesto de
+mouse é ignorado se houve toque nos últimos 700 ms.
+
+Também apareceu uma fragilidade de verdade: `e.touches[0]` estava sendo lido
+sem conferir, em três lugares. Num celular sempre vem um dedo, mas um evento
+sem ponto derrubava o laço do jogo inteiro. Agora todos conferem.
+
+### O rearranjo da tela
+
+Com os comandos ocupando as duas bordas, os painéis de canto ficavam por
+baixo deles. O que mudou no modo de dedo:
+
+- os painéis das quatro quinas recuam a largura da tira lateral;
+- a caixa do combustível desce para a coluna da esquerda, liberando o meio de
+  cima para os três botões;
+- o painel do pouso vira uma **tira deitada** no rodapé, entre o seletor de
+  armas e o gatilho, com os rótulos escondidos — e sem repetir trem e flapes,
+  que já estão escritos nos próprios botões;
+- o olho e a qualidade recuam para dentro da tira do acelerador.
+
+Medido em três telas (844×390, 915×412 e 667×375), com treze elementos
+conferidos dois a dois: **nenhuma sobreposição e nada fora da tela**. Foram
+três rodadas até chegar lá — a cada arrumação aparecia uma colisão nova, e num
+celular pequeno três de uma vez.
+
+### O teste que se enganou sozinho
+
+Numa das rodadas o seletor de armas "não respondia". O comando estava certo: o
+teste tinha aberto a manete a 95% com o avião **parado na pista**, ele correu,
+saiu da pista, bateu — e a tela de capa voltou e cobriu os botões. O
+`elementFromPoint` no ponto do toque devolvia `codigo`, que é um elemento da
+capa. Foi o que entregou.

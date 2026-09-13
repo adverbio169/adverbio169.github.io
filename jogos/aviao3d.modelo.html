@@ -73,6 +73,80 @@
   #cMotor .tira i{display:block;height:100%;width:67%;border-radius:99px;background:#5eff9a;transition:width .1s linear}
   #cMotor .tira.nit i{background:#7fd8ff}
   #cMotor.turbo{border-color:rgba(127,216,255,.65);box-shadow:0 0 18px rgba(127,216,255,.35)}
+  /* ---- comandos de dedo (jogando direto no celular) ---- */
+  #dedos{display:none}
+  body.dedos #dedos{display:block}
+  #dedos > *{position:fixed;z-index:6;user-select:none;-webkit-user-select:none;touch-action:none}
+  .dedoM{border-radius:14px;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.5);
+         backdrop-filter:blur(6px);overflow:hidden;
+         width:min(13vw,58px);height:min(56vh,200px);top:46%;transform:translateY(-50%)}
+  #dAcel{right:calc(8px + env(safe-area-inset-right))}
+  #dNitro{left:calc(8px + env(safe-area-inset-left));display:flex;align-items:center;justify-content:center}
+  #dAcelBarra{position:absolute;left:0;right:0;bottom:0;height:70%;
+              background:linear-gradient(0deg,rgba(94,255,154,.28),rgba(94,255,154,.52));
+              border-top:2px solid #5eff9a}
+  #dAcelNum{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;
+            font:900 min(3.4vw,15px)/1 inherit;color:#e6fff0;text-shadow:0 2px 8px #000}
+  #dNitro b{position:relative;z-index:2;writing-mode:vertical-rl;transform:rotate(180deg);
+            font:900 min(3.2vw,14px)/1 inherit;letter-spacing:4px;color:#bfe6ff;text-shadow:0 2px 8px #000}
+  #dNitroCarga{position:absolute;left:0;right:0;bottom:0;height:100%;
+               background:linear-gradient(0deg,rgba(92,200,255,.5),rgba(140,230,255,.2))}
+  #dNitro.ligado{border-color:#7fd8ff;box-shadow:0 0 0 2px rgba(127,216,255,.35)}
+  #dFogo{right:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-right));
+         bottom:calc(10px + env(safe-area-inset-bottom));
+         width:min(26vw,120px);height:min(26vw,120px);border:0;border-radius:50%;
+         font:900 min(4vw,17px)/1 inherit;letter-spacing:2px;color:#fff;background:#d8422f;
+         box-shadow:0 6px 0 #8f2a1d;cursor:pointer}
+  #dFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
+  #dArma{left:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-left));
+         bottom:calc(10px + env(safe-area-inset-bottom));
+         width:min(32vw,180px);height:min(19vw,86px);border-radius:14px;
+         border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.5);backdrop-filter:blur(6px);
+         display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab}
+  #dArma b{font:900 min(3.4vw,16px)/1.1 inherit;letter-spacing:1.5px;color:#ffc24d}
+  #dArma i{font-style:normal;font:700 min(2.6vw,12px)/1 inherit;color:#9fb0cc;margin-top:4px}
+  #dArma .dica{position:absolute;bottom:4px;left:0;right:0;text-align:center;
+               font-size:9px;letter-spacing:2px;color:#5d6b85}
+  #dArma.trocou{background:rgba(255,194,77,.2)}
+  #dCima{top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+         display:flex;gap:6px}
+  .dBt{border:1px solid rgba(255,255,255,.2);background:rgba(8,12,26,.55);color:#dce5f5;
+       border-radius:9px;padding:7px 10px;font:700 min(2.6vw,12px)/1 inherit;cursor:pointer}
+  .dBt.ligado{background:rgba(94,255,154,.2);border-color:rgba(94,255,154,.5);color:#c7ffdb}
+  /* com os comandos de dedo na tela, os painéis saem da frente dos polegares */
+  /* O painel do pouso no alto do meio caía em cima da bússola e do
+     combustível. A faixa livre é a de BAIXO, entre o seletor de armas e o
+     gatilho — e lá ele vira uma tira deitada, com os rótulos escondidos:
+     "1849 · mín 640 | Trem EMBAIXO | Flapes 1 | [leme]". */
+  body.dedos #cPouso{left:50%;transform:translateX(-50%);top:auto;
+       bottom:calc(46px + env(safe-area-inset-bottom));min-width:0;
+       display:flex;align-items:center;gap:9px;padding:5px 10px;white-space:nowrap}
+  body.dedos #cPouso .rot{display:none}
+  body.dedos #cPouso .val{font-size:15px}
+  body.dedos #cPouso .val small{font-size:9.5px}
+  /* trem e flapes já estão escritos nos próprios botões: aqui seria dizer
+     duas vezes, e é justamente o que não cabe num celular pequeno */
+  body.dedos #cPouso .lin{display:none}
+  body.dedos #cPouso .tira{width:46px;margin:0;flex:0 0 46px}
+  /* a caixa do combustível desce para a coluna da esquerda e libera o meio de
+     cima para os três botões */
+  body.dedos #cComb{top:154px;left:calc(14px + min(13vw,58px));transform:none;min-width:0;padding:6px 10px}
+  body.dedos #cComb .val{font-size:17px}
+  body.dedos #cArma{display:none}
+  /* o olho e a qualidade ficavam debaixo da tira do acelerador: recuam a
+     largura dela, e sobem acima do gatilho */
+  body.dedos #btVisao{left:auto;right:calc(14px + min(13vw,58px));bottom:calc(14px + min(26vw,120px) + 16px)}
+  body.dedos #btQual{left:auto;right:calc(70px + min(13vw,58px));bottom:calc(14px + min(26vw,120px) + 16px)}
+  body.dedos #cMotor,body.dedos #convite{display:none}
+  /* As tiras laterais ocupam a borda inteira, e os painéis de canto ficavam
+     por baixo delas. Com os botões na tela, tudo recua a largura da tira. */
+  body.dedos #cDist,body.dedos #cPontos{left:calc(14px + min(13vw,58px))}
+  body.dedos #cRec,body.dedos #cVida{right:calc(14px + min(13vw,58px))}
+  body.dedos #cGente{left:calc(14px + min(13vw,58px))}
+  body.dedos #cDist,body.dedos #cRec{padding:6px 10px}
+  body.dedos #cDist .val,body.dedos #cRec .val,body.dedos #cVida .val{font-size:18px}
+  body.dedos #cPontos{top:76px} body.dedos #cVida{top:76px}
+
   #aviso{position:fixed;z-index:4;top:38%;left:0;right:0;text-align:center;font-size:clamp(20px,4vw,40px);
          font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s;pointer-events:none}
   .bt{position:fixed;z-index:5;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.6);
@@ -153,6 +227,24 @@
   <div class="tira"><i id="barraMotor"></i></div>
   <div class="rot">Nitro</div>
   <div class="tira nit"><i id="barraNitro"></i></div></div>
+<!-- =========================================================================
+     COMANDOS NA TELA, para quem joga DIRETO no celular.
+     Só aparecem quando não há um celular separado fazendo de controle: com
+     controle, quem manda é ele e estes botões seriam dois donos do mesmo
+     avião. Mesmo desenho do controle.html, porque a mão já aprendeu ele.
+     ====================================================================== -->
+<div id="dedos">
+  <div class="dedoM" id="dNitro"><i id="dNitroCarga"></i><b>NITRO</b></div>
+  <div class="dedoM" id="dAcel"><i id="dAcelBarra"></i><span id="dAcelNum">70%</span></div>
+  <button id="dFogo">FOGO</button>
+  <div id="dArma"><b id="dArmaNome">NUCLEAR</b><i id="dArmaMun">6</i>
+    <span class="dica">&lsaquo; deslize &rsaquo;</span></div>
+  <div id="dCima">
+    <button class="dBt" id="dTrem">TREM ▼</button>
+    <button class="dBt" id="dFlap">FLAPE 0</button>
+    <button class="dBt" id="dZerar">zerar</button>
+  </div>
+</div>
 <div id="aviso"></div>
 <div id="convite" title="outro celular pode entrar a qualquer momento">
   <canvas id="qrJogo" width="180" height="180"></canvas>
@@ -307,6 +399,7 @@ const Controle = {
     Controle._mancheBruto  = -Math.asin(Math.max(-1, Math.min(1, uz))) * G;
     Controle.volante = voltaCurta(Controle._volanteBruto - Controle.zeroVolante);
     Controle.manche  = Controle._mancheBruto - Controle.zeroManche;
+    Controle.lemeApontado(e, b, g);
     Controle.recebeu = true;
     Controle.ultimaLeitura = Date.now();
     if (Controle.esperandoSensor){
@@ -315,6 +408,47 @@ const Controle = {
       Controle.calibrar();
       if (typeof mostraAviso === 'function') mostraAviso('SENSOR LIGADO', '#7dffb0');
     }
+  },
+
+  /* -------------------------------------------------------------------------
+     O LEME, por APONTAR o celular para o lado.
+
+     É a mesma conta do controle.html, e precisa estar aqui também porque
+     jogando DIRETO no celular quem lê o sensor é esta página — sem isto, quem
+     joga no aparelho continuava com o leme velho, o de deslizar, que nunca
+     funcionou direito.
+
+     Rolar o celular é o aileron, puxar a borda de cima é o profundor, e
+     APONTAR o conjunto para o lado não mexe em nenhum dos dois. Da orientação
+     inteira do aparelho sai o eixo que atravessa a tela de dentro para fora:
+     rolar não mexe nele (girar em torno de um eixo deixa o eixo onde estava) e
+     arfar só o levanta. O rumo dele no plano horizontal é o apontar, e só ele.
+
+     A FUGA LENTA DO ZERO: no Android o `alpha` é giroscópio integrado e
+     escorrega alguns graus por minuto. Enquanto o pedido for pequeno, o zero
+     persegue a leitura com constante de uns 20 s — come a escorregada sem
+     roubar um leme segurado de propósito.
+     ---------------------------------------------------------------------- */
+  _psi: 0, _psiZero: 0, temPsi: false, _tPsi: 0,
+  LEME_CHEIO: 34, LEME_MORTO: 7,
+  lemeApontado(e, b, g){
+    if (e.alpha === null || e.alpha === undefined) return;
+    const R = Math.PI/180, G = 180/Math.PI;
+    const a = e.alpha*R;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const cb = Math.cos(b), sb = Math.sin(b), cg = Math.cos(g), sg = Math.sin(g);
+    const zx = ca*sg + sa*sb*cg;
+    const zy = sa*sg - ca*sb*cg;
+    if (Math.hypot(zx, zy) < 0.25) return;      // tela virada para cima: sem rumo
+    const psi = Math.atan2(zx, zy) * G;
+    const agora = Date.now();
+    const dt = Math.min(0.5, Math.max(0.004, (agora - (this._tPsi || agora))/1000));
+    this._tPsi = agora;
+    if (!this.temPsi){ this._psiZero = psi; this.temPsi = true; }
+    this._psi = psi;
+    const fora = voltaCurta(psi - this._psiZero);
+    if (Math.abs(fora) < this.LEME_MORTO*2.2) this._psiZero += fora * Math.min(1, dt*0.05);
+    this.leme = grausParaEixo(voltaCurta(psi - this._psiZero), this.LEME_CHEIO, this.LEME_MORTO);
   },
 
   // iOS pede permissão SEPARADA para orientação e para movimento.
@@ -420,13 +554,15 @@ const Controle = {
     }
     this._chute *= Math.pow(0.5, dtReal/0.5);    // o chute vai sumindo sozinho
     if (Math.abs(this._chute) < 0.02) this._chute = 0;
-    this.leme = this._chute;
+    // plano B: o deslize só manda no leme se o apontar não estiver pegando
+    if (!this.temPsi) this.leme = this._chute;
   },
 
   calibrar(){
     this.zeroVolante = this._volanteBruto || 0;
     this.zeroManche  = this._mancheBruto  || 0;
     this._aFiltro = 0; this._chute = 0; this._quieto = 1; this._janela = 0; this.leme = 0;
+    this._psiZero = this._psi || 0;      // o "reto" do leme é para onde a mão aponta agora
     this.volante = 0; this.manche = 0;   // vale já, não só na próxima leitura
   }
 };
@@ -2733,6 +2869,7 @@ function pinta(){
   $('vFlap').textContent = flap === 0 ? '—' : String(flap);
   $('vFlap').className = flap ? 'ok' : '';
   $('cPouso').classList.toggle('estol', !noChao && voo < velMin());
+  Dedos.pinta();
   const pv = Math.max(0, Math.min(100, vida));
   $('vidaBarra').style.width = pv.toFixed(0) + '%';
   $('vidaBarra').style.background = pv < 30 ? '#ff5a5a' : pv < 65 ? '#ffc24d' : '#5eff9a';
@@ -2819,13 +2956,15 @@ addEventListener('blur', () => { nitroBotao = false; tecla.mais = tecla.menos = 
 
 /* dedo na tela: arrastar vira/levanta, tocar atira */
 let toqueIni = null;
+// um toque sem ponto nenhum não pode derrubar o quadro: `touches[0]` vem
+// indefinido em evento sintético, e a exceção matava o laço inteiro
 addEventListener('touchstart', e => {
-  if (!jogando) return;
+  if (!jogando || !e.touches || !e.touches[0]) return;
   usandoToque = Controle.modo !== 'sensor';
   toqueIni = { x:e.touches[0].clientX, y:e.touches[0].clientY, t:Date.now() };
 }, {passive:true});
 addEventListener('touchmove', e => {
-  if (!toqueIni || !usandoToque) return;
+  if (!toqueIni || !usandoToque || !e.touches || !e.touches[0]) return;
   toqueX = Math.max(-1, Math.min(1, (e.touches[0].clientX - toqueIni.x)/90));
   toqueY = Math.max(-1, Math.min(1, (toqueIni.y - e.touches[0].clientY)/90));
 }, {passive:true});
@@ -2920,7 +3059,10 @@ function telaCheia(){
     }).catch(()=>{});
   }catch(e){}
 }
-$('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque = true; telaCheia(); comeca(); };
+$('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque = true; telaCheia();
+  // no computador o teclado dá conta; no celular, sem os botões não há manete
+  Dedos.mostra(('ontouchstart' in window) && Tripulacao.membros.length === 0);
+  comeca(); };
 (function(){
   const bp = $('btPista'), ba = $('btAr');
   const pinta = () => { bp.classList.toggle('ligado', naPistaAoComecar);
@@ -2929,6 +3071,141 @@ $('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque
   bp.onclick = () => poe(true);
   ba.onclick = () => poe(false);
   pinta();
+})();
+
+/* =============================================================================
+   OS COMANDOS DE DEDO
+
+   Jogando direto no celular não existe um segundo aparelho para segurar a
+   manete, o nitro, o trem e os flapes — e sem eles o avião voa sempre na mesma
+   potência, não decola e não pousa. Então a própria tela do jogo ganha os
+   mesmos comandos do controle.html, nos mesmos lugares, porque a mão já
+   aprendeu onde eles ficam.
+
+   Eles só aparecem quando NÃO há um celular separado fazendo de controle: com
+   controle seriam dois donos do mesmo avião, um brigando com o outro.
+   ========================================================================== */
+function vibraAqui(p){ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} }
+/* Num aparelho de toque o navegador ainda dispara mouse DEPOIS do toque, por
+   compatibilidade. Sem esta trava cada gesto valia duas vezes — um deslize no
+   seletor pulava duas armas de uma vez. */
+let ultimoToque = 0;
+const eDoMouse = e => { if (e && e.touches) { ultimoToque = Date.now(); return false; }
+                        return Date.now() - ultimoToque < 700; };
+/* o ponto do dedo, ou o do mouse — e nunca `undefined`: o touchend não traz
+   dedo nenhum em `touches`, e ler .clientX dali estoura o comando inteiro */
+const pontoDe = e => (e && e.touches && e.touches[0]) ? e.touches[0]
+                   : (e && e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : e;
+const Dedos = (function(){
+  const D = { ligado:false, mostra(){}, pinta(){} };
+  const el = id => document.getElementById(id);
+  const caixa = el('dedos');
+  if (!caixa) return D;
+
+  /* ---- acelerador: alavanca, o dedo pousa na altura que quer ---- */
+  const acel = el('dAcel'), barra = el('dAcelBarra'), num = el('dAcelNum');
+  function poeMotor(v, comToque){
+    v = Math.max(0, Math.min(1, v));
+    const antes = Math.round(motor*10);
+    motor = v;
+    barra.style.height = (v*100).toFixed(1) + '%';
+    num.textContent = Math.round(v*100) + '%';
+    if (comToque && Math.round(v*10) !== antes) vibraAqui(12);
+  }
+  function valorDoDedo(x, y){
+    const r = acel.getBoundingClientRect();
+    if (r.height >= r.width) return Math.max(0, Math.min(1, 1 - (y - r.top)/Math.max(1,r.height)));
+    return Math.max(0, Math.min(1, (x - r.left)/Math.max(1,r.width)));
+  }
+  let pegouAcel = false;
+  const pega = e => { if (eDoMouse(e)) return; e.preventDefault(); pegouAcel = true;
+    const t = pontoDe(e); if (!t) return; poeMotor(valorDoDedo(t.clientX, t.clientY), true); };
+  const anda = e => { if (!pegouAcel || eDoMouse(e)) return; e.preventDefault();
+    const t = pontoDe(e); if (!t) return; poeMotor(valorDoDedo(t.clientX, t.clientY), true); };
+  const solta = () => { pegouAcel = false; };
+  acel.addEventListener('touchstart', pega, {passive:false});
+  acel.addEventListener('touchmove', anda, {passive:false});
+  acel.addEventListener('touchend', solta);
+  acel.addEventListener('touchcancel', solta);
+  acel.addEventListener('mousedown', pega);
+  window.addEventListener('mousemove', anda);
+  window.addEventListener('mouseup', solta);
+
+  /* ---- nitro: de segurar ---- */
+  const nit = el('dNitro'), nitCarga = el('dNitroCarga');
+  const poeNitro = liga => e => { if (eDoMouse(e)) return;
+    if (e) e.preventDefault();
+    if (nitroBotao === liga) return;
+    nitroBotao = liga; nit.classList.toggle('ligado', liga);
+    if (liga) vibraAqui([22,40,22]); };
+  nit.addEventListener('touchstart', poeNitro(true), {passive:false});
+  nit.addEventListener('touchend', poeNitro(false), {passive:false});
+  nit.addEventListener('touchcancel', poeNitro(false));
+  nit.addEventListener('mousedown', poeNitro(true));
+  window.addEventListener('mouseup', poeNitro(false));
+  window.addEventListener('blur', poeNitro(false));
+
+  /* ---- gatilho ---- */
+  const fogo = el('dFogo');
+  const puxa = v => e => { if (eDoMouse(e)) return; e.preventDefault(); atirando = v; if (v) vibraAqui(15); };
+  fogo.addEventListener('touchstart', puxa(true), {passive:false});
+  fogo.addEventListener('touchend', puxa(false), {passive:false});
+  fogo.addEventListener('touchcancel', puxa(false));
+  fogo.addEventListener('mousedown', puxa(true));
+  window.addEventListener('mouseup', puxa(false));
+
+  /* ---- armas: DESLIZAR, não apertar (é o pedido antigo do Brunno) ---- */
+  const cxArma = el('dArma');
+  const ORDEM = ['bomba','missil','metralha'];
+  const TOQUES = { bomba:[28], missil:[28,60,28], metralha:[28,60,28,60,28] };
+  function vaiArma(passo){
+    const i = (ORDEM.indexOf(arma) + passo + ORDEM.length) % ORDEM.length;
+    trocaArma(ORDEM[i]);
+    vibraAqui(TOQUES[ORDEM[i]]);
+    cxArma.classList.add('trocou');
+    setTimeout(() => cxArma.classList.remove('trocou'), 160);
+  }
+  let x0 = null, ultimo = 0, arrastou = 0;
+  const PASSO_ARMA = 46;
+  const pegaA = e => { if (eDoMouse(e)) return; e.preventDefault();
+    const t = pontoDe(e); if (!t) return;
+    x0 = t.clientX; ultimo = t.clientX; arrastou = 0; };
+  const andaA = e => { if (x0 === null || eDoMouse(e)) return; e.preventDefault();
+    const t = pontoDe(e); if (!t) return;
+    const x = t.clientX;
+    arrastou += Math.abs(x - ultimo);
+    while (x - ultimo >=  PASSO_ARMA){ vaiArma( 1); ultimo += PASSO_ARMA; }
+    while (x - ultimo <= -PASSO_ARMA){ vaiArma(-1); ultimo -= PASSO_ARMA; } };
+  const soltaA = () => { if (x0 !== null && arrastou < 10) vaiArma(1); x0 = null; };
+  cxArma.addEventListener('touchstart', pegaA, {passive:false});
+  cxArma.addEventListener('touchmove', andaA, {passive:false});
+  cxArma.addEventListener('touchend', e => { ultimoToque = Date.now(); e.preventDefault(); soltaA(); }, {passive:false});
+  cxArma.addEventListener('mousedown', pegaA);
+  window.addEventListener('mousemove', andaA);
+  window.addEventListener('mouseup', () => { if (x0 !== null) soltaA(); });
+
+  /* ---- trem, flapes e zerar ---- */
+  el('dTrem').onclick = e => { e.preventDefault(); mexeTrem(); vibraAqui(35); };
+  el('dFlap').onclick = e => { e.preventDefault(); mexeFlap(); vibraAqui([18,40,18]); };
+  el('dZerar').onclick = e => { e.preventDefault(); Controle.calibrar(); vibraAqui(25); };
+
+  D.mostra = liga => {
+    D.ligado = !!liga;
+    document.body.classList.toggle('dedos', D.ligado);
+    if (D.ligado) poeMotor(motor, false);
+  };
+  /* uma vez por quadro: os botões mostram o que o avião está fazendo */
+  D.pinta = () => {
+    if (!D.ligado) return;
+    barra.style.height = (motor*100).toFixed(1) + '%';
+    num.textContent = Math.round(motor*100) + '%';
+    nitCarga.style.height = nitroCarga.toFixed(0) + '%';
+    el('dArmaNome').textContent = ARMAS[arma].nome;
+    el('dArmaMun').textContent = 'x' + municao[arma];
+    const t = el('dTrem'); t.textContent = 'TREM ' + (trem ? '▼' : '▲'); t.classList.toggle('ligado', trem);
+    const f = el('dFlap'); f.textContent = 'FLAPE ' + flap; f.classList.toggle('ligado', flap > 0);
+  };
+  return D;
 })();
 
 function estadoBatalha(classe, txt){
@@ -2956,7 +3233,8 @@ setInterval(pintaBatalha, 1000);
 
 $('btSensor').onclick = async () => {
   ligaAudio();
-  try { await Controle.ligarSensor(); telaCheia(); comeca(); }
+  try { await Controle.ligarSensor(); telaCheia();
+        Dedos.mostra(Tripulacao.membros.length === 0); comeca(); }
   catch(e){ erro(e.message + ' Dá para jogar com o dedo ou com o teclado.'); }
 };
 Controle.escutar();
@@ -3038,6 +3316,8 @@ const Tripulacao = {
   },
   avisaPapel(m){
     try { m.c.send({ t:'papel', p:m.papel, n:this.membros.length }); } catch(e){}
+    // chegou controle de verdade: os botões de dedo saem, senão são dois donos
+    if (typeof Dedos !== 'undefined') Dedos.mostra(false);
     temArtilheiro = this.membros.some(o => o.papel === 'artilheiro');
     if (!temArtilheiro){ miraX = 0; miraY = 0; }
   },
