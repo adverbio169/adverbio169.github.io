@@ -1147,3 +1147,88 @@ A e B abrem salas próprias, B entra na de A
 6) um celular entra na sala de A: vira PILOTO, e o
    avião do B continua contando como jogador           ✔
 ```
+
+---
+
+## O míssil voava de lado
+
+> *"a perspectiva de ver ele tá estranha… eu vejo ele indo de lado, quando na
+> verdade tenho que ver ele de trás."*
+
+Uma linha, e dessas que só existem porque o código mudou por baixo:
+
+```js
+b.no.lookAt(b.x + b.vx, b.y + b.vy, b.z + b.vz);
+b.no.rotateX(Math.PI/2);
+```
+
+O `lookAt` já aponta o **+Z** do objeto para onde ele vai. O quarto de volta a
+mais existia por causa da **bomba**, que é uma cápsula deitada no eixo Y — é
+ele que leva o eixo da cápsula para a frente.
+
+Só que o míssil novo já nasce montado apontando para +Z. Ele estava levando
+esse quarto de volta em cima do que já estava certo, e saía voando de
+través. Agora o giro extra vale só para a bomba. Medido: o nariz do míssil
+está a **0,0°** da direção em que ele voa, e o eixo da bomba continua a 0,0°
+da direção em que ela cai.
+
+## O estol precisava de um tom de desespero
+
+> *"o som do travamento tá PERFEITO, é esse o nível de estresse que temos que
+> ter na cabine. O ESTOL, que é algo desastroso, não tá com esse tom de
+> desespero."*
+
+Estava um `bip` de 180 Hz a cada 1,1 s. Soava como um forninho avisando que o
+pão ficou pronto.
+
+Buzina de estol de verdade é **contínua**, áspera, e não deixa pensar em outra
+coisa — é essa a função dela. Como esta é feita:
+
+- **duas dentes-de-serra desafinadas** (392 e 407 Hz): o batimento entre as
+  duas é o urro. Uma só sairia limpa demais;
+- uma terceira duas oitavas abaixo, para ter peso;
+- **passa-banda com Q alto** por cima, que é o que dá cara de corneta barata
+  em vez de sintetizador;
+- **tremor de 9 Hz na amplitude** — e é esse o detalhe que importa. Sem ele
+  era só um som feio; com ele, é um som *aflito*. A diferença entre barulho e
+  urgência está no ritmo, não no timbre.
+
+E não para até o avião voltar a voar. A tela acompanha: uma borda vermelha
+pulsando no mesmo compasso, porque um aviso de texto se perde no meio de uma
+manobra.
+
+## O controle treme junto
+
+> *"quando eu solto o míssil, ou o atiro, ou metralho, tem que tremer o meu
+> controle."*
+
+O recado de tremer vai **na hora**, fora do pacote de estado — que só sai de
+250 em 250 ms, tarde demais para casar com o estalo de um tiro.
+
+O motorzinho do celular só sabe ligar e desligar, então quem dá caráter a cada
+arma é o **ritmo**:
+
+| o que aconteceu | como treme |
+|---|---|
+| metralhadora | contínuo enquanto o gatilho estiver apertado |
+| míssil | um tranco curto e um longo — o sopro da saída |
+| bomba | um baque só, grave e comprido |
+| travou o alvo | três toques secos, no ritmo do som de travamento |
+| levou tiro | dois trancos fortes |
+| estol | batida lenta e insistente, que não para |
+
+**Duas decisões que valem explicar.**
+
+A metralhadora **não manda um recado por tiro**. A 14 tiros por segundo seriam
+14 mensagens e 14 tremidinhas que o motorzinho nem consegue separar. Vai
+"começou" e "parou", e quem faz o padrão contínuo é o celular.
+
+E o contínuo **se reprograma sozinho**, um pouco antes de o padrão acabar:
+`navigator.vibrate` não tem laço, o padrão toca uma vez e morre. Sem
+reprogramar antes do fim, fica um buraco audível entre uma volta e outra.
+
+Medido, com um celular de verdade ligado numa sala de verdade e o vibrador
+espionado: míssil chega `[45,35,130]`, bomba `[180]`, metralhadora manda 4
+padrões contínuos em 1,6 s e **manda `0` ao soltar o gatilho** (que é o que
+cala o motorzinho). No estol, a buzina liga junto com o tremor e os dois
+calam quando a potência volta.

@@ -7086,7 +7086,7 @@ let eixoF={x:0,y:0,z:1}, eixoC={x:0,y:1,z:0}, eixoD={x:1,y:0,z:0};
 let rumo=0, inclinacao=0, arfagem=0, leme=0;
 let voo=VOO_BASE, turbo=0, combustivel=100, distancia=0, recorde=0;
 let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
-let noChao=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0;
+let noChao=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0, estolando=false;
 let vida=100;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
@@ -7934,6 +7934,60 @@ function somTravado(liga){
   }catch(e){ tomTravado = null; }
 }
 
+/* --- A BUZINA DE ESTOL -----------------------------------------------------
+   Estol é a coisa mais feia que acontece com um avião, e o aviso era um
+   `bip` de 180 Hz a cada 1,1 s — soava como um forninho avisando que o pão
+   ficou pronto. Buzina de estol de verdade é CONTÍNUA, áspera e não deixa
+   pensar em outra coisa, que é o ponto dela.
+
+   Como esta é feita:
+     · duas dentes-de-serra desafinadas (392 e 407 Hz) — o batimento entre as
+       duas é o "urro" que dá a aspereza; uma só soaria limpa demais
+     · uma terceira duas oitavas abaixo, para ter peso
+     · passa-banda com Q alto em cima disso, que é o que dá cara de corneta
+       barata em vez de sintetizador
+     · tremor de 9 Hz na amplitude: é o que transforma um tom feio num tom
+       AFLITO. Sem o tremor era só barulho; com ele, é urgência.
+   E ela só para quando o avião voltar a voar.
+   -------------------------------------------------------------------------- */
+let buzinaEstol = null;
+function somEstol(liga){
+  if (!audio) return;
+  try{
+    if (liga && !buzinaEstol){
+      const t0 = audio.currentTime;
+      const g = audio.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.16, t0 + 0.05);
+      const bp = audio.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 800; bp.Q.value = 3.2;
+      bp.connect(g); g.connect(audio.destination);
+      const oscs = [];
+      for (const f of [392, 407, 98]){
+        const o = audio.createOscillator();
+        o.type = 'sawtooth'; o.frequency.value = f;
+        const gi = audio.createGain(); gi.gain.value = f < 200 ? 0.5 : 1;
+        o.connect(gi); gi.connect(bp); o.start(t0);
+        oscs.push(o);
+      }
+      // o tremor: um oscilador lento mexendo no volume
+      const lfo = audio.createOscillator(), lg = audio.createGain();
+      lfo.type = 'sine'; lfo.frequency.value = 9;
+      lg.gain.value = 0.085;
+      lfo.connect(lg); lg.connect(g.gain); lfo.start(t0);
+      buzinaEstol = { g, oscs, lfo };
+    } else if (!liga && buzinaEstol){
+      const { g, oscs, lfo } = buzinaEstol; buzinaEstol = null;
+      const t0 = audio.currentTime;
+      g.gain.cancelScheduledValues(t0);
+      g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12);
+      for (const o of oscs) o.stop(t0 + 0.2);
+      lfo.stop(t0 + 0.2);
+    }
+  }catch(e){ buzinaEstol = null; }
+}
+
 function somNuclear(){
   if (!audio) return;
   try{
@@ -8167,6 +8221,7 @@ const Mira = {
       this.carga = Math.min(TRAVA_SEG, this.carga + dt);
       if (!this.travado && this.carga >= TRAVA_SEG){
         this.travado = true; somTravado(true);
+        Controles.bate('travou');
         mostraAviso('TRAVADO', '#7fffa8', 700);
       }
       if (!this.travado){
@@ -8196,6 +8251,7 @@ function dispara(){
     bombas.push({ no:m, tipo:'bomba', x:aviaoX, y:aviaoY-60, z:aviaoZ,
                   vx:eixoF.x*voo, vy:eixoF.y*voo - 60, vz:eixoF.z*voo });
     bip(150, 0.12, 'sawtooth', 0.1);
+    Controles.bate('bomba');
   } else if (arma === 'missil'){
     const m = montaMissil(); cena.add(m);
     const T = direcaoDaMira();
@@ -8205,6 +8261,7 @@ function dispara(){
                   vx:T.x*vel, vy:T.y*vel, vz:T.z*vel, vida:6.0,
                   segue: perseguido, fumaca: 0 });
     somMissil();
+    Controles.bate('missil');
     if (perseguido) mostraAviso('MÍSSIL A CAMINHO', '#ff9a6b', 900);
     // trava gasta: um míssil, um alvo
     Mira.solta();
@@ -8250,6 +8307,8 @@ function atingeAr(x, y, z, raio, dano){
 function atualizaTiros(dt){
   if (recarga > 0) recarga -= dt;
   Mira.passo(dt);
+  // o tremor contínuo da metralhadora acompanha o gatilho, não cada tiro
+  Controles.treme('metralha', atirando && arma === 'metralha' && municao.metralha > 0 && !caindo);
   if (atirando) dispara();
   for (const b of bombas){
     b.x += b.vx*dt; b.z += b.vz*dt;
@@ -8294,7 +8353,14 @@ function atualizaTiros(dt){
     }
     b.no.position.set(b.x, b.y, b.z);
     b.no.lookAt(b.x + b.vx, b.y + b.vy, b.z + b.vz);
-    b.no.rotateX(Math.PI/2);
+    /* O `lookAt` já aponta o +Z do objeto para onde ele vai. O quarto de volta
+       a mais existe só para a BOMBA, que é uma cápsula deitada no eixo Y — é
+       ele que leva o Y da cápsula para a frente.
+
+       O míssil novo já nasce montado apontando para +Z, e estava levando esse
+       quarto de volta em cima: saía voando DE LADO. Era o que o Brunno via —
+       "vejo ele indo de lado, quando tinha que ver ele de trás". */
+    if (b.tipo !== 'missil') b.no.rotateX(Math.PI/2);
   }
   bombas = bombas.filter(b => { if (b.morto){ cena.remove(b.no); return false; } return true; });
   for (const t of tiros){
@@ -8312,6 +8378,7 @@ function atualizaTiros(dt){
 function derruba(motivo){
   if (caindo) return;
   caindo = true; noChao = false; motivoQueda = motivo; vq = 0;
+  if (estolando){ estolando = false; somEstol(false); Controles.treme('estol', false); }
   explode(aviaoX, aviaoY, aviaoZ, motivo === 'combustivel' ? 0.6 : 1.4);
   mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL'
             : motivo === 'abatido' ? 'ABATIDO!' : 'BATEU!', '#ff8080', 1400);
@@ -8608,8 +8675,11 @@ function atualiza(dt){
     const falta = Math.min(1, (velMin() - voo)/240);
     const r2 = giraPar(eixoF, eixoC, -falta*1.1*dt); eixoF = r2[0]; eixoC = r2[1];
     endireitaEixos();
+    if (!estolando){ estolando = true; somEstol(true); Controles.treme('estol', true); }
     avisouEstol -= dt;
-    if (avisouEstol <= 0){ avisouEstol = 1.1; mostraAviso('ESTOL — MAIS POTÊNCIA', '#ffb86b', 800); bip(180,0.18,'square',0.05); }
+    if (avisouEstol <= 0){ avisouEstol = 1.0; mostraAviso('ESTOL — MAIS POTÊNCIA', '#ff8f6b', 800); }
+  } else if (estolando){
+    estolando = false; somEstol(false); Controles.treme('estol', false);
   }
   // acelerador aberto bebe mais: meia potência gasta bem menos que tudo
   if (!infinito) combustivel -= dt * (turbinando ? GASTO_TURBO : GASTO*(0.55 + 0.7*motor));
@@ -9016,6 +9086,29 @@ function desenhaHUD(){
     }
   }
 
+  /* ESTOL na tela: uma borda vermelha que pulsa junto com a buzina. O aviso
+     de texto sozinho se perde no meio de uma manobra. */
+  if (estolando && jogando && !caindo){
+    const f = 0.30 + 0.30*Math.abs(Math.sin(Date.now()/110));
+    const esp = Math.min(W,H)*0.085;
+    const g1 = h2.createLinearGradient(0,0,0,esp);
+    g1.addColorStop(0, 'rgba(255,40,40,' + f.toFixed(2) + ')');
+    g1.addColorStop(1, 'rgba(255,40,40,0)');
+    h2.fillStyle = g1; h2.fillRect(0,0,W,esp);
+    const g2 = h2.createLinearGradient(0,H,0,H-esp);
+    g2.addColorStop(0, 'rgba(255,40,40,' + f.toFixed(2) + ')');
+    g2.addColorStop(1, 'rgba(255,40,40,0)');
+    h2.fillStyle = g2; h2.fillRect(0,H-esp,W,esp);
+    const g3 = h2.createLinearGradient(0,0,esp,0);
+    g3.addColorStop(0, 'rgba(255,40,40,' + f.toFixed(2) + ')');
+    g3.addColorStop(1, 'rgba(255,40,40,0)');
+    h2.fillStyle = g3; h2.fillRect(0,0,esp,H);
+    const g4 = h2.createLinearGradient(W,0,W-esp,0);
+    g4.addColorStop(0, 'rgba(255,40,40,' + f.toFixed(2) + ')');
+    g4.addColorStop(1, 'rgba(255,40,40,0)');
+    h2.fillStyle = g4; h2.fillRect(W-esp,0,esp,H);
+  }
+
   if (infinito && jogando){
     // no canto de cima à esquerda, abaixo dos painéis: no rodapé ele
     // atravessava a caixa da arma
@@ -9177,6 +9270,7 @@ function reinicia(){
   turbo = 0; combustivel = 100; distancia = 0;
   nitroCarga = 100; nitroBotao = false; turbinando = false;
   avisouEstol = 0; pousos = 0; vida = VIDA_CHEIA;
+  if (estolando){ estolando = false; somEstol(false); }
   pontos = 0; alvosDestruidos = 0; venceu = false;
   arma = 'bomba'; recarga = 0; atirando = false; leme = 0; miraX = 0; miraY = 0;
   municao = {}; for (const k in ARMAS) municao[k] = ARMAS[k].municao;
@@ -9201,6 +9295,8 @@ function comeca(){
 }
 function fim(){
   jogando = false;
+  if (estolando){ estolando = false; somEstol(false); }
+  Controles.treme('metralha', false); Controles.treme('estol', false);
   const m = Math.round(distancia/METRO);
   if (m > recorde){ recorde = m; try{ localStorage.setItem('aviao.recorde', String(m)); }catch(e){} }
   const t = venceu ? 'Missão cumprida! Todos os alvos no chão.'
@@ -9399,6 +9495,28 @@ const Tripulacao = {
                              : 'piloto + ' + art + ' artilheiro' + (art > 1 ? 's' : ''));
   }
 };
+/* =============================================================================
+   TREMOR NO CONTROLE
+
+   O recado de tremer vai NA HORA, fora do pacote de estado (que só sai de
+   250 em 250 ms — tarde demais para casar com o estalo de um tiro).
+
+   A metralhadora não manda um recado por tiro: a 14 tiros por segundo isso
+   seriam 14 mensagens e 14 tremidinhas que o motorzinho do celular nem
+   consegue separar. Manda-se "começou" e "parou", e quem faz o padrão
+   contínuo é o celular.
+   ========================================================================== */
+const Controles = {
+  _metra: false,
+  manda(o){ Tripulacao.envia(o); },
+  bate(arma){ this.manda({ t:'tremer', a:arma }); },
+  /* liga/desliga um tremor contínuo (metralhadora, estol) */
+  treme(qual, liga){
+    if (qual === 'metralha'){ if (this._metra === liga) return; this._metra = liga; }
+    this.manda({ t:'tremer', a:qual, on: !!liga });
+  }
+};
+
 function mandaEstado(){
   Tripulacao.envia({ t:'estado', jogando, acabou: !jogando, dist: Math.round(distancia/METRO),
     comb: Math.round(combustivel), turbo: turbinando, nit: Math.round(nitroCarga),
@@ -9410,6 +9528,8 @@ function mandaEstado(){
 function pausa(){
   if (!jogando || pausado) return;
   pausado = true; jogando = false; Motor.desliga();
+  if (estolando){ estolando = false; somEstol(false); }
+  Controles.treme('metralha', false); Controles.treme('estol', false);
   mostraAviso('SEM SINAL DO CELULAR', '#ffb86b', 4000);
 }
 function retoma(){
@@ -9624,6 +9744,7 @@ const Batalha = {
     bip(180, 0.08, 'square', 0.06);
     solta(aviaoX, aviaoY, aviaoZ, 6, 0xffb86b, 26, 260);
     mostraAviso('ATINGIDO! ' + Math.max(0, Math.round(vida)) + '%', '#ff8080', 800);
+    Controles.bate('levou');
     if (vida <= 0){
       vida = 0;
       mostraAviso('VOCÊ FOI ABATIDO', '#ff6a5a', 1800);

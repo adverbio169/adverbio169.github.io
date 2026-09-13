@@ -588,6 +588,7 @@ function conectar(codigo){
     conn.on('data', d => {
       if (!d || !d.t) return;
       if (d.t === 'papel'){ assumePosto(d.p, d.n); return; }
+      if (d.t === 'tremer'){ Tremor.recebe(d); return; }
       if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
       if (d.t === 'estado'){
         $('pDist').textContent = d.dist;
@@ -603,7 +604,7 @@ function conectar(codigo){
         combAntes = d.comb; jogandoAntes = !!d.jogando;
       }
     });
-    conn.on('close', () => { estadoRede('nao', 'a TV desconectou'); });
+    conn.on('close', () => { estadoRede('nao', 'a TV desconectou'); Tremor.calaTudo(); });
     conn.on('error', e => { estadoRede('nao', 'erro na conexão: ' + (e.message || e.type || e)); });
     // se a sala não existir, o PeerJS demora a avisar; vigiamos por conta própria
     setTimeout(() => { if (!conn.open) estadoRede('nao', 'sala ' + codigo + ' não encontrada. O código está certo? A TV está aberta?'); }, 8000);
@@ -618,6 +619,63 @@ function conectar(codigo){
 }
 
 function vibra(ms){ try { navigator.vibrate && navigator.vibrate(ms); } catch(e){} }
+
+/* --- TREMOR: o controle sente o que o avião faz --------------------------
+   Pedido: "quando eu solto o míssil, ou atiro, ou metralho, tem que tremer o
+   meu controle".
+
+   Cada arma tem um padrão diferente, porque o motorzinho do celular só sabe
+   ligar e desligar — quem dá caráter é o RITMO:
+
+     metralhadora  tremor CONTÍNUO enquanto o gatilho estiver apertado
+     míssil        um tranco curto e um longo: o sopro da saída
+     bomba         um baque só, grave e comprido
+     travou        três toques secos, o mesmo ritmo do som de travamento
+     levou tiro    dois trancos fortes
+     estol         batida lenta e insistente, que não para até sair do estol
+
+   O CONTÍNUO é repetido de propósito: `navigator.vibrate` não tem laço, o
+   padrão toca uma vez e acaba. Então enquanto o gatilho estiver apertado o
+   controle se reprograma sozinho, um pouco antes de o padrão terminar, senão
+   fica um buraco audível entre uma repetição e a outra.
+   ----------------------------------------------------------------------- */
+const Tremor = (function(){
+  const PADROES = {
+    missil:  [45, 35, 130],
+    bomba:   [180],
+    travou:  [22, 55, 22, 55, 22],
+    levou:   [90, 60, 90]
+  };
+  const CONTINUO = {
+    metralha: { padrao: [26, 34], ciclo: 60,  vezes: 8 },   // ~14 estalos por segundo
+    estol:    { padrao: [130, 120], ciclo: 250, vezes: 3 }
+  };
+  const T = {};
+  const relogios = {};
+  function paraContinuo(qual){
+    if (relogios[qual]){ clearInterval(relogios[qual]); relogios[qual] = null; }
+    // só corta a vibração se não houver outro contínuo tocando
+    if (!Object.values(relogios).some(Boolean)) vibra(0);
+  }
+  function comecaContinuo(qual){
+    const c = CONTINUO[qual];
+    if (!c || relogios[qual]) return;
+    const bate = () => { const p = []; for (let i=0;i<c.vezes;i++) p.push(...c.padrao); vibra(p); };
+    bate();
+    // reprograma um pouco ANTES de acabar, senão fica um buraco entre as voltas
+    relogios[qual] = setInterval(bate, c.ciclo*c.vezes - 40);
+  }
+  T.recebe = d => {
+    const a = d.a;
+    if (d.on !== undefined){ if (d.on) comecaContinuo(a); else paraContinuo(a); return; }
+    if (PADROES[a]) vibra(PADROES[a]);
+  };
+  T.calaTudo = () => { for (const k in relogios) paraContinuo(k); };
+  // a aba sumiu com o dedo no gatilho: não deixa o celular tremendo para sempre
+  document.addEventListener('visibilitychange', () => { if (document.hidden) T.calaTudo(); });
+  window.addEventListener('pagehide', T.calaTudo);
+  return T;
+})();
 
 /* --- MANDAR NA HORA DA LEITURA, não de 33 em 33 ms -------------------------
    O relógio de 33 ms somava até 33 ms de espera entre a mão mexer e o pacote
