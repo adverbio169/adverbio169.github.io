@@ -786,14 +786,32 @@ const VOO_BASE = 1700*VEL, VOO_TURBO = 3000*VEL;
    continuar sendo os mesmos ~1700 de sempre. */
 const VOO_MIN = 520*VEL, VOO_MAX = 2200*VEL, MOTOR_PADRAO = 0.70;
 const NITRO_GASTO = 26, NITRO_ENCHE = 8.5;
-const MAPA = 60000, METRO = 20;
+/* --- O TAMANHO DO MUNDO ------------------------------------------------------
+   "Ampliar o mapa." O motivo é o avião ter dobrado de velocidade: o mundo de
+   120 mil de lado passou a ser atravessado na metade do tempo, e ficou
+   pequeno. Dobrado, ele volta a levar o que levava.
+
+   Mas ampliar sem pensar quadruplica a conta: com a mesma densidade, os 53
+   aviões viram 212, os 344 tambores viram 1.376, e as ordens de desenho saltam
+   de 2.583 para umas 10.000 — num celular, o fim.
+
+   O princípio que resolve é o mesmo que motivou a ampliação: se o avião voa o
+   dobro, o ESPAÇAMENTO tem de dobrar junto. Aí o número de coisas no mundo não
+   muda, e o ritmo com que elas aparecem na janela também não — que é o que a
+   pessoa sente. O mundo fica maior sem ficar mais caro.
+
+   Os prédios são a exceção, e de propósito: eles são UMA ordem de desenho
+   (InstancedMesh), então a cidade pode crescer de verdade. Ela quadruplica, e
+   custa 37 mil triângulos — que é troco. */
+const MAPA = 120000, METRO = 20;
+const ESPACO = VEL;                    // o espaçamento das coisas segue a velocidade
 const TAXA_ROL = 3.4, TAXA_ARF = 1.5, TAXA_LEME = 0.55;
 /* AILERON: quanto de celular vale rolagem cheia, e a folga do meio. Ver o
    comentário grande em `eixos()` sobre por que virou VELOCIDADE. */
 const ROL_CHEIO = 40, ROL_MORTO = 6, NIVELA = 1.5, NIVELA_ATE = 32;
 const RAIO_PEGA = 340, GASTO = 3.0, GASTO_TURBO = 4.6;
 const DA_NORMAL = 20, DA_AZUL = 32, TURBO_SEG = 5;
-const RAIO_NUKE = 9000, RAIO_POMBO = 170, RAIO_AVIAO = 430;
+const RAIO_NUKE = 9000, RAIO_POMBO = 170, RAIO_AVIAO = 430, RAIO_HELI = 400;
 
 /* ===========================================================================
    PISTA, TREM DE POUSO E FLAPES
@@ -826,7 +844,10 @@ const TAXA_ESTERCA = 0.85;                    // o leme esterça no chão
    — o avião saltava para a velocidade de rotação antes de a pista começar a
    passar. Assim dá uns 6 s de corrida, que é o bastante para parecer uma
    decolagem sem virar espera. */
-const ACEL_CHAO = 86*VEL, FREIO_CHAO = 330*VEL;
+/* A corrida subiu de 86 para 145 (vezes VEL): a decolagem passou de 6 s para
+   uns 3,5 — era a metade "grudado no chão" da queixa. A outra metade, o
+   "foguete", saiu da autoridade dos comandos, não daqui. */
+const ACEL_CHAO = 145*VEL, FREIO_CHAO = 330*VEL;
 /* O quanto o avião AFUNDA na faixa de estresse, antes do estol declarado.
    Escala com a velocidade do jogo: é uma velocidade, como as outras. */
 const AFUNDA = 900*VEL;
@@ -847,11 +868,15 @@ const ARMAS = {
 const rioX      = z => Math.sin(z/9000)*4200 + Math.sin(z/3100)*900;
 const estradaZ  = x => 8000 + Math.sin(x/11000)*2600;
 const estradaXv = z => -21000 + Math.sin(z/13000)*1800;
-function ehCidade(x, z){
-  const f = Math.sin(x/17000 + 0.6) + Math.sin(z/15000 - 0.4)
-          + Math.sin((x + z)/11000)*0.7 + Math.sin((x - z)/23000)*0.5;
-  return f > 0.62;
+/* O campo que decide onde há cidade. Ele já existia como um sim/não; agora o
+   VALOR dele também é usado, e é o que cria bairros: onde o campo é forte fica
+   o centro, com torres altas e escuras; na borda ficam os subúrbios, baixos e
+   claros. Sai de graça — é a mesma conta, lida com mais atenção. */
+function campoCidade(x, z){
+  return Math.sin(x/17000 + 0.6) + Math.sin(z/15000 - 0.4)
+       + Math.sin((x + z)/11000)*0.7 + Math.sin((x - z)/23000)*0.5;
 }
+function ehCidade(x, z){ return campoCidade(x, z) > 0.62; }
 function baralha(a,b){ return Math.abs(Math.sin(a*127.1 + b*311.7) * 43758.5453) % 1; }
 
 /* --- estado do voo: a mesma atitude de três eixos do jogo em 2D --- */
@@ -861,6 +886,7 @@ let rumo=0, inclinacao=0, arfagem=0, leme=0;
 let voo=VOO_BASE, turbo=0, combustivel=100, distancia=0, recorde=0;
 let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
 let noChao=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0, estolando=false;
+let rolChao = 0;          // o banco que sobrou do toque, escorrendo para zero
 let arfChao=0, rumoChao=0;
 let estresse=0;
 let vida=100;
@@ -903,18 +929,38 @@ function endireitaEixos(){
 let predios=[], tambores=[], alvos=[], obstaculos=[];
 function montaMapa(){
   predios = []; alvos = []; tambores = []; obstaculos = [];
-  const PASSO_T = 5200;
+  const PASSO_T = 5200*ESPACO;
   for (let x = -MAPA; x <= MAPA; x += PASSO_T)
     for (let z = -MAPA; z <= MAPA; z += PASSO_T){
       if (Math.random() < 0.42) continue;
       const tx = x + (Math.random()-0.5)*PASSO_T*0.8, tz = z + (Math.random()-0.5)*PASSO_T*0.8;
       tambores.push({ x:tx, y: 1200 + Math.random()*1800, z:tz,
                       azul: Math.random() < 0.18, pego:false, giro:Math.random()*6.28 });
-      if (Math.random() < 0.5)
-        obstaculos.push({ tipo: Math.random() < 0.34 ? 'aviao' : 'pombo',
+      /* --- QUEM VOA E QUEM PAIRA ------------------------------------------
+         "Não quero mais avião parado no mapa; se for parado que seja um
+         helicóptero, os aviões de pontuação devem estar em movimento."
+
+         Estava certo o incômodo: os aviões tinham `deriva` de ±300 e ficavam
+         balançando em volta do mesmo ponto — de longe, parados. Avião parado no
+         ar é a única coisa que um avião não faz.
+
+         Agora quem é avião CRUZA o mapa num rumo, e quem tem de ficar parado
+         virou helicóptero, que é o que pode. E o helicóptero não é enfeite: por
+         estar parado, ele é o alvo fácil, e vale menos. O avião, que atravessa,
+         vale o dobro. */
+      const sorte = Math.random();
+      if (sorte < 0.5){
+        const tipo = sorte < 0.17 ? 'aviao' : sorte < 0.26 ? 'helicoptero' : 'pombo';
+        obstaculos.push({ tipo,
           x: tx + (Math.random()-0.5)*3000, y: 900 + Math.random()*2200,
           z: tz + (Math.random()-0.5)*3000, fase: Math.random()*6.28,
-          deriva:(Math.random()-0.5)*300, rumo: Math.random()*6.283, x0:0, y0:0, vivo:true });
+          deriva:(Math.random()-0.5)*300, rumo: Math.random()*6.283,
+          /* o avião de rota vai de 900 a 1700 — abaixo do jogador, para dar
+             para alcançar, e acima do parado, para ter de mirar adiante */
+          vel: tipo === 'aviao' ? 900 + Math.random()*800 : 0,
+          giro: (Math.random()-0.5)*0.06,      // uma curva mansa, para não ser trilho
+          x0:0, y0:0, vivo:true });
+      }
     }
   for (const o of obstaculos){ o.x0 = o.x; o.y0 = o.y; }
 
@@ -927,19 +973,33 @@ function montaMapa(){
       if (Math.abs(xx - estradaXv(zz)) < 700) continue;
       if (perto_da_pista(xx, zz)) continue;          // o aeroporto é plano
       if (Math.random() < 0.20) continue;
+      /* --- BAIRROS ---------------------------------------------------------
+         Antes toda a cidade era o mesmo sorteio: caixas cinzas de altura
+         aleatória, iguais em qualquer canto do mapa. Voando por cima, um lugar
+         era indistinguível do outro — e num mundo que acabou de dobrar de
+         tamanho isso é pior ainda, porque não há como saber onde se está.
+
+         O campo que decide onde há cidade vai de 0,62 (a borda) a uns 2,6 (o
+         miolo). Usando esse número, o mesmo sorteio produz bairros: no centro
+         as torres passam de 3.000 e ficam escuras e estreitas; na periferia
+         são galpões baixos e claros. Nenhuma peça nova, nenhuma ordem de
+         desenho a mais — só parar de jogar fora um número que já estava ali. */
+      const centro = Math.max(0, Math.min(1, (campoCidade(xx, zz) - 0.62)/1.5));
+      const alt = 220 + Math.random()*Math.random()*(700 + centro*centro*3400);
+      const larg = (420 + Math.random()*520) * (1 - centro*0.35);
       predios.push({ x:xx + (Math.random()-0.5)*300, z:zz + (Math.random()-0.5)*300,
-                     w: 420 + Math.random()*520, d: 420 + Math.random()*520,
-                     h: 260 + Math.random()*Math.random()*1500, tom: Math.random(), vivo:true });
+                     w: larg, d: larg*(0.7 + Math.random()*0.6),
+                     h: alt, tom: Math.random(), centro, vivo:true });
     }
 
   let tent = 0;
-  while (alvos.length < 14 && tent < 4000){
+  while (alvos.length < 18 && tent < 6000){
     tent++;
     const ax = (Math.random()-0.5)*MAPA*1.8, az = (Math.random()-0.5)*MAPA*1.8;
     if (!ehCidade(ax, az)) continue;
     if (Math.abs(ax - rioX(az)) < 1200) continue;
     if (perto_da_pista(ax, az)) continue;
-    if (alvos.some(a => Math.hypot(a.x-ax, a.z-az) < 9000)) continue;
+    if (alvos.some(a => Math.hypot(a.x-ax, a.z-az) < 9000*ESPACO)) continue;
     if (Math.hypot(ax, az) < 6000) continue;
     // tipoAlvo marca quem NÃO tem altura própria: o buscador e o míssil
     // precisam saber que a altura destes é o chão, senão o `y` vem indefinido
@@ -974,7 +1034,8 @@ rend.toneMappingExposure = 0.95;
 
 const cena = new THREE.Scene();
 cena.fog = new THREE.Fog(COR_CEU, 5000, 46000);
-const cam = new THREE.PerspectiveCamera(58, 1, 40, 130000);
+const CAM_FOV = 58, CAM_FOV_TURBO = 74;
+const cam = new THREE.PerspectiveCamera(CAM_FOV, 1, 40, 130000);
 cena.add(cam);
 
 /* A luz de baixo era VERDE-CAMPO (0x46603f), para o chão devolver a cor da
@@ -1128,8 +1189,12 @@ function montaCidade(){
     m.makeScale(p.w, p.h, p.d);
     m.setPosition(p.x, CHAO + p.h/2, p.z);
     cidade.setMatrixAt(i, m);
-    const t = 0.62 + p.tom*0.3;
-    cor.setRGB(t*0.80, t*0.84, t*0.90);
+    /* a cor também conta onde se está: o centro é escuro e azulado (vidro), a
+       periferia é clara e amarelada (reboco). É o que dá para reconhecer um
+       bairro do alto sem nenhuma placa. */
+    const t = (0.62 + p.tom*0.3) * (1 - (p.centro||0)*0.42);
+    const q = p.centro || 0;
+    cor.setRGB(t*(0.80 + (1-q)*0.14), t*(0.84 + (1-q)*0.05), t*(0.90 + q*0.10));
     cidade.setColorAt(i, cor);
     cidadeIdx.push(p);
   });
@@ -1701,15 +1766,98 @@ const flapNos = [];
   }
 }
 
-/* o fogo dos motores, dois cones que crescem no turbo */
+/* --- O FOGO DA TURBINA -------------------------------------------------------
+   "Caprichar no efeito da turbina, que era só um cone."
+
+   Era mesmo: um cone azul translúcido que engordava no nitro. Cone sozinho não
+   parece fogo — fogo tem MIOLO. Uma chama de pós-combustão tem três coisas que
+   o olho reconhece, e as três são baratas:
+
+   1. UM NÚCLEO BRANCO, curto e quase opaco, colado no bocal. É ele que dá a
+      impressão de calor; sem ele o resto é fumaça colorida.
+   2. UM ENVELOPE longo e transparente por fora, somando luz. É a parte que se
+      vê de longe.
+   3. OS ANÉIS DE CHOQUE — aqueles losangos espaçados dentro do jato de um caça
+      em pós-combustão. São a assinatura visual do troço, e quase ninguém
+      desenha porque não sabe que existem. São três aros finos, e é o detalhe
+      que faz alguém dizer "esse fogo está certo".
+
+   Tudo soma luz e treme a cada quadro: chama parada é plástico.
+   ------------------------------------------------------------------------ */
 const jatos = [];
 for (const lado of [-1, 1]){
-  const j = new THREE.Mesh(new THREE.ConeGeometry(14, 120, 12, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.35,
-                                  fog: false, depthWrite: false, side: THREE.DoubleSide }));
-  j.rotation.x = Math.PI/2;              // a ponta tem que apontar para TRÁS
-  j.position.set(lado*37, -9, -250);
-  aviao.add(j); jatos.push(j);
+  const g = new THREE.Group();
+  g.position.set(lado*82, -6, -110);        // colado no bocal das turbinas novas
+  const fogo = (cor, op) => new THREE.MeshBasicMaterial({ color: cor, transparent: true,
+    opacity: op, fog: false, depthWrite: false, side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending });
+  const env = new THREE.Mesh(new THREE.ConeGeometry(17, 150, 14, 1, true), fogo(0x7fc4ff, 0.30));
+  env.rotation.x = Math.PI/2; env.position.z = -75; g.add(env);
+  const nuc = new THREE.Mesh(new THREE.ConeGeometry(9, 62, 12, 1, true), fogo(0xffffff, 0.85));
+  nuc.rotation.x = Math.PI/2; nuc.position.z = -31; g.add(nuc);
+  const anelChoque = [];
+  for (let i = 0; i < 3; i++){
+    const a2 = new THREE.Mesh(new THREE.TorusGeometry(8, 1.6, 5, 14), fogo(0xffe6b0, 0.7));
+    a2.position.z = -46 - i*38; anelChoque.push(a2); g.add(a2);
+  }
+  aviao.add(g);
+  jatos.push({ g, env, nuc, aneis: anelChoque });
+}
+
+/* --- AS RISCAS DE VELOCIDADE -------------------------------------------------
+   O que faz uma tela parecer rápida não é o número na caixa da velocidade: é
+   ter COISAS PASSANDO perto. A cidade passa longe e no céu não há nada — por
+   isso o nitro dava som e empurrão sem dar velocidade nenhuma aos olhos.
+
+   Setenta riscos finos vivendo num tubo em volta do avião, correndo para trás
+   na velocidade do voo e reaparecendo na frente quando saem por trás. Somem em
+   voo normal e acendem no nitro — e como andam com o avião, o truque vale
+   igual no chão, que era o pedido: acelerar na pista com nitro passa a ter a
+   mesma rajada.
+
+   É UMA ordem de desenho: um `LineSegments` só, com as pontas reescritas a
+   cada quadro. Setenta partículas de verdade custariam setenta.
+   ------------------------------------------------------------------------ */
+const N_RISCAS = 70, TUBO_R = 900, TUBO_L = 4200;
+const riscas = [];
+for (let i = 0; i < N_RISCAS; i++){
+  riscas.push({ a: Math.random()*Math.PI*2, r: 180 + Math.random()*TUBO_R,
+                ao: (Math.random()-0.5)*TUBO_L, giro: (Math.random()-0.5)*0.4 });
+}
+const riscasPos = new Float32Array(N_RISCAS*6);
+const riscasGeo = new THREE.BufferGeometry();
+riscasGeo.setAttribute('position', new THREE.BufferAttribute(riscasPos, 3));
+const riscasNo = new THREE.LineSegments(riscasGeo, new THREE.LineBasicMaterial({
+  color: 0xdff2ff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+riscasNo.frustumCulled = false;             // elas vivem coladas na câmera
+riscasNo.visible = false;
+cena.add(riscasNo);
+
+let forcaRisca = 0;
+function passoRiscas(dt){
+  /* Acende com o nitro e desce devagar, senão o efeito pisca junto com o botão
+     em vez de subir e descer como a velocidade. */
+  const quer = turbinando ? 1 : 0;
+  forcaRisca += (quer - forcaRisca) * Math.min(1, dt*(quer ? 6 : 2.4));
+  riscasNo.visible = forcaRisca > 0.02;
+  if (!riscasNo.visible) return;
+  riscasNo.material.opacity = forcaRisca*0.55;
+  const comp = 260 + voo*0.11;               // risco mais comprido, mais rápido
+  const meia = TUBO_L/2;
+  for (let i = 0; i < N_RISCAS; i++){
+    const t = riscas[i];
+    t.ao -= voo*dt;
+    if (t.ao < -meia){ t.ao += TUBO_L; t.a = Math.random()*Math.PI*2; }
+    t.a += t.giro*dt;
+    const lx = Math.cos(t.a)*t.r, ly = Math.sin(t.a)*t.r;
+    const bx = aviaoX + eixoF.x*t.ao + eixoD.x*lx + eixoC.x*ly;
+    const by = aviaoY + eixoF.y*t.ao + eixoD.y*lx + eixoC.y*ly;
+    const bz = aviaoZ + eixoF.z*t.ao + eixoD.z*lx + eixoC.z*ly;
+    const k = i*6;
+    riscasPos[k  ] = bx;                 riscasPos[k+1] = by;                 riscasPos[k+2] = bz;
+    riscasPos[k+3] = bx - eixoF.x*comp;  riscasPos[k+4] = by - eixoF.y*comp;  riscasPos[k+5] = bz - eixoF.z*comp;
+  }
+  riscasGeo.attributes.position.needsUpdate = true;
 }
 
 /* --- inimigos: o mesmo avião, vermelho --------------------------------- */
@@ -1726,6 +1874,64 @@ function montaInimigos(){
     n.scale.setScalar(1.3);
     o.no = n; cena.add(n); inimigos.push(n);
   }
+  for (const o of obstaculos){
+    if (o.tipo !== 'helicoptero') continue;
+    const n = montaHelicoptero();
+    o.no = n; o.rotor = n.userData.rotor; cena.add(n); inimigos.push(n);
+  }
+}
+
+/* --- O HELICÓPTERO ----------------------------------------------------------
+   Ele existe por um motivo só: é o que PODE ficar parado no ar. Antes havia
+   aviões pairando, que é a única coisa que um avião não faz — e de longe o
+   céu parecia um mural.
+
+   Construído com as mesmas peças do dragão (torno, esferas, cones) para não
+   destoar: casco redondo, bolha de vidro na frente, cauda fina, rotor de
+   quatro pás em cima e um rotorzinho de cauda. Dois materiais, poucas peças, e
+   fundido por cor no fim como todo o resto — um helicóptero não pode custar
+   mais ordens de desenho que o avião do jogador.
+   ------------------------------------------------------------------------ */
+function montaHelicoptero(){
+  const g = new THREE.Group();
+  const mC = new THREE.MeshPhongMaterial({ color: 0x2f6b3f, shininess: 34, specular: 0x3a5a44 });
+  const mE = new THREE.MeshPhongMaterial({ color: 0x1a2430, shininess: 40 });
+  const mV = new THREE.MeshPhongMaterial({ color: 0x9fd8ff, shininess: 140, specular: 0xffffff,
+                                           transparent: true, opacity: 0.6 });
+  const casco = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), mC);
+  casco.scale.set(120, 110, 190); casco.castShadow = true; g.add(casco);
+  const vidro = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mV);
+  vidro.scale.set(96, 88, 90); vidro.position.set(0, 14, 120); g.add(vidro);
+  const cauda = new THREE.Mesh(new THREE.CylinderGeometry(26, 15, 300, 10), mC);
+  cauda.rotation.x = Math.PI/2; cauda.position.set(0, 26, -230); cauda.castShadow = true; g.add(cauda);
+  const deriva = new THREE.Mesh(new THREE.BoxGeometry(12, 90, 70), mC);
+  deriva.position.set(0, 66, -350); g.add(deriva);
+  for (const lado of [-1, 1]){                       // os patins
+    const p2 = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 300, 6), mE);
+    p2.rotation.x = Math.PI/2; p2.position.set(lado*70, -118, 10); g.add(p2);
+    const pe = new THREE.Mesh(new THREE.BoxGeometry(10, 60, 12), mE);
+    pe.position.set(lado*70, -88, 40); g.add(pe);
+  }
+  const mastro = new THREE.Mesh(new THREE.CylinderGeometry(12, 12, 60, 8), mE);
+  mastro.position.y = 130; g.add(mastro);
+  // o rotor fica FORA da fusão: é a única peça que se mexe sozinha
+  const rotor = new THREE.Group();
+  for (let i = 0; i < 4; i++){
+    const pa = new THREE.Mesh(new THREE.BoxGeometry(760, 7, 46), mE);
+    pa.rotation.y = i*Math.PI/2; rotor.add(pa);
+  }
+  const rc = new THREE.Mesh(new THREE.CylinderGeometry(22, 22, 16, 10), mC);
+  rotor.add(rc);
+  fundePorCor(g);
+  rotor.position.y = 158; g.add(rotor);
+  const cRotor = new THREE.Group();
+  for (let i = 0; i < 3; i++){
+    const pa = new THREE.Mesh(new THREE.BoxGeometry(6, 190, 24), mE);
+    pa.rotation.x = i*Math.PI/3; cRotor.add(pa);
+  }
+  cRotor.position.set(22, 66, -352); g.add(cRotor);
+  g.userData.rotor = [rotor, cRotor];
+  return g;
 }
 
 /* --- pombos: um corpo simples com duas asas que batem ------------------- */
@@ -1908,6 +2114,16 @@ function poeCamera(dt){
      (direita, cima, -frente) dá uma base ESPELHADA — e o resultado é o avião
      indo parar atrás da câmera. lookAt monta a base certa a partir do "para
      onde" e do "para cima", que é o que eu tenho. */
+  /* O SOCO DE CAMPO DE VISÃO. É o truque mais forte que existe para sensação de
+     velocidade, e custa uma linha: no nitro a lente abre de 58° para 74°. O
+     mundo nas bordas passa a correr muito mais depressa que no meio, que é
+     exatamente o que o olho lê como "estou acelerando". Vai e volta macio —
+     abrir de repente enjoa. */
+  const fovQuer = turbinando ? CAM_FOV_TURBO : CAM_FOV;
+  if (Math.abs(cam.fov - fovQuer) > 0.05){
+    cam.fov += (fovQuer - cam.fov) * Math.min(1, dt*(turbinando ? 3.2 : 2.0));
+    cam.updateProjectionMatrix();
+  }
   cam.up.set(camC.x, camC.y, camC.z);
   cam.lookAt(camPos.x + camF.x*1000, camPos.y + camF.y*1000, camPos.z + camF.z*1000);
   cam.updateMatrixWorld();
@@ -2480,6 +2696,38 @@ const matTiro = new THREE.MeshBasicMaterial({ color: 0xffec96, fog: false });
    tem silhueta própria — corpo fino e comprido, ogiva em cone, quatro
    aletinhas atrás e o fogo saindo do bocal. Montado apontando para +z, que é
    o nariz, para o `lookAt` do voo servir sem conserto. */
+/* --- O MÍSSIL NUCLEAR -------------------------------------------------------
+   Maior e mais gordo que o ar-ar, com faixas amarelas e pretas de aviso e uma
+   ogiva grande e chata em vez de bico fino. Tem de dar para reconhecer no ar
+   qual dos dois está a caminho — inclusive de longe, por quem está no chão. */
+function montaNuke(){
+  const g = new THREE.Group();
+  const mC = new THREE.MeshPhongMaterial({ color: 0xe8e2d2, shininess: 60, specular: 0xb8b2a2 });
+  const mA = new THREE.MeshPhongMaterial({ color: 0xffc24d, shininess: 70 });
+  const mP = new THREE.MeshPhongMaterial({ color: 0x22242a, shininess: 50 });
+  const corpo = new THREE.Mesh(new THREE.CylinderGeometry(20, 20, 190, 14), mC);
+  corpo.rotation.x = Math.PI/2; corpo.castShadow = true; g.add(corpo);
+  const ogiva = new THREE.Mesh(new THREE.SphereGeometry(21, 14, 10), mC);
+  ogiva.scale.set(1, 1, 1.5); ogiva.position.z = 108; g.add(ogiva);
+  for (let i = 0; i < 3; i++){                      // as faixas de aviso
+    const f = new THREE.Mesh(new THREE.CylinderGeometry(20.6, 20.6, 16, 14),
+                             i % 2 ? mP : mA);
+    f.rotation.x = Math.PI/2; f.position.z = 40 - i*26; g.add(f);
+  }
+  for (let k = 0; k < 4; k++){
+    const a2 = new THREE.Mesh(new THREE.BoxGeometry(3.4, 26, 42), mA);
+    a2.position.set(0, 26, -74);
+    const eixo = new THREE.Group(); eixo.add(a2); eixo.rotation.z = k*Math.PI/2; g.add(eixo);
+  }
+  fundePorCor(g);
+  const fogo = new THREE.Mesh(new THREE.ConeGeometry(12, 78, 10, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.75,
+                                  side: THREE.DoubleSide, depthWrite: false }));
+  fogo.rotation.x = -Math.PI/2; fogo.position.z = -132; g.add(fogo);
+  g.userData.fogo = fogo;
+  return g;
+}
+
 function montaMissil(){
   const g = new THREE.Group();
   const matCorpo = new THREE.MeshPhongMaterial({ color: 0xd8dde6, shininess: 70, specular: 0xaab4c4 });
@@ -2559,7 +2807,7 @@ const Mira = {
       const c = (vx*d.x + vy*d.y + vz*d.z)/dist;
       if (c > melhorCos){ melhorCos = c; melhor = o; }
     };
-    for (const o of obstaculos) if (o.vivo && o.tipo === 'aviao') olha(o, o.x, o.y, o.z);
+    for (const o of obstaculos) if (o.vivo && o.tipo !== 'pombo') olha(o, o.x, o.y, o.z);
     for (const o of inimigosRede()) olha(o, o.x, o.y, o.z);
     for (const a of alvos) if (a.vivo) olha(a, a.x, CHAO + 300, a.z);
     return { alvo: melhor, cos: melhorCos };
@@ -2620,12 +2868,37 @@ function dispara(){
   if (!munInfinita) municao[arma]--;
   recarga = ARMAS[arma].recarga;
   if (arma === 'bomba'){
-    const m = new THREE.Mesh(geoBomba, matBomba); m.castShadow = true; cena.add(m);
-    bombas.push({ no:m, tipo:'bomba', x:aviaoX, y:aviaoY-60, z:aviaoZ,
-                  vx:eixoF.x*voo, vy:eixoF.y*voo - 60, vz:eixoF.z*voo });
-    bip(150, 0.12, 'sawtooth', 0.1);
-    sacode(0.12);
+    /* --- A NUCLEAR VIROU MÍSSIL AR-TERRA ---------------------------------
+       "A bomba nuclear não tem muita graça, nem vejo onde ela cai."
+
+       Era literal: uma cápsula largada da barriga, que caía por parábola atrás
+       do avião enquanto ele seguia em frente. Quando ela chegava ao chão o
+       jogador estava a quilômetros dali, olhando para a frente, e via — no
+       máximo — um clarão pelas costas. A arma mais destrutiva do jogo era a
+       única que ninguém via funcionar.
+
+       Agora ela é lançada, não largada: sai na direção da MIRA, procura o
+       ponto do chão que está sob ela e vai até lá em linha reta e depressa. E,
+       enquanto voa, o chão ganha um ALVO desenhado no lugar do impacto — dá
+       para ver para onde ela vai, corrigir o voo e chegar a tempo de assistir.
+
+       O que ela ganhou em graça, cobra em risco: ir ver de perto é entrar no
+       raio dela. */
+    const T = direcaoDaMira();
+    const m = montaNuke(); cena.add(m);
+    const vel = voo*1.9;
+    /* onde ela vai bater: o ponto em que esta reta cruza o chão. Se ela sair
+       apontada para cima, não há ponto — e aí a marca não aparece, que é a
+       resposta honesta para "onde cai?" */
+    const alvoChao = T.y < -0.02
+      ? { x: aviaoX + T.x*((CHAO - aviaoY)/T.y), z: aviaoZ + T.z*((CHAO - aviaoY)/T.y) }
+      : null;
+    bombas.push({ no:m, tipo:'nuke', x:aviaoX, y:aviaoY-60, z:aviaoZ,
+                  vx:T.x*vel, vy:T.y*vel, vz:T.z*vel, vida:9.0, fumaca:0, marca:alvoChao });
+    somMissil();
+    sacode(0.20);
     Controles.bate('bomba');
+    mostraAviso(alvoChao ? 'NUCLEAR A CAMINHO' : 'NUCLEAR — APONTE PARA BAIXO', '#ffc24d', 1000);
   } else if (arma === 'missil'){
     const m = montaMissil(); cena.add(m);
     const T = direcaoDaMira();
@@ -2676,13 +2949,17 @@ function atingeAr(x, y, z, raio, dano){
   if (Batalha.acerta(x, y, z, raio, dano || 10)) return true;
   for (const o of obstaculos){
     if (!o.vivo) continue;
-    const r = (o.tipo === 'aviao' ? RAIO_AVIAO : RAIO_POMBO) + raio;
+    const r = (o.tipo === 'aviao' ? RAIO_AVIAO
+             : o.tipo === 'helicoptero' ? RAIO_HELI : RAIO_POMBO) + raio;
     if (Math.abs(o.y-y) < r && Math.hypot(o.x-x, o.z-z) < r){
       o.vivo = false; if (o.no) o.no.visible = false;
-      pontos += o.tipo === 'aviao' ? 200 : 50;
-      explode(o.x, o.y, o.z, o.tipo === 'aviao' ? 1.2 : 0.5);
-      mostraAviso(o.tipo === 'aviao' ? 'AVIÃO ABATIDO! +200' : '+50', '#ffd257', 800);
-      Controles.bate(o.tipo === 'aviao' ? 'alvo' : 'pegou'); sacode(o.tipo === 'aviao' ? 0.22 : 0.08);
+      /* o helicóptero está parado: é o alvo fácil, e vale menos que o avião,
+         que obriga a mirar adiante */
+      pontos += o.tipo === 'aviao' ? 200 : o.tipo === 'helicoptero' ? 120 : 50;
+      explode(o.x, o.y, o.z, o.tipo === 'pombo' ? 0.5 : 1.2);
+      mostraAviso(o.tipo === 'aviao' ? 'AVIÃO ABATIDO! +200'
+                : o.tipo === 'helicoptero' ? 'HELICÓPTERO ABATIDO! +120' : '+50', '#ffd257', 800);
+      Controles.bate(o.tipo === 'pombo' ? 'pegou' : 'alvo'); sacode(o.tipo === 'pombo' ? 0.08 : 0.22);
       return true;
     }
   }
@@ -2730,6 +3007,26 @@ function atualizaTiros(dt){
       if (atingeAr(b.x,b.y,b.z,260,DANO.missil) || atingeAlvo(b.x,b.z,300)) b.morto = true;
       if (b.vida <= 0) b.morto = true;
       if (b.morto) estouraMissil(b.x, b.y, b.z);
+    } else if (b.tipo === 'nuke'){
+      /* Voa reto e rápido, com um fio de gravidade só para a trajetória não
+         ser uma régua. Estoura no chão OU no primeiro prédio que encontrar —
+         antes ela atravessava a cidade inteira e só acordava no asfalto. */
+      b.vy -= dt*260; b.y += b.vy*dt; b.vida -= dt;
+      b.fumaca -= dt;
+      if (b.fumaca <= 0){ b.fumaca = 0.02; fumacinha(b.x, b.y, b.z); }
+      let bateu = b.y <= CHAO || b.vida <= 0;
+      if (!bateu){
+        for (const p2 of predios){
+          if (!p2.vivo || b.y > CHAO + p2.h) continue;
+          if (Math.abs(p2.x-b.x) < p2.w/2 && Math.abs(p2.z-b.z) < p2.d/2){ bateu = true; break; }
+        }
+      }
+      if (bateu){
+        b.morto = true;
+        const yy = Math.max(CHAO, b.y);
+        explode(b.x, yy+200, b.z, 2.4); nuclear(b.x, b.z);
+        pegaNaNuclear(b.x, b.z); sacodeNuclear(b.x, b.z);
+      }
     } else {
       b.vy -= dt*1400; b.y += b.vy*dt;
       if (b.y <= CHAO){ b.morto = true; explode(b.x, CHAO+200, b.z, 2.4); nuclear(b.x, b.z);
@@ -2744,7 +3041,7 @@ function atualizaTiros(dt){
        O míssil novo já nasce montado apontando para +Z, e estava levando esse
        quarto de volta em cima: saía voando DE LADO. Era o que o Brunno via —
        "vejo ele indo de lado, quando tinha que ver ele de trás". */
-    if (b.tipo !== 'missil') b.no.rotateX(Math.PI/2);
+    if (b.tipo !== 'missil' && b.tipo !== 'nuke') b.no.rotateX(Math.PI/2);
   }
   bombas = bombas.filter(b => { if (b.morto){ cena.remove(b.no); return false; } return true; });
   for (const t of tiros){
@@ -2755,6 +3052,7 @@ function atualizaTiros(dt){
     t.no.rotateX(Math.PI/2);
   }
   tiros = tiros.filter(t => { if (t.vida <= 0){ cena.remove(t.no); return false; } return true; });
+  passoRiscas(dt);
   passoFumo(dt);
 }
 
@@ -2812,6 +3110,12 @@ function aterra(queda){
   // bico desce sozinho na corrida
   arfChao = Math.max(0, Math.min(ARF_CHAO, arfagem));
   rumoChao = Math.atan2(eixoF.x, eixoF.z);
+  /* A ASA NÃO NIVELA NUM QUADRO. Isto punha `eixoC = (0,1,0)` de uma vez: quem
+     tocasse com 10° de banco via o avião estalar para o nivelado entre um
+     quadro e o outro. Guardado o banco do toque, ele escorre para zero em meio
+     segundo — é o amortecedor comprimindo e a asa assentando, e é o que faz o
+     pouso parecer um pouso em vez de um encaixe. */
+  rolChao = voltaCurta(inclinacao) * Math.PI/180;
   eixoF = vnorm({ x: eixoF.x, y: 0, z: eixoF.z });
   eixoC = { x: 0, y: 1, z: 0 };
   endireitaEixos();
@@ -2874,6 +3178,12 @@ function rolaNoChao(dt, e){
   eixoF = { x: sr*ca, y: sa, z: cr*ca };
   eixoC = { x: -sr*sa, y: ca, z: -cr*sa };
   endireitaEixos();
+  // e o banco que sobrou do toque escorrendo para zero
+  if (Math.abs(rolChao) > 0.002){
+    rolChao -= rolChao * Math.min(1, dt*4.5);
+    const r2 = giraPar(eixoD, eixoC, -rolChao); eixoD = r2[0]; eixoC = r2[1];
+    endireitaEixos();
+  } else rolChao = 0;
   leme += ((e.leme || 0) - leme) * Math.min(1, dt*22);
 
   if (tecla.mais)  motor = Math.min(1, motor + dt*0.65);
@@ -3031,9 +3341,34 @@ function atualiza(dt){
       rol = Math.max(-NIVELA, Math.min(NIVELA, erro*1.7));
     } else rol = 0;                       // curva firme: segura o banco
   } else rol = e.lat * TAXA_ROL;
+
+  /* --- A AUTORIDADE DOS COMANDOS DEPENDE DA VELOCIDADE -------------------------
+     Aqui estava a verdadeira "discrepância" entre a pista e o céu, e não na
+     aceleração como eu tinha pensado primeiro. Medido no traço da decolagem:
+     a puxada de rotação, 0,6 s de manche, levava o nariz a 46° — e o avião,
+     recém-saído do chão a 1.300, apontava para o céu e subia 740 por segundo.
+     Isso é o foguete. No chão ele mal levanta o bico; no quadro seguinte faz
+     46° num piscar.
+
+     A causa é o comando ter a mesma força a qualquer velocidade. Num avião não
+     tem: o profundor e os ailerons trabalham com o ar que passa por eles, e a
+     força cresce com o QUADRADO da velocidade. Devagar o manche é mole; rápido
+     ele é firme. É por isso que ninguém arranca um avião do chão em 46°.
+
+     Com a autoridade amarrada à velocidade, a transição se resolve sozinha e
+     de graça em três lugares ao mesmo tempo: a decolagem fica mansa, o pouso
+     lento fica delicado, e o voo perto do estol fica mole — que é exatamente
+     como se sente um avião no limite. Nada disso precisou de caso especial.
+
+     O piso de 0,25 existe para o avião nunca ficar sem comando nenhum; o teto
+     de 1,15 dá o troco de manobrar mais firme em alta. */
+  const q = voo/VOO_BASE;
+  const autoridade = Math.max(0.25, Math.min(1.15, q*q));
+  rol *= autoridade;
+
   let r = giraPar(eixoD, eixoC, -rol*dt); eixoD = r[0]; eixoC = r[1];
 
-  let cab = e.ver * TAXA_ARF;
+  let cab = e.ver * TAXA_ARF * autoridade;
   /* MÃO SOLTA, O AVIÃO VOLTA AO NIVELADO — menos quando está estolado.
 
      Este endireitamento é o que torna o avião dócil: soltou o manche, o nariz
@@ -3120,6 +3455,25 @@ function atualiza(dt){
   // trem fora e flape baixado ARRASTAM: o avião simplesmente não corre mais
   vooAlvo = Math.min(vooAlvo, FLAP_TETO[flap] || FLAP_TETO[0]);
   if (trem) vooAlvo = Math.min(vooAlvo, TREM_TETO);
+  /* --- O DEGRAU ENTRE A PISTA E O CÉU -----------------------------------------
+     "Parece que estou grudado no chão, e quando decola do nada parece um
+     foguete. É muito discrepante."
+
+     Minha primeira teoria foi a aceleração: no chão o avião ganhava 215 por
+     segundo e no ar 3.775, dezessete vezes mais, de um quadro para o outro.
+     Pus um TETO na aceleração do ar — e quebrei o jogo. O teto matou toda
+     subida: a escada inteira passou a estolar, inclusive 30° com potência de
+     cruzeiro.
+
+     A razão é bonita. A perseguição `(alvo - voo)*2,5` não é só pressa: ela é
+     o que EQUILIBRA o custo da subida. Quanto mais a subida drena velocidade,
+     mais forte ela puxa de volta, e o avião assenta onde as duas se igualam —
+     é dela que sai a escada de ângulos. Um teto fixo corta esse braço e o
+     avião não tem mais como pagar subida nenhuma.
+
+     E o "foguete" nunca foi a aceleração. Era o MANCHE — ver a nota da
+     autoridade dos comandos, logo abaixo. A corrida no chão ficou mais forte
+     (a metade "grudado" da queixa) e o resto se resolveu sozinho. */
   voo += (vooAlvo - voo) * Math.min(1, dt*2.5);
 
   /* --- SUBIR CUSTA, DESCER DEVOLVE -------------------------------------------
@@ -3275,9 +3629,32 @@ function atualiza(dt){
   for (const o of obstaculos){
     if (!o.vivo) continue;
     o.fase += dt*2;
-    o.x = o.x0 + Math.sin(o.fase*0.7)*o.deriva;
-    if (o.tipo === 'pombo') o.y = o.y0 + Math.cos(o.fase*1.1)*220;
-    const raio = (o.tipo === 'aviao' ? RAIO_AVIAO : RAIO_POMBO) + 150;
+    if (o.tipo === 'aviao'){
+      /* AVIÃO DE ROTA: anda no rumo, curva manso e dá a volta pelo outro lado
+         do mapa quando chega ao fim. Sem a volta, em dois minutos o céu ficava
+         vazio de um lado e entupido do outro. */
+      /* `|| 0` nos dois: um obstáculo montado sem velocidade ou sem giro —
+         e existem, tanto em teste quanto em recado de rede antigo — fazia
+         `Math.sin(rumo)*undefined` virar NaN, e dali para a frente a posição
+         inteira do bicho era NaN. É a mesma armadilha do `y` que faltava nos
+         alvos de chão e que já tinha estourado a perseguição do míssil: um
+         campo ausente não avisa, só contamina. */
+      o.rumo += (o.giro || 0)*dt;
+      o.x += Math.sin(o.rumo)*(o.vel || 0)*dt;
+      o.z += Math.cos(o.rumo)*(o.vel || 0)*dt;
+      o.y = (o.y0 || o.y) + Math.sin(o.fase*0.25)*160;   // sobe e desce de leve
+      if (o.x >  MAPA) o.x = -MAPA; else if (o.x < -MAPA) o.x = MAPA;
+      if (o.z >  MAPA) o.z = -MAPA; else if (o.z < -MAPA) o.z = MAPA;
+    } else if (o.tipo === 'helicoptero'){
+      // pairando: só o bailado do rotor e uma guinada lenta
+      o.y = o.y0 + Math.sin(o.fase*0.5)*70;
+      o.rumo += 0.18*dt;
+    } else {
+      o.x = o.x0 + Math.sin(o.fase*0.7)*o.deriva;
+      o.y = o.y0 + Math.cos(o.fase*1.1)*220;
+    }
+    const raio = (o.tipo === 'aviao' ? RAIO_AVIAO
+                : o.tipo === 'helicoptero' ? RAIO_HELI : RAIO_POMBO) + 150;
     const dx = aviaoX-o.x, dy = aviaoY-o.y, dz = aviaoZ-o.z;
     if (dx*dx + dy*dy + dz*dz < raio*raio){ derruba(o.tipo); return; }
   }
@@ -3299,12 +3676,20 @@ function arruma(){
   poeMalha(aviao, aviaoX, aviaoY, aviaoZ, D, C, eixoF);
   aviao.visible = !cockpit;
   for (const j of jatos){
-    // a chama cresce com o acelerador, e estoura no nitro
+    // a chama cresce com o acelerador e estoura no nitro; o tremido a cada
+    // quadro é o que a separa de um cone de plástico
     const q = turbinando ? 1 : motor;
-    j.scale.set(1, turbinando ? 2.4 : 0.5 + q*0.7, 1);
-    // (o trem e os flapes são arrumados logo abaixo, em arruma())
-    j.position.z = -250 - (turbinando ? 90 : 0);
-    j.material.opacity = turbinando ? 0.6 : 0.10 + q*0.18;
+    const comp = (turbinando ? 2.6 : 0.45 + q*0.75) * (0.9 + Math.random()*0.2);
+    j.env.scale.set(1, comp, 1);
+    j.nuc.scale.set(1, comp*(0.55 + Math.random()*0.12), 1);
+    j.env.material.opacity = (turbinando ? 0.55 : 0.10 + q*0.16) * (0.85 + Math.random()*0.3);
+    j.nuc.material.opacity = (turbinando ? 0.9 : 0.25 + q*0.35) * (0.85 + Math.random()*0.3);
+    j.aneis.forEach((a2, i) => {
+      a2.visible = turbinando;              // anel de choque só em pós-combustão
+      a2.position.z = -46 - i*38*comp*0.9;
+      a2.material.opacity = 0.6 * (0.7 + Math.random()*0.6);
+      a2.scale.setScalar(1 - i*0.14);
+    });
   }
   /* trem e flapes: os dois se mexem devagar, senão aparecem e somem de um
      quadro para o outro e não se vê nada acontecer */
@@ -3341,6 +3726,13 @@ function arruma(){
       const Fr = vnorm({ x: Math.sin(rr), y: Math.sin(bal)*0.1, z: Math.cos(rr) });
       const Dd = vnorm({ x: Math.cos(rr), y: Math.sin(bal)*0.5, z: -Math.sin(rr) });
       poeMalha(o.no, o.x, o.y, o.z, Dd, vcruz(Fr, Dd), Fr);
+    } else if (o.tipo === 'helicoptero'){
+      o.no.position.set(o.x, o.y, o.z);
+      o.no.rotation.y = o.rumo;
+      if (o.rotor){
+        o.rotor[0].rotation.y += 0.55;      // o rotor principal
+        o.rotor[1].rotation.x += 0.9;       // e o de cauda, mais rápido
+      }
     } else {
       o.no.position.set(o.x, o.y, o.z);
       o.no.rotation.y = o.rumo;
@@ -3899,17 +4291,32 @@ function desenhaHUD(){
       const x = (v2.x*0.5+0.5)*W, y = (-v2.y*0.5+0.5)*H;
       if (x < -60 || x > W+60 || y < -60 || y > H+60) continue;
       const d = Math.hypot(o.x-aviaoX, o.y-aviaoY, o.z-aviaoZ);
+      /* --- O TAMANHO DA MARCA ---------------------------------------------
+         "O HUD dos aviões de outros players fica muito grande, fica um
+         grandão no meio da tela, fica feio."
+
+         A caixa crescia até 70 px de meio-lado — 140 de lado, num HUD onde
+         nenhuma outra coisa passa de 30. De perto ela tomava o meio da tela e
+         tapava justamente o avião que se está tentando acertar.
+
+         O erro foi querer que a caixa ENVOLVESSE o alvo. Mira de caça não faz
+         isso: ela aponta, e quem enxerga o avião é o olho. Agora é uma marca
+         pequena e de tamanho quase fixo, com quatro cantos em vez de um
+         retângulo fechado — igual em estilo às outras marcas do HUD. */
       const perto = d < 12000;
-      const r = Math.max(10, Math.min(70, 900000/Math.max(900, d)));
-      h2.strokeStyle = perto ? 'rgba(255,120,100,.95)' : 'rgba(255,255,255,.55)';
-      h2.lineWidth = 2;
-      h2.strokeRect(x-r, y-r, r*2, r*2);
+      const r = Math.max(9, Math.min(26, 260000/Math.max(900, d)));
+      h2.strokeStyle = perto ? 'rgba(255,120,100,.95)' : 'rgba(255,255,255,.5)';
+      h2.lineWidth = 1.8;
+      const c = r*0.55;                         // só os cantos, não a caixa toda
+      h2.beginPath();
+      for (const [sx, sy] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+        h2.moveTo(x + sx*r, y + sy*r - sy*c); h2.lineTo(x + sx*r, y + sy*r);
+        h2.lineTo(x + sx*r - sx*c, y + sy*r);
+      }
+      h2.stroke();
       h2.fillStyle = h2.strokeStyle;
-      h2.font = '800 ' + Math.max(9, H*0.018).toFixed(0) + 'px system-ui, sans-serif';
-      h2.fillText(o.nome, x, y - r - 6);
-      h2.font = '700 ' + Math.max(8, H*0.015).toFixed(0) + 'px ui-monospace, monospace';
-      h2.fillText(Math.round(d/METRO) + 'm · ' + Math.round(o.vida === undefined ? 100 : o.vida) + '%',
-                  x, y + r + 14);
+      h2.font = '700 ' + Math.max(8, H*0.014).toFixed(0) + 'px system-ui, sans-serif';
+      h2.fillText(o.nome + '  ' + Math.round(d/METRO) + 'm', x, y - r - 5);
     }
     h2.textAlign = 'left';
   }
@@ -4025,6 +4432,94 @@ function desenhaHUD(){
     g4.addColorStop(0, 'rgba(255,40,40,' + f.toFixed(2) + ')');
     g4.addColorStop(1, 'rgba(255,40,40,0)');
     h2.fillStyle = g4; h2.fillRect(W-esp,0,esp,H);
+  }
+
+  /* --- A MARCA DO IMPACTO NUCLEAR ---------------------------------------------
+     "Nem vejo onde ela cai." O míssil resolve metade — dá para segui-lo com os
+     olhos —, mas segui-lo é justamente o que se não pode fazer enquanto se
+     pilota. Então o chão diz.
+
+     Um alvo desenhado no ponto de impacto, projetado pela mesma câmera que
+     desenha o mundo, com a distância escrita ao lado e um anel que aperta
+     conforme o míssil chega. Quando o anel fecha, é agora — e é o aviso de que
+     está na hora de estar longe, porque o raio da nuclear é 9.000. */
+  for (const b of bombas){
+    if (b.tipo !== 'nuke' || !b.marca) continue;
+    const v3 = new THREE.Vector3(b.marca.x, CHAO + 30, b.marca.z).project(cam);
+    if (v3.z > 1) continue;
+    const mx = (v3.x*0.5+0.5)*W, my = (-v3.y*0.5+0.5)*H;
+    if (mx < -80 || mx > W+80 || my < -80 || my > H+80) continue;
+    const falta = Math.max(0, Math.min(1, b.vida/9));
+    const r = Math.max(9, H*0.045);
+    h2.strokeStyle = 'rgba(255,194,77,.95)'; h2.lineWidth = 2.4;
+    h2.beginPath(); h2.arc(mx, my, r, 0, 7); h2.stroke();
+    h2.beginPath();                                    // a cruz do centro
+    h2.moveTo(mx - r*1.5, my); h2.lineTo(mx - r*0.4, my);
+    h2.moveTo(mx + r*0.4, my); h2.lineTo(mx + r*1.5, my);
+    h2.moveTo(mx, my - r*1.5); h2.lineTo(mx, my - r*0.4);
+    h2.moveTo(mx, my + r*0.4); h2.lineTo(mx, my + r*1.5);
+    h2.stroke();
+    // o anel que aperta: quando encosta no alvo, é agora
+    h2.strokeStyle = 'rgba(255,120,60,.9)'; h2.lineWidth = 3;
+    h2.beginPath(); h2.arc(mx, my, r + falta*r*2.6, 0, 7); h2.stroke();
+    h2.textAlign = 'center';
+    h2.font = '800 ' + Math.max(10, H*0.019).toFixed(0) + 'px ui-monospace, monospace';
+    h2.fillStyle = 'rgba(255,214,120,.95)';
+    const dm = Math.round(Math.hypot(b.marca.x-aviaoX, b.marca.z-aviaoZ)/METRO);
+    h2.fillText('NUCLEAR · ' + dm + 'm', mx, my - r*1.9);
+    /* e o alerta de estar perto demais do próprio estrago */
+    if (Math.hypot(b.marca.x-aviaoX, b.marca.z-aviaoZ) < RAIO_NUKE){
+      h2.fillStyle = 'rgba(255,90,70,.95)';
+      h2.fillText('SAIA DAQUI', mx, my + r*2.4);
+    }
+    h2.textAlign = 'left';
+  }
+
+  /* --- A MIRA DA METRALHADORA -------------------------------------------------
+     "A metralhadora também tem que ter um HUD de disparo verde, projetando
+     para onde vão os tiros."
+
+     Fazia falta: a mira do meio da tela diz para onde o NARIZ aponta, e os
+     tiros saem por ali mas morrem a uma distância certa. Sem ver o alcance,
+     atira-se muito longe e não se entende por que não acerta.
+
+     Isto desenha o caminho real da bala — a mesma direção que `dispara()` usa,
+     a mesma velocidade, o mesmo tempo de vida — projetado pela câmera do jogo.
+     Os traços marcam os quartos do alcance e o círculo é onde a bala acaba:
+     alvo além do círculo é alvo que não vai ser atingido, e isso passa a ser
+     visível em vez de adivinhado. Em verde, como o resto do HUD da cabine. */
+  if (jogando && !caindo && arma === 'metralha' && municao.metralha > 0){
+    const T = direcaoDaMira();
+    const alcance = voo*6*1.1;                 // v * vida, os números do `dispara()`
+    const v3 = new THREE.Vector3();
+    const naTela3 = k => {
+      v3.set(aviaoX + T.x*alcance*k, aviaoY + T.y*alcance*k, aviaoZ + T.z*alcance*k).project(cam);
+      return { x:(v3.x*0.5+0.5)*W, y:(-v3.y*0.5+0.5)*H, atras: v3.z > 1 };
+    };
+    const pontos4 = [0.28, 0.52, 0.76, 1].map(naTela3);
+    if (!pontos4.some(q => q.atras)){
+      h2.strokeStyle = 'rgba(120,255,170,.55)'; h2.lineWidth = 1.4;
+      h2.beginPath();
+      h2.moveTo(pontos4[0].x, pontos4[0].y);
+      for (const q of pontos4) h2.lineTo(q.x, q.y);
+      h2.stroke();
+      // os traços dos quartos, cada vez menores: é isso que dá a profundidade
+      h2.strokeStyle = 'rgba(120,255,170,.8)'; h2.lineWidth = 2;
+      pontos4.forEach((q, i) => {
+        if (i === 3) return;
+        const t = Math.max(4, H*0.016*(1 - i*0.26));
+        h2.beginPath(); h2.moveTo(q.x - t, q.y); h2.lineTo(q.x + t, q.y); h2.stroke();
+      });
+      // e o fim do alcance
+      const f = pontos4[3];
+      h2.strokeStyle = 'rgba(150,255,190,.95)'; h2.lineWidth = 2;
+      h2.beginPath(); h2.arc(f.x, f.y, Math.max(5, H*0.013), 0, 7); h2.stroke();
+      h2.textAlign = 'center';
+      h2.font = '700 ' + Math.max(8, H*0.014).toFixed(0) + 'px ui-monospace, monospace';
+      h2.fillStyle = 'rgba(120,255,170,.75)';
+      h2.fillText(Math.round(alcance/METRO) + 'm', f.x, f.y + Math.max(14, H*0.030));
+      h2.textAlign = 'left';
+    }
   }
 
   if (jogando && !caindo) desenhaRadar();
@@ -4228,7 +4723,7 @@ function reinicia(){
     aviaoZ = PISTA_Z0 + 1200 + fila*5000;
     aviaoY = PISTA_Y + RODA;
     noChao = true; trem = true; flap = 1; motor = 0; voo = 0; parado = 0;
-    arfChao = 0; rumoChao = 0;
+    arfChao = 0; rumoChao = 0; rolChao = 0;
   } else {
     const p = Batalha.ligada ? sorteiaNascimento() : null;
     aviaoX = p ? p.x : 0; aviaoZ = p ? p.z : 0; aviaoY = p ? p.y : 1500;

@@ -2755,3 +2755,92 @@ a mesma com flape 2: não estolou, nariz a 0°                               ✔
 as seis atitudes, inclusive de cabeça para baixo: todas caem de bico       ✔
 mergulhando 40°: 5.140 contra 3.392 nivelado                               ✔
 ```
+
+---
+
+## O mundo ganhou vida (e ficou maior)
+
+Cinco pedidos de uma vez. O primeiro — *"o nariz para cima perde velocidade, para
+baixo ganha"* — já estava pronto desde a rodada anterior; os outros quatro são
+desta.
+
+### Avião não fica parado no ar
+
+> *"Não quero mais avião parado no mapa; se for parado que seja um helicóptero,
+> os aviões de pontuação devem estar em movimento."*
+
+Os aviões tinham uma `deriva` de ±300 e ficavam balançando em volta do mesmo
+ponto: de longe, parados. **Avião parado no ar é a única coisa que um avião não
+faz.**
+
+Agora quem é avião **cruza o mapa** num rumo, com uma curva mansa, e dá a volta
+pelo outro lado quando chega ao fim — sem isso, em dois minutos o céu fica vazio
+de um lado e entupido do outro. E quem tinha de ficar parado virou
+**helicóptero**, que é o que pode.
+
+O helicóptero não é enfeite: por estar parado é o alvo fácil, e vale **120**
+contra os **200** do avião, que obriga a mirar adiante. Construído com as mesmas
+peças do dragão para não destoar, e fundido por cor como todo o resto — um
+figurante não pode custar mais ordens de desenho que o avião do jogador.
+
+### A nuclear virou míssil ar-terra
+
+> *"A bomba nuclear não tem muita graça, nem vejo onde ela cai."*
+
+Era literal: uma cápsula largada da barriga, que caía por parábola **atrás** do
+avião enquanto ele seguia em frente. Quando ela chegava ao chão, o jogador
+estava a quilômetros dali olhando para a frente. A arma mais destrutiva do jogo
+era a única que ninguém via funcionar.
+
+Agora ela é **lançada, não largada**: sai na direção da mira a quase o dobro da
+velocidade do avião, e estoura no chão **ou no primeiro prédio que encontrar** —
+antes ela atravessava a cidade inteira e só acordava no asfalto.
+
+E o chão diz onde ela vai cair. Um alvo desenhado no ponto de impacto, com a
+distância escrita e um anel que aperta conforme ela chega; quando o anel fecha, é
+agora. Se a pessoa disparar apontando para **cima**, não há ponto de impacto — e
+o jogo diz isso (`NUCLEAR — APONTE PARA BAIXO`) em vez de inventar uma marca.
+
+O que ela ganhou em graça, cobra em risco: ir ver de perto é entrar no raio de
+9.000 dela, e o HUD avisa com um **SAIA DAQUI** por cima da marca.
+
+### O mapa dobrou e não ficou mais caro
+
+O motivo é o avião ter dobrado de velocidade: o mundo passou a ser atravessado na
+metade do tempo. Mas ampliar sem pensar **quadruplica a conta** — 53 aviões
+viram 212, 344 tambores viram 1.376.
+
+O princípio que resolve é o mesmo que motivou a ampliação: **se o avião voa o
+dobro, o espaçamento tem de dobrar junto.** O número de coisas no mundo não muda,
+e o ritmo com que elas aparecem na janela também não — que é o que a pessoa
+sente.
+
+Os prédios são a exceção de propósito: eles são **uma** ordem de desenho
+(`InstancedMesh`), então a cidade pode crescer de verdade.
+
+```
+                 antes            agora
+mapa             120 mil de lado  240 mil de lado
+prédios          774              3.255
+aviões           53               54
+ordens de desenho 1.400           1.483
+```
+
+### Bairros, de graça
+
+O campo que decide onde há cidade já existia como um **sim/não**. Usando o
+**valor** dele, o mesmo sorteio produz bairros: onde o campo é forte fica o
+centro, com torres passando de 3.000, estreitas e escuras (vidro); na borda ficam
+galpões baixos, largos e claros (reboco). Nenhuma peça nova, nenhuma ordem de
+desenho a mais — só parar de jogar fora um número que já estava ali.
+
+Num mundo que acabou de quadruplicar, isso é o que dá para saber onde se está.
+
+### Um `undefined` que viraria NaN
+
+Os obstáculos novos ganharam `vel` e `giro`. Um obstáculo montado sem eles — e
+existem, em teste e em recado de rede antigo — fazia `Math.sin(rumo)*undefined`
+virar **NaN**, e dali em diante a posição inteira do bicho era NaN. É a mesma
+armadilha do `y` que faltava nos alvos de chão e que já tinha estourado a
+perseguição do míssil: **um campo ausente não avisa, só contamina.** Os dois
+ganharam `|| 0`.
