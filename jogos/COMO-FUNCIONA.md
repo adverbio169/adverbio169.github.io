@@ -3502,3 +3502,81 @@ segurando 2 s:
 
 De brinde, a decolagem ficou muito melhor: o traço quadro a quadro sobe suave de
 8° a 16° de nariz, onde antes rampava até 39° e estolava.
+
+---
+
+## O pescoço: um limite que é limite, e o sinal decidido na mão
+
+> *"Ainda está estranho. E tem um limite: não tem como eu estar num avião e
+> olhar 180 graus. Tem uma limitação angular, e tem que ser suave."*
+>
+> *"Ao olhar para a direita — nariz apontando para a direita, minha mão direita
+> — a tela deveria ir para a direita. A tela está indo para o outro lado."*
+
+Quatro coisas produziam o "estranho", e vale separar porque cada uma tinha uma
+causa diferente.
+
+### O teto era uma parede
+
+Era um corte (`Math.min`) em 145°. Corte não é limite de pescoço, é parede: você
+chega lá e o mundo simplesmente para de se mexer por mais que você continue
+virando. Pescoço vai ficando **duro** até não ir mais.
+
+Virou uma `tanh`: perto do meio ela não faz nada, e quanto mais perto do limite,
+mais comprime. Nunca passa, nunca bate. E o limite caiu de 145° para **100°**,
+que é o que um piloto amarrado no assento alcança torcendo o tronco — 145° era
+olhar por cima do encosto, coisa que ninguém faz voando.
+
+```
+os últimos degraus, com passos iguais de cabeça: +0,9°  +0,2°  +0,0°
+                                                  ✔ vai endurecendo, não bate
+```
+
+### A resposta era reta
+
+Um fio de cabeça no meio já mexia a vista inteira. Mesmo remédio que resolveu o
+manche e o aileron: **curva** (expoente 1,6). A região do meio — onde a cabeça
+vive — fica calma, e o ganho só aparece quando você realmente vira.
+
+```
+ 5% da imagem ->   0,4°        30% ->  64°
+10% da imagem ->   7,2°        45% ->  92°
+20% da imagem ->  33,3°        60% ->  99°
+```
+
+### O repouso aprendia enquanto você olhava
+
+Ele aprendia **sempre**, inclusive com a sua cabeça virada — e aí, segurando o
+olhar dez segundos, o "reto" andava atrás de você e a vista voltava sozinha para
+o meio com a cabeça ainda torta. Isso é estranho de um jeito difícil de
+descrever, que é exatamente como a queixa chegou.
+
+Agora ele só aprende quando você está **perto do meio**: é onde a cabeça fica
+quando não está fazendo nada, que é a definição de repouso.
+
+### Perder o rosto soltava a vista
+
+E perde-se o rosto justamente quando se vira muito — quando você mais quer que a
+vista fique parada. Agora ela **segura firme por 0,7 s** e só então escorre de
+volta, em uns dois segundos. Piscada de detector não mexe mais em nada.
+
+```
+15 s com a cabeça virada: a vista foi de 85° para 85°   ✔ não escorrega
+duas leituras sem rosto:  ficou em 85°                  ✔ segura
+3 s sem rosto nenhum:     voltou para 24°               ✔ volta sozinha
+```
+
+### E o sinal estava invertido — a mão ganhou do papel
+
+Eu tinha espelhado o X por raciocínio, e o raciocínio é bom: a webcam vê você
+como outra pessoa veria, então o seu lado direito cai na esquerda da imagem.
+
+Só que isso vale para quem se **desloca** de lado. E ninguém desliza: as pessoas
+**viram o rosto**. Girando a cabeça, ela não escorrega — ela pivota num eixo que
+fica *atrás* do rosto, no pescoço. O nariz vai para a direita e o bloco do rosto
+varre para o outro lado.
+
+Não há teoria que ganhe de *"ao olhar para a direita, a tela está indo para o
+outro lado"*. O sinal é o que o teste disse. A página de prova
+(`jogos/rosto.html`) mudou junto — duas páginas com convenções contrárias seria
+uma armadilha guardada para daqui a três meses.

@@ -251,10 +251,14 @@ function passo(){
 
   if (f){
     achou = true; cru = f;
-    /* posição normalizada: -1 é a borda esquerda, +1 a direita. O X entra
-       ESPELHADO porque a câmera do notebook devolve a imagem invertida — sem
-       isso, mover a cabeça para a direita mandava olhar para a esquerda. */
-    const px = -((f.c/f.L)*2 - 1);
+    /* Posição normalizada: -1 é a borda esquerda, +1 a direita.
+       O X NÃO é espelhado, e isso foi decidido testando, não raciocinando.
+       No papel a webcam inverte (o seu lado direito cai na esquerda da
+       imagem), e isso vale para quem se desloca de lado. Só que ninguém
+       desliza: as pessoas VIRAM o rosto, e a cabeça pivota num eixo que fica
+       atrás dele. O nariz vai para um lado e o bloco do rosto varre para o
+       outro. O jogo usa a mesma convenção — as duas páginas têm de concordar. */
+    const px = (f.c/f.L)*2 - 1;
     const py = -((f.r/f.A)*2 - 1);
     const pz = f.s/f.A;
     if (!repouso) repouso = { x:px, y:py, z:pz };

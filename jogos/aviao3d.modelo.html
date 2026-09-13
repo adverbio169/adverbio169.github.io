@@ -2272,12 +2272,41 @@ function eixos(){
    NADA SAI DAQUI. A imagem não é enviada nem gravada: a conta inteira acontece
    dentro desta página, e a câmera é solta no instante em que se desliga.
    ========================================================================== */
-const CAB_AMPLIA_X = 135;   // graus de olhar por unidade de cabeça andada
-const CAB_AMPLIA_Y = 85;
-const CAB_LIMITE_X = 145;   // não passa disso para os lados (dá o "check six")
-const CAB_LIMITE_Y = 55;
-const CAB_ZONA = 0.035;     // folga no meio: sem ela o olhar nunca fica parado
+/* --- OS NÚMEROS DO PESCOÇO ---------------------------------------------------
+   "Ainda está estranho. E tem um limite: não tem como eu estar num avião e
+   olhar 180 graus. Tem uma limitação angular, e tem que ser suave."
+
+   Certíssimo nas duas coisas, e a segunda é fácil de errar do jeito que eu
+   tinha errado: o teto era um CORTE (`Math.min`). Corte não é limite de
+   pescoço — é uma parede. Você chega nos 145° e o mundo simplesmente para de
+   se mexer, por mais que você continue virando. Pescoço não faz isso; ele vai
+   ficando mais duro até não ir mais.
+
+   Então o teto virou uma `tanh`: perto do meio ela não faz nada (a resposta é
+   a mesma de antes), e quanto mais perto do limite, mais ela comprime. Nunca
+   passa, nunca bate. E o limite baixou de 145° para 100° — que é o que um
+   piloto amarrado no assento alcança torcendo o tronco. 145° era olhar para
+   trás por cima do encosto, coisa que ninguém faz voando.
+
+   A CURVA é o outro remédio para o "estranho": a resposta era RETA, então um
+   fio de cabeça no meio já mexia a vista inteira e nada ficava parado. Com o
+   expoente 1,35 a região do meio fica calma — que é onde a cabeça vive — e o
+   ganho só aparece quando você realmente vira. É a mesma ideia do manche e do
+   aileron; foi o que resolveu os dois. */
+/* Os ganhos são grandes porque a curva come quase tudo perto do meio: eles
+   valem no FIM do curso, não no começo. Calibrados numa medição em que a
+   cabeça anda 30% da largura da imagem — que é o que uma pessoa faz de
+   verdade sentada num notebook — e isso tem de dar uns 65° de olhar. */
+const CAB_GANHO_X = 650;    // graus por unidade de cabeça andada, ANTES da curva
+const CAB_GANHO_Y = 430;
+const CAB_CURVA = 1.6;      // fino no meio, cheio no fim do curso
+const CAB_LIMITE_X = 100;   // o quanto um pescoço amarrado no assento vira
+const CAB_LIMITE_Y = 40;
+const CAB_ZONA = 0.04;      // folga no meio: sem ela o olhar nunca fica parado
 const CAB_MACIO = 6.0;      // por segundo; alisa o tranco da leitura
+const CAB_SEGURA = 0.7;     // segundos segurando a vista quando o rosto some
+/* o teto macio: `tanh` é reta perto de zero e assíntota no limite */
+function tetoMacio(v, limite){ return limite*Math.tanh(v/limite); }
 const CAB_CADENCIA = 66;    // ms entre buscas (uns 15 por segundo)
 const CAB_LARGURA = 200;    // a imagem encolhe para isto antes da busca
 const CAB_MIN = 0.16;       // menor rosto procurado, em fração da altura
@@ -2374,18 +2403,39 @@ const Cabeca = {
       if (f){
         if (!this.achou) pintaBotaoCabeca();
         this.achou = true; this._perdido = 0;
-        /* espelhado no X: a webcam devolve a imagem invertida, e sem isto
-           mover a cabeça para a direita mandava olhar para a esquerda */
-        const px = -((f.c/f.L)*2 - 1), py = -((f.r/f.A)*2 - 1);
+        /* --- O SINAL DO X, DECIDIDO NA MÃO E NÃO NO PAPEL --------------------
+           Eu tinha espelhado o X por raciocínio: a webcam vê você como outra
+           pessoa veria, então o seu lado direito cai na esquerda da imagem.
+           O raciocínio está certo para quem se DESLOCA de lado — e errado para
+           o que as pessoas realmente fazem, que é VIRAR o rosto.
+
+           Girando a cabeça, ela não desliza: ela pivota num eixo que fica
+           ATRÁS do rosto, no pescoço. O nariz vai para a direita e o bloco do
+           rosto varre para o outro lado. Foi o que veio do teste, com todas as
+           letras: "ao olhar para a direita, a tela está indo para o outro
+           lado". Não há teoria que ganhe disso — o sinal é este. */
+        const px = (f.c/f.L)*2 - 1, py = -((f.r/f.A)*2 - 1);
         if (!this._repouso) this._repouso = { x:px, y:py };
-        else { this._repouso.x += (px - this._repouso.x)*0.004;
-               this._repouso.y += (py - this._repouso.y)*0.004; }
+        const ux = px - this._repouso.x, uy = py - this._repouso.y;
+        /* --- O REPOUSO SÓ APRENDE QUANDO A CABEÇA ESTÁ EM REPOUSO ------------
+           Ele aprendia SEMPRE, inclusive enquanto você estava olhando para o
+           lado — e aí, segurando o olhar por dez segundos, o "reto" andava
+           atrás de você e a vista voltava sozinha para o meio com a sua cabeça
+           ainda virada. Isso é estranho de um jeito difícil de descrever, que
+           é exatamente como a queixa chegou.
+
+           Agora ele só aprende quando você está perto do meio: é o lugar onde
+           a sua cabeça fica quando NÃO está fazendo nada, que é a definição de
+           repouso. E aprende mais devagar. */
+        if (Math.hypot(ux, uy) < 0.10){
+          this._repouso.x += ux*0.0025;
+          this._repouso.y += uy*0.0025;
+        }
         const folga = v => { const a = Math.abs(v);
                              return a < CAB_ZONA ? 0 : Math.sign(v)*(a - CAB_ZONA); };
-        this._alvoX = Math.max(-CAB_LIMITE_X, Math.min(CAB_LIMITE_X,
-                        folga(px - this._repouso.x)*CAB_AMPLIA_X));
-        this._alvoY = Math.max(-CAB_LIMITE_Y, Math.min(CAB_LIMITE_Y,
-                        folga(py - this._repouso.y)*CAB_AMPLIA_Y));
+        const curva = (v, ganho) => Math.sign(v)*Math.pow(Math.abs(v), CAB_CURVA)*ganho;
+        this._alvoX = tetoMacio(curva(folga(ux), CAB_GANHO_X), CAB_LIMITE_X);
+        this._alvoY = tetoMacio(curva(folga(uy), CAB_GANHO_Y), CAB_LIMITE_Y);
       } else {
         /* Perdeu o rosto — e perde-se sempre, virando a cabeça demais. O olhar
            VOLTA sozinho para a frente em vez de travar de lado: ficar preso
@@ -2393,7 +2443,19 @@ const Cabeca = {
            num controle que a pessoa não vê. */
         if (this.achou) pintaBotaoCabeca();
         this.achou = false; this._perdido += CAB_CADENCIA/1000;
-        this._alvoX -= this._alvoX*0.10; this._alvoY -= this._alvoY*0.10;
+        /* --- PERDEU O ROSTO: SEGURA PRIMEIRO, VOLTA DEPOIS --------------------
+           Perde-se o rosto justamente quando se vira muito a cabeça — que é
+           quando você MAIS quer que a vista fique onde está. A versão anterior
+           começava a voltar para o meio no primeiro quadro perdido: você
+           olhava para trás, o detector piscava, e a vista escapava da sua mão.
+
+           Agora ela segura firme por 0,7 s e só então escorre de volta, em
+           uns dois segundos. Piscada de detector não mexe mais em nada, e
+           quem realmente saiu da frente da câmera não fica com a vista
+           travada de lado para sempre. */
+        if (this._perdido > CAB_SEGURA){
+          this._alvoX -= this._alvoX*0.035; this._alvoY -= this._alvoY*0.035;
+        }
       }
     }
     const k = Math.min(1, dt*CAB_MACIO);
