@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jogos</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nothing+You+Could+Do&family=Outfit:wght@400;600;700&display=swap">
+<style>
+  :root{ --papel:#FDFCF8; --tinta:#18181C; --ceu:#DCEBF2; --rosa:#E94C6A; }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; padding:clamp(22px,6vw,54px) 16px;
+    background:linear-gradient(180deg,#CFE7F2 0%,#E7F1E4 55%,#FBF3E2 100%);
+    color:var(--tinta); font-family:"Outfit",system-ui,-apple-system,Segoe UI,Arial,sans-serif;
+    display:flex; flex-direction:column; align-items:center; gap:clamp(18px,4vw,30px);
+  }
+  h1{
+    font-family:"Nothing You Could Do",cursive; font-weight:400; margin:0;
+    font-size:clamp(36px,10vw,58px); line-height:1.05; text-align:center;
+  }
+  .sub{margin:0; text-align:center; color:#55525e; font-size:clamp(14px,3.8vw,16px); max-width:34rem; line-height:1.55}
+  .lista{display:grid; gap:20px; width:min(100%,760px); grid-template-columns:1fr}
+  @media (min-width:700px){ .lista{grid-template-columns:1fr 1fr} }
+  .jogo{
+    display:flex; flex-direction:column; text-decoration:none; color:inherit;
+    background:var(--papel); border:2px solid var(--tinta); border-radius:18px; overflow:hidden;
+    box-shadow:0 6px 0 var(--tinta); transition:transform .1s, box-shadow .1s;
+  }
+  .jogo:hover{transform:translateY(-3px); box-shadow:0 9px 0 var(--tinta)}
+  .jogo:active{transform:translateY(6px); box-shadow:0 0 0 var(--tinta)}
+  .jogo:focus-visible{outline:3px solid var(--rosa); outline-offset:3px}
+  .jogo img{display:block; width:100%; aspect-ratio:1000/477; object-fit:cover; border-bottom:2px solid var(--tinta)}
+  .texto{padding:16px 18px 18px; display:flex; flex-direction:column; gap:6px}
+  .texto h2{margin:0; font-size:1.15rem; font-weight:700}
+  .texto p{margin:0; font-size:.92rem; line-height:1.5; color:#55525e}
+  .tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:4px}
+  .tag{font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em;
+       background:#F1EEE4; border:1px solid rgba(24,24,28,.16); border-radius:999px; padding:3px 9px; color:#6a6672}
+  .breve{
+    border:2px dashed rgba(24,24,28,.3); border-radius:18px; background:rgba(253,252,248,.55);
+    display:grid; place-items:center; text-align:center; padding:28px 20px; min-height:170px;
+    color:#6a6672; font-size:.95rem; line-height:1.5;
+  }
+  footer{font-size:.82rem; color:#6a6672; text-align:center}
+  footer a{color:var(--rosa)}
+</style>
+</head>
+<body>
+  <h1>Jogos</h1>
+  <p class="sub">Os jogos que a gente fez em casa. Feitos à mão, um arquivo só, rodando direto no navegador do celular ou do computador.</p>
+
+  <div class="lista">
+    <a class="jogo" href="corrida-da-vitoria/">
+      <img src="corrida-da-vitoria/capa.png" alt="A personagem do desenho da Vitória correndo por um campo verde em 3D">
+      <div class="texto">
+        <h2>Corrida da Vitória</h2>
+        <p>O desenho da Vitória saiu do papel e foi correr. Quatro fases, bichinhos, estrelas e corações — controlado pela inclinação do celular.</p>
+        <div class="tags"><span class="tag">3D</span><span class="tag">Plataforma</span><span class="tag">Acelerômetro</span></div>
+      </div>
+    </a>
+    <div class="breve">O próximo jogo vem aqui.<br>Tem ideia?</div>
+  </div>
+
+  <footer>Feito em casa. Veja também <a href="../vitoria/">o vídeo do desenho da Vitória</a>.</footer>
+</body>
+</html>
