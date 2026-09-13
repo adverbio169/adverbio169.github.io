@@ -643,41 +643,91 @@ e **erro solto não é despedida** — quem sai, sai pelo `close` ou pelo silên
 
 ## Esquerda e direita trocadas na versão 3D
 
-O Brunno testou a versão 3D e disse: *"os controles estão invertidos, a
-esquerda e a direita"*. Inclinar para a direita virava para a esquerda.
+O Brunno testou e explicou o problema melhor do que qualquer medição:
 
-A causa não estava no controle nem no sensor, e sim na **mão do sistema de
-eixos**. O avião guarda três vetores: `eixoF` (o nariz), `eixoC` (o teto) e
-`eixoD` (a asa direita). O `eixoD` era calculado assim:
+> *"cada mão segurando o celular (deitado) é como se controlasse uma asa. Ao
+> inclinar para a esquerda — mão esquerda para baixo — o avião rotacionava a
+> asa esquerda para cima."*
+
+A causa é a **mão do sistema de eixos**. O avião guarda três vetores, e um
+deles o código chama de "asa direita" (`eixoD`). Ele era calculado como
+`teto × nariz`, e num sistema destro isso dá o vetor que aparece à
+**esquerda** de quem olha para a frente. Medido, numa tela de 1280 (o centro
+é 640):
+
+```
+o vetor que o código chama de eixoD aparece em x=221 -> ESQUERDA da tela
+```
+
+Na versão em canvas o erro não aparecia: aquele desenho é espelhado do mesmo
+jeito e os dois enganos se cancelavam. Com o three.js, que usa a convenção
+certa, o espelho sumiu.
+
+### A primeira tentativa quebrou a câmera — e por quê
+
+O conserto "certo no papel" seria trocar o `eixoD` por dentro. Foi o que eu
+fiz, e o Brunno respondeu: *"o controle piorou, a câmera ficou fora de
+controle; no primeiro teste a câmera estava perfeita"*.
+
+O motivo: a **inclinação** é medida a partir do próprio eixoD
+(`atan2(-eixoD.y, eixoC.y)`), e a rolagem pelo celular é um comando
+**absoluto** — o jogo não aplica uma velocidade de rolagem, ele *persegue* o
+ângulo que a mão pediu:
 
 ```js
-eixoD = vcruz(eixoC, eixoF);      // teto × nariz
+const erro = (lat*180 - inclinacao);    // o quanto falta
+rol = clamp(erro*3.2);                  // corrige na direção do erro
 ```
 
-Num sistema **destro**, com o nariz apontando para `+z` e o teto para `+y`,
-`teto × nariz` dá `+x` — e, olhando na direção de `+z`, o `+x` fica à
-**esquerda** da tela. Ou seja: aquilo que o código chamava de "asa direita"
-era a asa esquerda o tempo todo.
+Trocando o sinal do `eixoD` sem trocar o da medida, `inclinacao` passou a ter
+o sinal contrário e a correção deixou de puxar **contra** o erro para empurrar
+**a favor** dele. Realimentação positiva: o avião rodopiando sem parar e a
+câmera atrás, tentando acompanhar. O sintoma parecia "a câmera enlouqueceu",
+mas a câmera estava certa — quem enlouqueceu foi a malha de controle.
 
-Por que ninguém tinha notado em 2D? Porque o desenhador do jogo em 2D é feito
-à mão e está **espelhado do mesmo jeito**. Dois erros que se cancelam. Quando
-a mesma conta foi entregue ao three.js — que usa a convenção certa — o
-espelho sumiu e o erro apareceu sozinho.
+### A correção que ficou
 
-A medida que provou isso: projetar um ponto colado na asa "direita" e ver de
-que lado da tela ele cai.
+O espelho se desfaz na **entrada**, num sinal só:
 
-```
-3D  · ponto na ASA DIREITA aparece em x=-5645 (centro é 640) -> ESQUERDA  ✘
-2D  · ponto na ASA DIREITA aparece em x= 6112 (centro é 640) -> DIREITA   ✔
+```js
+const MAO = -1;      // o eixoD do jogo é, visualmente, a asa esquerda
+lat  = MAO * (volante/180)
+leme = MAO * leme
 ```
 
-A correção é uma linha, `eixoD = vcruz(eixoF, eixoC)`, mais o `rumo` e as duas
-funções que traduzem rumo em direção (`dirDoRumo`, `rumoDe`), que precisavam
-concordar com o eixo novo. Depois disso os dois medem igual. **A versão 2D
-ficou como estava de propósito**: está espelhada por dentro, mas é coerente
-consigo mesma e o jogo se comporta certo — mexer ali só criaria um segundo
-bug.
+O mundo continua coerente consigo mesmo, a realimentação continua negativa
+(mede e persegue o mesmo eixoD de sempre, com o mesmo sinal), e só o lado para
+onde o comando pede é que muda. A câmera nem fica sabendo.
+
+A bússola tinha o mesmo espelho, e foi desfeito só na **hora de desenhar**
+(`rumoVisto() = -rumo`), sem tocar no `rumo` que as nuvens e a escada de
+arfagem usam.
+
+### O que foi medido depois
+
+```
+celular 35° para a DIREITA : desceu a asa DIREITA     ✔
+celular 35° para a ESQUERDA: desceu a asa ESQUERDA    ✔
+curva para a DIREITA : o mundo correu para a ESQUERDA ✔   bússola 000° -> 015°  ✔
+curva para a ESQUERDA: o mundo correu para a DIREITA  ✔   bússola 000° -> 345°  ✔
+leme para a DIREITA  : o nariz foi para a DIREITA     ✔
+leme para a ESQUERDA : o nariz foi para a ESQUERDA    ✔
+puxar -> nariz +78°  |  empurrar -> -78°              ✔
+setas do teclado                                      ✔
+câmera após 5 s de manobra forte: 748 de distância, avião bem à frente  ✔
+```
+
+**Duas armadilhas na hora de medir**, que me custaram duas rodadas:
+
+1. **Projetar um ponto que está fora do quadro não serve de prova.** Um ponto
+   a 85° do eixo da câmera devolve um x absurdo (5357 numa tela de 1280) e o
+   sinal pode até virar. A medida confiável é com vetores do mundo:
+   `direita da tela = frente × cima` — regra tirada de um teste mínimo de
+   convenção, não de memória.
+2. **"Inclinar e puxar" com puxada forte não é curva, é cambalhota.** Numa das
+   rodadas o nariz terminou a 0,96 de vertical, e aí `atan2(x, z)` do rumo é
+   só ruído: a bússola parecia errada e estava certa. O teste passou a
+   imprimir a arfagem junto, para não cair nisso de novo.
 
 ## O acelerador e o nitro
 
