@@ -19,6 +19,8 @@
   #euSou b{color:#fff}
   .rotG{font-size:13px;letter-spacing:.6px;color:#9fd4ff;text-transform:none;font-weight:800}
   #sala.chama{border-color:rgba(92,200,255,.6);box-shadow:0 0 0 2px rgba(92,200,255,.18)}
+  #provaTremor{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:2px}
+  #tremorComo{font-size:12.5px;color:#8fa3c4}
   #hud{pointer-events:none;z-index:2}
   .painel{position:fixed;z-index:3;pointer-events:none;background:rgba(8,12,26,.55);
           border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:9px 13px;
@@ -335,6 +337,11 @@
     </div>
     <button class="grande azul" id="btSensor">Jogar com a inclinação do celular</button>
     <button class="grande cinza" id="btToque">Jogar com o dedo / teclado</button>
+    <!-- o mesmo botão de prova do controle.html, para quem joga direto aqui -->
+    <div id="provaTremor">
+      <button class="op" id="btTestaTremor">Testar o tremor</button>
+      <span id="tremorComo">&nbsp;</span>
+    </div>
     <p class="txt" style="font-size:12.5px;color:#7d8cab">No computador: setas voam, <b>A</b> e <b>D</b> são o leme,
        <b>W</b> e <b>S</b> são o acelerador, <b>Shift</b> é o nitro, <b>G</b> o trem de pouso,
        <b>F</b> os flapes, <b>espaço</b> atira, <b>V</b> troca a vista, <b>1 2 3</b> trocam de arma.</p>
@@ -10485,6 +10492,15 @@ $('btSensor').onclick = async () => {
         Dedos.mostra(Tripulacao.membros.length === 0); comeca(); }
   catch(e){ erro(e.message + ' Dá para jogar com o dedo ou com o teclado.'); }
 };
+$('btTestaTremor').onclick = () => {
+  /* Longo de propósito: um pulso de jogo tem de ser curto para caber no ritmo,
+     este aqui tem é de ser SENTIDO. Se este não passa, nenhum passa. */
+  tremeAqui([220, 120, 220, 120, 420]);
+  Controles.manda({ t:'tremer', a:'prova', p:[220, 120, 220, 120, 420] });
+};
+$('tremorComo').textContent = Vibra.como === 'vibrate'     ? 'pelo vibrador (Android)'
+                            : Vibra.como === 'interruptor' ? 'pelo háptico do iPhone'
+                            : 'este aparelho não tem vibrador';
 Controle.escutar();
 
 
@@ -10643,21 +10659,37 @@ const Controles = {
      pela rede, E para o vibrador DESTE aparelho. No computador o
      `navigator.vibrate` não existe ou não faz nada, e sai de graça.
      --------------------------------------------------------------------- */
+  /* --- O TAMANHO DOS TRANQUINHOS ------------------------------------------
+     Relato dos dois lados: "não senti a vibração no Android, e também não
+     sentiram no iPhone". O caminho estava certo — o `navigator.vibrate` era
+     chamado, o teste provava — mas os TEMPOS eram de brinquedo.
+
+     Vibrador de celular moderno não é o motorzinho desbalanceado de antes: é
+     um solenoide (LRA) que leva uns 20 ms só para PEGAR o embalo. Um pulso de
+     16 ms, como o do tremor aerodinâmico, não chega a acontecer; um de 26 ms,
+     como o da metralhadora, é um cosquinha. E quem está jogando não está com
+     o aparelho parado na mesa: está INCLINANDO ele para virar o avião, com o
+     braço em movimento. O que se sente parado some inteiro no meio do gesto.
+
+     Todos os "ligado" dobraram, e os intervalos ficaram quase iguais — quem
+     manda no que se sente é o tempo ligado, não a pausa. O ritmo de cada um
+     continua o mesmo, que é o que faz dar para reconhecer na mão qual é qual.
+     --------------------------------------------------------------------- */
   PADROES: {
-    missil:  [45, 35, 130],
-    bomba:   [180],
-    travou:  [22, 55, 22, 55, 22],
-    levou:   [90, 60, 90],
-    explode: [60, 40, 120],
-    bateu:   [300, 80, 200, 80, 400],
-    tocou:   [70, 50, 110],
-    pegou:   [30],
-    alvo:    [40, 50, 40, 50, 90]
+    missil:  [70, 40, 180],
+    bomba:   [260],
+    travou:  [40, 50, 40, 50, 70],
+    levou:   [130, 60, 150],
+    explode: [95, 45, 180],
+    bateu:   [400, 90, 260, 90, 520],
+    tocou:   [110, 55, 160],
+    pegou:   [60],
+    alvo:    [65, 45, 65, 45, 130]
   },
   CONTINUO: {
-    metralha: { padrao:[26, 34],  ciclo:60,  vezes:8  },
-    buffet:   { padrao:[16, 26],  ciclo:42,  vezes:10 },
-    estol:    { padrao:[130,120], ciclo:250, vezes:3  }
+    metralha: { padrao:[42, 30],  ciclo:72,  vezes:7  },
+    buffet:   { padrao:[32, 26],  ciclo:58,  vezes:8  },
+    estol:    { padrao:[190,110], ciclo:300, vezes:3  }
   },
   vibraAqui(p){ tremeAqui(p); },
   paraAqui(qual){
@@ -10673,9 +10705,23 @@ const Controles = {
     this._relogios[qual] = setInterval(bate, c.ciclo*c.vezes - 40);
   },
   manda(o){ Tripulacao.envia(o); },
+  /* --- QUEM SABE O PADRÃO É QUEM MANDA --------------------------------------
+     Esta tabela existia DUAS vezes: uma aqui e uma no controle.html, porque o
+     recado levava só o NOME ("explode") e o outro lado procurava o padrão na
+     tabela dele. Aí as duas cópias desandaram: o jogo passou a mandar nove
+     nomes e o controle só conhecia quatro — `explode`, `bateu`, `tocou`,
+     `pegou` e `alvo` chegavam e eram jogados fora CALADOS, porque a linha lá
+     era `if (PADROES[a]) vibra(...)`. Metade dos tremores do jogo nunca
+     chegou a nenhum controle, e ninguém teve como desconfiar.
+
+     Duas tabelas que precisam ser iguais um dia ficam diferentes. Então agora
+     o recado leva o PADRÃO junto: quem sabe o que aconteceu é quem manda, e o
+     controle só toca o que chegou, sem tabela nenhuma para desandar. O nome
+     continua indo para os controles antigos, que ainda procuram na tabela. */
   bate(arma){
-    this.manda({ t:'tremer', a:arma });
-    if (this.PADROES[arma]) this.vibraAqui(this.PADROES[arma]);
+    const p = this.PADROES[arma];
+    this.manda({ t:'tremer', a:arma, p });
+    if (p) this.vibraAqui(p);
   },
   /* Liga/desliga um tremor CONTÍNUO (metralhadora, tremor aerodinâmico,
      estol). Só manda quando MUDA — isto é chamado a cada quadro, e sem a
@@ -10686,7 +10732,7 @@ const Controles = {
     liga = !!liga;
     if (this._liga[qual] === liga) return;
     this._liga[qual] = liga;
-    this.manda({ t:'tremer', a:qual, on: liga });
+    this.manda({ t:'tremer', a:qual, on: liga, c: this.CONTINUO[qual] });
     if (liga) this.comecaAqui(qual); else this.paraAqui(qual);
   },
   /* a aba sumiu com o dedo no gatilho: não deixa o aparelho tremendo sozinho */

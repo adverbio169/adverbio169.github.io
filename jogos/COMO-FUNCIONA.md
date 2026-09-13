@@ -1923,3 +1923,84 @@ tapavam o próprio fogo. Viraram 26 a 40.
 estouro do míssil: cogumelos 0, peças de fogo 3, clarão 0,43, vibrou  ✔
 0,8 s depois: 0 peça(s) de fogo                                      ✔ não deixa entulho
 ```
+
+---
+
+## O tremor que não chegava
+
+> *"Eu acho que não senti também a vibração no Android. E também não sentiram
+> no iPhone."*
+
+Dos dois lados. No Android o `navigator.vibrate` é caminho direto, sem truque
+nenhum — se lá também não vibra, o defeito é meu. E era: **dois**, somados.
+
+### 1. Metade dos tremores nunca saía do jogo
+
+A tabela de padrões existia **duas vezes**: uma no jogo e outra no
+`controle.html`. O recado que atravessava a rede levava só o **nome** do
+tremor, e o outro lado procurava o padrão na cópia dele:
+
+```js
+if (PADROES[a]) vibra(PADROES[a]);      // no controle.html
+```
+
+O jogo cresceu e passou a mandar nove nomes. O controle continuou conhecendo
+quatro. Então `explode`, `bateu`, `tocou`, `pegou` e `alvo` chegavam, não
+achavam o nome na tabela e **caíam no chão calados** — sem erro, sem aviso,
+sem nada. Explodir um avião, bater no chão, pousar, pegar um tambor, acertar
+um alvo: nada disso chegava a nenhum controle, e não havia como desconfiar.
+
+Duas tabelas que precisam ser iguais um dia ficam diferentes. A correção não é
+copiar a tabela de novo — é **mandar o padrão junto com o recado**. Quem sabe o
+que aconteceu é quem manda; o controle só toca o que chegou. A tabela de lá
+continua existindo como reserva para um recado de versão antiga, mas parou de
+ser necessária, e é isso que a impede de desandar outra vez.
+
+### 2. E os que chegavam eram curtos demais para sentir
+
+Vibrador de celular moderno não é o motorzinho desbalanceado de antigamente: é
+um solenoide (LRA), e ele leva uns **20 ms só para pegar o embalo**. Olhando os
+tempos com isso em mente:
+
+| tremor | ligado, antes | depois |
+|---|---|---|
+| tremor aerodinâmico | **16 ms** | 32 ms |
+| metralhadora | **26 ms** | 42 ms |
+| travamento | 22 ms | 40 ms |
+| míssil | 45+130 ms | 70+180 ms |
+
+Um pulso de 16 ms não chega a acontecer. Um de 26 ms é cócega. E quem está
+jogando **não está com o aparelho parado na mesa** — está inclinando o celular
+para virar o avião, com o braço em movimento. O que mal se sente parado some
+inteiro no meio do gesto.
+
+Todos os tempos *ligado* dobraram; as pausas ficaram quase iguais, porque quem
+manda no que se sente é o tempo ligado, não a pausa. O ritmo de cada um
+continua o mesmo — é ele que deixa reconhecer na mão qual é qual sem olhar.
+
+### 3. Um botão para a próxima vez
+
+Daqui eu não sinto o aparelho de ninguém, e *"não senti"* pode ser três coisas
+diferentes: o recado não chegou, o padrão é fraco, ou o aparelho não vibra.
+Então entrou um **testar o tremor** nos dois lados — na entrada do controle e
+na capa do jogo — junto de uma linha dizendo qual caminho está em uso:
+
+```
+tremor: pelo vibrador (Android)      [ testar o tremor ]
+tremor: pelo háptico do iPhone
+tremor: este aparelho não tem
+```
+
+O padrão do teste é longo de propósito (220–120–220–120–420): não precisa caber
+em ritmo nenhum, precisa ser **sentido**. Se esse não passa, nenhum passa — e
+aí o relato deixa de ser "não senti" e vira "apertei e não senti", que é outro
+defeito, com outro conserto.
+
+```
+o controle diz "tremor: pelo vibrador (Android)"
+  e o botão de prova soltou [220,120,220,120,420] ...... ✔
+os 9 tremores do jogo: chegaram 9/9 .................... ✔ nenhum cai no chão
+metralhadora contínua: liga e desliga .................. ✔
+tempo LIGADO: míssil 250 ms, travamento 150 ms,
+  pulso da metralhadora 42 ms, do buffet 32 ms ......... ✔ acima dos ~20 ms do LRA
+```

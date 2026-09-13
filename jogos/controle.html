@@ -316,6 +316,12 @@ body.paisagem #controle.ver,
     <button class="bt sec alto" id="btMeuAviao">
       <b>A TELA DO JOGO</b><small>o avião aparece aqui, e o seu controle entra por um QR</small></button>
     <div class="estado" id="estadoSensor"><span class="luz"></span><span id="estadoSensorTxt">verificando o sensor&hellip;</span></div>
+    <!-- Daqui eu não sinto o aparelho de ninguém. Este botão existe para o
+         relato deixar de ser "não senti" e virar "apertei e não senti", que
+         são dois defeitos diferentes: um é o padrão fraco demais, o outro é o
+         aparelho não vibrar de jeito nenhum. -->
+    <div class="estado" id="estadoTremor"><span class="luz"></span><span id="estadoTremorTxt">tremor: verificando&hellip;</span></div>
+    <button class="bt lnk" id="btTestaTremor">testar o tremor</button>
     <button class="bt lnk" id="btTrocaSala">trocar de sala</button>
   </div>
 </div>
@@ -741,18 +747,35 @@ function vibra(ms){ if (ms === 0) Vibra.para(); else Vibra.bate(ms); }
    fica um buraco audível entre uma repetição e a outra.
    ----------------------------------------------------------------------- */
 const Tremor = (function(){
+  /* --- ESTA TABELA É SÓ RESERVA ---------------------------------------------
+     Ela já foi a tabela de verdade, e foi por isso que metade dos tremores do
+     jogo nunca chegou aqui: o recado trazia só o NOME e esta cópia conhecia
+     quatro dos nove que o jogo manda. `explode`, `bateu`, `tocou`, `pegou` e
+     `alvo` caíam no chão sem um ruído — a linha era `if (PADROES[a])`, e o que
+     não estava na tabela simplesmente não acontecia.
+
+     Agora o jogo manda o PADRÃO junto com o nome, e é ele que toca. Isto aqui
+     só serve se um dia chegar um recado de uma versão velha do jogo, sem
+     padrão. Duas tabelas que precisam ser iguais um dia ficam diferentes —
+     esta parou de precisar.
+     ---------------------------------------------------------------------- */
   const PADROES = {
-    missil:  [45, 35, 130],
-    bomba:   [180],
-    travou:  [22, 55, 22, 55, 22],
-    levou:   [90, 60, 90]
+    missil:  [70, 40, 180],
+    bomba:   [260],
+    travou:  [40, 50, 40, 50, 70],
+    levou:   [130, 60, 150],
+    explode: [95, 45, 180],
+    bateu:   [400, 90, 260, 90, 520],
+    tocou:   [110, 55, 160],
+    pegou:   [60],
+    alvo:    [65, 45, 65, 45, 130]
   };
   const CONTINUO = {
-    metralha: { padrao: [26, 34], ciclo: 60,  vezes: 8 },   // ~14 estalos por segundo
+    metralha: { padrao: [42, 30], ciclo: 72,  vezes: 7 },   // ~14 estalos por segundo
     // o tremor aerodinâmico: rápido e miúdo, como a asa reclamando. Diferente
     // do estol, que é lento e pesado, para dar para saber qual é qual na mão
-    buffet:   { padrao: [16, 26], ciclo: 42,  vezes: 10 },
-    estol:    { padrao: [130, 120], ciclo: 250, vezes: 3 }
+    buffet:   { padrao: [32, 26], ciclo: 58,  vezes: 8 },
+    estol:    { padrao: [190, 110], ciclo: 300, vezes: 3 }
   };
   const T = {};
   const relogios = {};
@@ -761,9 +784,9 @@ const Tremor = (function(){
     // só corta a vibração se não houver outro contínuo tocando
     if (!Object.values(relogios).some(Boolean)) Vibra.para();
   }
-  function comecaContinuo(qual){
-    const c = CONTINUO[qual];
-    if (!c || relogios[qual]) return;
+  function comecaContinuo(qual, vindo){
+    const c = vindo || CONTINUO[qual];
+    if (!c || !c.padrao || relogios[qual]) return;
     const bate = () => { const p = []; for (let i=0;i<c.vezes;i++) p.push(...c.padrao); vibra(p); };
     bate();
     // reprograma um pouco ANTES de acabar, senão fica um buraco entre as voltas
@@ -771,9 +794,12 @@ const Tremor = (function(){
   }
   T.recebe = d => {
     const a = d.a;
-    if (d.on !== undefined){ if (d.on) comecaContinuo(a); else paraContinuo(a); return; }
-    if (PADROES[a]) vibra(PADROES[a]);
+    // `d.c` e `d.p` vêm do jogo; a tabela daqui é só para recado antigo
+    if (d.on !== undefined){ if (d.on) comecaContinuo(a, d.c); else paraContinuo(a); return; }
+    const p = d.p || PADROES[a];
+    if (p) vibra(p);
   };
+  T.testa = () => vibra([220, 120, 220, 120, 420]);   // longo de propósito: é para SENTIR
   T.calaTudo = () => { for (const k in relogios) paraContinuo(k); };
   // a aba sumiu com o dedo no gatilho: não deixa o celular tremendo para sempre
   document.addEventListener('visibilitychange', () => { if (document.hidden) T.calaTudo(); });
@@ -879,6 +905,15 @@ function salaValida(){
 }
 $('btSala').onclick = () => { if (salaValida()) mostraPasso('papel'); };
 $('btTrocaSala').onclick = () => { mostraPasso('sala'); elCodigo.focus(); elCodigo.select(); };
+$('btTestaTremor').onclick = () => { Tremor.testa(); };
+(function(){
+  const e = $('estadoTremor'), t = $('estadoTremorTxt');
+  if (!e) return;
+  e.className = 'estado ' + (Vibra.tem ? 'ok' : 'nao');
+  t.textContent = Vibra.como === 'vibrate'     ? 'tremor: pelo vibrador (Android)'
+                : Vibra.como === 'interruptor' ? 'tremor: pelo háptico do iPhone'
+                : 'tremor: este aparelho não tem';
+})();
 
 $('btConectar').onclick = async () => {
   const codigo = salaValida();
