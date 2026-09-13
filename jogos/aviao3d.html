@@ -7462,6 +7462,8 @@ let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
 let noChao=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0, estolando=false;
 let ladoEstol = 0;        // para que lado a asa largou neste estol
 let rolChao = 0;          // o banco que sobrou do toque, escorrendo para zero
+let giroNariz = {x:0,y:0,z:0};   // quanto o nariz varre por segundo (rad/s)
+let nariz0 = {x:0,y:0,z:1};      // o nariz do quadro passado
 let arfChao=0, rumoChao=0;
 let estresse=0;
 let vida=100;
@@ -10650,6 +10652,27 @@ function atualiza(dt){
   endireitaEixos();
 
 
+  /* --- QUANTO O NARIZ ESTÁ VARRENDO ------------------------------------------
+     Sai do produto vetorial entre o nariz de antes e o de agora: para ângulos
+     pequenos ele dá o eixo de rotação multiplicado pelo ângulo, e dividido
+     pelo tempo vira a velocidade angular. A rolagem em torno do próprio nariz
+     não entra — e não deve, porque girar em torno do eixo do cano não desloca
+     bala nenhuma.
+
+     Alisado, senão a mira treme junto com o dedo. Isto já existiu e foi
+     removido quando a mira giroscópica caiu; voltou porque a mira giroscópica
+     voltou, agora no papel certo dela. */
+  {
+    const cx2 = nariz0.y*eixoF.z - nariz0.z*eixoF.y;
+    const cy2 = nariz0.z*eixoF.x - nariz0.x*eixoF.z;
+    const cz2 = nariz0.x*eixoF.y - nariz0.y*eixoF.x;
+    const k = Math.min(1, dt*9);
+    giroNariz.x += (cx2/dt - giroNariz.x)*k;
+    giroNariz.y += (cy2/dt - giroNariz.y)*k;
+    giroNariz.z += (cz2/dt - giroNariz.z)*k;
+    nariz0 = { x:eixoF.x, y:eixoF.y, z:eixoF.z };
+  }
+
   aviaoX += eixoF.x*voo*dt; aviaoY += eixoF.y*voo*dt; aviaoZ += eixoF.z*voo*dt;
   /* A RAZÃO DE SUBIDA, para o altímetro da cabine. Sai direto de `eixoF.y*voo`
      — o quanto do vetor de voo aponta para cima — e não de comparar alturas
@@ -11890,42 +11913,104 @@ function desenhaHUD(){
     h2.textAlign = 'left';
   }
 
-  /* --- A MIRA DA METRALHADORA -------------------------------------------------
-     Três versões até acertar, e as três estão contadas aqui porque cada erro
-     ensinou o seguinte.
+  /* --- A MIRA DA METRALHADORA: DUAS MARCAS E O RASTRO ENTRE ELAS --------------
+     "Ela tem que ter duas miras, uma interna e outra externa, sendo a mesma
+     mira: quando o avião desloca, a externa acompanha onde vai o disparo.
+     Reto, as duas centralizam; em curva, se separam — e a linha da bala liga
+     as duas. E essa linha sempre existe, não só quando atira."
 
-     1ª — LINHA CURTA, DO NARIZ ATÉ O ALCANCE. Trinta pixels parados no meio da
-          tela: "o HUD ficou muito curto e não acompanha o movimento".
-     2ª — LINHA LONGA, começando colada no cano. Ficou comprida e varria a tela
-          ao manobrar, mas: "está com um rastro fixo e grande; não é isso, o
-          rastro se forma dependendo do movimento do avião".
-     3ª — esta. E o pedido, relido, é uma ideia melhor do que as duas minhas:
-          o rastro não é para ser DESENHADO, é para ser MEDIDO.
+     Isto é uma mira giroscópica, que é como se atirava de caça desde 1943. E
+     é a QUARTA versão desta mira aqui; as três anteriores estão contadas mais
+     acima, e a terceira delas — o rastro desenhado pelas balas de verdade —
+     estava certa e incompleta: só existia com o dedo no gatilho.
 
-     Então o HUD passou a ter duas peças, com papéis separados:
+     Vale registrar o meu erro maior, porque foi de interpretação e não de
+     conta. Eu já tinha construído exatamente esta curva, medi, e joguei fora
+     concluindo "está errada". A medição dizia: *uma bala disparada agora
+     termina na linha RETA do cano, não na curva*. Isso é verdade e continua
+     verdade. Só que eu estava perguntando à curva uma coisa que não é o
+     trabalho dela.
 
-       O ANEL, sempre presente e pequeno, onde o cano aponta. É a mira: o ponto
-       do meio é por onde a bala passa, o anel dá o tamanho angular do alvo, o
-       número diz até onde a bala chega. Nada de trilho comprido atravessando a
-       tela quando não se está atirando.
+     As duas marcas respondem a DUAS perguntas diferentes:
 
-       O RASTRO, só quando há bala no ar, desenhado pelas posições REAIS das
-       balas que estão voando. Voando reto ele sai reto; numa curva ele
-       encurva sozinho, porque as balas ficaram para trás de verdade — não é
-       efeito, é o estado do mundo lido e projetado. Aparece quando o dedo
-       aperta e some quando solta.
+       A CRUZ (interna) é o cano. Bala que sai agora vai por ali — é a
+       resposta da tal medição, e é por isso que a cruz existe.
 
-     A média móvel de três pontos existe porque as balas nascem espalhadas até
-     110 para o lado (os canos são nas asas): sem ela a linha ficava serrilhada
-     de perto. */
+       O ANEL (externo) é onde o RASTRO está. As balas que já estão no ar
+       saíram quando o nariz apontava para outro lugar, então em curva elas
+       ficam para trás de `ω·t`. É o que se vê pela janela.
+
+     E é o anel que serve para MIRAR num alvo que você está acompanhando na
+     curva: pondo o anel em cima dele, o nariz fica automaticamente adiantado
+     do tanto certo, e a bala que sair agora chega junto com ele. Essa é a
+     ideia inteira da mira giroscópica, e é por isso que ela ganhou a guerra
+     para quem a tinha.
+
+     Voando reto, `ω` é zero: a curva vira um ponto e as duas marcas viram
+     uma. Exatamente como foi pedido — e não por gentileza, é a geometria.
+
+     O tempo de voo usado é o do ALVO, quando há um travado (a solução de tiro
+     já sabe a distância dele); sem alvo, o alcance cheio. Mira giroscópica de
+     verdade também precisa da distância, e nos caças antigos quem informava
+     era o piloto, girando um anel no manete. */
   if (jogando && !caindo && arma === 'metralha' && municao.metralha > 0){
     const T = direcaoDaMira();
-    const alcance = alcanceBala();
+    const vBala = voo*6, alcance = alcanceBala();
+    const ate = MiraTiro.bom && MiraTiro.solucao
+              ? Math.max(alcance*0.25, Math.min(alcance, MiraTiro.solucao.dist)) : alcance;
     const v3 = new THREE.Vector3();
+
+    /* o rastro é o nariz girado PARA TRÁS do que ele já varreu no tempo de voo
+       — Rodrigues em torno do eixo de rotação do próprio avião */
+    const wm = Math.hypot(giroNariz.x, giroNariz.y, giroNariz.z);
+    const ex = wm > 1e-5 ? giroNariz.x/wm : 0;
+    const ey = wm > 1e-5 ? giroNariz.y/wm : 0;
+    const ez = wm > 1e-5 ? giroNariz.z/wm : 1;
+    const pe = ex*T.x + ey*T.y + ez*T.z;
+    /* --- OS PONTOS DA CURVA, TODOS À MESMA DISTÂNCIA ---------------------------
+       A primeira tentativa desenhou a TRAJETÓRIA: cada ponto a uma distância
+       diferente, como a bala realmente voa. A medição reprovou por um motivo
+       que eu não tinha visto — a câmera de perseguição NÃO fica na linha do
+       cano, ela fica 210 acima. Então o ponto perto do avião e o ponto longe
+       caem em lugares diferentes da tela mesmo voando reto, e as duas marcas
+       nasciam separadas por 63 px sem nenhuma curva acontecer.
+
+       Agora os pontos ficam todos à MESMA distância (`ate`) e só o ângulo
+       muda, de zero até o giro cheio. Vira um arco que sai da cruz e termina
+       no anel, ligando as duas marcas nas duas vistas — que é o pedido — e
+       some para um ponto só quando o nariz não está varrendo nada.
+
+       O rastro de verdade continua existindo na tela: são as balas, em 3D,
+       que o jogo já desenha. O HUD não precisa imitá-las; precisa dizer onde
+       elas VÃO PARAR. */
+    /* --- O BATENTE -------------------------------------------------------------
+       Numa curva violenta — 58°/s de nariz, que este avião faz — a dianteira
+       dá 64°, e o anel sai voando para fora da tela com a linha atravessando
+       tudo. Mira giroscópica de verdade tem batente pelo mesmo motivo: o
+       retículo é uma imagem projetada num vidro que tem tamanho, e passando do
+       curso ele para nos limites mecânicos.
+
+       Aqui o limite é 16°, e quando ele é atingido o anel muda de cara — fica
+       vazado, sem os riscos — para dizer o que um batente diz: "a dianteira
+       que você precisa é maior do que eu consigo mostrar; alivie a curva". */
+    const LEAD_MAX = 16*Math.PI/180;
+    const leadCheio = wm*(ate/vBala);
+    const noBatente = leadCheio > LEAD_MAX;
+    const lead = Math.min(leadCheio, LEAD_MAX);
+    const naTela = k => {
+      const a = -lead*k;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const dx = T.x*ca + (ey*T.z - ez*T.y)*sa + ex*pe*(1-ca);
+      const dy = T.y*ca + (ez*T.x - ex*T.z)*sa + ey*pe*(1-ca);
+      const dz = T.z*ca + (ex*T.y - ey*T.x)*sa + ez*pe*(1-ca);
+      v3.set(aviaoX + dx*ate, aviaoY + dy*ate, aviaoZ + dz*ate).project(cam);
+      return { x:(v3.x*0.5+0.5)*W, y:(-v3.y*0.5+0.5)*H, atras: v3.z > 1 };
+    };
+    const curva = [0, 0.17, 0.34, 0.5, 0.67, 0.84, 1].map(naTela);
     const preso = MiraTiro.bom;
 
-    /* onde está a solução na tela — calculada antes, porque é ela que decide
-       se ainda cabe escrever o alcance embaixo do anel */
+    /* a solução de tiro (o losango do ATIRE), calculada antes: ela decide se
+       ainda cabe escrever o alcance embaixo do anel */
     let sol = null;
     if (preso && MiraTiro.solucao){
       const S = MiraTiro.solucao;
@@ -11937,62 +12022,61 @@ function desenhaHUD(){
       }
     }
 
-    /* --- O RASTRO DE VERDADE ------------------------------------------------ */
-    if (tiros.length >= 2){
-      const pts = [];
-      for (const t of tiros){
-        v3.set(t.x, t.y, t.z).project(cam);
-        if (v3.z > 1) continue;
-        pts.push({ x:(v3.x*0.5+0.5)*W, y:(-v3.y*0.5+0.5)*H });
-      }
-      if (pts.length >= 2){
-        const liso = pts.map((q, i) => {
-          const a = pts[Math.max(0, i-1)], b = pts[Math.min(pts.length-1, i+1)];
-          return { x:(a.x + q.x + b.x)/3, y:(a.y + q.y + b.y)/3 };
-        });
-        h2.lineWidth = 2.2; h2.lineCap = 'round';
-        for (let i = 0; i < liso.length-1; i++){
-          // a ponta nova é a mais viva; a velha vai apagando
-          const f = (i+1)/liso.length;
-          h2.strokeStyle = 'rgba(150,255,190,' + (0.18 + f*0.62).toFixed(3) + ')';
-          h2.beginPath(); h2.moveTo(liso[i].x, liso[i].y);
-          h2.lineTo(liso[i+1].x, liso[i+1].y); h2.stroke();
+    if (!curva.some(q => q.atras)){
+      const dentro = curva[0], fora = curva[curva.length-1];
+      const afastou = Math.hypot(fora.x-dentro.x, fora.y-dentro.y);
+
+      /* --- A LINHA ENTRE AS DUAS, sempre --------------------------------- */
+      if (afastou > 3){
+        h2.lineWidth = 1.8; h2.lineCap = 'round';
+        for (let i = 0; i < curva.length-1; i++){
+          const f = (i+1)/curva.length;      // mais viva perto do cano
+          h2.strokeStyle = 'rgba(120,255,170,' + (0.65 - f*0.30).toFixed(3) + ')';
+          h2.beginPath(); h2.moveTo(curva[i].x, curva[i].y);
+          h2.lineTo(curva[i+1].x, curva[i+1].y); h2.stroke();
         }
         h2.lineCap = 'butt';
       }
-    }
 
-    /* --- O ANEL ------------------------------------------------------------- */
-    v3.set(aviaoX + T.x*alcance, aviaoY + T.y*alcance, aviaoZ + T.z*alcance).project(cam);
-    if (v3.z <= 1){
-      const px = (v3.x*0.5+0.5)*W, py = (-v3.y*0.5+0.5)*H;
-      const r = Math.max(13, H*0.05);
-      h2.strokeStyle = preso ? 'rgba(150,255,190,.95)' : 'rgba(120,255,170,.6)';
-      h2.lineWidth = preso ? 2.4 : 1.6;
-      for (let i = 0; i < 4; i++){          // quatro arcos, com folga entre eles
+      /* --- A CRUZ INTERNA: o cano ---------------------------------------- */
+      const c = dentro, t2 = Math.max(5, H*0.012);
+      h2.strokeStyle = 'rgba(120,255,170,.8)'; h2.lineWidth = 2;
+      h2.beginPath();
+      h2.moveTo(c.x - t2*2.4, c.y); h2.lineTo(c.x - t2*0.8, c.y);
+      h2.moveTo(c.x + t2*0.8, c.y); h2.lineTo(c.x + t2*2.4, c.y);
+      h2.moveTo(c.x, c.y - t2*2.4); h2.lineTo(c.x, c.y - t2*0.8);
+      h2.stroke();
+      h2.beginPath(); h2.arc(c.x, c.y, Math.max(2, H*0.004), 0, 7); h2.stroke();
+
+      /* --- O ANEL EXTERNO: onde está o rastro ----------------------------- */
+      const f2 = fora, r = Math.max(13, H*0.05);
+      h2.strokeStyle = preso ? 'rgba(150,255,190,.95)'
+                     : noBatente ? 'rgba(255,194,77,.75)' : 'rgba(120,255,170,.7)';
+      h2.lineWidth = preso ? 2.6 : 1.8;
+      for (let i = 0; i < 4; i++){
         h2.beginPath();
-        h2.arc(px, py, r, i*Math.PI/2 + 0.16, (i+1)*Math.PI/2 - 0.16);
+        h2.arc(f2.x, f2.y, r, i*Math.PI/2 + 0.16, (i+1)*Math.PI/2 - 0.16);
         h2.stroke();
       }
       h2.strokeStyle = 'rgba(120,255,170,.85)'; h2.lineWidth = 2;
-      for (const a of [0, Math.PI/2, Math.PI, -Math.PI/2]){
-        const cx = Math.cos(a), sy = Math.sin(a);
+      for (const a of (noBatente ? [] : [0, Math.PI/2, Math.PI, -Math.PI/2])){
+        const cx2 = Math.cos(a), sy2 = Math.sin(a);
         h2.beginPath();
-        h2.moveTo(px + cx*r*0.72, py + sy*r*0.72);
-        h2.lineTo(px + cx*r*0.94, py + sy*r*0.94);
+        h2.moveTo(f2.x + cx2*r*0.72, f2.y + sy2*r*0.72);
+        h2.lineTo(f2.x + cx2*r*0.94, f2.y + sy2*r*0.94);
         h2.stroke();
       }
       h2.fillStyle = 'rgba(150,255,190,.95)';
-      h2.beginPath(); h2.arc(px, py, Math.max(2, H*0.005), 0, 7); h2.fill();
+      h2.beginPath(); h2.arc(f2.x, f2.y, Math.max(2, H*0.005), 0, 7); h2.fill();
       h2.textAlign = 'center';
       h2.font = '700 ' + Math.max(8, H*0.014).toFixed(0) + 'px ui-monospace, monospace';
       h2.fillStyle = 'rgba(120,255,170,.75)';
-      if (!sol || Math.hypot(sol.x-px, sol.y-py) > r*1.6)
-        h2.fillText(Math.round(alcance/METRO) + 'm', px, py + r + Math.max(14, H*0.028));
+      if (!sol || Math.hypot(sol.x-f2.x, sol.y-f2.y) > r*1.6)
+        h2.fillText(Math.round(ate/METRO) + 'm', f2.x, f2.y + r + Math.max(14, H*0.028));
       h2.textAlign = 'left';
     }
 
-    /* --- E A SOLUÇÃO DE TIRO, quando existe --------------------------------- */
+    /* --- E O LOSANGO DA SOLUÇÃO ----------------------------------------- */
     if (sol){
       h2.strokeStyle = 'rgba(150,255,190,.45)'; h2.lineWidth = 1.4;
       h2.beginPath(); h2.moveTo(sol.ax, sol.ay); h2.lineTo(sol.x, sol.y); h2.stroke();

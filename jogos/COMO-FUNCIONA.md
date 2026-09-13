@@ -3742,3 +3742,93 @@ Vale a lição: transformação de canvas é **estado global**, e estado global 
 abre num lugar e se fecha em outro é uma armadilha silenciosa — nada quebra, tudo
 só aparece um pouco fora do lugar. A prova que mede *"quantos pixels verdes há
 onde eu espero"* pega isso; ler o código não pegava.
+
+---
+
+## As duas miras da metralhadora (e o erro de interpretação que me custou uma volta)
+
+> *"A metralhadora tem que ter duas miras, uma interna e outra externa, sendo a
+> mesma mira: quando o avião desloca, a externa acompanha onde vai o disparo.
+> Reto, as duas centralizam; em curva, se separam — e a linha da bala liga as
+> duas. E essa linha sempre existe, não só quando atira."*
+
+Isto é uma **mira giroscópica**, que é como se atira de caça desde 1943. É a
+quarta versão desta mira, e a lição desta rodada não é de conta — é de leitura.
+
+### Eu já tinha construído esta curva, e joguei fora
+
+Numa rodada anterior eu fiz exatamente esta curva, medi e concluí *"está
+errada"*. A medição dizia: **uma bala disparada agora termina na linha reta do
+cano, não na curva**. Isso era verdade e continua sendo. O erro foi meu, ao
+perguntar à curva uma coisa que não é o trabalho dela.
+
+As duas marcas respondem a **duas perguntas diferentes**:
+
+- **A cruz (interna) é o cano.** Bala que sai agora vai por ali. É a resposta
+  daquela medição, e é por isso que a cruz existe.
+- **O anel (externo) é onde o rastro está.** As balas que já estão no ar saíram
+  quando o nariz apontava para outro lugar; em curva elas ficam para trás de
+  `ω·t`. É o que se enxerga pela janela.
+
+E é o anel que serve para **mirar** num alvo que você acompanha na curva: pondo o
+anel em cima dele, o cano fica automaticamente adiantado do tanto certo. Essa é a
+ideia inteira da mira giroscópica.
+
+Voando reto, `ω` é zero: a curva vira um ponto e as duas marcas viram uma. Não
+por gentileza — é a geometria.
+
+### Duas armadilhas de geometria, as duas pegas medindo
+
+**A câmera não fica na linha do cano.** A primeira tentativa desenhou a
+trajetória de verdade, cada ponto a uma distância diferente. Reprovou: a câmera
+de perseguição fica 210 acima da linha do cano, então o ponto perto do avião e o
+ponto longe caem em lugares diferentes da tela **mesmo voando reto** — as duas
+marcas nasciam separadas por 63 px sem curva nenhuma. Agora todos os pontos ficam
+à mesma distância e só o ângulo muda: vira um arco que sai da cruz e termina no
+anel, ligando as duas nas duas vistas.
+
+**O batente.** Numa curva violenta — 58°/s de nariz, que este avião faz — a
+dianteira dá 64°, e o anel saía voando para fora da tela com a linha
+atravessando tudo. Mira giroscópica de verdade tem batente pelo mesmo motivo: o
+retículo é uma imagem num vidro que tem tamanho. O limite aqui é 16°, e no
+batente o anel fica âmbar e vazado — que é o que um batente diz: *"a dianteira
+que você precisa é maior do que eu mostro; alivie a curva"*.
+
+### A prova, e as três provas erradas antes dela
+
+Comparar o anel com *"a bala mais velha do ar"* não presta: na curva a velocidade
+cai (a bala velha saiu mais rápida que as de agora), o avião ainda percorre o
+arco, e qual é a bala mais velha depende de quantos quadros o teste atirou. Foi
+assim que a primeira versão da prova acusou 42° de erro que não existiam.
+
+A afirmação que a mira giroscópica realmente faz é exata:
+
+> Acompanhando um alvo — o nariz varrendo na mesma taxa em que a linha de visada
+> gira —, o **anel cai em cima do alvo** no instante em que o **cano** está
+> apontado para a dianteira certa.
+
+Sai da conta, sem aproximação: a taxa de visada de um alvo que cruza a `Vt` a uma
+distância `D` é `Vt/D`; o giro do nariz que o acompanha é o mesmo; então o
+deslocamento do anel é `ω·t = (Vt/D)·(D/vB) = Vt/vB` — exatamente a dianteira.
+
+Montar essa situação no teste me custou mais três erros, todos meus:
+
+1. pus `giroNariz` na mão com um sinal chutado — circular, o teste passou a medir
+   o meu chute. Passou a ser **derivado** do jeito que o jogo deriva: produto
+   vetorial entre o nariz de antes e o de agora;
+2. perguntei a solução de tiro **antes** de apontar o cano, então o travamento
+   não pegava e a mira supunha o alcance cheio em vez da distância do alvo;
+3. o próprio teste não copiava a regra de alcance do HUD, e media um anel que o
+   jogo não desenha.
+
+Corrigidos os três:
+
+```
+1) voando reto: as duas marcas a 0,0 px uma da outra          ✔ viram uma só
+2) em curva a 58°/s: separadas por 143 px, dianteira de 16°   ✔ e sem sair da tela
+3) acompanhando um alvo que cruza a 1500 a 13.464 de distância:
+   o cano aponta 4,2° adiante do alvo (a dianteira)
+   o anel cai a 0,0° do alvo                                  ✔
+   (com o sinal trocado cairia a 8,4°)
+4) a cruz interna está a 0 px da linha reta do cano           ✔ é o cano mesmo
+```
