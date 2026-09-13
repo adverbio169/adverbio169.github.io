@@ -5487,6 +5487,7 @@ function desenhaHUD(){
       }
     }
 
+    let anel = null;                     // onde o anel ficou, para o ATIRE não bater nele
     if (!curva.some(q => q.atras)){
       const dentro = curva[0], fora = curva[curva.length-1];
       const afastou = Math.hypot(fora.x-dentro.x, fora.y-dentro.y);
@@ -5515,8 +5516,13 @@ function desenhaHUD(){
 
       /* --- O ANEL EXTERNO: onde está o rastro ----------------------------- */
       const f2 = fora, r = Math.max(13, H*0.05);
-      h2.strokeStyle = preso ? 'rgba(150,255,190,.95)'
-                     : noBatente ? 'rgba(255,194,77,.75)' : 'rgba(120,255,170,.7)';
+      anel = { x:f2.x, y:f2.y, r };
+      /* Uma cor só, do começo ao fim: o mesmo verde do resto do HUD. O que
+         muda entre travado, solto e no batente é a GROSSURA e o desenho — o
+         anel no batente perde os riscos —, nunca a tinta. Havia um âmbar aqui
+         para o batente e dois verdes diferentes espalhados; num HUD, cor que
+         muda é cor que quer dizer alguma coisa, e essas não queriam. */
+      h2.strokeStyle = 'rgba(120,255,170,' + (preso ? .95 : noBatente ? .6 : .7) + ')';
       h2.lineWidth = preso ? 2.6 : 1.8;
       for (let i = 0; i < 4; i++){
         h2.beginPath();
@@ -5531,7 +5537,7 @@ function desenhaHUD(){
         h2.lineTo(f2.x + cx2*r*0.94, f2.y + sy2*r*0.94);
         h2.stroke();
       }
-      h2.fillStyle = 'rgba(150,255,190,.95)';
+      h2.fillStyle = 'rgba(120,255,170,.95)';
       h2.beginPath(); h2.arc(f2.x, f2.y, Math.max(2, H*0.005), 0, 7); h2.fill();
       h2.textAlign = 'center';
       h2.font = '700 ' + Math.max(8, H*0.014).toFixed(0) + 'px ui-monospace, monospace';
@@ -5543,11 +5549,11 @@ function desenhaHUD(){
 
     /* --- E O LOSANGO DA SOLUÇÃO ----------------------------------------- */
     if (sol){
-      h2.strokeStyle = 'rgba(150,255,190,.45)'; h2.lineWidth = 1.4;
+      h2.strokeStyle = 'rgba(120,255,170,.45)'; h2.lineWidth = 1.4;
       h2.beginPath(); h2.moveTo(sol.ax, sol.ay); h2.lineTo(sol.x, sol.y); h2.stroke();
       const pisca = Math.sin(Date.now()/90) > -0.4;
       const r = Math.max(9, H*0.026);
-      h2.strokeStyle = pisca ? 'rgba(150,255,190,.98)' : 'rgba(150,255,190,.4)';
+      h2.strokeStyle = pisca ? 'rgba(120,255,170,.98)' : 'rgba(120,255,170,.4)';
       h2.lineWidth = 2.6;
       h2.beginPath();
       h2.moveTo(sol.x, sol.y-r); h2.lineTo(sol.x+r, sol.y);
@@ -5555,8 +5561,14 @@ function desenhaHUD(){
       h2.closePath(); h2.stroke();
       h2.textAlign = 'center';
       h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px ui-monospace, monospace';
-      h2.fillStyle = 'rgba(150,255,190,.95)';
-      h2.fillText('ATIRE', sol.x, sol.y - r - Math.max(6, H*0.012));
+      h2.fillStyle = 'rgba(120,255,170,.95)';
+      /* o ATIRE ia logo acima do losango, e o losango vive DENTRO do anel
+         quando o alvo está centrado: a palavra saía escrita por cima do aro.
+         Sobe acima do que estiver mais alto dos dois. */
+      let topo = sol.y - r;
+      if (anel && Math.hypot(anel.x-sol.x, anel.y-sol.y) < anel.r + r)
+        topo = Math.min(topo, anel.y - anel.r);
+      h2.fillText('ATIRE', sol.x, topo - Math.max(7, H*0.014));
       h2.textAlign = 'left';
     }
   }

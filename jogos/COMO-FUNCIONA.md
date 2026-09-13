@@ -3832,3 +3832,20 @@ Corrigidos os três:
    (com o sinal trocado cairia a 8,4°)
 4) a cruz interna está a 0 px da linha reta do cano           ✔ é o cano mesmo
 ```
+
+
+### Uma cor só
+
+> *"Coloca tudo verde o HUD do canhão. Deixa a mesma cor."*
+
+Havia três tintas ali sem querer: o verde do HUD (`120,255,170`), um verde mais
+claro que tinha entrado junto com a solução de tiro (`150,255,190`) e um âmbar
+para o batente. Agora é **uma só**, e o que muda entre travado, solto e no
+batente é a **grossura** e o **desenho** — o anel no batente perde os riscos —,
+nunca a tinta.
+
+Num HUD, cor que muda é cor que quer dizer alguma coisa. Aquelas não queriam.
+
+*(De tabela: a palavra `ATIRE` ia logo acima do losango, e o losango vive dentro
+do anel quando o alvo está centrado — a palavra saía escrita por cima do aro.
+Agora ela sobe acima do que estiver mais alto dos dois.)*
