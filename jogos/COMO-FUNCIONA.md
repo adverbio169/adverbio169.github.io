@@ -2222,3 +2222,67 @@ quadros por segundo: 6,6 -> 5,6 (o mesmo de antes do radar)
 O botão `SALA` nasceu em `top:14; left:50%` — exatamente onde mora a caixa do
 combustível. As duas se sobrepunham, com "SALA CUNN" escrito por cima do 100%.
 Desceu para baixo dela.
+
+---
+
+## Altímetro na cabine, e nascer espalhado
+
+### O número que faltava
+
+> *"O HUD do modo cabine também tem que ter altitude, em verde."*
+
+Faltava mesmo — e não só na cabine: **o jogo inteiro não tinha altímetro**. Dava
+para saber a velocidade, o combustível, a fuselagem, a distância voada e a
+potência, e não dava para saber a que altura se está, que é o número que decide
+se dá para puxar ou não.
+
+Na cabine ele foi para a **direita**, do outro lado da mira: é ali que o olho de
+quem voa procura altitude, e a esquerda já é do motor. Mesma tinta verde e mesmo
+vidro escuro atrás — o verde do HUD some em cima da cidade branca, e as réguas
+do motor já tinham aprendido isso.
+
+Duas linhas, porque uma só não conta a história: os **metros** grandes, e embaixo
+a **subida ou descida em metros por segundo**, com sinal. Altitude parada não diz
+se o chão está chegando. Abaixo de 120 m o número fica vermelho.
+
+A razão de subida sai direto de `eixoF.y * voo` — o quanto do vetor de voo aponta
+para cima — e não de comparar alturas entre quadros, que com quadro irregular
+pula de +300 para −900 e volta. Alisada, senão ninguém lê um algarismo que troca
+sessenta vezes por segundo.
+
+### A fila indiana
+
+> *"O nascimento da batalha aérea tem que ser aleatório no mapa. Sempre nasce um
+> atrás do outro no mesmo ponto."*
+
+Era literal. O `reinicia()` punha todo mundo em `(0, 1500, 0)`, olhando para
+`+z`. Dois aviões que entram na mesma batalha nascem colados, e quem morre e
+volta reaparece exatamente onde o outro está esperando. Não é batalha, é fila.
+
+Sozinho o ponto fixo não incomoda — e os testes contam com ele —, então o
+sorteio vale **só quando há batalha**.
+
+Sortear um ponto qualquer também não basta: o sorteio pode cair em cima de outro
+avião, e aí o problema volta pior, porque agora é surpresa. Ele tenta até vinte
+pontos e fica no primeiro que estiver a mais de 8.000 de todo mundo; se os vinte
+falharem (céu cheio), fica com o mais longe que achou, que é sempre melhor que o
+ponto fixo.
+
+O raio do sorteio é o do mapinha: nascer **dentro do alcance do radar** é o que
+faz a pessoa se achar, em vez de procurar a pista no vazio. O rumo também é
+sorteado — nascer todo mundo olhando para o mesmo lado é meia fila.
+
+E quem escolheu **começar na pista** não dá para espalhar pelo mapa. Aí o sorteio
+é outro: ao longo da pista, cada um no seu pedaço, e um pouco ao lado do eixo —
+ela tem 620 de meia-largura, cabem os dois.
+
+```
+sozinho, 5 vezes: sempre 0,0 ................................ ✔ como antes
+em batalha, 40 vezes: 40 pontos diferentes, 5.427 a 25.807 ... ✔ nunca repete
+   alturas de 1.572 a 4.213 ................................. ✔
+   rumos de -179° a 168°, eixos normalizados ................ ✔ cada um para um lado
+com alguém no céu, 30 vezes: nasceu colado nele 0 vezes ...... ✔
+na pista, em batalha: z de -7.630 a -3.258, todos no asfalto . ✔
+cabine a 2.000 m: o altímetro verde aparece .................. ✔
+a 60 m do chão: fica vermelho ................................ ✔
+```

@@ -7366,6 +7366,7 @@ let estresse=0;
 let vida=100;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
+let subida = 0;            // metros por segundo para cima, alisado, para o altímetro
 let jogando=false, caindo=false, giroQueda=0, vq=0, motivoQueda='';
 let cockpit=false, infinito=true, munInfinita=true, qualidade=2;
 /* a torre do copiloto: desvio da mira em relação ao nariz, dentro de um cone */
@@ -9489,6 +9490,12 @@ function atualiza(dt){
   endireitaEixos();
 
   aviaoX += eixoF.x*voo*dt; aviaoY += eixoF.y*voo*dt; aviaoZ += eixoF.z*voo*dt;
+  /* A RAZÃO DE SUBIDA, para o altímetro da cabine. Sai direto de `eixoF.y*voo`
+     — o quanto do vetor de voo aponta para cima — e não de comparar alturas
+     entre quadros, que num jogo com quadro irregular pula de 300 para -900 e
+     volta. Alisada, senão o número é ilegível: ninguém lê um algarismo que
+     troca 60 vezes por segundo. */
+  subida += (eixoF.y*voo - subida) * Math.min(1, dt*2.5);
 
   const fora = Math.max(Math.abs(aviaoX), Math.abs(aviaoZ));
   if (fora > MAPA){
@@ -10093,6 +10100,41 @@ function desenhaHUD(){
     };
     regua(turbinando ? 'PWR  MAX' : 'PWR  ' + Math.round(motor*100), turbinando ? 1 : motor, turbinando, 0);
     regua('NIT  ' + Math.round(nitroCarga), nitroCarga/100, nitroBotao && nitroCarga > 0, 1);
+
+    /* --- A ALTITUDE ---------------------------------------------------------
+       O jogo não tinha altímetro em lugar nenhum — nem na cabine, nem nos
+       painéis de fora. Dava para saber a velocidade, o combustível, a
+       fuselagem e a distância voada, e não dava para saber a que altura se
+       está, que é o número que decide se dá para puxar ou não.
+
+       Na cabine ele vai à DIREITA, do outro lado da mira, porque é ali que o
+       olho de quem voa procura altitude — e porque a esquerda já é do motor.
+       Mesma tinta verde e mesmo vidro escuro atrás: o verde do HUD some em
+       cima da cidade branca, e o painel do motor já tinha aprendido isso.
+
+       Duas linhas: os metros grandes, e embaixo a subida ou descida em metros
+       por segundo, com sinal. A segunda é o que diz se o chão está chegando —
+       um número parado de altitude não conta isso. */
+    const ah = Math.max(11, H*0.030);            // altura do número grande
+    const aw = Math.max(84, W*0.135);
+    const ax = W - W*0.075 - aw, ay = H*0.63;
+    h2.fillStyle = 'rgba(4,10,14,.42)';
+    h2.fillRect(ax - 10, ay - ah - 6, aw + 20, ah + Math.max(10, H*0.021) + 18);
+    h2.textAlign = 'right';
+    h2.font = '700 ' + Math.max(9, H*0.017).toFixed(0) + 'px ui-monospace, monospace';
+    h2.fillStyle = 'rgba(120,255,170,.8)';
+    h2.fillText('ALT', ax + aw, ay - ah - Math.max(-2, -H*0.002));
+    const metros = Math.max(0, Math.round((aviaoY - CHAO) / METRO));
+    /* vermelho quando está baixo: a mesma altura em que o trem de pouso pode
+       sair e em que uma nuclear larga em cima da própria cabeça */
+    h2.fillStyle = metros < 120 ? 'rgba(255,150,120,.98)' : 'rgba(150,255,190,.98)';
+    h2.font = '800 ' + ah.toFixed(0) + 'px ui-monospace, monospace';
+    h2.fillText(String(metros), ax + aw, ay + 2);
+    const vsi = Math.round(subida / METRO);
+    h2.font = '700 ' + Math.max(9, H*0.016).toFixed(0) + 'px ui-monospace, monospace';
+    h2.fillStyle = 'rgba(120,255,170,.85)';
+    h2.fillText((vsi >= 0 ? '+' : '') + vsi + ' m/s', ax + aw, ay + Math.max(14, H*0.030));
+    h2.textAlign = 'left';
   }
 
   /* --- OS OUTROS AVIÕES: uma marca em cima de cada um ---------------------
@@ -10392,21 +10434,65 @@ $('btQual').onclick = () => poeQualidade((qualidade + 2) % 3);
 let naPistaAoComecar = true;
 try { naPistaAoComecar = localStorage.getItem('aviao3d.pista') !== '0'; } catch(e){}
 
+/* --- ONDE SE NASCE NUMA BATALHA ---------------------------------------------
+   Relato: "sempre nasce um atrás do outro no mesmo ponto". Era literal — o
+   `reinicia()` punha todo mundo em (0, 1500, 0), olhando para +z. Dois aviões
+   que entram na mesma batalha nascem colados, e quem morre e volta reaparece
+   exatamente onde o outro está esperando. Não é batalha, é fila.
+
+   Sozinho o ponto fixo não incomoda (e os testes contam com ele), então o
+   sorteio vale só quando há batalha.
+
+   Sortear um ponto qualquer não basta: o sorteio pode cair em cima de outro
+   avião, e aí o problema volta pior, porque agora é surpresa. Ele tenta até
+   vinte pontos e fica no primeiro que estiver a mais de 8.000 de todo mundo —
+   e se os vinte falharem (céu cheio), fica com o mais longe que achou, que é
+   sempre melhor que o ponto fixo.
+
+   O raio do sorteio é o do mapinha: nascer dentro do alcance do radar é o que
+   faz a pessoa se achar em vez de ficar procurando a pista no vazio. */
+function sorteiaNascimento(){
+  let melhor = null, melhorD = -1;
+  for (let t = 0; t < 20; t++){
+    const a = Math.random()*Math.PI*2, d = 5000 + Math.random()*(RADAR_KM - 5000);
+    const p = { x: Math.sin(a)*d, z: Math.cos(a)*d,
+                y: 1500 + Math.random()*2800, rumo: Math.random()*Math.PI*2 };
+    let perto = Infinity;
+    for (const o of Batalha.outros.values()){
+      if (o.vivo === false || o.x === undefined) continue;
+      perto = Math.min(perto, Math.hypot(o.x - p.x, o.z - p.z));
+    }
+    if (perto > 8000) return p;
+    if (perto > melhorD){ melhorD = perto; melhor = p; }
+  }
+  return melhor;
+}
+
 function reinicia(){
+  let rumo0 = 0;
   if (naPistaAoComecar){
-    aviaoX = 0; aviaoZ = PISTA_Z0 + 1200; aviaoY = PISTA_Y + RODA;
+    /* na pista o sorteio é outro: não dá para espalhar pelo mapa quem escolheu
+       decolar, então espalha-se AO LONGO da pista, cada um no seu pedaço e um
+       pouco ao lado do eixo — ela tem 620 de meia-largura, cabem os dois */
+    const fila = Batalha.ligada ? Math.random() : 0;
+    aviaoX = Batalha.ligada ? (Math.random()-0.5)*620 : 0;
+    aviaoZ = PISTA_Z0 + 1200 + fila*5000;
+    aviaoY = PISTA_Y + RODA;
     noChao = true; trem = true; flap = 1; motor = 0; voo = 0; parado = 0;
     arfChao = 0; rumoChao = 0;
   } else {
-    aviaoX = 0; aviaoZ = 0; aviaoY = 1500;
+    const p = Batalha.ligada ? sorteiaNascimento() : null;
+    aviaoX = p ? p.x : 0; aviaoZ = p ? p.z : 0; aviaoY = p ? p.y : 1500;
+    rumo0 = p ? p.rumo : 0;
     noChao = false; trem = false; flap = 0; motor = MOTOR_PADRAO; voo = VOO_BASE;
   }
   tremAnim = trem ? 1 : 0; flapAnim = flap;
-  eixoF = {x:0,y:0,z:1}; eixoC = {x:0,y:1,z:0}; eixoD = {x:1,y:0,z:0};
+  eixoF = {x:Math.sin(rumo0), y:0, z:Math.cos(rumo0)};
+  eixoC = {x:0,y:1,z:0}; eixoD = vcruz(eixoC, eixoF);
   endireitaEixos();
-  camF = {x:0,y:0,z:1}; camC = {x:0,y:1,z:0}; camD = {x:1,y:0,z:0};
-  camPos.set(aviaoX, aviaoY + 210, aviaoZ - CAMD);
-  turbo = 0; combustivel = 100; distancia = 0;
+  camF = {x:eixoF.x,y:0,z:eixoF.z}; camC = {x:0,y:1,z:0}; camD = {x:eixoD.x,y:0,z:eixoD.z};
+  camPos.set(aviaoX - eixoF.x*CAMD, aviaoY + 210, aviaoZ - eixoF.z*CAMD);
+  turbo = 0; combustivel = 100; distancia = 0; subida = 0;
   nitroCarga = 100; nitroBotao = false; turbinando = false;
   avisouEstol = 0; pousos = 0; vida = VIDA_CHEIA;
   if (estolando){ estolando = false; somEstol(false); }
