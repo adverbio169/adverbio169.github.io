@@ -5028,7 +5028,15 @@ function desenhaHUD(){
   presoNaTela();
 
   if (cockpit){
-    // mira do canhão e escada de arfagem, projetadas pelo mesmo three.js
+    /* A CRUZ DO CANHÃO é o único desenho deste bloco que não vem da projeção:
+       ela mora no meio da tela porque marca para onde o NARIZ aponta. Então
+       ela é do vidro, e sai de cena com ele quando a cabeça vira — senão fica
+       uma cruz de mira flutuando no meio de uma vista que não é a do nariz,
+       que é a mentira mais confusa que este HUD poderia contar.
+
+       A escada de arfagem, logo abaixo, é o contrário: vem da câmera, já
+       contém o giro, e por isso é desenhada na tela crua. */
+    presoNoAviao();
     const cx = W/2, cy = H/2;
     h2.strokeStyle = 'rgba(120,255,170,.8)'; h2.lineWidth = 2.2;
     h2.beginPath();
@@ -5037,6 +5045,7 @@ function desenhaHUD(){
     h2.moveTo(cx, cy - H*0.026); h2.lineTo(cx, cy - H*0.009);
     h2.stroke();
     h2.beginPath(); h2.arc(cx, cy, Math.max(4, H*0.010), 0, 7); h2.stroke();
+    presoNaTela();
     /* ---------------------------------------------------------------------
        A ESCADA DE ARFAGEM tem de ficar PARALELA AO HORIZONTE.
 
@@ -5103,7 +5112,12 @@ function desenhaHUD(){
 
     /* as duas réguas do motor, na mesma tinta verde do resto do HUD: a de
        cima é o acelerador, a de baixo é a carga do nitro. Ficam na canhoto
-       da tela, onde não atrapalham a mira. */
+       da tela, onde não atrapalham a mira.
+
+       São instrumentos de cabine, então também são do vidro: a foto com a
+       cabeça a 35° mostrou o HUD inteiro escorrendo e estas duas ficando
+       para trás, sozinhas na tela. */
+    presoNoAviao();
     const { bx, bw, bh, cor, passo, topo } = reguasOnde();
     // um vidro escuro atrás, senão o verde some em cima da cidade branca
     h2.fillStyle = 'rgba(4,10,14,.42)';
@@ -5163,6 +5177,7 @@ function desenhaHUD(){
       h2.font = '700 ' + Math.max(8, H*0.014).toFixed(0) + 'px system-ui, sans-serif';
       h2.fillText(o.nome + '  ' + Math.round(d/METRO) + 'm', x, y - r - 5);
     }
+    presoNaTela();
     h2.textAlign = 'left';
   }
 

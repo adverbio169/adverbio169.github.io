@@ -3682,3 +3682,23 @@ está a 0° do nariz                          ✔ o olhar não realimenta
 *(E a prova do `cabeca` teve de mudar junto: ela lia `camF` para saber para onde
 se estava olhando, e `camF` deixou de ser essa resposta. Agora ela pergunta à
 câmera do three.js, que é quem sabe.)*
+
+
+### E na cabine, duas peças que tinham ficado para trás
+
+A foto com a cabeça a 35° dentro da cabine mostrou o HUD inteiro escorrendo com
+o nariz e **duas coisas paradas na tela**: a cruz do canhão e as réguas de
+potência/nitro.
+
+Ambas são do vidro, e pelo mesmo motivo. A **cruz do canhão** marca para onde o
+nariz aponta — uma cruz de mira flutuando no meio de uma vista que não é a do
+nariz é a mentira mais confusa que este HUD poderia contar. As **réguas** são
+instrumento de cabine como qualquer outro.
+
+A escada de arfagem, ao lado da cruz no mesmo bloco, é o contrário: vem da
+projeção da câmera, já contém o giro, e continua desenhada na tela crua.
+
+```
+a cruz do canhão, a 25° de cabeça: 49 px no meio da tela
+                                  e 234 px em cima do nariz   ✔ foi com o vidro
+```
