@@ -10195,7 +10195,33 @@ function erro(msg){ const e = $('erro'); e.textContent = msg; e.style.display = 
    contexto por baixo do motor, que ficava tocando no antigo (mudo). Agora
    cria uma vez e só manda acordar nas vezes seguintes, que é o que o iPhone
    precisa mesmo. */
+/* --- A CHAVINHA DE SILENCIOSO ------------------------------------------------
+   Relato: "o jogo sendo visto e controlado pelo iPhone não tem som" — e no
+   monitor, com o mesmo iPhone de controle, o som tinha saído.
+
+   Essa diferença é a pista inteira. Não é o contexto preso (esse acorda, e o
+   aviso que eu pus no rodapé não aparecia), não é o motor (ele monta). O que
+   o monitor não tem e o iPhone tem é a CHAVINHA DE SILENCIOSO na lateral.
+
+   O Safari classifica o som de uma página em "categorias". A padrão é
+   `ambient` — som de enfeite, do tipo que ninguém quer ouvir no meio de uma
+   reunião — e som `ambient` OBEDECE a chavinha. Vídeo e música ficam na
+   categoria `playback`, que a ignora, e é por isso que um vídeo toca com o
+   telefone no mudo e o nosso motor não tocava.
+
+   O que faltava era o jogo DIZER em que categoria ele está. Uma linha:
+
+       navigator.audioSession.type = 'playback'
+
+   E tem de ser dita antes de o contexto começar a tocar, dentro do mesmo
+   toque — daí ela morar aqui, no único lugar por onde todo mundo passa.
+   ------------------------------------------------------------------------- */
 function ligaAudio(){
+  try {
+    /* som de JOGO é `playback`, não enfeite: sem isto a chavinha de silencioso
+       do iPhone emudece o jogo inteiro, e nada na tela dá pista disso */
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
+  } catch(e){}
   try {
     if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
     if (audio.state === 'suspended') audio.resume();
@@ -10223,12 +10249,26 @@ function ligaAudio(){
 for (const ev of ['pointerdown', 'touchstart', 'keydown', 'click'])
   addEventListener(ev, ligaAudio, { passive: true, capture: true });
 
+const ehIPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+                (/Mac/.test(navigator.platform || '') && navigator.maxTouchPoints > 1);
 function somPreso(){ return !audio || audio.state !== 'running'; }
 setInterval(() => {
   const b = $('btSom'); if (!b) return;
   b.classList.toggle('ver', jogando && somPreso());
 }, 500);
 $('btSom').onclick = () => { ligaAudio(); Motor.liga(); };
+/* A chavinha de silencioso NÃO dá para ler pelo navegador: com ela ligada o
+   contexto fica `running` do mesmo jeito e o som some no caminho. Então o
+   jogo não tem como avisar sozinho — só pode dizer onde olhar, e só no
+   aparelho onde essa chavinha existe. */
+if (ehIPhone){
+  const d = document.createElement('p');
+  d.className = 'txt';
+  d.style.cssText = 'font-size:12.5px;color:#7d8cab;max-width:34ch';
+  d.innerHTML = 'iPhone: se ficar mudo, confira a <b>chavinha de silencioso</b> na lateral.';
+  const alvo = $('provaTremor');
+  if (alvo && alvo.parentNode) alvo.parentNode.insertBefore(d, alvo.nextSibling);
+}
 function telaCheia(){
   try{
     const el = document.documentElement;

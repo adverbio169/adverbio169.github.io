@@ -2004,3 +2004,66 @@ metralhadora contínua: liga e desliga .................. ✔
 tempo LIGADO: míssil 250 ms, travamento 150 ms,
   pulso da metralhadora 42 ms, do buffet 32 ms ......... ✔ acima dos ~20 ms do LRA
 ```
+
+---
+
+## O iPhone mudo, parte 2: a chavinha de silencioso
+
+> *"O jogo sendo visto e controlado pelo iPhone não tem som."*
+
+Duas semanas depois do monitor mudo, o mesmo sintoma noutro lugar — e a
+diferença entre os dois casos é que dá a resposta.
+
+No monitor, com o iPhone só de controle, **o som saiu**. No iPhone rodando o
+jogo, não sai. O contexto de áudio acorda (o aviso que eu pus no rodapé nem
+aparece), o motor monta, o `running` está lá. O que o monitor não tem e o
+iPhone tem é a **chavinha de silencioso na lateral**.
+
+### Categoria de áudio
+
+O Safari classifica o som de uma página em **categorias**. A padrão é
+`ambient` — som de enfeite, do tipo que ninguém quer ouvir tocar sozinho no
+meio de uma reunião — e som `ambient` **obedece a chavinha**. Vídeo e música
+ficam em `playback`, que a ignora: é por isso que um vídeo toca com o telefone
+no mudo e o nosso motor não tocava.
+
+Faltava o jogo **dizer em que categoria ele está**. Uma linha:
+
+```js
+navigator.audioSession.type = 'playback';
+```
+
+E tem de ser dita antes de o contexto começar a tocar, dentro do mesmo toque —
+por isso mora no `ligaAudio()`, o único lugar por onde todo mundo passa.
+
+### O mesmo defeito estava nos quatro jogos
+
+No `aviao.html` (e portanto no `tv.html` e no `aviao-tv.html`, que herdam o
+núcleo dele) o áudio é **preguiçoso**: só nasce quando alguma coisa toca. E a
+primeira coisa a tocar pode acontecer longe do dedo da pessoa — aí o navegador
+segura o contexto **e** a categoria chega tarde. Ganharam o mesmo destravar por
+gesto que o 3D já tinha, e a mesma declaração de categoria.
+
+```
+aviao3d.html  declarou ["playback","CONTEXTO","playback"]  ✔ antes do contexto tocar
+aviao.html    declarou ["playback","CONTEXTO","playback"]  ✔
+tv.html       declarou ["playback","CONTEXTO","playback"]  ✔
+```
+
+### O que o jogo não tem como saber
+
+A chavinha **não dá para ler pelo navegador**: com ela ligada o contexto fica
+`running` do mesmo jeito e o som some no caminho, sem deixar rastro. Então o
+`🔇 ligar o som` do rodapé, que resolve o caso do contexto preso, é cego para
+este — e ficar mudo sem explicação nenhuma é o pior que pode acontecer.
+
+O jogo não pode avisar sozinho, mas pode **dizer onde olhar**, e só no aparelho
+onde essa chavinha existe:
+
+> iPhone: se ficar mudo, confira a **chavinha de silencioso** na lateral.
+
+**O que eu não consigo garantir daqui:** não há chavinha de silencioso neste
+contêiner. O que ficou provado é que os quatro jogos declaram `playback`, e
+declaram antes do contexto tocar. Se a `navigator.audioSession` não existir no
+iOS desse aparelho, a linha sai de graça e sobra a dica — que aí passa a ser a
+correção inteira.

@@ -2791,9 +2791,19 @@ function pinta4(pol, estilo){
 try { recorde = parseInt(localStorage.getItem('aviao.recorde') || '0', 10) || 0; } catch(e){}
 
 let audio=null;
+/* Som de JOGO é `playback`, não enfeite. Sem esta linha o Safari põe o áudio
+   da página na categoria `ambient`, que OBEDECE a chavinha de silencioso do
+   iPhone — e o jogo inteiro fica mudo, com o contexto `running` e nada na tela
+   dando pista disso. (O mesmo conserto do aviao3d; o defeito era igual aqui.) */
+function somDeJogo(){
+  try{ if (navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}
+  if (!audio) audio = new (window.AudioContext||window.webkitAudioContext)();
+  if (audio.state === 'suspended') { try{ audio.resume(); }catch(e){} }
+  return audio;
+}
 function bip(freq, dur, tipo, vol){
   try{
-    if(!audio) audio = new (window.AudioContext||window.webkitAudioContext)();
+    somDeJogo();
     const o=audio.createOscillator(), g=audio.createGain();
     o.type=tipo||'sine'; o.frequency.value=freq;
     g.gain.value = vol==null?0.06:vol;
@@ -2804,7 +2814,7 @@ function bip(freq, dur, tipo, vol){
 }
 function ruido(dur, corte, vol){
   try{
-    if(!audio) audio = new (window.AudioContext||window.webkitAudioContext)();
+    somDeJogo();
     const n = Math.max(1, Math.floor(audio.sampleRate * dur));
     const buf = audio.createBuffer(1, n, audio.sampleRate);
     const d = buf.getChannelData(0);
@@ -2817,6 +2827,13 @@ function ruido(dur, corte, vol){
   }catch(e){}
 }
 const estouro = () => ruido(0.55, 900, 0.4);
+/* Aqui o áudio é PREGUIÇOSO: só nasce quando algo toca, e a primeira coisa a
+   tocar pode acontecer longe do dedo da pessoa — e aí o navegador segura, e a
+   categoria `playback` chega tarde. Um toque em qualquer lugar resolve os
+   dois: cria o contexto dentro do gesto e declara a categoria antes de o
+   primeiro som existir. (Mesma correção do aviao3d.) */
+for (const ev of ['pointerdown', 'touchstart', 'keydown', 'click'])
+  addEventListener(ev, () => { try{ somDeJogo(); }catch(e){} }, { passive:true, capture:true });
 
 /* =============================================================================
    O MOTOR — som contínuo, gerado na hora (nenhum arquivo de áudio)
@@ -2829,8 +2846,7 @@ const Motor = {
   liga(){
     if (this.ligado || this.mudo) return;
     try{
-      if(!audio) audio = new (window.AudioContext||window.webkitAudioContext)();
-      if (audio.state === 'suspended') audio.resume();
+      somDeJogo();
 
       this.mestre = audio.createGain(); this.mestre.gain.value = 0;
       this.mestre.connect(audio.destination);
