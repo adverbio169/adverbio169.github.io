@@ -2966,3 +2966,111 @@ e isso passa a ser visto em vez de adivinhado.
 *(Este teste pegou de brinde o `baque`: a prova de "o clarão acende a borda e
 deixa o meio limpo" passou a medir a mira nova, que mora no meio. Ela passou a
 medir com o míssil selecionado.)*
+
+---
+
+## O tiro que não ia onde se mirava
+
+> *"A mira nova da metralhadora mora justamente no meio, mas ela tem que projetar
+> onde vai pegar na frente. O tiro não vai onde se dispara, só se estiver muito
+> perto — e fazendo curva os tiros ainda se desviam no ar."*
+
+A queixa estava certa e tinha **duas** causas. Uma eu adivinhei errado; a outra
+era o defeito de verdade.
+
+### O que eu achei que era (e a medição desmentiu)
+
+Raciocínio: numa curva o nariz varre enquanto a bala viaja, então a linha da
+mira tinha que **encurvar para trás** de `ω·t` — a *mira giroscópica* dos caças
+de verdade. Implementei, ficou bonito, e fui medir. O teste solta **uma** bala e
+vai ver onde ela parou:
+
+```
+em linha reta : 399 da mira reta · 399 da giroscópica   (alcance 14247)
+em curva leve : 249 da mira reta · 1950 da giroscópica  (alcance  9803)
+em curva forte: 496 da mira reta · 5946 da giroscópica  (alcance 14990)
+```
+
+A giroscópica errava **doze vezes mais** na curva forte. O raciocínio tinha um
+buraco: a bala que sai **agora** viaja reta a partir de agora, e o nariz
+continuar girando depois não a entorta. A curva mostrava onde estão as balas do
+**passado** — que é exatamente o rastro torto que se enxerga, e por isso parecia
+certa — mas a mira precisa dizer para onde vai a **próxima**. A linha é reta.
+
+Fica registrado porque a lição é essa: a medição desmontou o raciocínio que a
+produziu, e quem manda é a medição.
+
+### O que era de verdade: os canos nunca se cruzavam
+
+A bala nascia deslocada até 110 para o lado — os canos ficam nas asas, não no
+nariz — e saía **paralela** ao nariz. Paralela nunca encontra: o rastro corria
+eternamente ao lado da mira, e só de bem perto o erro ficava pequeno o bastante
+para acertar. Era literalmente *"o tiro não vai onde se dispara, só se estiver
+muito perto"*.
+
+Caça de verdade resolve isso torcendo os canos um tantinho para dentro, para os
+tiros se cruzarem numa distância escolhida: chama-se **harmonização**. Aqui cada
+bala é apontada para o ponto da linha da mira a **62% do alcance**.
+
+```
+1) em linha reta : a bala terminou a 2 da linha da mira   ✔ (o raio de acerto é 320)
+2) em curva leve : a bala terminou a 2 da linha da mira   ✔
+3) em curva forte: a bala terminou a 2 da linha da mira   ✔
+4) harmonização: nascem a até 106 do eixo e cruzam a mira a 0  ✔
+```
+
+---
+
+## O alarme de atirar
+
+> *"Tem que ter o mesmo alarme sonoro do travador de alvo do míssil quando a
+> projeção dos disparos estiver correta — um aviso sonoro para poder atirar com
+> a metralhadora."*
+
+O buscador do míssil pergunta *"o alvo está no cone?"*. Da metralhadora a
+pergunta é outra e é mais dura: **"se eu apertar agora, a bala encontra o
+alvo?"** — o míssil corrige o caminho sozinho, a bala não corrige nada. Então a
+conta é a de artilharia:
+
+1. quanto tempo a bala leva para chegar — `t = distância / velocidade`;
+2. onde o alvo vai estar depois desse tempo — a **dianteira**;
+3. esse ponto adiantado está em cima da linha do cano, e dentro do alcance?
+
+O passo 1 depende do passo 2 (alvo mais longe = mais tempo = alvo mais adiantado
+ainda), então a conta roda **duas vezes**; converge rápido porque a bala é seis
+vezes mais rápida que o avião.
+
+A tolerância não foi escolhida a dedo: é o **raio de acerto de verdade**, o mesmo
+que o `atingeAr()` usa — 320 da bala mais o raio do alvo —, com uma folga de 25%
+para o alarme avisar um instante antes de o dedo precisar apertar. Quando toca, é
+porque acerta.
+
+E é o **mesmo tom** do míssil travado, que é o pedido: aquele que já era o som
+favorito da casa. Some meio quarto de segundo depois de perder a solução — sem
+essa folga, um alvo cruzando ligava e desligava o tom várias vezes por segundo.
+
+Só entra o que a metralhadora **mata**: aviões, helicópteros, pombos e gente de
+verdade na batalha. Alvo de chão não vale, porque a bala nem colide com ele — e
+alarme que toca para o que não morre é mentira.
+
+Na tela, a solução aparece onde ela está: um **losango** no ponto de encontro, o
+traço fino que liga esse ponto ao alvo de agora — a dianteira que se está dando,
+e ver o tamanho dela ensina a mirar na frente sem ninguém explicar — e a palavra
+`ATIRE`. A linha da mira engrossa e clareia junto.
+
+```
+5) alvo parado bem na frente   : alarme toca    ✔
+6) alvo parado 3000 fora       : alarme calado  ✔
+7) alvo cruzando a 1700/s      : centrado agora, calado · 935 atrás, toca  ✔ dá dianteira
+8) o tom contínuo é o do míssil                  ✔
+9) trocando de arma, o tom cala                  ✔
+```
+
+Para a dianteira valer contra **gente de verdade**, o avião de rede ganhou
+velocidade estimada: a rede só manda posição, 20 vezes por segundo, e a
+velocidade sai da diferença entre dois pacotes (alisada, senão pacote atrasado
+vira um pico absurdo). Sem isso o alarme só tocaria para alvo parado.
+
+*(De brinde, o `fim()` passou a soltar as duas miras: ganhar a missão com um alvo
+travado deixava o alarme tocando na tela de fim, para sempre — o laço morre ali,
+e com ele os `passo()` que desligariam o tom sozinhos.)*

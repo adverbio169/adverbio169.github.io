@@ -2771,6 +2771,7 @@ function trocaArma(nova){
   if (!ARMAS[nova] || arma === nova) return;
   arma = nova; recarga = 0.2;
   if (arma !== 'missil') Mira.solta();
+  if (arma !== 'metralha') MiraTiro.solta();
   bip(700, 0.05, 'square', 0.05);
 }
 
@@ -2787,6 +2788,12 @@ function trocaArma(nova){
    tirar os olhos do alvo: PROCURANDO é um pulso curto que acelera quanto mais
    centrado estiver o alvo; TRAVADO é um tom contínuo, que não pisca mais.
    ========================================================================== */
+/* O alcance da bala sai dos números do próprio `dispara()`: velocidade
+   `voo*6` durante `vida` de 1,1 s. Fica numa função só para a mira, a solução
+   de tiro e o tiro nunca discordarem entre si. */
+function alcanceBala(){ return voo*6*1.1; }
+const HARMONIZA = 0.62;      // onde as balas dos dois canos se cruzam
+
 const MIRA_CONE = 0.965;          // cosseno do meio-ângulo: uns 15°
 const MIRA_LONGE = 26000, MIRA_PERTO = 500;
 const TRAVA_SEG = 0.9;            // quanto tempo centrado para travar
@@ -2848,6 +2855,97 @@ const Mira = {
       // folga antes de largar: turbulência não pode derrubar a trava
       this._perdeu += dt;
       if (this._perdeu > 0.5) this.solta();
+    }
+  }
+};
+/* =============================================================================
+   A SOLUÇÃO DE TIRO DA METRALHADORA
+
+   "Tem que ter o mesmo alarme sonoro do travador de alvo do míssil quando a
+   projeção dos disparos estiver correta — um aviso sonoro para poder atirar
+   com a metralhadora."
+
+   O buscador do míssil pergunta "o alvo está no cone?". Aqui a pergunta é
+   outra e é mais dura: "se eu apertar AGORA, a bala encontra o alvo?". São
+   coisas diferentes — o míssil corrige o caminho sozinho, a bala não corrige
+   nada. Então a conta é a de artilharia mesmo:
+
+     1. quanto tempo a bala leva para chegar (t = distância / velocidade)
+     2. onde o alvo vai estar depois desse tempo — a DIANTEIRA, o lead
+     3. esse ponto adiantado está em cima da linha do cano? e dentro do
+        alcance da bala, que morre em 1,1 s?
+
+   O passo 1 depende do passo 2 (alvo mais longe = mais tempo = alvo mais
+   adiantado ainda), então roda duas vezes: converge rápido porque a bala é
+   seis vezes mais rápida que o avião.
+
+   A tolerância não é um ângulo escolhido a dedo: é o raio de acerto de
+   verdade, o mesmo que `atingeAr()` usa — 320 da bala mais o raio do alvo —
+   com uma folga pequena para o alarme avisar um instante ANTES de o dedo
+   precisar apertar. Ou seja, quando toca, é porque acerta.
+
+   Só entra o que a metralhadora mata: aviões, helicópteros e pombos e gente
+   de verdade na batalha. Alvo de chão não vale — a bala nem colide com ele —
+   e um alarme que toca para o que não morre é mentira.
+   ========================================================================== */
+const TIRO_FOLGA = 1.25;      // um tico maior que o raio de acerto: avisa antes
+const TIRO_PERTO = 260;       // colado demais, não dá tempo de nada
+const MiraTiro = {
+  bom: false, solucao: null, _perdeu: 0,
+  solta(){
+    if (this.bom) somTravado(false);
+    this.bom = false; this.solucao = null; this._perdeu = 0;
+  },
+  passo(dt){
+    if (arma !== 'metralha' || !jogando || caindo || (!munInfinita && municao.metralha <= 0)){
+      this.solta(); return;
+    }
+    const d = direcaoDaMira();
+    const vBala = voo*6, alcance = alcanceBala();
+    let melhor = null, melhorErro = 1;
+    const olha = (x, y, z, vx, vy, vz, raio) => {
+      // duas passadas: o tempo de voo depende de onde o alvo vai estar
+      let t = Math.hypot(x-aviaoX, y-aviaoY, z-aviaoZ)/vBala;
+      let px = x, py = y, pz = z;
+      for (let i = 0; i < 2; i++){
+        px = x + vx*t; py = y + vy*t; pz = z + vz*t;
+        t = Math.hypot(px-aviaoX, py-aviaoY, pz-aviaoZ)/vBala;
+      }
+      const ex = px-aviaoX, ey = py-aviaoY, ez = pz-aviaoZ;
+      const dist = Math.hypot(ex, ey, ez);
+      if (dist > alcance || dist < TIRO_PERTO) return;
+      const proj = ex*d.x + ey*d.y + ez*d.z;
+      if (proj <= 0) return;                       // atrás: não existe solução
+      const fora = Math.hypot(ex - d.x*proj, ey - d.y*proj, ez - d.z*proj);
+      const erro = fora/((raio + 320)*TIRO_FOLGA);
+      if (erro < 1 && erro < melhorErro){
+        melhorErro = erro;
+        melhor = { px, py, pz, ax:x, ay:y, az:z, dist };
+      }
+    };
+    for (const o of obstaculos){
+      if (!o.vivo) continue;
+      const v = o.vel || 0;
+      olha(o.x, o.y, o.z, Math.sin(o.rumo || 0)*v, 0, Math.cos(o.rumo || 0)*v,
+           o.tipo === 'aviao' ? RAIO_AVIAO : o.tipo === 'helicoptero' ? RAIO_HELI : RAIO_POMBO);
+    }
+    for (const o of inimigosRede())
+      olha(o.x, o.y, o.z, o.vx || 0, o.vy || 0, o.vz || 0, RAIO_AVIAO);
+
+    if (melhor){
+      this._perdeu = 0;
+      this.solucao = melhor;
+      if (!this.bom){
+        this.bom = true;
+        somTravado(true);            // o MESMO tom do míssil travado
+        Controles.bate('travou');
+      }
+    } else {
+      /* meio quarto de segundo de folga. Sem isso, um alvo cruzando ligava e
+         desligava o tom várias vezes por segundo, e o alarme mais atrapalhava
+         do que ajudava. */
+      this._perdeu += dt;
+      if (this._perdeu > 0.25) this.solta();
     }
   }
 };
@@ -2914,11 +3012,29 @@ function dispara(){
     // trava gasta: um míssil, um alvo
     Mira.solta();
   } else {
+    /* --- A HARMONIZAÇÃO ---------------------------------------------------
+       "O tiro não vai onde se dispara, só se estiver muito perto."
+
+       Estava certo, e a culpa era daqui: a bala nascia deslocada até 110 para
+       o lado (os canos ficam nas asas, não no nariz) e saía PARALELA ao
+       nariz. Paralela nunca cruza — o rastro corria eternamente ao lado da
+       mira, e só de bem perto o erro era pequeno o bastante para acertar.
+
+       Caça de verdade resolve isso torcendo os canos um tantinho para dentro,
+       de modo que os tiros se cruzem numa distância escolhida. Chama-se
+       harmonização. Aqui cada bala é apontada para o ponto da linha da mira a
+       62% do alcance: perto disso o tiro pega onde a mira está, e o pouco que
+       sobra de espalhamento vira a densidade da rajada, que é o que se quer. */
     const lado = (Math.random()-0.5)*220;
     const m = new THREE.Mesh(geoTiro, matTiro); cena.add(m);
     const T = direcaoDaMira();
-    tiros.push({ no:m, x:aviaoX + eixoD.x*lado, y:aviaoY + eixoD.y*lado, z:aviaoZ + eixoD.z*lado,
-                 dx:T.x, dy:T.y, dz:T.z, v:voo*6, vida:1.1 });
+    const bx = aviaoX + eixoD.x*lado, by = aviaoY + eixoD.y*lado, bz = aviaoZ + eixoD.z*lado;
+    const h = alcanceBala()*HARMONIZA;
+    let ax = aviaoX + T.x*h - bx, ay = aviaoY + T.y*h - by, az = aviaoZ + T.z*h - bz;
+    const an = Math.hypot(ax, ay, az) || 1;
+    ax /= an; ay /= an; az /= an;
+    tiros.push({ no:m, x:bx, y:by, z:bz,
+                 dx:ax, dy:ay, dz:az, v:voo*6, vida:1.1 });
     somTiro();
     /* O coice da metralhadora era 0,05 — três centésimos de pixel na tela, ou
        seja, nada. Enquanto havia tremor no aparelho isso não fazia falta; num
@@ -2968,6 +3084,7 @@ function atingeAr(x, y, z, raio, dano){
 function atualizaTiros(dt){
   if (recarga > 0) recarga -= dt;
   Mira.passo(dt);
+  MiraTiro.passo(dt);
   // o tremor contínuo da metralhadora acompanha o gatilho, não cada tiro
   Controles.treme('metralha', atirando && arma === 'metralha' && municao.metralha > 0 && !caindo);
   if (atirando) dispara();
@@ -3398,6 +3515,7 @@ function atualiza(dt){
   leme += ((e.leme || 0) - leme) * Math.min(1, dt*22);
   if (Math.abs(leme) > 0.002){ r = giraPar(eixoF, eixoD, leme*TAXA_LEME*dt); eixoF = r[0]; eixoD = r[1]; }
   endireitaEixos();
+
 
   aviaoX += eixoF.x*voo*dt; aviaoY += eixoF.y*voo*dt; aviaoZ += eixoF.z*voo*dt;
   /* A RAZÃO DE SUBIDA, para o altímetro da cabine. Sai direto de `eixoF.y*voo`
@@ -4487,18 +4605,53 @@ function desenhaHUD(){
      a mesma velocidade, o mesmo tempo de vida — projetado pela câmera do jogo.
      Os traços marcam os quartos do alcance e o círculo é onde a bala acaba:
      alvo além do círculo é alvo que não vai ser atingido, e isso passa a ser
-     visível em vez de adivinhado. Em verde, como o resto do HUD da cabine. */
+     visível em vez de adivinhado. Em verde, como o resto do HUD da cabine.
+
+     --- E POR QUE A LINHA É RETA ------------------------------------------------
+     Houve uma versão giroscópica aqui: a linha era encurvada para trás de
+     `ω·t`, para acompanhar o rastro que se vê saindo do cano numa curva. Ela
+     foi MEDIDA e estava errada, e a medição vale mais do que o raciocínio que
+     a produziu. O teste soltou UMA bala e foi ver onde ela parou:
+
+         em linha reta : 399 da mira reta · 399 da giroscópica (alcance 14247)
+         em curva leve : 249 da mira reta · 1950 da giroscópica (alcance 9803)
+         em curva forte: 496 da mira reta · 5946 da giroscópica (alcance 14990)
+
+     A bala que sai AGORA viaja reta a partir de agora — o nariz continuar
+     girando depois não a entorta. A curva giroscópica mostrava onde estão as
+     balas do passado, que é justamente o rastro torto que se enxerga; mas o
+     que a mira precisa dizer é onde vai a próxima. Ela é reta.
+
+     O que estava REALMENTE errado no "o tiro não vai onde se dispara" era
+     outra coisa, e está corrigido em `dispara()`: as balas nasciam espalhadas
+     de lado e saíam PARALELAS, sem nunca cruzar a linha da mira. Agora elas
+     convergem — é a harmonização das metralhadoras de caça. */
   if (jogando && !caindo && arma === 'metralha' && municao.metralha > 0){
     const T = direcaoDaMira();
-    const alcance = voo*6*1.1;                 // v * vida, os números do `dispara()`
+    const alcance = alcanceBala();
     const v3 = new THREE.Vector3();
     const naTela3 = k => {
-      v3.set(aviaoX + T.x*alcance*k, aviaoY + T.y*alcance*k, aviaoZ + T.z*alcance*k).project(cam);
+      const d = alcance*k;
+      v3.set(aviaoX + T.x*d, aviaoY + T.y*d, aviaoZ + T.z*d).project(cam);
       return { x:(v3.x*0.5+0.5)*W, y:(-v3.y*0.5+0.5)*H, atras: v3.z > 1 };
     };
     const pontos4 = [0.28, 0.52, 0.76, 1].map(naTela3);
+    const preso = MiraTiro.bom;
+    /* onde está a solução na tela — calculada ANTES, porque é ela que decide
+       se ainda cabe escrever o alcance embaixo do círculo */
+    let sol = null;
+    if (preso && MiraTiro.solucao){
+      const S = MiraTiro.solucao;
+      v3.set(S.px, S.py, S.pz).project(cam);
+      if (v3.z <= 1){
+        sol = { x:(v3.x*0.5+0.5)*W, y:(-v3.y*0.5+0.5)*H };
+        v3.set(S.ax, S.ay, S.az).project(cam);
+        sol.ax = (v3.x*0.5+0.5)*W; sol.ay = (-v3.y*0.5+0.5)*H;
+      }
+    }
     if (!pontos4.some(q => q.atras)){
-      h2.strokeStyle = 'rgba(120,255,170,.55)'; h2.lineWidth = 1.4;
+      h2.strokeStyle = preso ? 'rgba(150,255,190,.95)' : 'rgba(120,255,170,.55)';
+      h2.lineWidth = preso ? 2.4 : 1.4;
       h2.beginPath();
       h2.moveTo(pontos4[0].x, pontos4[0].y);
       for (const q of pontos4) h2.lineTo(q.x, q.y);
@@ -4517,7 +4670,39 @@ function desenhaHUD(){
       h2.textAlign = 'center';
       h2.font = '700 ' + Math.max(8, H*0.014).toFixed(0) + 'px ui-monospace, monospace';
       h2.fillStyle = 'rgba(120,255,170,.75)';
-      h2.fillText(Math.round(alcance/METRO) + 'm', f.x, f.y + Math.max(14, H*0.030));
+      /* com o losango da solução em cima, o número do alcance vira rabisco
+         por baixo dele: some, que o que importa naquele instante é atirar */
+      if (!sol || Math.hypot(sol.x-f.x, sol.y-f.y) > Math.max(26, H*0.055))
+        h2.fillText(Math.round(alcance/METRO) + 'm', f.x, f.y + Math.max(14, H*0.030));
+      h2.textAlign = 'left';
+    }
+
+    /* --- SOLUÇÃO DE TIRO: onde a bala e o alvo se encontram -------------------
+       "Tem que ter o mesmo alarme sonoro do travador do míssil quando a
+       projeção dos disparos estiver correta."
+
+       Quando `MiraTiro` acha uma solução, o alarme toca — e a tela mostra
+       ONDE ela está: um losango no ponto de encontro (o alvo adiantado do
+       tempo de voo da bala) e o traço que liga esse ponto ao alvo de agora.
+       Esse traço é a dianteira que se está dando ao alvo; ver o tamanho dele
+       ensina a mirar na frente sem ninguém explicar. */
+    if (sol){
+      // o traço da dianteira: do alvo agora até onde ele vai estar
+      h2.strokeStyle = 'rgba(150,255,190,.45)'; h2.lineWidth = 1.4;
+      h2.beginPath(); h2.moveTo(sol.ax, sol.ay); h2.lineTo(sol.x, sol.y); h2.stroke();
+      // o losango, piscando como o TRAVADO do míssil
+      const pisca = Math.sin(Date.now()/90) > -0.4;
+      const r = Math.max(9, H*0.026);
+      h2.strokeStyle = pisca ? 'rgba(150,255,190,.98)' : 'rgba(150,255,190,.4)';
+      h2.lineWidth = 2.6;
+      h2.beginPath();
+      h2.moveTo(sol.x, sol.y-r); h2.lineTo(sol.x+r, sol.y);
+      h2.lineTo(sol.x, sol.y+r); h2.lineTo(sol.x-r, sol.y);
+      h2.closePath(); h2.stroke();
+      h2.textAlign = 'center';
+      h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px ui-monospace, monospace';
+      h2.fillStyle = 'rgba(150,255,190,.95)';
+      h2.fillText('ATIRE', sol.x, sol.y - r - Math.max(6, H*0.012));
       h2.textAlign = 'left';
     }
   }
@@ -4751,7 +4936,7 @@ function reinicia(){
   for (const f of faiscas) cena.remove(f.no); faiscas = [];
   for (const c of cogumelos) cena.remove(c.no); cogumelos = [];
   for (const f of fumos) cena.remove(f.no); fumos = [];
-  Mira.solta();
+  Mira.solta(); MiraTiro.solta();
   montaMapa(); montaChao(); montaPista(); montaCidade(); montaTambores(); montaAlvos();
   montaInimigos(); montaPombos(); montaNuvens();
   poeCamera(1);
@@ -4769,6 +4954,10 @@ function comeca(){
 }
 function fim(){
   jogando = false;
+  /* O laço para aqui, e com ele os `passo()` que desligariam o tom sozinhos:
+     ganhar a missão com o alvo travado deixava o alarme tocando na tela de
+     fim, para sempre. */
+  Mira.solta(); MiraTiro.solta();
   if (estolando){ estolando = false; somEstol(false); }
   estresse = 0; somBuffet(0); sacudidaFixa = 0; sacudida = 0; pulso = 0;
   Controles.treme('metralha', false); Controles.treme('estol', false);
@@ -5715,6 +5904,20 @@ const Batalha = {
       o = { id, no, nome: nome || 'visitante', cor: cor || CORES_JOGADOR[1] };
       this.outros.set(id, o);
       pintaBatalha();
+    }
+    /* A VELOCIDADE DE QUEM ESTÁ DO OUTRO LADO. Vem só das posições, que
+       chegam 20 vezes por segundo: a rede não manda velocidade nenhuma. É o
+       que a solução de tiro precisa para dar dianteira a um avião de gente
+       de verdade — sem isso o alarme só tocaria para alvo parado. Alisada,
+       porque pacote atrasado vira um pico absurdo na conta. */
+    if (o.t){
+      const dtr = (Date.now() - o.t)/1000;
+      if (dtr > 0.01 && dtr < 0.6){
+        const k = Math.min(1, dtr*6);
+        o.vx = (o.vx || 0) + ((d.x - o.x)/dtr - (o.vx || 0))*k;
+        o.vy = (o.vy || 0) + ((d.y - o.y)/dtr - (o.vy || 0))*k;
+        o.vz = (o.vz || 0) + ((d.z - o.z)/dtr - (o.vz || 0))*k;
+      }
     }
     o.x = d.x; o.y = d.y; o.z = d.z;
     o.F = { x:d.fx, y:d.fy, z:d.fz };
