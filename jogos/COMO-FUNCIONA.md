@@ -3270,3 +3270,109 @@ tamanho de quem está sentado na frente do notebook — e as fotos de teste eram
 cenas largas, com rostos pequenos. O piso caiu para 16% e todos apareceram.)*
 
 Isto é `jogos/rosto.html`, uma página solta: ainda **não** encosta no avião.
+
+---
+
+## A cabeça entrou no avião
+
+Três coisas de uma vez, e as três se encaixam porque são a mesma ideia vista de
+ângulos diferentes: **o piloto olha, e o avião entende**.
+
+### 1. A vista obedece à cabeça
+
+Um giro só, aplicado ao trio da câmera, serve às duas vistas — e cada uma pelo
+motivo dela:
+
+**Na cabine** é o esperado: o piloto vira a cabeça e o mundo passa.
+
+**De fora** girar só a mira jogaria o próprio avião para fora da tela. Mas
+reparei numa coisa ao ler a câmera de perseguição: ela já olha *exatamente* para
+o ponto `avião + cima×210`, porque está a `CAMD` atrás dele na direção de `camF`.
+Então basta **reancorar a câmera nesse mesmo ponto** depois de girar o trio,
+mantendo a distância: ela **orbita** o avião e continua apontada para ele. É o
+*check six* — você olha para trás e vê o seu avião e quem vem atrás. Saiu de
+graça, sem nenhum caso especial.
+
+```
+cabine, olhando 40° à direita: a vista girou 40° para a direita       ✔
+e o avião não girou junto: o nariz mudou 0°                           ✔
+de fora, olhando 150° para trás: a câmera orbitou, distância 655→655  ✔
+e continua olhando para o avião                                       ✔
+```
+
+E como com a vista torta é fácil esquecer para onde o **avião** aponta, um risco
+no canto diz de que lado está a frente e quantos graus faltam.
+
+### 2. A cabeça escolhe o alvo — mira de capacete
+
+> *"Alvos múltiplos: a minha cabeça indica o alvo que escolhi para o abate."*
+
+Isso tem nome e existe em caça de verdade: **mira de capacete**. E a divisão é a
+parte bonita:
+
+- o **cano** continua preso ao avião — bala vai onde o avião aponta, e isso não
+  muda nunca;
+- o **buscador do míssil** passa a olhar para onde o piloto olha.
+
+Vira a cara para o avião que está na sua esquerda, o míssil trava nele, você
+dispara sem apontar o nariz. Sem o olhar ligado, `direcaoDoOlhar()` devolve o
+nariz e absolutamente nada muda.
+
+Faltava uma coisa para isso funcionar de verdade: o buscador **não trocava de
+alvo depois de travado**, de propósito, para uma turbulência não derrubar a
+trava. Com o capacete, trocar de alvo é justamente o que se quer — então ele
+passa a trocar quando o alvo antigo **sai do cone do olhar**. É a diferença entre
+"a trava é firme" e "a trava é teimosa".
+
+```
+sem a cabeça, o buscador pega o que está na frente          ✔
+virando a cara para a esquerda, ele troca para o outro      ✔
+a metralhadora continua saindo pelo cano, a 0° do nariz     ✔
+```
+
+### 3. A nuclear trava no chão
+
+> *"No chão a nuclear também tem que travar, e fazer aquele barulhinho de alvo
+> travado. kkkkk"*
+
+Só que a pergunta dela é outra. O míssil pergunta *"o alvo está no cone?"*; a
+nuclear é ar-terra e pergunta **"onde é que isto vai cair?"**. Então a conta é a
+de um visor de bombardeio: estende-se o raio da mira até o chão e vê-se que alvo
+está perto do ponto de impacto. Travou = **se largar agora, acerta**. A cesta é
+de 3.000 (150 m); o estrago tem raio 9.000, então quem trava destrói com folga —
+a trava aqui não é sobre matar, é sobre **precisão**.
+
+Travada, ela ainda **corrige o rumo atrás do alvo**, com taxa de curva menor que
+a do míssil, porque é um bicho pesado.
+
+E aprendi uma coisa medindo: na primeira versão ela travava em alvo a 60 km e a
+bomba morria no ar antes de chegar — 9 segundos de vida a `voo × 1,9` dão uns 58
+km. **A trava passou a exigir alcance.** O barulhinho de travado é uma promessa
+("larga agora que pega"), e mira que promete o que a arma não alcança é mira
+mentindo. É a mesma regra do círculo de alcance da metralhadora.
+
+```
+alvo de chão a 1105m: travou, é do chão, o tom contínuo tocando   ✔
+largando travada: saiu perseguindo, e acertou em 3,5 s            ✔
+alvo a 6824m com alcance de 2746m: NÃO travou                     ✔
+parada na pista: não trava (largar ali é suicídio)                ✔
+```
+
+### E o preço de tudo isso
+
+O detector roda **15 vezes por segundo**, não 60 — uma busca custa de 8 a 12 ms e
+um quadro de jogo tem 16,7 no total. O alisamento roda todo quadro, então o
+movimento na tela continua contínuo com a leitura entrecortada. Mesmo princípio
+da posição dos outros aviões na batalha: chega 20 vezes por segundo, é desenhada
+60.
+
+*(O botão nasceu ao lado do olho e da qualidade, em `left:130px`, e a prova de
+sobreposição do HUD reprovou na hora: `cPouso` mora exatamente ali. A fileira de
+baixo está cheia; ele foi para o vão do canto de cima à esquerda, entre os
+painéis e o radar.)*
+
+O botão só aparece em **computador com câmera** — no celular o aparelho *é* o
+manche, está na mão sendo torcido e a câmera aponta para o teto. `C` liga; com o
+olhar já ligado, `C` recalibra o "reto", que é o que se quer apertar depois de se
+acomodar melhor na cadeira. A imagem não sai do aparelho, e desligar solta a
+câmera na hora.

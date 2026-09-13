@@ -207,6 +207,16 @@
       color:#dce5f5;border-radius:10px;padding:9px 12px;font:700 14px/1 inherit;cursor:pointer}
   #btVisao{left:14px;bottom:14px;font-size:22px;padding:7px 11px}
   #btQual{left:70px;bottom:14px}
+  /* O primeiro lugar que escolhi foi ao lado do olho e da qualidade, em
+     `left:130px`. A prova de sobreposição do HUD reprovou na hora: `cPouso`
+     mora exatamente ali (left:128, largura mínima 186). A fileira de baixo
+     está cheia — o canto de cima à esquerda, abaixo dos painéis e acima do
+     radar, é o vão que sobra. */
+  #btCabeca{left:14px;top:180px;display:none}
+  #btCabeca.pode{display:block}
+  #btCabeca.on{background:rgba(94,255,154,.18);border-color:rgba(94,255,154,.5);color:#bfffd6}
+  #btCabeca.perdeu{background:rgba(255,194,77,.16);border-color:rgba(255,194,77,.45);color:#ffe1a8}
+  body.dedos #btCabeca{display:none}
   #btSom{display:none;left:50%;transform:translateX(-50%);bottom:14px;
          background:rgba(255,170,60,.18);border-color:rgba(255,190,90,.55);color:#ffe0ad;font-weight:800}
   #btSom.ver{display:block}
@@ -331,6 +341,9 @@
 </div>
 <button class="bt" id="btVisao" title="cabine / de fora (V)">&#128065;</button>
 <button class="bt" id="btQual" title="qualidade do desenho">alto</button>
+<!-- só aparece em computador com câmera: no celular o aparelho É o manche, e a
+     câmera dele aponta para o teto -->
+<button class="bt" id="btCabeca" title="olhar com a cabeça (C)">&#129504; cabeça</button>
 <!-- ============ O PAINEL DA SALA ==========================================
      "O jogo nos celulares não consegue entrar na mesma sala. Ao entrar numa
      sala, tem que ficar o código disponível na tela, ou então o QR."
@@ -7447,6 +7460,26 @@ function direcaoDaMira(){
   d = { x: d.x*c2 + eixoC.x*s2, y: d.y*c2 + eixoC.y*s2, z: d.z*c2 + eixoC.z*s2 };
   return vnorm(d);
 }
+/* --- PARA ONDE A CABEÇA ESTÁ OLHANDO ---------------------------------------
+   "Alvos múltiplos: a minha cabeça indica o alvo que escolhi para o abate."
+
+   É exatamente o que faz um caça moderno, e tem nome: mira de capacete. O
+   CANO continua preso ao avião — bala vai onde o avião aponta, e isso não
+   muda —, mas o BUSCADOR DO MÍSSIL passa a olhar para onde o piloto olha.
+   Vira a cabeça para o avião que está na sua esquerda, o míssil trava nele,
+   e você dispara sem precisar apontar o nariz.
+
+   Sem o olhar ligado, isto devolve a mira de sempre e nada muda. */
+function direcaoDoOlhar(){
+  const base = direcaoDaMira();
+  if (!Cabeca.ligada || (Math.abs(Cabeca.x) < 0.5 && Math.abs(Cabeca.y) < 0.5)) return base;
+  const oy = Cabeca.x*Math.PI/180, op = Cabeca.y*Math.PI/180;
+  let r = giraPar(base, eixoD, oy);
+  const d1 = r[0], lado = r[1];
+  const cima = vcruz(d1, lado);          // o "cima" do olhar, já girado
+  r = giraPar(d1, cima, op);
+  return vnorm(r[0]);
+}
 let tecla={esq:false,dir:false,cima:false,baixo:false,lemeE:false,lemeD:false,mais:false,menos:false};
 let toqueX=0, toqueY=0, usandoToque=false;
 try { if (new URLSearchParams(location.search).get('infinito') === '0') infinito = false; } catch(e){}
@@ -8614,6 +8647,189 @@ function eixos(){
            ver: (tecla.cima?1:0) + (tecla.baixo?-1:0), leme: MAO*lemeTecla() };
 }
 
+/* =============================================================================
+   OLHAR COM A CABEÇA (só no computador, só se você ligar)
+
+   A webcam acha o seu rosto, e para onde a sua cabeça anda é para onde a
+   câmera do jogo olha. É o TrackIR dos simuladores, feito com 240 KB.
+
+   POR QUE POSIÇÃO E NÃO ROTAÇÃO DO ROSTO. Ler para que lado o rosto está
+   VIRADO exige malha de rosto — 13 MB de rede neural rodando 30 vezes por
+   segundo em cima de um jogo 3D. Ler para onde a cabeça se MOVEU é achar um
+   retângulo, e um detector de 1998 faz isso em 8 milissegundos. E para pilotar
+   dá no mesmo: quando você olha para a esquerda, o corpo leva a cabeça junto,
+   sozinho. Basta amplificar.
+
+   O CENTRO NÃO É O CENTRO DA IMAGEM: ninguém senta exatamente na frente da
+   webcam. O repouso é aprendido — uma média muito lenta de onde a sua cabeça
+   costuma estar — e por isso existe o botão de recalibrar.
+
+   QUINZE VEZES POR SEGUNDO, NÃO SESSENTA. Uma busca custa de 8 a 12 ms; um
+   quadro do jogo tem 16,7 no total. Cabeça humana não muda de lugar 60 vezes
+   por segundo: a busca roda 15 vezes e o ALISAMENTO roda todo quadro, então o
+   movimento na tela continua contínuo. É o mesmo que se faz com a posição dos
+   outros aviões na batalha, que chega 20 vezes por segundo e é desenhada 60.
+
+   NADA SAI DAQUI. A imagem não é enviada nem gravada: a conta inteira acontece
+   dentro desta página, e a câmera é solta no instante em que se desliga.
+   ========================================================================== */
+const CAB_AMPLIA_X = 135;   // graus de olhar por unidade de cabeça andada
+const CAB_AMPLIA_Y = 85;
+const CAB_LIMITE_X = 145;   // não passa disso para os lados (dá o "check six")
+const CAB_LIMITE_Y = 55;
+const CAB_ZONA = 0.035;     // folga no meio: sem ela o olhar nunca fica parado
+const CAB_MACIO = 6.0;      // por segundo; alisa o tranco da leitura
+const CAB_CADENCIA = 66;    // ms entre buscas (uns 15 por segundo)
+const CAB_LARGURA = 200;    // a imagem encolhe para isto antes da busca
+const CAB_MIN = 0.16;       // menor rosto procurado, em fração da altura
+const CAB_CONFIA = 22;      // abaixo disto é mancha de parede, não cabeça
+const Cabeca = {
+  ligada:false, achou:false, x:0, y:0, custo:0, aviso:'',
+  _fluxo:null, _video:null, _cv:null, _ctx:null, _classifica:null, _memoria:null,
+  _repouso:null, _alvoX:0, _alvoY:0, _proxima:0, _perdido:0,
+
+  temCamera(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); },
+
+  /* O detector mora em `vendor/` e só é buscado quando alguém liga: o jogo não
+     carrega 240 KB para quem nunca vai usar a câmera. */
+  async _carrega(){
+    if (this._classifica) return;
+    if (typeof pico === 'undefined'){
+      await new Promise((ok, erro) => {
+        const t = document.createElement('script');
+        t.src = 'vendor/pico.js'; t.onload = ok;
+        t.onerror = () => erro(new Error('não achei vendor/pico.js'));
+        document.head.appendChild(t);
+      });
+    }
+    const r = await fetch('vendor/facefinder');
+    if (!r.ok) throw new Error('não achei vendor/facefinder');
+    this._classifica = pico.unpack_cascade(new Int8Array(await r.arrayBuffer()));
+    this._memoria = pico.instantiate_detection_memory(5);
+  },
+
+  async liga(){
+    if (this.ligada) return;
+    try{
+      mostraAviso('PROCURANDO A CÂMERA…', '#7fd8ff', 900);
+      await this._carrega();
+      this._fluxo = await navigator.mediaDevices.getUserMedia({
+        video:{ width:{ideal:640}, height:{ideal:480}, facingMode:'user' }, audio:false });
+      if (!this._video){
+        this._video = document.createElement('video');
+        this._video.playsInline = true; this._video.muted = true;
+      }
+      this._video.srcObject = this._fluxo;
+      await this._video.play();
+      const A = Math.round(CAB_LARGURA*3/4);
+      this._cv = document.createElement('canvas');
+      this._cv.width = CAB_LARGURA; this._cv.height = A;
+      this._ctx = this._cv.getContext('2d', { willReadFrequently:true });
+      this.ligada = true; this._repouso = null; this._perdido = 0;
+      this.x = this.y = this._alvoX = this._alvoY = 0;
+      mostraAviso('OLHAR COM A CABEÇA — LIGADO', '#7fffa8', 1400);
+    }catch(e){
+      this.desliga();
+      this.aviso = e && e.name === 'NotAllowedError' ? 'sem permissão da câmera'
+                 : (e && e.message) || 'não deu para ligar a câmera';
+      mostraAviso(this.aviso.toUpperCase(), '#ff8f6b', 2200);
+    }
+    pintaBotaoCabeca();
+  },
+
+  desliga(){
+    if (this._fluxo){ for (const t of this._fluxo.getTracks()) t.stop(); this._fluxo = null; }
+    if (this._video) this._video.srcObject = null;
+    this.ligada = false; this.achou = false;
+    this.x = this.y = this._alvoX = this._alvoY = 0; this._repouso = null;
+    pintaBotaoCabeca();
+  },
+
+  centraliza(){ this._repouso = null; this._alvoX = this._alvoY = 0; },
+
+  /* uma busca: cinza, pequena, e só o rosto mais forte -------------------- */
+  _procura(){
+    const L = this._cv.width, A = this._cv.height;
+    this._ctx.drawImage(this._video, 0, 0, L, A);
+    const d = this._ctx.getImageData(0, 0, L, A).data;
+    const cinza = new Uint8Array(L*A);
+    for (let i = 0, j = 0; i < d.length; i += 4, j++)
+      cinza[j] = (d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114) >> 0;
+    let dets = pico.run_cascade({ pixels:cinza, nrows:A, ncols:L, ldim:L }, this._classifica,
+      { shiftfactor:0.12, minsize:Math.round(A*CAB_MIN), maxsize:Math.round(A*0.95), scalefactor:1.12 });
+    dets = pico.cluster_detections(this._memoria(dets), 0.2);
+    let melhor = null;
+    for (const q of dets) if (q[3] > CAB_CONFIA && (!melhor || q[3] > melhor[3])) melhor = q;
+    return melhor ? { r:melhor[0], c:melhor[1], L, A } : null;
+  },
+
+  passo(dt){
+    if (!this.ligada) return;
+    const agora = performance.now();
+    if (this._video.videoWidth && agora >= this._proxima){
+      this._proxima = agora + CAB_CADENCIA;
+      const t0 = performance.now();
+      let f = null;
+      try{ f = this._procura(); }catch(e){ this.desliga(); return; }
+      this.custo += (performance.now() - t0 - this.custo)*0.2;
+      if (f){
+        if (!this.achou) pintaBotaoCabeca();
+        this.achou = true; this._perdido = 0;
+        /* espelhado no X: a webcam devolve a imagem invertida, e sem isto
+           mover a cabeça para a direita mandava olhar para a esquerda */
+        const px = -((f.c/f.L)*2 - 1), py = -((f.r/f.A)*2 - 1);
+        if (!this._repouso) this._repouso = { x:px, y:py };
+        else { this._repouso.x += (px - this._repouso.x)*0.004;
+               this._repouso.y += (py - this._repouso.y)*0.004; }
+        const folga = v => { const a = Math.abs(v);
+                             return a < CAB_ZONA ? 0 : Math.sign(v)*(a - CAB_ZONA); };
+        this._alvoX = Math.max(-CAB_LIMITE_X, Math.min(CAB_LIMITE_X,
+                        folga(px - this._repouso.x)*CAB_AMPLIA_X));
+        this._alvoY = Math.max(-CAB_LIMITE_Y, Math.min(CAB_LIMITE_Y,
+                        folga(py - this._repouso.y)*CAB_AMPLIA_Y));
+      } else {
+        /* Perdeu o rosto — e perde-se sempre, virando a cabeça demais. O olhar
+           VOLTA sozinho para a frente em vez de travar de lado: ficar preso
+           olhando para o nada, sem saber por quê, é o pior que pode acontecer
+           num controle que a pessoa não vê. */
+        if (this.achou) pintaBotaoCabeca();
+        this.achou = false; this._perdido += CAB_CADENCIA/1000;
+        this._alvoX -= this._alvoX*0.10; this._alvoY -= this._alvoY*0.10;
+      }
+    }
+    const k = Math.min(1, dt*CAB_MACIO);
+    this.x += (this._alvoX - this.x)*k;
+    this.y += (this._alvoY - this.y)*k;
+  }
+};
+/* --- e a câmera do jogo obedece -------------------------------------------
+   Um giro só, aplicado ao trio da câmera, serve às duas vistas:
+
+   · NA CABINE é o que se espera — o piloto vira a cabeça e o mundo passa.
+   · DE FORA, girar só a mira jogaria o próprio avião para fora da tela. Mas a
+     câmera de fora já olha exatamente para o ponto `avião + cima*210`: ela
+     está a `CAMD` atrás dele, na direção de `camF`. Então basta reancorar a
+     câmera nesse mesmo ponto depois de girar o trio, mantendo a distância: ela
+     ORBITA o avião e continua apontada para ele. É o "check six" — você olha
+     para trás e vê o seu avião e quem vem atrás.
+   -------------------------------------------------------------------------- */
+function olhaComACabeca(){
+  if (!Cabeca.ligada || (Math.abs(Cabeca.x) < 0.15 && Math.abs(Cabeca.y) < 0.15)) return;
+  const oy = Cabeca.x*Math.PI/180, op = Cabeca.y*Math.PI/180;
+  let alvoX = 0, alvoY = 0, alvoZ = 0, dist = 0;
+  if (!cockpit){
+    alvoX = camPos.x + camF.x*CAMD; alvoY = camPos.y + camF.y*CAMD; alvoZ = camPos.z + camF.z*CAMD;
+    dist = Math.hypot(camPos.x-alvoX, camPos.y-alvoY, camPos.z-alvoZ);
+  }
+  let r = giraPar(camF, camD, oy); camF = r[0]; camD = r[1];
+  r = giraPar(camF, camC, op);     camF = r[0]; camC = r[1];
+  camF = vnorm(camF);
+  camC = vnorm(vsub(camC, vmul(camF, vponto(camC, camF))));
+  camD = vcruz(camC, camF);
+  if (!cockpit && dist > 1){
+    camPos.set(alvoX - camF.x*dist, alvoY - camF.y*dist, alvoZ - camF.z*dist);
+  }
+}
 function poeCamera(dt){
   if (cockpit){
     camF = eixoF; camC = eixoC; camD = eixoD;
@@ -8646,6 +8862,7 @@ function poeCamera(dt){
                                    aviaoZ - eixoF.z*CAMD + eixoC.z*210);
     camPos.lerp(alvo, Math.min(1, dt*12));
   }
+  olhaComACabeca();
   /* o sacolejo entra DEPOIS da posição calculada: a câmera continua
      perseguindo o avião direitinho, só que com a mão tremendo */
   const tr = Math.max(sacudida, sacudidaFixa);
@@ -9315,7 +9532,7 @@ function montaMissil(){
 function trocaArma(nova){
   if (!ARMAS[nova] || arma === nova) return;
   arma = nova; recarga = 0.2;
-  if (arma !== 'missil') Mira.solta();
+  if (arma !== 'missil' && arma !== 'bomba') Mira.solta();
   if (arma !== 'metralha') MiraTiro.solta();
   bip(700, 0.05, 'square', 0.05);
 }
@@ -9342,27 +9559,72 @@ const HARMONIZA = 0.62;      // onde as balas dos dois canos se cruzam
 const MIRA_CONE = 0.965;          // cosseno do meio-ângulo: uns 15°
 const MIRA_LONGE = 26000, MIRA_PERTO = 500;
 const TRAVA_SEG = 0.9;            // quanto tempo centrado para travar
+const NUKE_CESTA = 3000;          // 150 metros em volta do ponto de impacto
+const NUKE_TRAVA_SEG = 0.5;       // visor de bombardeio trava mais depressa
 const Mira = {
-  alvo: null, carga: 0, travado: false, _pulso: 0, _perdeu: 0,
+  alvo: null, carga: 0, travado: false, chao: false, impacto: null, _pulso: 0, _perdeu: 0,
   solta(){
     if (this.travado) somTravado(false);
     this.alvo = null; this.carga = 0; this.travado = false; this._perdeu = 0;
   },
-  /* o melhor candidato: vivo, na frente, dentro do cone e do alcance */
+  /* o melhor candidato: vivo, na frente, dentro do cone e do alcance.
+     O cone segue o OLHAR, não o nariz: com a cabeça ligada, escolher alvo é
+     virar a cara para ele. Sem ela, `direcaoDoOlhar` devolve o nariz e tudo
+     fica como era. */
   procura(){
-    const d = direcaoDaMira();
-    let melhor = null, melhorCos = MIRA_CONE;
+    const d = direcaoDoOlhar();
+    let melhor = null, melhorCos = MIRA_CONE, atualNoCone = false;
+    const eu = this;
     const olha = (o, x, y, z) => {
       const vx = x-aviaoX, vy = y-aviaoY, vz = z-aviaoZ;
       const dist = Math.hypot(vx, vy, vz);
       if (dist < MIRA_PERTO || dist > MIRA_LONGE) return;
       const c = (vx*d.x + vy*d.y + vz*d.z)/dist;
+      if (o === eu.alvo && c > MIRA_CONE) atualNoCone = true;
       if (c > melhorCos){ melhorCos = c; melhor = o; }
     };
     for (const o of obstaculos) if (o.vivo && o.tipo !== 'pombo') olha(o, o.x, o.y, o.z);
     for (const o of inimigosRede()) olha(o, o.x, o.y, o.z);
     for (const a of alvos) if (a.vivo) olha(a, a.x, CHAO + 300, a.z);
-    return { alvo: melhor, cos: melhorCos };
+    return { alvo: melhor, cos: melhorCos, atualNoCone };
+  },
+
+  /* --- A NUCLEAR TAMBÉM TRAVA, e no chão -------------------------------------
+     "No chão a nuclear também tem que travar, e fazer aquele barulhinho de
+     alvo travado."
+
+     Só que a pergunta dela é outra. O míssil pergunta "o alvo está no cone?";
+     a nuclear é ar-terra e pergunta "onde isto vai CAIR?". Então a conta é a
+     de um visor de bombardeio: estende-se o raio da mira até o chão, e vê-se
+     que alvo está perto do ponto de impacto. Travou = se você largar agora,
+     acerta. E travada, ela ainda corrige o rumo atrás do alvo, como o míssil.
+
+     A cesta é de 3.000 (150 metros). O estrago da nuclear tem raio 9.000, ou
+     seja, quem trava destrói com folga — a trava aqui não é sobre matar, é
+     sobre PRECISÃO: é o aviso de que a mira está no lugar certo. */
+  procuraChao(){
+    const T = direcaoDoOlhar();
+    if (T.y > -0.02) return { alvo:null, cos:0, atualNoCone:false };
+    const t = (CHAO - aviaoY)/T.y;
+    const px = aviaoX + T.x*t, pz = aviaoZ + T.z*t;
+    let melhor = null, menor = NUKE_CESTA;
+    let atualNoCone = false;
+    /* --- E SÓ TRAVA NO QUE ELA ALCANÇA ----------------------------------------
+       A nuclear voa a `voo*1,9` durante 9 segundos: uns 58 km com o avião em
+       cruzeiro. Alvo além disso ela não alcança — a bomba morre no ar antes de
+       chegar. Travar nele seria a mira MENTINDO, e o barulhinho de travado é
+       justamente uma promessa: "larga agora que pega". Mesma regra do círculo
+       de alcance da metralhadora. */
+    const alcance = voo*1.9*8.5;
+    for (const a of alvos){
+      if (!a.vivo) continue;
+      if (Math.hypot(a.x - aviaoX, a.z - aviaoZ) > alcance) continue;
+      const dd = Math.hypot(a.x - px, a.z - pz);
+      if (a === this.alvo && dd < NUKE_CESTA) atualNoCone = true;
+      if (dd < menor){ menor = dd; melhor = a; }
+    }
+    this.impacto = { x:px, z:pz };
+    return { alvo: melhor, cos: 1 - menor/NUKE_CESTA, atualNoCone };
   },
   posicaoDe(o){
     const semAltura = o.tipoAlvo === 'chao' || typeof o.y !== 'number';
@@ -9370,19 +9632,29 @@ const Mira = {
   },
   vivo(o){ return o && o.vivo !== false; },
   passo(dt){
-    if (arma !== 'missil' || !jogando || caindo){ this.solta(); return; }
-    const r = this.procura();
+    const doChao = arma === 'bomba';   // 'bomba' é a chave da NUCLEAR
+    if ((arma !== 'missil' && !doChao) || !jogando || caindo){ this.solta(); return; }
+    if (doChao && noChao){ this.solta(); return; }   // parado na pista não se trava nada
+    this.chao = doChao;
+    const r = doChao ? this.procuraChao() : this.procura();
     // continua valendo o alvo de antes, se ele ainda está no cone
     if (this.alvo && !this.vivo(this.alvo)) this.solta();
     if (r.alvo && r.alvo !== this.alvo){
-      // só troca de alvo se ainda não travou, ou se o antigo sumiu do cone
-      if (!this.travado || !this.alvo) { this.alvo = r.alvo; this.carga = 0; }
+      /* Troca de alvo se ainda não travou — ou se o antigo saiu do cone, que
+         é justamente COMO SE ESCOLHE outro alvo com a cabeça: basta olhar
+         para ele. Sem isso a primeira trava grudava e a mira de capacete não
+         servia para nada. */
+      if (!this.travado || !this.alvo || !r.atualNoCone){
+        if (this.travado){ this.travado = false; somTravado(false); }
+        this.alvo = r.alvo; this.carga = 0;
+      }
     }
     const temAlvo = !!r.alvo && (r.alvo === this.alvo || !this.alvo);
     if (temAlvo){
       this._perdeu = 0;
-      this.carga = Math.min(TRAVA_SEG, this.carga + dt);
-      if (!this.travado && this.carga >= TRAVA_SEG){
+      const precisa = doChao ? NUKE_TRAVA_SEG : TRAVA_SEG;
+      this.carga = Math.min(precisa, this.carga + dt);
+      if (!this.travado && this.carga >= precisa){
         this.travado = true; somTravado(true);
         Controles.bate('travou');
         mostraAviso('TRAVADO', '#7fffa8', 700);
@@ -9392,7 +9664,8 @@ const Mira = {
         this._pulso -= dt;
         if (this._pulso <= 0){
           somProcura();
-          const centro = Math.max(0, (r.cos - MIRA_CONE)/(1 - MIRA_CONE));
+          const centro = doChao ? Math.max(0, r.cos)
+                              : Math.max(0, (r.cos - MIRA_CONE)/(1 - MIRA_CONE));
           this._pulso = 0.34 - centro*0.24;
         }
       }
@@ -9536,12 +9809,20 @@ function dispara(){
     const alvoChao = T.y < -0.02
       ? { x: aviaoX + T.x*((CHAO - aviaoY)/T.y), z: aviaoZ + T.z*((CHAO - aviaoY)/T.y) }
       : null;
+    /* travada, ela vai ATRÁS do alvo: a mesma perseguição do míssil, com taxa
+       de curva menor, porque é um bicho grande e rápido. Sem trava, cai onde
+       foi apontada, como sempre. */
+    const alvoTravado = Mira.travado && Mira.chao ? Mira.alvo : null;
     bombas.push({ no:m, tipo:'nuke', x:aviaoX, y:aviaoY-60, z:aviaoZ,
-                  vx:T.x*vel, vy:T.y*vel, vz:T.z*vel, vida:9.0, fumaca:0, marca:alvoChao });
+                  vx:T.x*vel, vy:T.y*vel, vz:T.z*vel, vida:9.0, fumaca:0,
+                  segue: alvoTravado,
+                  marca: alvoTravado ? { x:alvoTravado.x, z:alvoTravado.z } : alvoChao });
     somMissil();
     sacode(0.20);
     Controles.bate('bomba');
-    mostraAviso(alvoChao ? 'NUCLEAR A CAMINHO' : 'NUCLEAR — APONTE PARA BAIXO', '#ffc24d', 1000);
+    mostraAviso(alvoTravado ? 'NUCLEAR TRAVADA — A CAMINHO'
+              : alvoChao ? 'NUCLEAR A CAMINHO' : 'NUCLEAR — APONTE PARA BAIXO', '#ffc24d', 1000);
+    Mira.solta();                       // uma trava, uma bomba
   } else if (arma === 'missil'){
     const m = montaMissil(); cena.add(m);
     const T = direcaoDaMira();
@@ -9630,6 +9911,7 @@ function atualizaTiros(dt){
   if (recarga > 0) recarga -= dt;
   Mira.passo(dt);
   MiraTiro.passo(dt);
+  Cabeca.passo(dt);
   // o tremor contínuo da metralhadora acompanha o gatilho, não cada tiro
   Controles.treme('metralha', atirando && arma === 'metralha' && municao.metralha > 0 && !caindo);
   if (atirando) dispara();
@@ -9674,6 +9956,22 @@ function atualizaTiros(dt){
          ser uma régua. Estoura no chão OU no primeiro prédio que encontrar —
          antes ela atravessava a cidade inteira e só acordava no asfalto. */
       b.vy -= dt*260; b.y += b.vy*dt; b.vida -= dt;
+      if (b.segue){
+        if (b.segue.vivo === false) b.segue = null;
+        else {
+          const ax = b.segue.x, ay = CHAO + 120, az = b.segue.z;
+          const dx = ax-b.x, dy = ay-b.y, dz = az-b.z;
+          const dist = Math.hypot(dx,dy,dz) || 1;
+          const v = Math.hypot(b.vx,b.vy,b.vz) || 1;
+          const k = Math.min(1, dt*1.5);       // curva mansa: é um bicho pesado
+          let nx = b.vx/v + (dx/dist - b.vx/v)*k;
+          let ny = b.vy/v + (dy/dist - b.vy/v)*k;
+          let nz = b.vz/v + (dz/dist - b.vz/v)*k;
+          const n = Math.hypot(nx,ny,nz) || 1;
+          b.vx = nx/n*v; b.vy = ny/n*v; b.vz = nz/n*v;
+          b.marca = { x:b.segue.x, z:b.segue.z };
+        }
+      }
       b.fumaca -= dt;
       if (b.fumaca <= 0){ b.fumaca = 0.02; fumacinha(b.x, b.y, b.z); }
       let bateu = b.y <= CHAO || b.vida <= 0;
@@ -11046,11 +11344,11 @@ function desenhaHUD(){
      carrega — a barra é o próprio tamanho do quadrado, sem número nenhum.
      Travado, ele pisca e ganha as pontas fechadas. */
   if (Mira.alvo && jogando && !caindo){
-    const q = Mira.posicaoDe(Mira.alvo);
+    const q = Mira.chao ? { x:Mira.alvo.x, y:CHAO+300, z:Mira.alvo.z } : Mira.posicaoDe(Mira.alvo);
     const v = new THREE.Vector3(q.x, q.y, q.z).project(cam);
     if (v.z < 1){
       const x = (v.x*0.5+0.5)*W, y = (-v.y*0.5+0.5)*H;
-      const frac = Mira.carga/TRAVA_SEG;
+      const frac = Mira.carga/(Mira.chao ? NUKE_TRAVA_SEG : TRAVA_SEG);
       const r = Math.min(W,H) * (0.075 - 0.035*frac);
       const pisca = Mira.travado ? (Math.sin(Date.now()/90) > -0.4) : true;
       h2.save(); h2.translate(x, y);
@@ -11067,7 +11365,7 @@ function desenhaHUD(){
       h2.font = '800 ' + Math.max(9, H*0.020).toFixed(0) + 'px ui-monospace, monospace';
       h2.textAlign = 'center';
       h2.fillStyle = h2.strokeStyle;
-      h2.fillText(Mira.travado ? 'TRAVADO' : 'PROCURANDO', 0, -r - 8);
+      h2.fillText(Mira.travado ? 'TRAVADO' : Mira.chao ? 'MIRANDO' : 'PROCURANDO', 0, -r - 8);
       const dist = Math.round(Math.hypot(q.x-aviaoX, q.y-aviaoY, q.z-aviaoZ)/METRO);
       h2.font = '700 ' + Math.max(8, H*0.016).toFixed(0) + 'px ui-monospace, monospace';
       h2.fillText(dist + 'm', 0, r + 16);
@@ -11380,6 +11678,27 @@ function desenhaHUD(){
     }
   }
 
+  /* --- ONDE ESTÁ O NARIZ, QUANDO A CABEÇA VIROU -----------------------------
+     Com a vista torta, a coisa mais fácil do mundo é esquecer para onde o
+     AVIÃO está apontado — e num caça isso é a diferença entre uma curva e um
+     morro. Um risco no canto da tela diz de que lado está a frente, e quantos
+     graus faltam para voltar. Some sozinho quando a cabeça volta ao meio. */
+  if (jogando && !caindo && Cabeca.ligada && Math.abs(Cabeca.x) > 8){
+    const g = Math.round(Cabeca.x);
+    const dir = g > 0;
+    const x = dir ? W - Math.max(18, W*0.03) : Math.max(18, W*0.03);
+    h2.strokeStyle = 'rgba(120,255,170,.85)'; h2.lineWidth = 2.4;
+    h2.beginPath();
+    const t = Math.max(10, H*0.022), s2 = dir ? -1 : 1;
+    h2.moveTo(x + s2*t, H*0.5 - t); h2.lineTo(x, H*0.5); h2.lineTo(x + s2*t, H*0.5 + t);
+    h2.stroke();
+    h2.textAlign = dir ? 'right' : 'left';
+    h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px ui-monospace, monospace';
+    h2.fillStyle = 'rgba(120,255,170,.8)';
+    h2.fillText('NARIZ ' + Math.abs(g) + '°', dir ? x - t - 6 : x + t + 6, H*0.5 + 4);
+    h2.textAlign = 'left';
+  }
+
   if (jogando && !caindo) desenhaRadar();
 
   if ((infinito || munInfinita) && jogando){
@@ -11480,6 +11799,9 @@ document.addEventListener('keydown', e => {
   if (e.key==='2') trocaArma('missil');
   if (e.key==='3') trocaArma('metralha');
   if (e.key==='v'||e.key==='V'){ cockpit = !cockpit; esqueceRadar(); }
+  /* C liga; com o olhar já ligado, C recalibra o "reto" — que é o que se quer
+     apertar no meio do jogo, depois de se acomodar melhor na cadeira */
+  if (e.key==='c'||e.key==='C'){ if (Cabeca.ligada) Cabeca.centraliza(); else Cabeca.liga(); }
   if (e.key==='g'||e.key==='G') mexeTrem();
   if (e.key==='f'||e.key==='F') mexeFlap();
   if (e.key==='w'||e.key==='W') tecla.mais=true;
@@ -11529,6 +11851,25 @@ addEventListener('touchend', () => {
 
 $('btVisao').onclick = () => { cockpit = !cockpit; esqueceRadar(); };
 $('btQual').onclick = () => poeQualidade((qualidade + 2) % 3);
+
+/* --- o botão da cabeça ------------------------------------------------------
+   Ele só existe onde faz sentido: computador com câmera. No celular o aparelho
+   É o manche — está na mão sendo torcido, e a câmera aponta para o teto.
+
+   Clique liga; clicando de novo, desliga. Com ele ligado, o clique longo (ou a
+   tecla C com o olhar já ligado) recalibra o "reto". */
+function pintaBotaoCabeca(){
+  const b = $('btCabeca'); if (!b) return;
+  b.classList.toggle('on', Cabeca.ligada && Cabeca.achou);
+  b.classList.toggle('perdeu', Cabeca.ligada && !Cabeca.achou);
+  b.innerHTML = Cabeca.ligada
+    ? (Cabeca.achou ? '&#129504; olhando' : '&#129504; cadê você?')
+    : '&#129504; cabeça';
+}
+if (Cabeca.temCamera()) $('btCabeca').classList.add('pode');
+$('btCabeca').onclick = () => { if (Cabeca.ligada) Cabeca.desliga(); else Cabeca.liga(); };
+$('btCabeca').oncontextmenu = e => { e.preventDefault(); Cabeca.centraliza(); };
+window.addEventListener('pagehide', () => Cabeca.desliga());
 
 /* Começar NA PISTA ou JÁ NO AR. Quem quer só sair bombardeando não tem de
    fazer a decolagem toda; quem quer decolar, decola. A escolha fica guardada
