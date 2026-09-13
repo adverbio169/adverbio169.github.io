@@ -47,7 +47,7 @@
   #provaTremor{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:2px}
   #tremorComo{font-size:12.5px;color:#8fa3c4}
   #hud{pointer-events:none;z-index:2}
-  .painel{position:fixed;z-index:3;pointer-events:none;background:rgba(8,12,26,.55);
+  .painel{translate:var(--olhoX,0) var(--olhoY,0);position:fixed;z-index:3;pointer-events:none;background:rgba(8,12,26,.55);
           border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:9px 13px;
           font-variant-numeric:tabular-nums;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
   .rot{font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:#8fa3c8;font-weight:700}
@@ -201,7 +201,7 @@
   #gire span{font-size:14px;font-weight:600;color:#8fa3c8}
   @keyframes giradica{ 0%,100%{transform:rotate(-12deg)} 50%{transform:rotate(78deg)} }
 
-  #aviso{position:fixed;z-index:4;top:38%;left:0;right:0;text-align:center;font-size:clamp(20px,4vw,40px);
+  #aviso{translate:var(--olhoX,0) var(--olhoY,0);position:fixed;z-index:4;top:38%;left:0;right:0;text-align:center;font-size:clamp(20px,4vw,40px);
          font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s;pointer-events:none}
   .bt{position:fixed;z-index:5;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.6);
       color:#dce5f5;border-radius:10px;padding:9px 12px;font:700 14px/1 inherit;cursor:pointer}
@@ -9036,14 +9036,35 @@ const Cabeca = {
    olhar para trás é justamente deixar de olhar para a frente. E para não se
    perder, o HUD diz de que lado ficou o nariz.
    -------------------------------------------------------------------------- */
+/* --- E ISTO NÃO PODE ESCREVER NO `camF` -------------------------------------
+   A primeira versão girava os eixos da câmera no lugar, e havia ali um bug de
+   realimentação que o teste do vidro do HUD acabou desenterrando:
+
+   Na vista de fora, `camF` é ESTADO — ele persegue o nariz de um quadro para o
+   outro (`camF += (eixoF - camF)*k`). Girando `camF` em si, o giro da cabeça
+   entrava no estado: no quadro seguinte a perseguição puxava 11% de volta e a
+   cabeça somava os mesmos graus OUTRA VEZ. O erro se acumulava até a
+   perseguição empatar com ele, uns NOVE vezes maior do que devia. Vinte graus
+   de cabeça viravam uma câmera girada quase noventa, chegando lá devagar,
+   escorrendo.
+
+   Chama-se realimentação, e é a coisa mais difícil de enxergar num laço de
+   câmera, porque o resultado parece "só" mal calibrado. Era boa parte do
+   "ainda está estranho".
+
+   Agora ele devolve uma cópia. O estado da câmera segue o avião; o olhar é
+   aplicado por cima, na hora de olhar, e não sobra nada para o quadro
+   seguinte. */
 function olhaComACabeca(){
-  if (!Cabeca.ligada || (Math.abs(Cabeca.x) < 0.15 && Math.abs(Cabeca.y) < 0.15)) return;
+  if (!Cabeca.ligada || (Math.abs(Cabeca.x) < 0.15 && Math.abs(Cabeca.y) < 0.15))
+    return { F:camF, C:camC, D:camD };
   const oy = Cabeca.x*Math.PI/180, op = Cabeca.y*Math.PI/180;
-  let r = giraPar(camF, camD, oy); camF = r[0]; camD = r[1];
-  r = giraPar(camF, camC, op);     camF = r[0]; camC = r[1];
-  camF = vnorm(camF);
-  camC = vnorm(vsub(camC, vmul(camF, vponto(camC, camF))));
-  camD = vcruz(camC, camF);
+  let r = giraPar(camF, camD, oy);
+  let F = r[0], D = r[1];
+  r = giraPar(F, camC, op);
+  F = vnorm(r[0]);
+  let C = vnorm(vsub(r[1], vmul(F, vponto(r[1], F))));
+  return { F, C, D: vcruz(C, F) };
 }
 function poeCamera(dt){
   if (cockpit){
@@ -9077,7 +9098,7 @@ function poeCamera(dt){
                                    aviaoZ - eixoF.z*CAMD + eixoC.z*210);
     camPos.lerp(alvo, Math.min(1, dt*12));
   }
-  olhaComACabeca();
+  const vista = olhaComACabeca();
   /* o sacolejo entra DEPOIS da posição calculada: a câmera continua
      perseguindo o avião direitinho, só que com a mão tremendo */
   const tr = Math.max(sacudida, sacudidaFixa);
@@ -9101,8 +9122,8 @@ function poeCamera(dt){
     cam.fov += (fovQuer - cam.fov) * Math.min(1, dt*(turbinando ? 3.2 : 2.0));
     cam.updateProjectionMatrix();
   }
-  cam.up.set(camC.x, camC.y, camC.z);
-  cam.lookAt(camPos.x + camF.x*1000, camPos.y + camF.y*1000, camPos.z + camF.z*1000);
+  cam.up.set(vista.C.x, vista.C.y, vista.C.z);
+  cam.lookAt(camPos.x + vista.F.x*1000, camPos.y + vista.F.y*1000, camPos.z + vista.F.z*1000);
   cam.updateMatrixWorld();
 
   ceu.position.copy(camPos);
@@ -11439,8 +11460,84 @@ function desenhaRadar(){
   h2.fillText(Math.round(RADAR_KM/METRO/100)/10 + ' km', cx, cy + r - Math.max(5, r*0.10));
 }
 
+/* =============================================================================
+   O HUD É VIDRO PRESO NO AVIÃO — NÃO É ÓCULOS
+
+   "Já sei o que pode estar causando esse desconforto: é o HUD! Ao mexer a
+   cabeça o HUD não pode ir junto; tudo tem que estar estático quando a cabeça
+   se move." E, logo depois: "aí dá a sensação de mover a cabeça e não mover o
+   avião — você não controla o avião, controla apenas o campo de visão."
+
+   Isso é o diagnóstico inteiro, e é de manual. HUD de verdade é uma placa de
+   vidro montada na frente do piloto, **presa à fuselagem**. Virando a cabeça,
+   ela sai do campo de visão como sai qualquer outra coisa do avião — o painel,
+   a moldura da cabine, a asa. Ela NÃO acompanha o olho.
+
+   O nosso estava desenhado num canvas colado na tela, então acompanhava. O
+   mundo varria e os instrumentos ficavam grudados na cara — e é essa
+   contradição que o corpo lê como enjoo: metade da imagem diz "você virou" e a
+   outra metade diz "você não virou".
+
+   O conserto é geométrico e exato. A cabeça girou de θ em relação ao nariz;
+   então o nariz — e o vidro preso nele — aparece na tela deslocado de
+   `tan(θ)/tan(fov/2)` meia-telas para o lado contrário. É a mesma projeção em
+   perspectiva que a câmera usa, aplicada de propósito ao HUD.
+
+   O que NÃO se desloca, e por quê:
+     · o clarão e o pulso nas bordas — são coisas do OLHO, não do avião;
+     · tudo o que já vem projetado pela câmera (mira, travas, marcas dos outros
+       aviões, escada de arfagem): a projeção já contém o giro da cabeça, e
+       deslocar de novo seria contar duas vezes;
+     · o aviso de "NARIZ 40°", que existe justamente para quem está olhando
+       para o lado e precisa achar a frente;
+     · os botões, que precisam continuar clicáveis.
+   ========================================================================== */
+let hudDX = 0, hudDY = 0;
+function calculaDeslocHUD(){
+  if (!Cabeca.ligada || (Math.abs(Cabeca.x) < 0.2 && Math.abs(Cabeca.y) < 0.2)){
+    hudDX = hudDY = 0;
+  } else {
+    /* --- PERGUNTAR, EM VEZ DE DEDUZIR ---------------------------------------
+       A primeira versão calculava o deslocamento a partir do ângulo da cabeça,
+       com `tan(θ)/tan(fov/2)` e um sinal que eu deduzi. A conta estava certa e
+       o SINAL estava errado — o HUD corria para o lado oposto ao do nariz, o
+       que é o dobro do defeito que se estava consertando.
+
+       Deduzir de que lado o nariz cai na tela exige acertar a mão do sistema
+       de eixos, a ordem do produto vetorial e a convenção da câmera do
+       three.js, tudo de cabeça. Não é preciso: basta PERGUNTAR. O nariz é um
+       ponto do mundo; a câmera sabe onde ele cai. A conta abaixo põe o nariz
+       no espaço da câmera e lê o desvio direto de lá — sem sinal nenhum para
+       eu errar, e correto mesmo se um dia a convenção dos eixos mudar. */
+    const q = cam.worldToLocal(new THREE.Vector3(
+      camPos.x + eixoF.x*100000, camPos.y + eixoF.y*100000, camPos.z + eixoF.z*100000));
+    const ty = Math.tan(cam.fov*Math.PI/360), tx = ty*(W/H);
+    if (q.z < -1){                       // a câmera olha pelo -z dela
+      hudDX = (q.x/-q.z)/tx*(W/2);
+      hudDY = -(q.y/-q.z)/ty*(H/2);
+    } else {                             // nariz atrás da câmera: fora da tela
+      hudDX = Math.sign(q.x || 1)*W*1.6;
+      hudDY = Math.sign(-q.y || 1)*H*1.6;
+    }
+    const teto = W*1.6;
+    hudDX = Math.max(-teto, Math.min(teto, hudDX));
+    hudDY = Math.max(-H*1.6, Math.min(H*1.6, hudDY));
+  }
+  /* os painéis em HTML são instrumentos de cabine também, e vão junto. Usa a
+     propriedade `translate`, que é separada do `transform` — assim os painéis
+     que já têm `translateX(-50%)` para se centralizarem continuam inteiros. */
+  const r = document.documentElement.style;
+  r.setProperty('--olhoX', hudDX.toFixed(1) + 'px');
+  r.setProperty('--olhoY', hudDY.toFixed(1) + 'px');
+}
+/* o vidro preso na fuselagem, e a tela crua (para o que já vem projetado) */
+function presoNoAviao(){ h2.setTransform(dpr, 0, 0, dpr, hudDX*dpr, hudDY*dpr); }
+function presoNaTela(){  h2.setTransform(dpr, 0, 0, dpr, 0, 0); }
+
 function desenhaHUD(){
+  presoNaTela();
   h2.clearRect(0,0,W,H);
+  calculaDeslocHUD();
   if (clarao > 0){
     h2.fillStyle = 'rgba(255,250,235,' + Math.min(0.92, clarao).toFixed(3) + ')';
     h2.fillRect(0,0,W,H);
@@ -11460,8 +11557,10 @@ function desenhaHUD(){
   }
   // um degrau mais abaixo: com a fita mais alta, o número do rumo ficava
   // escondido atrás da caixa do combustível
+  presoNoAviao();
   bussola(cockpit ? H*0.175 : H*0.205);
   if (jogando && !caindo) fitaAltura();
+  presoNaTela();
 
   if (cockpit){
     // mira do canhão e escada de arfagem, projetadas pelo mesmo three.js
@@ -11899,7 +11998,7 @@ function desenhaHUD(){
     h2.textAlign = 'left';
   }
 
-  if (jogando && !caindo) desenhaRadar();
+  if (jogando && !caindo){ presoNoAviao(); desenhaRadar(); presoNaTela(); }
 
   if ((infinito || munInfinita) && jogando){
     // no canto de cima à esquerda, abaixo dos painéis: no rodapé ele

@@ -3600,3 +3600,85 @@ questão para todo mundo.
 Então tem **tecla**: `X` inverte o lado e fica guardado no aparelho. Dois
 segundos para acertar, para sempre, em vez de mais uma rodada de adivinhação. É
 o tipo de coisa que devia ter nascido com botão.
+
+---
+
+## O HUD é vidro preso no avião — e havia um bug escondido atrás disso
+
+> *"Já sei o que pode estar causando esse desconforto: é o HUD! Ao mexer a
+> cabeça o HUD não pode ir junto; tudo tem que estar estático quando a cabeça
+> se move."*
+>
+> *"Aí dá a sensação de mover a cabeça e não mover o avião — você não controla o
+> avião, controla apenas o campo de visão."*
+
+Esse é o diagnóstico inteiro, e é de manual. HUD de verdade é uma placa de vidro
+montada na frente do piloto, **presa à fuselagem**. Virando a cabeça, ela sai do
+campo de visão como sai qualquer outra coisa do avião — o painel, a moldura da
+cabine, a asa. Ela não acompanha o olho.
+
+O nosso estava desenhado num canvas colado na tela, então acompanhava. O mundo
+varria e os instrumentos ficavam grudados na cara — e é essa contradição que o
+corpo lê como enjoo: metade da imagem diz *"você virou"* e a outra metade diz
+*"você não virou"*.
+
+Agora o vidro anda com o nariz, e os painéis em HTML vão junto (pela propriedade
+`translate`, que é separada do `transform` — assim os painéis que já se
+centralizam com `translateX(-50%)` continuam inteiros).
+
+O que **não** se desloca, e por quê:
+
+- o clarão e o pulso nas bordas — são coisas do **olho**, não do avião;
+- tudo o que já vem projetado pela câmera (mira, travas, marcas dos outros
+  aviões, escada de arfagem): a projeção já contém o giro, e deslocar de novo
+  seria contar duas vezes;
+- o aviso de `NARIZ 40°`, que existe justamente para quem está olhando de lado;
+- os botões, que precisam continuar clicáveis.
+
+### Perguntar em vez de deduzir
+
+A primeira versão calculava o deslocamento a partir do ângulo da cabeça, com
+`tan(θ)/tan(fov/2)` e um sinal que eu deduzi. A conta estava certa e **o sinal
+estava errado** — o HUD corria para o lado oposto ao do nariz, que é o dobro do
+defeito que se estava consertando.
+
+Deduzir de que lado o nariz cai na tela exige acertar, de cabeça, a mão do
+sistema de eixos, a ordem do produto vetorial e a convenção da câmera do
+three.js. Não é preciso: **basta perguntar**. O nariz é um ponto do mundo e a
+câmera sabe onde ele cai. A conta põe o nariz no espaço da câmera e lê o desvio
+direto de lá — sem sinal nenhum para eu errar, e continua certa se um dia a
+convenção mudar.
+
+```
+olhando 30°: o nariz caiu em x=762 (meio da tela = 450) e o vidro andou 312  ✔
+os painéis em HTML foram junto: x=14 -> 327                                  ✔
+olhando 80°: painel em x=1454, fora da tela de 900                           ✔
+pixels de HUD desenhados: 40492 parado -> 29743 a 30° -> 1568 a 80°          ✔
+```
+
+### E o bug que estava embaixo
+
+A prova do vidro desenterrou algo bem pior, que era boa parte do *"ainda está
+estranho"*: **o giro da cabeça estava realimentando a câmera**.
+
+Na vista de fora, `camF` é **estado** — ele persegue o nariz de um quadro para o
+outro (`camF += (eixoF - camF)*k`). Eu estava girando o próprio `camF`. Então o
+giro da cabeça entrava no estado: no quadro seguinte a perseguição puxava 11% de
+volta e a cabeça somava os mesmos graus **outra vez**. O erro se acumulava até a
+perseguição empatar com ele — umas **nove vezes** maior do que devia. Vinte graus
+de cabeça viravam uma câmera girada quase noventa, chegando lá devagar,
+escorrendo.
+
+Realimentação é a coisa mais difícil de enxergar num laço de câmera, porque o
+resultado não parece um bug: parece calibração ruim. Agora o olhar devolve uma
+**cópia** — o estado segue o avião, o olhar é aplicado por cima na hora de olhar,
+e não sobra nada para o quadro seguinte.
+
+```
+depois de 120 quadros com 20° de cabeça, o estado da câmera
+está a 0° do nariz                          ✔ o olhar não realimenta
+```
+
+*(E a prova do `cabeca` teve de mudar junto: ela lia `camF` para saber para onde
+se estava olhando, e `camF` deixou de ser essa resposta. Agora ela pergunta à
+câmera do three.js, que é quem sabe.)*
