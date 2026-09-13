@@ -322,6 +322,8 @@ body.paisagem #controle.ver,
          aparelho não vibrar de jeito nenhum. -->
     <div class="estado" id="estadoTremor"><span class="luz"></span><span id="estadoTremorTxt">tremor: verificando&hellip;</span></div>
     <button class="bt lnk" id="btTestaTremor">testar o tremor</button>
+    <p class="txt" id="diagTremor" style="display:none;white-space:pre-line;font-size:11.5px;
+       text-align:left;background:rgba(255,255,255,.05);border-radius:8px;padding:8px 10px"></p>
     <button class="bt lnk" id="btTrocaSala">trocar de sala</button>
   </div>
 </div>
@@ -938,6 +940,57 @@ function salaValida(){
 }
 $('btSala').onclick = () => { if (salaValida()) mostraPasso('papel'); };
 $('btTrocaSala').onclick = () => { mostraPasso('sala'); elCodigo.focus(); elCodigo.select(); };
+/* --- O DIAGNÓSTICO DO TREMOR ------------------------------------------------
+   "Nem no Android está vibrando" — e no Android o `navigator.vibrate` é
+   caminho direto, sem truque. Ou o jogo não está chamando (e agora ele conta
+   que chama), ou o navegador não é o que eu estou supondo.
+
+   Uma hipótese que eu não tinha considerado, e que é das mais prováveis com um
+   jogo que se manda por link: NAVEGADOR EMBUTIDO DE APP. Quem abre o endereço
+   dentro do WhatsApp, do Instagram ou do Facebook não cai no Chrome — cai numa
+   WebView hospedada pelo app. E WebView do Android só vibra se o APP
+   HOSPEDEIRO tiver pedido a permissão de vibração ao sistema; os de mensagem
+   não pedem. O `navigator.vibrate` existe, aceita o pedido, devolve `true` e
+   não acontece nada. É exatamente o sintoma.
+
+   Dá para reconhecer pela assinatura do navegador: a WebView do Android põe um
+   ` wv` na string, e os apps grandes põem a marca deles.
+
+   Esta função escreve tudo o que o jogo consegue saber sobre o assunto, para o
+   próximo relato ser uma frase copiada da tela em vez de uma impressão.
+   ------------------------------------------------------------------------ */
+function diagTremor(){
+  const ua = navigator.userAgent || '';
+  const app = /; wv\)|\bwv\b/.test(ua) ? 'WebView (navegador DENTRO de um app)'
+            : /FBAN|FBAV|FB_IAB/.test(ua) ? 'navegador do Facebook'
+            : /Instagram/.test(ua)        ? 'navegador do Instagram'
+            : /Line\//.test(ua)           ? 'navegador do Line'
+            : null;
+  const nome = /EdgA?\//.test(ua) ? 'Edge'
+             : /SamsungBrowser/.test(ua) ? 'Samsung Internet'
+             : /OPR\//.test(ua) ? 'Opera'
+             : /Firefox\//.test(ua) ? 'Firefox'
+             : /CriOS|Chrome\//.test(ua) ? 'Chrome'
+             : /Safari\//.test(ua) ? 'Safari' : 'desconhecido';
+  const linhas = [];
+  linhas.push('navegador: ' + nome + (app ? ' · ' + app : '') +
+              (/Android/.test(ua) ? ' · Android' : /iPhone|iPad|iPod/.test(ua) ? ' · iOS' : ''));
+  linhas.push('navigator.vibrate: ' + (navigator.vibrate ? 'existe' : 'NÃO existe') +
+              ' · a página está em foco: ' + (document.hasFocus() ? 'sim' : 'não'));
+  /* e a chamada MAIS SIMPLES que existe, direta, dentro do toque: um número
+     só, sem padrão. Se nem esta funciona, nenhuma funciona — e o que ela
+     devolve separa "o navegador recusou" de "aceitou e o aparelho não fez" */
+  let direto = 'não dá para tentar';
+  if (navigator.vibrate){
+    try { direto = navigator.vibrate(500) === false ? 'RECUSADA' : 'aceita'; }
+    catch(e){ direto = 'deu erro: ' + (e && e.message || e); }
+  }
+  linhas.push('um buzz simples de 500 ms: ' + direto);
+  if (app) linhas.push('⚠ navegador de dentro de app quase nunca vibra — '
+                     + 'abra o link no Chrome (menu ⋮ → "Abrir no Chrome")');
+  return linhas.join('\n');
+}
+
 function contaTremor(depois){
   const e = $('estadoTremor'), t = $('estadoTremorTxt');
   if (!e) return;
@@ -948,7 +1001,10 @@ function contaTremor(depois){
   t.textContent = depois ? ('caminho ' + caminho + ' — ' + Vibra.ultimo)
                          : ('tremor: ' + caminho);
 }
-$('btTestaTremor').onclick = () => { Tremor.testa(); contaTremor(true); };
+$('btTestaTremor').onclick = () => {
+  Tremor.testa(); contaTremor(true);
+  const d = $('diagTremor'); if (d){ d.textContent = diagTremor(); d.style.display = 'block'; }
+};
 contaTremor(false);
 
 $('btConectar').onclick = async () => {

@@ -2398,3 +2398,39 @@ implementou a API de vibração, então lá o tremor depende inteiro do truque d
 interruptor háptico, que é hack e pode simplesmente não funcionar naquele iOS.
 Nesse caso a resposta honesta é que página nenhuma vibra num iPhone, e o que
 resta é o som e a sacudida da imagem.
+
+### E se nem no Android vibra
+
+No Android o `navigator.vibrate` é caminho direto, sem truque. Se lá também não
+vibra, ou o jogo não está chamando — e agora ele conta que chama — ou **o
+navegador não é o que eu estou supondo**.
+
+A hipótese que eu não tinha considerado, e que é das mais prováveis num jogo que
+se manda por link: **navegador embutido de app**. Quem abre o endereço dentro do
+WhatsApp, do Instagram ou do Facebook não cai no Chrome — cai numa **WebView**
+hospedada pelo app. E WebView do Android só vibra se o **app hospedeiro** tiver
+pedido a permissão de vibração ao sistema; os de mensagem não pedem.
+
+O sintoma bate exatamente: `navigator.vibrate` existe, aceita o pedido, devolve
+`true`, e não acontece nada. Um relato de "não tremeu" com o código antigo,
+surdo, era indistinguível de qualquer outra causa.
+
+Dá para reconhecer pela assinatura do navegador — a WebView do Android põe um
+` wv` na string, e os apps grandes põem a marca deles. O botão de teste agora
+escreve três linhas na tela, e uma quarta quando é o caso:
+
+```
+navegador: Chrome · WebView (navegador DENTRO de um app) · Android
+navigator.vibrate: existe · a página está em foco: sim
+um buzz simples de 500 ms: aceita
+⚠ navegador de dentro de app quase nunca vibra —
+  abra o link no Chrome (menu ⋮ → "Abrir no Chrome")
+```
+
+O "buzz simples" é de propósito a chamada **mais burra que existe**: um número
+só, direto, dentro do toque, sem padrão nenhum. Se nem essa funciona, nenhuma
+funciona — e o que ela devolve separa *"o navegador recusou"* de *"aceitou e o
+aparelho não fez"*, que são dois problemas com dois donos diferentes.
+
+Seis navegadores são reconhecidos no teste: Chrome no Android, WebView do
+WhatsApp, Instagram, Facebook, Samsung Internet e Safari no iPhone.
