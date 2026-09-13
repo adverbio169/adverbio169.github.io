@@ -1730,6 +1730,50 @@ let tremAnim = 1, flapAnim = 0;
    explosões e por levar chumbo. */
 let sacudida = 0, sacudidaFixa = 0;
 function sacode(f){ sacudida = Math.max(sacudida, f); }
+
+/* --- O BAQUE NA IMAGEM ------------------------------------------------------
+   "Não quero tirar o celular do silencioso; o jogo tem que conseguir extrair a
+   vibração."
+
+   Não dá. O `navigator.vibrate` é um PEDIDO — quem decide se o motorzinho gira
+   é o Android, abaixo do navegador, e no modo silencioso a Samsung desliga a
+   vibração inteira. Não existe API, permissão nem truque de página para furar
+   isso; o diagnóstico do próprio aparelho já disse que o navegador aceitou e
+   nada aconteceu. Insistir em código seria inventar.
+
+   Mas o que se quer não é o motorzinho: é SENTIR o tiro. E para isso sobra um
+   caminho que nenhum modo de silêncio desliga — a IMAGEM.
+
+   Cada evento que treme passa a dar também um coice na câmera e um clarão de
+   cor nas bordas. As cores dizem o que aconteceu sem ninguém precisar aprender:
+   verde quando a mira trava, vermelho quando se leva tiro, laranja quando algo
+   explode.
+
+   Isto mora colado no `Controles.bate`, e não espalhado pelos lugares que
+   atiram. É a lição da tabela duplicada do tremor: duas listas que precisam
+   ser iguais um dia ficam diferentes. Aqui só existe uma.
+   ------------------------------------------------------------------------ */
+const BAQUES = {
+  missil:  [0.17, '255,170,90'],
+  bomba:   [0.34, '255,205,130'],
+  travou:  [0.07, '120,255,170'],
+  levou:   [0.52, '255,80,70'],
+  explode: [0.26, '255,170,90'],
+  bateu:   [0.85, '255,60,50'],
+  tocou:   [0.14, '190,220,255'],
+  pegou:   [0.07, '255,214,90'],
+  alvo:    [0.24, '255,190,110']
+};
+let pulso = 0, pulsoCor = '255,255,255';
+function baqueVisual(qual){
+  const b = BAQUES[qual];
+  if (!b) return;
+  sacode(b[0]);
+  /* o clarão de borda não SOMA: o mais forte manda. Somando, uma rajada de
+     metralhadora acendia a tela inteira e não dava para ver o inimigo */
+  const f = Math.min(1, b[0]*1.7);
+  if (f >= pulso){ pulso = f; pulsoCor = b[1]; }
+}
 let camPos = new THREE.Vector3(), camF={x:0,y:0,z:1}, camC={x:0,y:1,z:0}, camD={x:1,y:0,z:0};
 const CAMD = 620;
 
@@ -2572,7 +2616,13 @@ function dispara(){
     tiros.push({ no:m, x:aviaoX + eixoD.x*lado, y:aviaoY + eixoD.y*lado, z:aviaoZ + eixoD.z*lado,
                  dx:T.x, dy:T.y, dz:T.z, v:voo*6, vida:1.1 });
     somTiro();
-    sacode(0.05);                 // o coice da metralhadora
+    /* O coice da metralhadora era 0,05 — três centésimos de pixel na tela, ou
+       seja, nada. Enquanto havia tremor no aparelho isso não fazia falta; num
+       telefone no silencioso é o ÚNICO retorno de que a arma está cuspindo.
+       Subiu para um solavanco pequeno mas visível, e ganhou um clarão quente
+       muito fraco na borda, que pisca no ritmo dos tiros. */
+    sacode(0.13);
+    if (pulso < 0.12){ pulso = 0.12; pulsoCor = '255,220,150'; }
   }
 }
 function atingeAlvo(x, z, raio){
@@ -2872,6 +2922,7 @@ function mexeFlap(passo){
 function atualiza(dt){
   Motor.ajusta();
   if (clarao > 0) clarao = Math.max(0, clarao - dt*1.4);
+  if (pulso > 0) pulso = Math.max(0, pulso - dt*3.0);
 
   // faíscas
   for (const f of faiscas){
@@ -3596,6 +3647,19 @@ function desenhaHUD(){
     h2.fillStyle = 'rgba(255,250,235,' + Math.min(0.92, clarao).toFixed(3) + ')';
     h2.fillRect(0,0,W,H);
   }
+  /* o clarão nas BORDAS, não na tela toda: no meio é onde se mira, e uma tela
+     inteira pintada esconde justamente o que se está tentando acertar */
+  if (pulso > 0.01){
+    /* O primeiro raio de fora ia a 0,60 da maior dimensão — logo ADIANTE dos
+       cantos da tela, então a parte forte do degradê caía fora do quadro e o
+       clarão quase não aparecia. Fechado para 0,50, que é por dentro do canto,
+       e com mais tinta: agora as bordas acendem de verdade e o meio continua
+       limpo, que é onde se mira. */
+    const g = h2.createRadialGradient(W/2, H/2, Math.min(W,H)*0.20, W/2, H/2, Math.max(W,H)*0.50);
+    g.addColorStop(0, 'rgba(' + pulsoCor + ',0)');
+    g.addColorStop(1, 'rgba(' + pulsoCor + ',' + (pulso*0.8).toFixed(3) + ')');
+    h2.fillStyle = g; h2.fillRect(0, 0, W, H);
+  }
   // um degrau mais abaixo: com a fita mais alta, o número do rumo ficava
   // escondido atrás da caixa do combustível
   bussola(cockpit ? H*0.175 : H*0.205);
@@ -4086,7 +4150,7 @@ function comeca(){
 function fim(){
   jogando = false;
   if (estolando){ estolando = false; somEstol(false); }
-  estresse = 0; somBuffet(0); sacudidaFixa = 0; sacudida = 0;
+  estresse = 0; somBuffet(0); sacudidaFixa = 0; sacudida = 0; pulso = 0;
   Controles.treme('metralha', false); Controles.treme('estol', false);
   Controles.treme('buffet', false);
   const m = Math.round(distancia/METRO);
@@ -4805,6 +4869,8 @@ const Controles = {
     const p = this.PADROES[arma];
     this.manda({ t:'tremer', a:arma, p });
     if (p) this.vibraAqui(p);
+    /* e o baque na imagem, que é o único que o modo silencioso não desliga */
+    baqueVisual(arma);
   },
   /* Liga/desliga um tremor CONTÍNUO (metralhadora, tremor aerodinâmico,
      estol). Só manda quando MUDA — isto é chamado a cada quadro, e sem a

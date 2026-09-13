@@ -2510,3 +2510,68 @@ as duas contas declaradas, não só os pixels:
  915x412  bússola 27 px · fita 27 px   ✔
  667x375  bússola 27 px · fita 27 px   ✔
 ```
+
+---
+
+## O que não dá para fazer por código
+
+> *"Não consegue fazer por código? Não quero tirar o celular do silencioso. O
+> jogo tem que conseguir extrair a vibração do celular."*
+
+Não dá, e vale dizer com todas as letras em vez de tentar mais uma rodada.
+
+O `navigator.vibrate` é um **pedido**. Quem decide se o motorzinho gira é o
+Android, abaixo do navegador — e no modo silencioso a Samsung desliga a vibração
+inteira, não só o som. Não existe API, permissão ou truque de página para furar
+isso; nem aplicativo nativo faz sem sinalizadores de sistema aos quais uma
+página não tem acesso. O diagnóstico do próprio aparelho já tinha dito o
+essencial: **o navegador aceitou e nada aconteceu**. Daquele ponto para baixo o
+jogo não alcança.
+
+Mas o que se quer não é o motorzinho — é **sentir o tiro**. E para isso sobra um
+caminho que nenhum modo de silêncio desliga: a **imagem**.
+
+### O baque
+
+Cada evento que treme passa a dar também um **coice na câmera** e um **clarão de
+cor nas bordas**. As cores dizem o que aconteceu sem ninguém precisar aprender:
+
+| evento | coice | borda |
+|---|---|---|
+| travar a mira | 0,07 | verde |
+| soltar míssil | 0,17 | laranja |
+| levar tiro | 0,52 | **vermelho** |
+| bater | 0,85 | vermelho forte |
+| metralhar | 0,13 por tiro | amarelo fraco, no ritmo |
+
+Isto mora colado no `Controles.bate`, e não espalhado pelos lugares que atiram —
+é a lição da tabela duplicada do tremor: **duas listas que precisam ser iguais um
+dia ficam diferentes**. Aqui só existe uma, e o teste confere que todo padrão de
+tremor tem o seu baque.
+
+O coice da metralhadora era 0,05 — três centésimos de pixel, ou seja, nada.
+Enquanto havia tremor no aparelho não fazia falta; num telefone no silencioso é
+o único retorno de que a arma está cuspindo.
+
+E o pedido de vibração **continua saindo**: quem puder vibrar, vibra. O baque é
+soma, não troca.
+
+### Duas coisas que o teste pegou
+
+**A câmera que "andou 424".** A primeira medição do coice teleportou o avião e
+mediu logo em seguida — e a câmera persegue o avião, então quase todo aquele
+movimento era perseguição, não coice. Com a câmera assentada primeiro: 0,0 por
+quadro em repouso contra 49 com o baque de bater.
+
+**O clarão que não aparecia.** O degradê ia até 0,60 da maior dimensão da tela —
+logo *adiante* dos cantos, então a parte forte caía fora do quadro. Fechado para
+0,50 e com mais tinta. Medido no pixel: canto com alfa 184, meio com alfa 0 — a
+borda acende e a mira continua limpa.
+
+```
+os 9 tremores têm baque na imagem: todos ........................ ✔
+travar 0,07 · levar tiro 0,52 · bater 0,85, e a cor muda ........ ✔
+um tiro de metralhadora: dá para ver a arma cuspindo ............ ✔
+0,66 s depois o clarão apagou .................................. ✔
+o pedido de vibração continua saindo ............................ ✔
+```
