@@ -20,7 +20,6 @@
   }
   #cena{position:fixed; inset:0; display:block; width:100%; height:100%}
 
-  /* ---------- HUD ---------- */
   #hud{
     position:fixed; inset:0; pointer-events:none;
     padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right))
@@ -48,11 +47,10 @@
   #aviso{
     align-self:center; margin-top:auto; margin-bottom:6px; background:var(--papel);
     border:2px dashed var(--tinta); border-radius:14px; padding:7px 14px;
-    font-size:14px; font-weight:600; opacity:.9; text-align:center; max-width:min(92vw,420px);
+    font-size:14px; font-weight:600; opacity:.9; text-align:center; max-width:min(92vw,440px);
   }
   #aviso:empty{display:none}
 
-  /* ---------- telas (folha de papel) ---------- */
   .tela{
     position:fixed; inset:0; display:none; padding:20px;
     background:linear-gradient(180deg,rgba(207,231,242,.25) 0%,rgba(207,231,242,.66) 45%,rgba(207,231,242,.86) 100%);
@@ -60,9 +58,10 @@
   .tela.on{display:flex; flex-direction:column; align-items:center; overflow-y:auto}
   .folha{
     margin-top:auto; margin-bottom:min(6vh,48px); flex:0 0 auto;
-    background:var(--papel); border-radius:20px; box-shadow:0 14px 34px var(--sombra);
-    padding:clamp(24px,6vw,38px) clamp(20px,6vw,40px); text-align:center;
-    width:min(94vw,430px); display:flex; flex-direction:column; align-items:center; gap:16px;
+    background:var(--papel);
+    border-radius:20px; box-shadow:0 14px 34px var(--sombra);
+    padding:clamp(22px,5.5vw,34px) clamp(20px,6vw,38px); text-align:center;
+    width:min(94vw,430px); display:flex; flex-direction:column; align-items:center; gap:15px;
     border:1px solid rgba(24,24,28,.08);
   }
   h1{
@@ -116,11 +115,11 @@
 <div class="tela on" id="telaInicio">
   <div class="folha">
     <h1>Corrida da Vitória</h1>
-    <p class="instr">O desenho da Vitória saiu do papel e foi correr.<br>Pegue os corações e desvie dos blocos vermelhos.</p>
+    <p class="instr">O desenho da Vitória saiu do papel e foi correr.<br>Ela corre sozinha: pule os buracos, pegue os corações<br>e desvie dos blocos vermelhos.</p>
     <div class="chaves">
-      <div class="chave"><span class="icone">📱</span><span><b>Incline o celular</b> para os lados para desviar</span></div>
+      <div class="chave"><span class="icone">📱</span><span><b>Incline o celular para a direita</b> para correr mais rápido, para a esquerda para segurar</span></div>
       <div class="chave"><span class="icone">👆</span><span><b>Toque na tela</b> para pular</span></div>
-      <div class="chave"><span class="icone">⌨️</span><span>No computador: <b>← →</b> para desviar e <b>espaço</b> para pular</span></div>
+      <div class="chave"><span class="icone">⌨️</span><span>No computador: <b>→</b> acelera, <b>←</b> segura e <b>espaço</b> pula</span></div>
     </div>
     <button class="jogar" id="btnComecar" type="button">Começar</button>
     <p class="rodape">Melhor até agora: <b id="recordeInicio">0 m</b></p>
@@ -142,8 +141,8 @@
 
 <script>
 /* ---------------------------------------------------------------------------
-   Corrida da Vitória — endless runner 3D feito a partir do desenho da Vitória.
-   Mundo em "papel": tudo branco com traço preto, como no desenho original.
+   Corrida da Vitória — plataforma 3D de rolagem lateral, com a personagem
+   do desenho da Vitória. Mundo em "papel": branco com traço preto.
 --------------------------------------------------------------------------- */
 (function () {
   "use strict";
@@ -170,35 +169,33 @@
 
   /* ============================ constantes ============================ */
   var COR = {
-    papel: 0xFDFCF8, tinta: 0x18181C, ceu: 0xCFE7F2, ceuBaixo: 0xFDF3E3,
+    papel: 0xFDFCF8, tinta: 0x18181C, ceu: 0xCFE7F2,
     vermelho: 0xDE1C1C, grama: 0x8FC98A, gramaEsc: 0x7BB878, tronco: 0xB98A5E,
-    mola: 0xF7C948
+    mola: 0xF7C948, cabelo: 0x6B4A32, rosa: 0xE94C6A, terra: 0xE3D6BF
   };
   var CORACOES = [0xE94C6A, 0xF79A3C, 0x5EB0D6, 0x7EC474, 0xC476D0];
 
-  var PISTA = 4.6;          // meia largura da pista
-  var LIMITE = 3.95;        // até onde a personagem pode ir
-  var FAIXAS = [-3, 0, 3];
-  var GRAV = 34;
-  var PULO = 12.6;
-  var MOLA = 20.5;
-  var VEL0 = 15, VELMAX = 30, ACEL = 0.3;
-  var LATERAL = 9.5;
-  var ESPELHO = -1;          // a camera olha para +Z, entao a tela espelha o eixo X
-  var VISTA = 165;
+  var GRAV = 42, PULO = 15.2, MOLA = 24.5;
+  var VEL0 = 9.5, VELMAX = 16.5, ACEL = 0.16;
+  var MEIO = 0.46;            // meia largura da personagem
+  var ALTURA = 3.1;           // altura da personagem
+  var DEGRAU = 1.35;          // altura que ela sobe sozinha
+  var VISTA = 62;             // quanto o mundo é gerado à frente
 
   /* ============================== estado ============================== */
   var cena, camera, render3d, relogio;
-  var heroi, sombra, pernaE, pernaD, bracoE, bracoD, corpoTodo;
-  var chaos = [], decors = [], obstaculos = [], coracoes = [], molas = [];
-  var jogador = { x: 0, y: 0, vx: 0, vy: 0, z: 0, giro: 0, girando: false, passo: 0 };
-  var estado = "menu";      // menu | jogando | fim
-  var vel = VEL0, dist = 0, pontos = 0, vidas = 3;
-  var invencivel = 0, tremor = 0, proxZ = 0, tempo = 0;
+  var heroi, sombra, corpoTodo, tronco, cabecaG, chapeuG, saia;
+  var ombroE, ombroD, cotoveloE, cotoveloD, coxaE, coxaD, joelhoE, joelhoD;
+  var solidos = [], blocos = [], coracoes = [], molas = [], decors = [];
+  var jogador = { x: 0, y: 0, vy: 0, vel: VEL0, noChao: true, giro: 0, girando: false, passo: 0 };
+  var estado = "menu";
+  var velBase = VEL0, dist = 0, pontos = 0, vidas = 3;
+  var invencivel = 0, tremor = 0, proxX = 0, tempo = 0, chaoAbaixo = 0;
+  var seguro = { x: 0, y: 0 };
   var inclinacao = 0, neutro = null, temSensor = false;
   var toqueAtivo = false, toqueX = 0, toqueMoveu = false, alvoToque = null;
   var teclas = { esq: false, dir: false };
-  var recorde = 0;
+  var recorde = 0, DIST_CAM = 20, ADIANTE = 3;
 
   var el = {
     hud: document.getElementById("hud"),
@@ -316,21 +313,10 @@
   function matPapel(cor) { return new THREE.MeshLambertMaterial({ color: cor === undefined ? COR.papel : cor }); }
 
   function comTraco(malha, cor) {
-    var linhas = new THREE.LineSegments(
+    malha.add(new THREE.LineSegments(
       new THREE.EdgesGeometry(malha.geometry, 25),
       new THREE.LineBasicMaterial({ color: cor === undefined ? COR.tinta : cor })
-    );
-    malha.add(linhas);
-    return malha;
-  }
-
-  function contorno(malha, esp) {
-    var casca = new THREE.Mesh(
-      malha.geometry,
-      new THREE.MeshBasicMaterial({ color: COR.tinta, side: THREE.BackSide })
-    );
-    casca.scale.setScalar(esp || 1.06);
-    malha.add(casca);
+    ));
     return malha;
   }
 
@@ -354,49 +340,210 @@
   }
   var GEO_CORACAO = null;
 
-  /* ===================== a Vitória (do desenho) ====================== */
+  var GRAD_TOON = null;
+  function gradienteToon() {
+    if (GRAD_TOON) return GRAD_TOON;
+    var d = new Uint8Array([126, 126, 138, 255, 208, 208, 214, 255, 255, 255, 255, 255]);
+    GRAD_TOON = new THREE.DataTexture(d, 3, 1, THREE.RGBAFormat);
+    GRAD_TOON.minFilter = THREE.NearestFilter;
+    GRAD_TOON.magFilter = THREE.NearestFilter;
+    GRAD_TOON.generateMipmaps = false;
+    GRAD_TOON.needsUpdate = true;
+    return GRAD_TOON;
+  }
+
+  var MAT_TINTA = null;
+  function matTinta() {
+    if (!MAT_TINTA) MAT_TINTA = new THREE.MeshBasicMaterial({ color: COR.tinta, side: THREE.BackSide });
+    return MAT_TINTA;
+  }
+
+  // Contorno com espessura constante: a casca cresce em volta do centro da peça.
+  function tinta(malha, esp) {
+    var g = malha.geometry;
+    if (!g.boundingBox) g.computeBoundingBox();
+    var tam = new THREE.Vector3(), cen = new THREE.Vector3();
+    g.boundingBox.getSize(tam);
+    g.boundingBox.getCenter(cen);
+    var sx = 1 + 2 * esp / Math.max(0.02, tam.x);
+    var sy = 1 + 2 * esp / Math.max(0.02, tam.y);
+    var sz = 1 + 2 * esp / Math.max(0.02, tam.z);
+    var casca = new THREE.Mesh(g, matTinta());
+    casca.scale.set(sx, sy, sz);
+    casca.position.set(cen.x * (1 - sx), cen.y * (1 - sy), cen.z * (1 - sz));
+    malha.add(casca);
+    return malha;
+  }
+
+  function parte(geo, cor, x, y, z, esp) {
+    var m = new THREE.Mesh(geo, new THREE.MeshToonMaterial({
+      color: cor === undefined ? COR.papel : cor, gradientMap: gradienteToon()
+    }));
+    m.position.set(x || 0, y || 0, z || 0);
+    if (esp !== 0) tinta(m, esp || 0.032);
+    return m;
+  }
+
+  // caixa de cantos arredondados (tronco, olhos, sapatos)
+  function geoCaixa(w, h, d, r) {
+    var W = w / 2, H = h / 2;
+    var f = new THREE.Shape();
+    f.moveTo(-W, -H + r);
+    f.lineTo(-W, H - r); f.quadraticCurveTo(-W, H, -W + r, H);
+    f.lineTo(W - r, H); f.quadraticCurveTo(W, H, W, H - r);
+    f.lineTo(W, -H + r); f.quadraticCurveTo(W, -H, W - r, -H);
+    f.lineTo(-W + r, -H); f.quadraticCurveTo(-W, -H, -W, -H + r);
+    var b = Math.min(0.06, d * 0.3);
+    var g = new THREE.ExtrudeGeometry(f, {
+      depth: Math.max(0.02, d - b * 2), bevelEnabled: true,
+      bevelSize: b, bevelThickness: b, bevelSegments: 3, curveSegments: 6
+    });
+    g.center();
+    return g;
+  }
+
+  // sólido de revolução a partir de um perfil [[raio, altura], ...]
+  function geoTorno(perfil, seg) {
+    // o LatheGeometry só gera as normais para fora se o perfil subir; se veio
+    // de cima para baixo (mais legível de escrever), inverte antes.
+    var lista = perfil[0][1] > perfil[perfil.length - 1][1] ? perfil.slice().reverse() : perfil;
+    var pts = [];
+    for (var i = 0; i < lista.length; i++) pts.push(new THREE.Vector2(lista[i][0], lista[i][1]));
+    return new THREE.LatheGeometry(pts, seg || 28);
+  }
+
+  // membro afunilado com a ponta arredondada
+  function geoMembro(rTopo, rBase, alt) {
+    return new THREE.CylinderGeometry(rTopo, rBase, alt, 14);
+  }
+
   function criarHeroi() {
     var g = new THREE.Group();
     corpoTodo = new THREE.Group();
+    corpoTodo.scale.setScalar(0.95);
     g.add(corpoTodo);
 
-    // corpo (o retângulo do desenho)
-    corpoTodo.add(peca(new THREE.BoxGeometry(0.95, 1.15, 0.55), COR.papel, 0, 1.32, 0));
-    // saia (o triângulo)
-    var saia = peca(new THREE.ConeGeometry(0.78, 0.85, 20), COR.papel, 0, 0.92, 0);
-    corpoTodo.add(saia);
-    // cabeça (o círculo) + olhinhos quadrados
-    var cabeca = peca(new THREE.SphereGeometry(0.52, 18, 14), COR.papel, 0, 2.32, 0, false);
-    contorno(cabeca, 1.09);
-    cabeca.scale.set(1, 0.94, 0.9);
-    corpoTodo.add(cabeca);
-    var olho = new THREE.BoxGeometry(0.12, 0.14, 0.06);
-    var matOlho = new THREE.MeshLambertMaterial({ color: COR.tinta });
-    var oE = new THREE.Mesh(olho, matOlho); oE.position.set(-0.17, 2.33, 0.47); corpoTodo.add(oE);
-    var oD = new THREE.Mesh(olho, matOlho); oD.position.set(0.17, 2.33, 0.47); corpoTodo.add(oD);
-    // chapéu: aba redonda + triângulo vermelho
-    corpoTodo.add(peca(new THREE.CylinderGeometry(0.76, 0.76, 0.12, 22), COR.papel, 0, 2.72, 0));
-    corpoTodo.add(peca(new THREE.ConeGeometry(0.5, 0.62, 20), COR.vermelho, 0, 3.08, 0));
-    // braços (pivô no ombro)
-    bracoE = new THREE.Group(); bracoE.position.set(-0.52, 1.72, 0); corpoTodo.add(bracoE);
-    bracoD = new THREE.Group(); bracoD.position.set(0.52, 1.72, 0); corpoTodo.add(bracoD);
-    [bracoE, bracoD].forEach(function (b, i) {
-      var braco = peca(new THREE.CylinderGeometry(0.14, 0.13, 0.72, 10), COR.papel, 0, -0.34, 0);
-      b.add(braco);
-      b.add(contorno(peca(new THREE.SphereGeometry(0.15, 10, 8), COR.papel, 0, -0.7, 0, false), 1.14));
-      b.rotation.z = i === 0 ? 0.25 : -0.25;
-    });
-    // pernas (pivô no quadril)
-    pernaE = new THREE.Group(); pernaE.position.set(-0.24, 0.78, 0); corpoTodo.add(pernaE);
-    pernaD = new THREE.Group(); pernaD.position.set(0.24, 0.78, 0); corpoTodo.add(pernaD);
-    [pernaE, pernaD].forEach(function (p) {
-      p.add(peca(new THREE.CylinderGeometry(0.15, 0.14, 0.68, 10), COR.papel, 0, -0.34, 0));
-      p.add(contorno(peca(new THREE.SphereGeometry(0.16, 10, 8), COR.papel, 0, -0.68, 0.04, false), 1.13));
+    /* ---- do quadril para cima (balança ao correr) ---- */
+    tronco = new THREE.Group();
+    tronco.position.y = 1.15;
+    corpoTodo.add(tronco);
+
+    tronco.add(parte(geoCaixa(0.66, 1.05, 0.42, 0.17), COR.papel, 0, 0.525, 0, 0.032));
+
+    var gola = parte(new THREE.TorusGeometry(0.17, 0.045, 8, 20), COR.vermelho, 0, 1.0, 0, 0.02);
+    gola.rotation.x = Math.PI / 2;
+    gola.scale.set(1.12, 1, 0.66);
+    tronco.add(gola);
+
+    var cinto = parte(new THREE.TorusGeometry(0.27, 0.048, 8, 24), COR.vermelho, 0, 0.05, 0, 0.02);
+    cinto.rotation.x = Math.PI / 2;
+    cinto.scale.set(1.14, 1, 0.68);
+    tronco.add(cinto);
+
+    // saia curta: o triângulo do desenho, deixando as pernas à mostra
+    saia = parte(geoTorno([
+      [0, 0.08], [0.28, 0.05], [0.37, -0.06], [0.45, -0.2],
+      [0.5, -0.31], [0.51, -0.35], [0.36, -0.36], [0, -0.36]
+    ]), COR.papel, 0, 0, 0, 0.028);
+    tronco.add(saia);
+    var barra = parte(new THREE.TorusGeometry(0.495, 0.04, 8, 28), COR.rosa, 0, -0.33, 0, 0.02);
+    barra.rotation.x = Math.PI / 2;
+    saia.add(barra);
+
+    tronco.add(parte(geoMembro(0.16, 0.18, 0.18), COR.papel, 0, 1.08, 0, 0.026));
+
+    /* ---- cabeça ---- */
+    cabecaG = new THREE.Group();
+    cabecaG.position.y = 1.63;
+    tronco.add(cabecaG);
+
+    var cabeca = parte(new THREE.SphereGeometry(0.52, 26, 20), COR.papel, 0, 0, 0, 0.032);
+    cabeca.scale.set(1, 0.96, 0.93);
+    cabecaG.add(cabeca);
+
+    // olhinhos quadrados, como ela desenhou, com um brilho dentro
+    var geoOlho = geoCaixa(0.16, 0.18, 0.07, 0.045);
+    [-1, 1].forEach(function (l) {
+      cabecaG.add(parte(geoOlho, COR.tinta, l * 0.18, 0.05, 0.42, 0));
+      cabecaG.add(parte(new THREE.SphereGeometry(0.034, 8, 6), 0xFFFFFF, l * 0.158, 0.1, 0.47, 0));
+      var bo = parte(new THREE.SphereGeometry(0.1, 10, 8), 0xF7A8B8, l * 0.31, -0.09, 0.33, 0);
+      bo.scale.set(1, 0.7, 0.42);
+      cabecaG.add(bo);
     });
 
-    // sombrinha no chão
+    // cabelo: tufo atrás e duas chiquinhas com laço
+    var tufo = parte(new THREE.SphereGeometry(0.38, 18, 14), COR.cabelo, 0, -0.04, -0.22, 0.026);
+    tufo.scale.set(1.04, 0.92, 0.74);
+    cabecaG.add(tufo);
+    [-1, 1].forEach(function (l) {
+      var ch = new THREE.Group();
+      ch.position.set(l * 0.45, -0.1, -0.06);
+      ch.rotation.z = l * 0.75;
+      cabecaG.add(ch);
+      ch.add(parte(new THREE.SphereGeometry(0.15, 14, 11), COR.cabelo, 0, -0.17, 0, 0.024));
+      var laco = parte(new THREE.TorusGeometry(0.095, 0.038, 8, 16), COR.vermelho, 0, 0.01, 0, 0.02);
+      laco.rotation.y = Math.PI / 2;
+      ch.add(laco);
+    });
+
+    // sorrisinho
+    var arco = Math.PI * 0.78;
+    var sorriso = parte(new THREE.TorusGeometry(0.13, 0.024, 8, 20, arco), COR.tinta, 0, -0.13, 0.4, 0);
+    sorriso.rotation.z = -(Math.PI / 2 + arco / 2);
+    cabecaG.add(sorriso);
+
+    /* ---- chapéu (aba redonda + o triângulo vermelho) ---- */
+    chapeuG = new THREE.Group();
+    chapeuG.position.y = 0.5;
+    cabecaG.add(chapeuG);
+    chapeuG.add(parte(geoTorno([
+      [0, 0.045], [0.26, 0.05], [0.52, 0.035], [0.68, 0.005],
+      [0.74, 0.055], [0.7, -0.02], [0.5, -0.045], [0.26, -0.055], [0, -0.05]
+    ]), COR.papel, 0, 0, 0, 0.026));
+    chapeuG.add(parte(geoTorno([
+      [0, 0.36], [0.08, 0.32], [0.24, 0.16], [0.38, -0.03],
+      [0.48, -0.21], [0.5, -0.26], [0, -0.26]
+    ]), COR.vermelho, 0, 0.28, 0, 0.028));
+
+    /* ---- braços com cotovelo ---- */
+    [-1, 1].forEach(function (l) {
+      var ombro = new THREE.Group();
+      ombro.position.set(l * 0.4, 0.9, 0);
+      ombro.rotation.z = l * 0.3;
+      tronco.add(ombro);
+      ombro.add(parte(geoMembro(0.12, 0.105, 0.4), COR.papel, 0, -0.2, 0, 0.024));
+
+      var cotovelo = new THREE.Group();
+      cotovelo.position.y = -0.4;
+      ombro.add(cotovelo);
+      cotovelo.add(parte(geoMembro(0.105, 0.092, 0.34), COR.papel, 0, -0.17, 0, 0.024));
+      cotovelo.add(parte(new THREE.SphereGeometry(0.125, 12, 10), COR.papel, 0, -0.35, 0, 0.024));
+
+      if (l < 0) { ombroE = ombro; cotoveloE = cotovelo; }
+      else { ombroD = ombro; cotoveloD = cotovelo; }
+    });
+
+    /* ---- pernas com joelho e sapatinho ---- */
+    var geoPe = geoCaixa(0.24, 0.16, 0.38, 0.06);
+    [-1, 1].forEach(function (l) {
+      var coxa = new THREE.Group();
+      coxa.position.set(l * 0.18, 1.15, 0);
+      corpoTodo.add(coxa);
+      coxa.add(parte(geoMembro(0.15, 0.13, 0.55), COR.papel, 0, -0.275, 0, 0.024));
+
+      var joelho = new THREE.Group();
+      joelho.position.y = -0.55;
+      coxa.add(joelho);
+      joelho.add(parte(geoMembro(0.13, 0.115, 0.5), COR.papel, 0, -0.25, 0, 0.024));
+      joelho.add(parte(geoPe, COR.vermelho, 0, -0.5, 0.08, 0.024));
+
+      if (l < 0) { coxaE = coxa; joelhoE = joelho; }
+      else { coxaD = coxa; joelhoD = joelho; }
+    });
+
+    /* ---- sombrinha no chão ---- */
     sombra = new THREE.Mesh(
-      new THREE.CircleGeometry(0.62, 20),
+      new THREE.CircleGeometry(0.62, 22),
       new THREE.MeshBasicMaterial({ color: 0x2a2a30, transparent: true, opacity: 0.2 })
     );
     sombra.rotation.x = -Math.PI / 2;
@@ -407,34 +554,25 @@
     return g;
   }
 
-  /* ========================== chão e enfeites ========================= */
-  var CHAO_LEN = 30, N_CHAOS = 8;
-
-  function criarChao() {
+  /* ===================== chão, plataformas e enfeites ================= */
+  function novoSolido() {
     var g = new THREE.Group();
-    var pista = new THREE.Mesh(new THREE.PlaneGeometry(PISTA * 2, CHAO_LEN), matPapel(COR.papel));
-    pista.rotation.x = -Math.PI / 2;
-    g.add(pista);
-    [-1, 1].forEach(function (s) {
-      var grama = new THREE.Mesh(new THREE.PlaneGeometry(34, CHAO_LEN), matPapel(COR.grama));
-      grama.rotation.x = -Math.PI / 2;
-      grama.position.set(s * (PISTA + 17), -0.06, 0);
-      g.add(grama);
-      var borda = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, CHAO_LEN), new THREE.MeshBasicMaterial({ color: COR.tinta }));
-      borda.position.set(s * PISTA, 0.05, 0);
-      g.add(borda);
-    });
-    // tracinhos do meio da pista
-    for (var i = 0; i < 5; i++) {
-      [-1.5, 1.5].forEach(function (x) {
-        var t = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 2.4), new THREE.MeshBasicMaterial({ color: 0xCFCEC8 }));
-        t.rotation.x = -Math.PI / 2;
-        t.position.set(x, 0.02, -CHAO_LEN / 2 + 3 + i * 6);
-        g.add(t);
-      });
-    }
+    var base = peca(new THREE.BoxGeometry(1, 1, 3.4), COR.terra, 0, 0, 0);
+    var topo = peca(new THREE.BoxGeometry(1, 0.3, 3.6), COR.grama, 0, 0, 0);
+    g.add(base); g.add(topo);
+    g.visible = false;
     cena.add(g);
-    return g;
+    return { obj: g, base: base, topo: topo, ativo: false, x0: 0, x1: 0, y: 0 };
+  }
+
+  function novoBloco() {
+    var g = new THREE.Group();
+    g.add(parte(geoCaixa(1.5, 1.6, 1.5, 0.25), COR.vermelho, 0, 0.8, 0, 0.035));
+    g.add(parte(new THREE.SphereGeometry(0.09, 8, 6), COR.papel, -0.3, 1.0, 0.78, 0));
+    g.add(parte(new THREE.SphereGeometry(0.09, 8, 6), COR.papel, 0.3, 1.0, 0.78, 0));
+    g.visible = false;
+    cena.add(g);
+    return { obj: g, ativo: false, x: 0, y: 0 };
   }
 
   function criarArvore() {
@@ -458,7 +596,175 @@
     return g;
   }
 
+  function criarMorro() {
+    var g = new THREE.Group();
+    var m = peca(new THREE.SphereGeometry(6, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), COR.grama, 0, 0, 0);
+    m.scale.set(1, 0.42, 1);
+    g.add(m);
+    cena.add(g);
+    return g;
+  }
+
+  /* ======================= geração do caminho ======================== */
+  function livre(lista) { for (var i = 0; i < lista.length; i++) if (!lista[i].ativo) return lista[i]; return null; }
+
+  function porSolido(x0, comp, topoY, espessura) {
+    var s = livre(solidos); if (!s) return;
+    var alt = espessura || 1.3;
+    s.ativo = true; s.obj.visible = true;
+    s.x0 = x0; s.x1 = x0 + comp; s.y = topoY;
+    s.base.scale.set(comp, alt, 1);
+    s.base.position.set(0, topoY - 0.3 - alt / 2, 0);
+    s.topo.scale.set(comp, 1, 1);
+    s.topo.position.set(0, topoY - 0.15, 0);
+    s.obj.position.set(x0 + comp / 2, 0, 0);
+  }
+
+  function porBloco(x, topoY) {
+    var b = livre(blocos); if (!b) return;
+    b.ativo = true; b.obj.visible = true;
+    b.x = x; b.y = topoY;
+    b.obj.position.set(x, topoY, 0);
+  }
+
+  function porCoracao(x, y) {
+    var c = livre(coracoes); if (!c) return;
+    c.ativo = true; c.obj.visible = true;
+    c.obj.position.set(x, y, 0);
+    c.obj.rotation.set(0, Math.random() * 6.28, 0);
+  }
+
+  function porMola(x, topoY) {
+    var m = livre(molas); if (!m) return;
+    m.ativo = true; m.obj.visible = true;
+    m.x = x; m.y = topoY;
+    m.obj.position.set(x, topoY + 0.18, 0);
+  }
+
+  function linhaCoracoes(x, y, n, passo) {
+    for (var i = 0; i < n; i++) porCoracao(x + i * (passo || 1.4), y);
+  }
+
+  function arcoCoracoes(x0, vao, alturaBase) {
+    var n = Math.max(3, Math.round(vao / 1.05));
+    for (var i = 0; i <= n; i++) {
+      var t = i / n;
+      porCoracao(x0 + t * vao, (alturaBase || 1.5) + Math.sin(t * Math.PI) * 2.3);
+    }
+  }
+
+  function gerarTrecho(x) {
+    var dif = Math.min(1, dist / 650);
+    var r = Math.random();
+
+    if (r < 0.24) {                                  // chão reto com blocos
+      porSolido(x, 16, 0);
+      porBloco(x + 6, 0);
+      if (Math.random() < 0.28 + dif * 0.42) porBloco(x + 11, 0);
+      linhaCoracoes(x + 2, 1.4, 3, 1.4);
+      return 16;
+    }
+    if (r < 0.46) {                                  // buraco para pular
+      porSolido(x, 10, 0);
+      var vao = 3.4 + dif * 2.3;
+      arcoCoracoes(x + 10, vao);
+      return 10 + vao;
+    }
+    if (r < 0.64) {                                  // plataformas sobre o vão
+      porSolido(x, 9, 0);
+      porSolido(x + 12.5, 4.6, 2.4, 0.7);
+      linhaCoracoes(x + 13.2, 3.6, 3, 1.3);
+      porSolido(x + 21, 12, 0);
+      return 33;
+    }
+    if (r < 0.82) {                                  // degraus (sobe e desce)
+      porSolido(x, 6, 0);
+      porSolido(x + 6, 4.5, 1.2);
+      porSolido(x + 10.5, 4.5, 2.4);
+      linhaCoracoes(x + 11, 3.7, 3, 1.3);
+      porSolido(x + 15, 5, 1.2);
+      porSolido(x + 20, 8, 0);
+      return 28;
+    }
+    porSolido(x, 14, 0);                             // mola
+    porMola(x + 4.5, 0);
+    for (var k = 0; k < 6; k++) porCoracao(x + 5.6 + k * 1.6, 2.4 + Math.sin(k / 5 * Math.PI) * 4.4);
+    return 14;
+  }
+
+  function limparMundo() {
+    [solidos, blocos, coracoes, molas].forEach(function (lista) {
+      lista.forEach(function (it) { it.ativo = false; it.obj.visible = false; });
+    });
+  }
+
+  function prepararMundo() {
+    limparMundo();
+    porSolido(-14, 34, 0);                           // chão firme para começar
+    proxX = 20;
+    while (proxX < VISTA) proxX += gerarTrecho(proxX);
+    decors.forEach(function (d, i) {
+      d.obj.visible = true;
+      reposicionarDecor(d, -20 + (i / decors.length) * (VISTA + 30));
+    });
+  }
+
+  function reposicionarDecor(d, x) {
+    if (d.tipo === "arvore") {
+      var e = 0.8 + Math.random() * 0.6;
+      d.obj.scale.set(e, e, e);
+      d.obj.position.set(x, -1.4 - Math.random() * 1.0, -11 - Math.random() * 11);
+    } else if (d.tipo === "morro") {
+      var e2 = 0.9 + Math.random() * 1.4;
+      d.obj.scale.set(e2, e2, e2);
+      d.obj.position.set(x, -3.2, -30 - Math.random() * 12);
+    } else {
+      var e3 = 0.6 + Math.random() * 0.7;
+      d.obj.scale.set(e3, e3, e3);
+      d.obj.position.set(x, 8 + Math.random() * 6, -24 - Math.random() * 16);
+    }
+  }
+
+  function animarCorrida(dt, v) {
+    if (v > 0.5) {                       // correndo
+      jogador.passo += dt * (4.4 + v * 0.28);
+      var s = Math.sin(jogador.passo), c = Math.cos(jogador.passo);
+
+      coxaE.rotation.x = s * 0.95;
+      coxaD.rotation.x = -s * 0.95;
+      joelhoE.rotation.x = -0.12 - Math.max(0, -s) * 1.5;
+      joelhoD.rotation.x = -0.12 - Math.max(0, s) * 1.5;
+
+      ombroE.rotation.x = -s * 0.8;
+      ombroD.rotation.x = s * 0.8;
+      cotoveloE.rotation.x = -0.5 - Math.max(0, s) * 0.55;
+      cotoveloD.rotation.x = -0.5 - Math.max(0, -s) * 0.55;
+
+      tronco.position.y = 1.15 + Math.abs(c) * 0.07;
+      tronco.rotation.x = 0.1;
+      tronco.rotation.z = s * 0.045;
+      cabecaG.rotation.x = -0.1 - Math.abs(c) * 0.05;
+      cabecaG.rotation.z = -s * 0.05;
+      saia.rotation.x = -0.05 - Math.abs(c) * 0.04;
+      saia.rotation.z = s * 0.07;
+    } else {                             // no ar
+      coxaE.rotation.x = -0.95; joelhoE.rotation.x = -1.15;
+      coxaD.rotation.x = -0.3; joelhoD.rotation.x = -1.75;
+      ombroE.rotation.x = -2.3; ombroD.rotation.x = -2.3;
+      cotoveloE.rotation.x = -0.45; cotoveloD.rotation.x = -0.45;
+      tronco.position.y = 1.15;
+      tronco.rotation.x = -0.12; tronco.rotation.z = 0;
+      cabecaG.rotation.set(0.08, 0, 0);
+      saia.rotation.x = 0.06; saia.rotation.z = 0;
+    }
+    // o chapéu balança um pouquinho atrás do movimento
+    chapeuG.rotation.z = Math.sin(jogador.passo * 0.5) * 0.035;
+    chapeuG.rotation.x = -0.02 + Math.sin(jogador.passo) * 0.025;
+  }
+
   /* ============================ montagem ============================= */
+  var fundo;
+
   function iniciar() {
     var canvas = document.getElementById("cena");
     render3d = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
@@ -467,40 +773,42 @@
 
     cena = new THREE.Scene();
     cena.background = ceuGradiente();
-    cena.fog = new THREE.Fog(0xDDEEF6, 55, VISTA);
+    cena.fog = new THREE.Fog(0xDDEEF6, 34, 96);
 
-    camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 400);
-    camera.position.set(0, 4.85, -10.2);
+    camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 300);
+    camera.position.set(0, 5, 20);
 
     cena.add(new THREE.HemisphereLight(0xFFFFFF, 0xBFD9C8, 0.95));
-    var sol = new THREE.DirectionalLight(0xFFF6E2, 0.65);
-    sol.position.set(-8, 16, -6);
+    var sol = new THREE.DirectionalLight(0xFFF6E2, 0.7);
+    sol.position.set(6, 14, 12);
     cena.add(sol);
+
+    fundo = new THREE.Mesh(new THREE.PlaneGeometry(400, 80), matPapel(0xBCE2B4));
+    fundo.position.set(0, -38.7, -34);
+    cena.add(fundo);
 
     GEO_CORACAO = geoCoracao();
     relogio = new THREE.Clock();
     heroi = criarHeroi();
+    heroi.rotation.y = Math.PI / 2;              // de frente para a direita
 
-    for (var i = 0; i < N_CHAOS; i++) chaos.push(criarChao());
-    for (var j = 0; j < 16; j++) { var a = criarArvore(); a.visible = false; decors.push({ obj: a, tipo: "arvore" }); }
-    for (var k = 0; k < 8; k++) { var n = criarNuvem(); n.visible = false; decors.push({ obj: n, tipo: "nuvem" }); }
-
-    for (var o = 0; o < 34; o++) {
-      var bloco = contorno(peca(new THREE.BoxGeometry(1.7, 1.15, 1.1), COR.vermelho, 0, 0.58, 0), 1.05);
-      bloco.visible = false; cena.add(bloco);
-      obstaculos.push({ obj: bloco, ativo: false });
-    }
-    for (var c = 0; c < 90; c++) {
+    for (var i = 0; i < 26; i++) solidos.push(novoSolido());
+    for (var j = 0; j < 14; j++) blocos.push(novoBloco());
+    for (var c = 0; c < 80; c++) {
       var cm = new THREE.Mesh(GEO_CORACAO, new THREE.MeshLambertMaterial({ color: CORACOES[c % CORACOES.length] }));
-      cm.scale.setScalar(0.85);
+      cm.scale.setScalar(0.8);
       cm.visible = false; cena.add(cm);
       coracoes.push({ obj: cm, ativo: false });
     }
-    for (var m = 0; m < 8; m++) {
-      var mola = peca(new THREE.CylinderGeometry(0.75, 0.85, 0.3, 16), COR.mola, 0, 0.16, 0);
-      mola.visible = false; cena.add(mola);
-      molas.push({ obj: mola, ativo: false });
+    for (var m = 0; m < 6; m++) {
+      var mo = peca(new THREE.CylinderGeometry(0.7, 0.8, 0.36, 16), COR.mola, 0, 0, 0);
+      mo.visible = false; cena.add(mo);
+      molas.push({ obj: mo, ativo: false, x: 0, y: 0 });
     }
+    for (var a = 0; a < 16; a++) decors.push({ obj: criarArvore(), tipo: "arvore" });
+    for (var n = 0; n < 8; n++) decors.push({ obj: criarNuvem(), tipo: "nuvem" });
+    for (var h = 0; h < 5; h++) decors.push({ obj: criarMorro(), tipo: "morro" });
+    decors.forEach(function (d) { d.obj.visible = false; });
 
     try { recorde = parseInt(localStorage.getItem("vitoria.recorde") || "0", 10) || 0; } catch (e) { recorde = 0; }
     el.recordeInicio.textContent = recorde + " m";
@@ -508,6 +816,7 @@
 
     ligarControles();
     window.addEventListener("resize", aoRedimensionar);
+    ajustarCamera();
     prepararMundo();
     requestAnimationFrame(quadro);
   }
@@ -524,94 +833,24 @@
     return new THREE.CanvasTexture(c);
   }
 
-  function aoRedimensionar() {
-    camera.aspect = window.innerWidth / window.innerHeight;
+  function ajustarCamera() {
+    var asp = window.innerWidth / window.innerHeight;
+    camera.aspect = asp;
+    var larg = asp < 0.85 ? 11 : 16;             // quanto de pista cabe na tela
+    var d = (larg / 2) / (Math.tan(camera.fov * Math.PI / 360) * asp);
+    DIST_CAM = Math.max(13, Math.min(34, d));
+    ADIANTE = asp < 0.85 ? 1.9 : 3.2;
     camera.updateProjectionMatrix();
+  }
+
+  function aoRedimensionar() {
     render3d.setSize(window.innerWidth, window.innerHeight);
-  }
-
-  /* ======================= geração do caminho ======================== */
-  function livre(lista) { for (var i = 0; i < lista.length; i++) if (!lista[i].ativo) return lista[i]; return null; }
-
-  function porObstaculo(x, z) {
-    var o = livre(obstaculos); if (!o) return;
-    o.ativo = true; o.obj.visible = true; o.obj.position.set(x, 0.58, z);
-  }
-  function porCoracao(x, y, z) {
-    var c = livre(coracoes); if (!c) return;
-    c.ativo = true; c.obj.visible = true; c.obj.position.set(x, y, z);
-    c.obj.rotation.set(0, Math.random() * 6.28, 0);
-  }
-  function porMola(x, z) {
-    var m = livre(molas); if (!m) return;
-    m.ativo = true; m.obj.visible = true; m.obj.position.set(x, 0.16, z);
-  }
-
-  function gerarTrecho(z) {
-    var dif = Math.min(1, dist / 900);                 // 0 → 1 conforme avança
-    var r = Math.random();
-    var faixa = FAIXAS[(Math.random() * 3) | 0];
-
-    if (r < 0.12 + dif * 0.05) {                        // mola + corações no ar
-      porMola(faixa, z);
-      for (var a = 0; a < 6; a++) porCoracao(faixa, 1.4 + Math.sin(a / 5 * Math.PI) * 3.4, z + 4 + a * 2.6);
-      return 26;
-    }
-    if (r < 0.5 + dif * 0.22) {                         // blocos para desviar
-      var quantos = Math.random() < 0.35 + dif * 0.3 ? 2 : 1;
-      var usadas = [];
-      for (var i = 0; i < quantos; i++) {
-        var f;
-        do { f = (Math.random() * 3) | 0; } while (usadas.indexOf(f) >= 0);
-        usadas.push(f);
-        porObstaculo(FAIXAS[f], z);
-      }
-      var sobra = [0, 1, 2].filter(function (f2) { return usadas.indexOf(f2) < 0; });
-      var facil = FAIXAS[sobra[(Math.random() * sobra.length) | 0]];
-      for (var h = 0; h < 3; h++) porCoracao(facil, 1.1, z + 3 + h * 2.2);
-      return 14 - dif * 3;
-    }
-    if (r < 0.86) {                                     // fileira de corações
-      var n = 5 + ((Math.random() * 3) | 0);
-      for (var k = 0; k < n; k++) porCoracao(faixa, 1.1, z + k * 2.3);
-      return 12 + n * 2.3;
-    }
-    return 11;                                          // respiro
-  }
-
-  function limparMundo() {
-    [obstaculos, coracoes, molas].forEach(function (lista) {
-      lista.forEach(function (it) { it.ativo = false; it.obj.visible = false; });
-    });
-    decors.forEach(function (d) { d.obj.visible = false; });
-  }
-
-  function prepararMundo() {
-    limparMundo();
-    chaos.forEach(function (c, i) { c.position.z = i * CHAO_LEN - CHAO_LEN; });
-    decors.forEach(function (d, i) {
-      d.obj.visible = true;
-      reposicionarDecor(d, (i / decors.length) * VISTA);
-    });
-    proxZ = 40;
-    while (proxZ < VISTA) proxZ += gerarTrecho(proxZ);
-  }
-
-  function reposicionarDecor(d, z) {
-    var lado = Math.random() < 0.5 ? -1 : 1;
-    if (d.tipo === "arvore") {
-      var e = 0.7 + Math.random() * 0.7;
-      d.obj.scale.set(e, e, e);
-      d.obj.position.set(lado * (PISTA + 2.5 + Math.random() * 13), 0, z);
-      d.obj.rotation.y = Math.random() * 6.28;
-    } else {
-      var e2 = 0.9 + Math.random() * 1.1;
-      d.obj.scale.set(e2, e2, e2);
-      d.obj.position.set(lado * (6 + Math.random() * 22), 11 + Math.random() * 8, z);
-    }
+    ajustarCamera();
   }
 
   /* ============================ controles ============================ */
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
   function ligarControles() {
     window.addEventListener("keydown", function (e) {
       if (e.code === "ArrowLeft" || e.code === "KeyA") teclas.esq = true;
@@ -627,24 +866,21 @@
     var canvas = document.getElementById("cena");
     canvas.addEventListener("pointerdown", function (e) {
       toqueAtivo = true; toqueMoveu = false; toqueX = e.clientX;
-      if (!temSensor) alvoToque = jogador.x;
-      canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
+      if (!temSensor) alvoToque = 0;
+      if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
     });
     canvas.addEventListener("pointermove", function (e) {
       if (!toqueAtivo) return;
-      var d = e.clientX - toqueX;
-      if (Math.abs(d) > 12) toqueMoveu = true;
-      if (!temSensor && toqueMoveu && alvoToque !== null) {
-        alvoToque = clamp(alvoToque + ESPELHO * d / (window.innerWidth * 0.13), -LIMITE, LIMITE);
+      if (Math.abs(e.clientX - toqueX) > 14) toqueMoveu = true;
+      if (!temSensor && toqueMoveu) {
+        alvoToque = clamp((e.clientX - toqueX) / (window.innerWidth * 0.3), -1, 1);
       }
-      toqueX = e.clientX;
     });
     canvas.addEventListener("pointerup", function () {
       if (toqueAtivo && !toqueMoveu) pular();
-      toqueAtivo = false;
-      alvoToque = null;
+      toqueAtivo = false; alvoToque = null;
     });
-    canvas.addEventListener("pointercancel", function () { toqueAtivo = false; });
+    canvas.addEventListener("pointercancel", function () { toqueAtivo = false; alvoToque = null; });
 
     document.getElementById("btnComecar").addEventListener("click", pedirSensorEComecar);
     document.getElementById("btnDeNovo").addEventListener("click", comecar);
@@ -658,8 +894,7 @@
       if (localStorage.getItem("vitoria.mudo") === "1") { Som.mudo(true); el.som.textContent = "🔇"; }
     } catch (e) {}
     document.addEventListener("visibilitychange", function () {
-      if (document.hidden && estado === "jogando") Som.musica(false);
-      else if (!document.hidden && estado === "jogando") Som.musica(true);
+      if (estado === "jogando") Som.musica(!document.hidden);
     });
   }
 
@@ -668,7 +903,7 @@
     var ang = 0;
     if (window.screen && screen.orientation && typeof screen.orientation.angle === "number") ang = screen.orientation.angle;
     else if (typeof window.orientation === "number") ang = window.orientation;
-    var t;
+    var t;                                       // inclinação no eixo horizontal da tela
     if (ang === 90) t = -e.beta;
     else if (ang === 270 || ang === -90) t = e.beta;
     else if (ang === 180) t = -e.gamma;
@@ -679,7 +914,7 @@
   }
 
   function pedirSensorEComecar() {
-    Som.ligar();                      // o AudioContext precisa nascer no toque (iOS)
+    Som.ligar();                                 // o AudioContext precisa nascer no toque (iOS)
     var D = window.DeviceOrientationEvent;
     if (D && typeof D.requestPermission === "function") {
       D.requestPermission().then(function (r) {
@@ -692,28 +927,30 @@
     }
   }
 
-  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
-
   /* =========================== fluxo do jogo ========================= */
   function comecar() {
     estado = "jogando";
-    vel = VEL0; dist = 0; pontos = 0; vidas = 3; invencivel = 0; tremor = 0; tempo = 0;
-    jogador.x = 0; jogador.y = 0; jogador.vx = 0; jogador.vy = 0; jogador.z = 0;
-    jogador.giro = 0; jogador.girando = false; jogador.passo = 0;
+    velBase = VEL0; dist = 0; pontos = 0; vidas = 3;
+    invencivel = 0; tremor = 0; tempo = 0;
+    jogador.x = 0; jogador.y = 0; jogador.vy = 0; jogador.vel = VEL0;
+    jogador.giro = 0; jogador.girando = false; jogador.passo = 0; jogador.noChao = true;
+    seguro.x = 0; seguro.y = 0;
     neutro = null; inclinacao = 0; alvoToque = null;
     heroi.position.set(0, 0, 0);
-    camera.position.set(0, 4.85, -10.2);
+    corpoTodo.rotation.set(0, 0, 0); corpoTodo.position.set(0, 0, 0);
+    camera.position.set(ADIANTE, 2.9, DIST_CAM);
     prepararMundo();
     atualizarVidas(); atualizarHud();
     el.inicio.classList.remove("on");
     el.fim.classList.remove("on");
     el.hud.classList.add("ativo");
+    var deitado = window.innerWidth / window.innerHeight >= 0.85;
     var noComputador = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
-    el.aviso.textContent = temSensor ? ""
-      : (noComputador ? "Setas ← → para desviar, espaço para pular"
-                      : "Incline o celular ou arraste o dedo para os lados");
-    setTimeout(function () { if (estado === "jogando") el.aviso.textContent = ""; }, 4200);
-    Som.ligar(); Som.musica(true);
+    el.aviso.textContent = noComputador ? "→ acelera, ← segura, espaço pula"
+      : (deitado ? "Incline para a direita e acelere. Toque para pular."
+                 : "Vire o celular deitado para ver mais pista");
+    setTimeout(function () { if (estado === "jogando") el.aviso.textContent = ""; }, 4600);
+    Som.musica(true);
   }
 
   function terminar() {
@@ -737,8 +974,9 @@
 
   function pular() {
     if (estado !== "jogando") return;
-    if (jogador.y <= 0.01) {
+    if (jogador.noChao) {
       jogador.vy = PULO;
+      jogador.noChao = false;
       jogador.girando = true; jogador.giro = 0;
       Som.efeito("pulo");
     }
@@ -748,10 +986,25 @@
     vidas--;
     invencivel = 1.5;
     tremor = 0.5;
-    vel = Math.max(VEL0, vel - 5);
+    velBase = Math.max(VEL0, velBase - 2.5);
+    jogador.vel = Math.max(3, jogador.vel * 0.45);
     Som.efeito("batida");
     atualizarVidas();
     if (vidas <= 0) terminar();
+  }
+
+  function caiuNoBuraco() {
+    perderVida();
+    if (vidas <= 0) return;
+    var destino = null;                          // devolve ela para o próximo chão
+    for (var i = 0; i < solidos.length; i++) {
+      var s = solidos[i];
+      if (!s.ativo || s.x1 < jogador.x || s.y > 4) continue;
+      if (destino === null || s.x0 < destino.x0) destino = s;
+    }
+    if (destino) { jogador.x = destino.x0 + 1.6; jogador.y = destino.y + 0.2; }
+    else { jogador.x = seguro.x; jogador.y = seguro.y + 0.2; }
+    jogador.vy = 0;
   }
 
   function atualizarVidas() {
@@ -778,125 +1031,133 @@
     var dt = Math.min(relogio.getDelta(), 0.05);
     if (estado === "jogando") passo(dt);
     else ocioso(dt);
+    fundo.position.x = camera.position.x;
     render3d.render(cena, camera);
   }
 
   function ocioso(dt) {
-    tempo = (tempo || 0) + dt;
-    corpoTodo.visible = true;            // pode ter parado piscando ao perder a ultima vida
+    tempo += dt;
+    corpoTodo.visible = true;
     corpoTodo.rotation.set(0, 0, 0);
     corpoTodo.position.set(0, 0, 0);
-    heroi.rotation.y = Math.sin(tempo * 0.8) * 0.5;
-    heroi.rotation.z = 0;
-    heroi.position.y = Math.abs(Math.sin(tempo * 2.2)) * 0.12;
-    sombra.position.y = 0.02 - heroi.position.y;
+    heroi.rotation.y = Math.PI / 2 + Math.sin(tempo * 0.7) * 0.45;
+    heroi.position.y = jogador.y + Math.abs(Math.sin(tempo * 2.2)) * 0.1;
+    sombra.visible = true;
+    sombra.position.y = 0.03 - Math.abs(Math.sin(tempo * 2.2)) * 0.1;
     sombra.scale.setScalar(1);
     animarCorrida(dt, 6);
-    // a camera acompanha onde a Vitoria parou, nao a origem do mundo
-    var hx = heroi.position.x, hz = heroi.position.z;
-    camera.position.set(hx + Math.sin(tempo * 0.25) * 1.2, 4.2, hz - 11);
-    camera.lookAt(hx, -1.5, hz + 1);
-    if (camera.fov !== 62) { camera.fov = 62; camera.updateProjectionMatrix(); }
+    var ax = jogador.x + 1.2;
+    camera.position.set(ax, jogador.y + 2.6, DIST_CAM * 0.72);
+    camera.lookAt(ax - 1.2, jogador.y + 2.1, 0);
   }
 
   function passo(dt) {
     tempo += dt;
-    vel = Math.min(VELMAX, vel + ACEL * dt);
+    velBase = Math.min(VELMAX, velBase + ACEL * dt);
 
-    // ---- direção: sensor, dedo ou teclado
-    var alvoVx = 0;
+    /* ---- acelerar ou segurar ---- */
+    var f = 1;
     if (temSensor && alvoToque === null) {
       var t = clamp(inclinacao, -26, 26);
       if (Math.abs(t) < 2.5) t = 0;
-      alvoVx = ESPELHO * clamp(t / 20, -1, 1) * LATERAL;
+      f = 1 + clamp(t / 20, -1, 1) * 0.72;
     }
-    if (teclas.esq) alvoVx = -ESPELHO * LATERAL;
-    if (teclas.dir) alvoVx = ESPELHO * LATERAL;
-    if (alvoToque !== null) alvoVx = clamp((alvoToque - jogador.x) * 7, -LATERAL, LATERAL);
-    jogador.vx += (alvoVx - jogador.vx) * Math.min(1, dt * 11);
-    jogador.x = clamp(jogador.x + jogador.vx * dt, -LIMITE, LIMITE);
+    if (alvoToque !== null) f = 1 + alvoToque * 0.72;
+    if (teclas.dir) f = 1.72;
+    if (teclas.esq) f = 0.34;
+    jogador.vel += (velBase * f - jogador.vel) * Math.min(1, dt * 3.5);
+    jogador.vel = Math.max(2, jogador.vel);
+    jogador.x += jogador.vel * dt;
+    dist += jogador.vel * dt * 0.55;
 
-    // ---- pulo
+    /* ---- gravidade, chão e degraus ---- */
     jogador.vy -= GRAV * dt;
+    var yAnt = jogador.y;
     jogador.y += jogador.vy * dt;
-    if (jogador.y <= 0) { jogador.y = 0; jogador.vy = 0; jogador.girando = false; jogador.giro = 0; }
+    jogador.noChao = false;
+    chaoAbaixo = null;
 
-    // ---- avanço
-    var avanco = vel * dt;
-    jogador.z += avanco;
-    dist += avanco * 0.7;
+    var apoios = [];
+    for (var i = 0; i < solidos.length; i++) {
+      var s = solidos[i];
+      if (s.ativo && jogador.x > s.x0 - MEIO && jogador.x < s.x1 + MEIO) apoios.push(s.y);
+    }
+    for (var b = 0; b < blocos.length; b++) {
+      var bl = blocos[b];
+      if (bl.ativo && Math.abs(jogador.x - bl.x) < MEIO + 0.75) apoios.push(bl.y + 1.6);
+    }
+    for (var k = 0; k < apoios.length; k++) {
+      var topo = apoios[k];
+      if (jogador.vy <= 0 && yAnt >= topo - 0.02 && jogador.y <= topo) {
+        jogador.y = topo; jogador.vy = 0; jogador.noChao = true;
+      } else if (jogador.vy <= 0.1 && topo > jogador.y && topo - jogador.y <= DEGRAU) {
+        jogador.y = topo; jogador.vy = 0; jogador.noChao = true;   // sobe o degrau sozinha
+      }
+      if (topo <= jogador.y + 0.35 && (chaoAbaixo === null || topo > chaoAbaixo)) chaoAbaixo = topo;
+    }
+    if (jogador.noChao) { seguro.x = jogador.x; seguro.y = jogador.y; }
     if (invencivel > 0) invencivel -= dt;
     if (tremor > 0) tremor -= dt;
 
-    heroi.position.set(jogador.x, jogador.y, jogador.z);
-    heroi.rotation.y = jogador.vx * 0.045;
-    heroi.rotation.z = -jogador.vx * 0.02;
-    if (jogador.girando) {           // pirueta: a silhueta do desenho continua legivel
+    if (jogador.y < -8) { caiuNoBuraco(); if (estado !== "jogando") return; }
+
+    /* ---- a Vitória na tela ---- */
+    heroi.position.set(jogador.x, jogador.y, 0);
+    heroi.rotation.y = Math.PI / 2;
+    if (jogador.girando) {                       // mortal para a frente
       jogador.giro = Math.min(Math.PI * 2, jogador.giro + dt * 8.5);
-      corpoTodo.rotation.y = jogador.giro;
-      corpoTodo.rotation.x = Math.sin(jogador.giro) * 0.18;
-      if (jogador.giro >= Math.PI * 2) { jogador.girando = false; jogador.giro = 0; }
-    } else {
-      corpoTodo.rotation.y += (0 - corpoTodo.rotation.y) * Math.min(1, dt * 12);
-      corpoTodo.rotation.x += (0 - corpoTodo.rotation.x) * Math.min(1, dt * 12);
+      var hh = 1.5;
+      corpoTodo.rotation.x = jogador.giro;
+      corpoTodo.position.set(0, hh * (1 - Math.cos(jogador.giro)), -hh * Math.sin(jogador.giro));
+      if (jogador.giro >= Math.PI * 2 || jogador.noChao) {
+        jogador.girando = false; jogador.giro = 0;
+        corpoTodo.rotation.x = 0; corpoTodo.position.set(0, 0, 0);
+      }
     }
-    sombra.position.y = 0.02 - jogador.y;
-    sombra.scale.setScalar(clamp(1 - jogador.y * 0.11, 0.45, 1));
     corpoTodo.visible = !(invencivel > 0 && Math.floor(tempo * 14) % 2 === 0);
 
-    animarCorrida(dt, jogador.y > 0.05 ? 0 : vel);
+    if (chaoAbaixo === null) sombra.visible = false;
+    else {
+      sombra.visible = true;
+      sombra.position.y = chaoAbaixo - jogador.y + 0.04;
+      sombra.scale.setScalar(clamp(1 - (jogador.y - chaoAbaixo) * 0.08, 0.45, 1));
+    }
+
+    animarCorrida(dt, jogador.noChao ? jogador.vel : 0);
     moverMundo();
     checarColisoes();
     posicionarCamera(dt);
     atualizarHud();
   }
 
-  function animarCorrida(dt, v) {
-    if (v > 0) {
-      jogador.passo += dt * v * 0.62;
-      var s = Math.sin(jogador.passo);
-      pernaE.rotation.x = s * 0.85;
-      pernaD.rotation.x = -s * 0.85;
-      bracoE.rotation.x = -s * 0.6;
-      bracoD.rotation.x = s * 0.6;
-    } else {
-      pernaE.rotation.x = -0.4; pernaD.rotation.x = 0.55;
-      bracoE.rotation.x = -1.1; bracoD.rotation.x = -1.1;
-    }
-  }
-
   function moverMundo() {
-    var z = jogador.z;
-    chaos.forEach(function (c) {
-      if (c.position.z < z - CHAO_LEN * 1.5) c.position.z += CHAO_LEN * N_CHAOS;
-    });
-    decors.forEach(function (d) {
-      if (d.obj.position.z < z - 25) reposicionarDecor(d, z + VISTA);
-    });
-    while (proxZ < z + VISTA) proxZ += gerarTrecho(proxZ);
+    var x = jogador.x;
+    while (proxX < x + VISTA) proxX += gerarTrecho(proxX);
 
+    solidos.forEach(function (s) { if (s.ativo && s.x1 < x - 26) { s.ativo = false; s.obj.visible = false; } });
+    blocos.forEach(function (b) { if (b.ativo && b.x < x - 26) { b.ativo = false; b.obj.visible = false; } });
     coracoes.forEach(function (c) {
       if (!c.ativo) return;
-      c.obj.rotation.y += 2.6 * 0.016;
-      if (c.obj.position.z < z - 12) { c.ativo = false; c.obj.visible = false; }
-    });
-    obstaculos.forEach(function (o) {
-      if (o.ativo && o.obj.position.z < z - 12) { o.ativo = false; o.obj.visible = false; }
+      c.obj.rotation.y += 0.045;
+      if (c.obj.position.x < x - 26) { c.ativo = false; c.obj.visible = false; }
     });
     molas.forEach(function (m) {
       if (!m.ativo) return;
-      m.obj.scale.y = 1 + Math.sin(tempo * 6 + m.obj.position.z) * 0.12;
-      if (m.obj.position.z < z - 12) { m.ativo = false; m.obj.visible = false; }
+      m.obj.scale.y = 1 + Math.sin(tempo * 6 + m.x) * 0.14;
+      if (m.x < x - 26) { m.ativo = false; m.obj.visible = false; }
+    });
+    decors.forEach(function (d) {
+      if (d.obj.position.x < x - 34) reposicionarDecor(d, x + VISTA + Math.random() * 26);
     });
   }
 
   function checarColisoes() {
-    var px = jogador.x, py = jogador.y, pz = jogador.z;
+    var px = jogador.x, py = jogador.y;
 
     coracoes.forEach(function (c) {
       if (!c.ativo) return;
       var p = c.obj.position;
-      if (Math.abs(p.z - pz) < 1.1 && Math.abs(p.x - px) < 1.05 && Math.abs(p.y - (py + 1.2)) < 1.5) {
+      if (Math.abs(p.x - px) < 1.0 && p.y > py - 0.5 && p.y < py + ALTURA + 0.3) {
         c.ativo = false; c.obj.visible = false;
         pontos++; Som.efeito("coracao");
       }
@@ -904,40 +1165,36 @@
 
     molas.forEach(function (m) {
       if (!m.ativo) return;
-      var p = m.obj.position;
-      if (Math.abs(p.z - pz) < 1.1 && Math.abs(p.x - px) < 1.0 && py < 0.7 && jogador.vy <= 0.1) {
-        jogador.vy = MOLA; jogador.girando = true; jogador.giro = 0;
+      if (Math.abs(m.x - px) < 1.0 && py < m.y + 0.7 && py > m.y - 0.5 && jogador.vy <= 0.1) {
+        jogador.vy = MOLA; jogador.noChao = false;
+        jogador.girando = true; jogador.giro = 0;
         Som.efeito("mola");
       }
     });
 
     if (invencivel > 0) return;
-    for (var i = 0; i < obstaculos.length; i++) {
-      var o = obstaculos[i];
-      if (!o.ativo) continue;
-      var p = o.obj.position;
-      if (Math.abs(p.z - pz) < 1.0 && Math.abs(p.x - px) < 1.28 && py < 1.15) {
+    for (var i = 0; i < blocos.length; i++) {
+      var b = blocos[i];
+      if (!b.ativo) continue;
+      if (Math.abs(b.x - px) < MEIO + 0.72 && py < b.y + 1.6 - 0.4 && py + ALTURA > b.y + 0.1) {
         perderVida();
+        jogador.x = b.x - MEIO - 0.85;            // empurra para trás do bloco
         return;
       }
     }
   }
 
   function posicionarCamera(dt) {
-    var alvoX = jogador.x * 0.68;
-    var alvoY = 4.85 + jogador.y * 0.28;
-    var alvoZ = jogador.z - 10.2;
-    var k = Math.min(1, dt * 6);
-    camera.position.x += (alvoX - camera.position.x) * k;
-    camera.position.y += (alvoY - camera.position.y) * k;
-    camera.position.z += (alvoZ - camera.position.z) * Math.min(1, dt * 14);
+    var ax = jogador.x + ADIANTE;
+    var ay = 2.6 + Math.max(-1, jogador.y) * 0.6;
+    camera.position.x += (ax - camera.position.x) * Math.min(1, dt * 9);
+    camera.position.y += (ay - camera.position.y) * Math.min(1, dt * 4);
+    camera.position.z = DIST_CAM;
     if (tremor > 0) {
-      camera.position.x += (Math.random() - 0.5) * tremor * 0.7;
+      camera.position.x += (Math.random() - 0.5) * tremor * 0.6;
       camera.position.y += (Math.random() - 0.5) * tremor * 0.5;
     }
-    camera.fov = 62 + (vel - VEL0) * 0.32;
-    camera.updateProjectionMatrix();
-    camera.lookAt(jogador.x * 0.58, 1.95 + jogador.y * 0.22, jogador.z + 9.5);
+    camera.lookAt(jogador.x + 0.4, camera.position.y - 0.55, 0);
   }
 
   carregarThree(0);

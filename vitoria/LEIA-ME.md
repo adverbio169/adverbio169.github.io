@@ -39,17 +39,24 @@ acordes em `ACORDES` no `gerar_musica.py`.
 ## O jogo (`jogo/`)
 
 `jogo/index.html` é um arquivo só, sem build: abre direto no navegador do
-celular ou do computador. É um corre-sem-fim em 3D (estilo Sonic/Mario: só
-para a frente) com a Vitória do desenho, montada em 3D com as mesmas formas —
-círculo, retângulos, triângulo vermelho do chapéu — e o mundo inteiro em
-"papel": branco com traço preto.
+celular ou do computador. É um jogo de plataforma **em 3D com câmera lateral**
+(a Vitória corre da esquerda para a direita, estilo Sonic/Mario clássico, só
+que em 3D). Ela corre sozinha; você controla a velocidade e o pulo.
 
-- **Controle por acelerômetro**: incline o celular para os lados para desviar.
-  No iPhone o navegador pede permissão do sensor no primeiro toque em Começar.
-- **Toque na tela** para pular (no computador: setas e barra de espaço).
-  Sem sensor, dá para arrastar o dedo para os lados.
-- Pegue corações, desvie dos blocos vermelhos, pule nas molas amarelas.
-  Três vidas; a velocidade vai aumentando. O recorde fica salvo no aparelho.
+A personagem foi modelada em 3D a partir do desenho — o chapéu vermelho, os
+olhinhos quadrados, a saia — com sombreado *cel shading* e contorno de tinta,
+para parecer o desenho ganhando volume. Tem braços e pernas articulados
+(cotovelo e joelho), cabelo com maria-chiquinhas e sapatinhos vermelhos.
+
+- **Controle por acelerômetro**: incline o celular para a direita para correr
+  mais rápido, para a esquerda para segurar. No iPhone o navegador pede
+  permissão do sensor no primeiro toque em Começar.
+- **Toque na tela** para pular (ela dá um mortal no ar). No computador:
+  **→** acelera, **←** segura e **espaço** pula.
+- Pule os buracos, suba nas plataformas, pegue corações, desvie dos blocos
+  vermelhos e use as molas amarelas. Três vidas; se cair no buraco ela volta
+  para a próxima plataforma. A velocidade vai aumentando e o recorde fica
+  salvo no aparelho.
 - A música e os efeitos são sintetizados na hora pelo próprio navegador
   (Web Audio), sem nenhum arquivo de áudio.
 - O 3D usa a biblioteca Three.js, carregada de CDN — precisa de internet na
