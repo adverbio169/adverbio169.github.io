@@ -2471,3 +2471,42 @@ código a partir de *"não tremeu"*. Dois dos consertos eram necessários, mas
 nenhum era a causa — e eu só descobri isso quando **fiz o código contar o que
 acontecia**. Um `try/catch` mudo custou mais tempo que todos os defeitos que ele
 escondia.
+
+### A fita em pé estava mais gorda que a deitada
+
+Duas fitas que deviam ser irmãs, e uma conta diferente em cada:
+
+```js
+bussola:      H*0.050      // altura da caixa
+fitaAltura:   W*0.055      // largura da caixa
+```
+
+Numa tela de 1100×700 isso dá **35 contra 60** — 73% mais gorda. Copiar o número
+de uma para a outra não resolveria: em outra tela elas voltariam a divergir,
+porque uma seguia a altura e a outra a largura. Passou a existir uma
+`grossuraFita()`, e as duas a chamam.
+
+**Os números tiveram de sair de dentro.** Na bússola eles cabem porque lá a fita
+é comprida no sentido em que o texto corre; na fita em pé o texto corre
+atravessado, e "295" pede mais largura do que a fita inteira tem. Foram para
+fora, à direita, entre a fita e a borda da tela. Ficam legíveis sem engordar a
+fita, que era o pedido.
+
+### Medir também tem armadilha
+
+A primeira medição leu a bússola numa coluna só, **no meio** — e pegou o
+ponteiro e o número do rumo junto, dando 45 onde a caixa tem 35. A segunda
+mudou de coluna e caiu em cima de um "NE", que desce abaixo da caixa: 39 onde a
+caixa tem 26.
+
+Medir numa coluna só é loteria. O teste passou a varrer trinta colunas e ficar
+com a **menor** — a que não pode ter nada além da caixa —, e a comparar também
+as duas contas declaradas, não só os pixels:
+
+```
+1280x800  bússola 41 px · fita 41 px   ✔
+1100x700  bússola 35 px · fita 35 px   ✔
+ 844x390  bússola 27 px · fita 27 px   ✔
+ 915x412  bússola 27 px · fita 27 px   ✔
+ 667x375  bússola 27 px · fita 27 px   ✔
+```

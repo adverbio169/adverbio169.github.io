@@ -9772,13 +9772,22 @@ function marcaBussola(cx, meia, y, o, cor, abaixo){
   h2.textAlign = 'center';
   h2.fillText(Math.round(longe(o.x,o.z)/METRO) + 'm', x, abaixo ? y + t*3 : y - t*1.4);
 }
+/* A ESPESSURA DAS FITAS, num lugar só.
+   A bússola tinha `H*0.050` escrito aqui dentro e a fita da altura tinha
+   `W*0.055` escrito lá dentro. Numa tela de 1100×700 isso dá 35 contra 60: a
+   fita em pé saiu 73% mais gorda que a deitada, e duas fitas que deviam ser
+   irmãs ficaram de famílias diferentes. Copiar o número de uma para a outra
+   não resolveria — em outra tela elas voltariam a divergir, porque uma seguia
+   a altura e a outra a largura. Uma conta só, e as duas ficam iguais sempre. */
+function grossuraFita(){ return Math.max(26, H*0.050); }
+
 function bussola(y){
-  const meia = Math.min(W*0.27, H*0.55), cx = W/2;
+  const meia = Math.min(W*0.27, H*0.55), cx = W/2, esp = grossuraFita();
   h2.save(); h2.textAlign = 'center';
   h2.fillStyle = 'rgba(9,15,25,.5)';
   h2.beginPath();
-  if (h2.roundRect) h2.roundRect(cx-meia, y-H*0.028, meia*2, H*0.050, 4);
-  else h2.rect(cx-meia, y-H*0.028, meia*2, H*0.050);
+  if (h2.roundRect) h2.roundRect(cx-meia, y-H*0.028, meia*2, esp, 4);
+  else h2.rect(cx-meia, y-H*0.028, meia*2, esp);
   h2.fill();
   h2.strokeStyle = 'rgba(120,255,170,.3)'; h2.lineWidth = 1; h2.stroke();
   const g = rumoVisto()*180/Math.PI, base = Math.round(g/15)*15;
@@ -9852,7 +9861,7 @@ function fitaAlturaOnde(){
      brigar com um painel que está ali desde sempre. */
   const meia = Math.min(H*0.19, W*0.26);
   if (meia < 40) return null;
-  return { cx: W - Math.max(46, W*0.085), cy: H*0.50, meia, larg: Math.max(34, W*0.055) };
+  return { cx: W - Math.max(46, W*0.085), cy: H*0.50, meia, larg: grossuraFita() };
 }
 function fitaAltura(){
   const o = fitaAlturaOnde();
@@ -9870,7 +9879,7 @@ function fitaAltura(){
   h2.clip();
 
   const base = Math.round(alt/10)*10;
-  h2.textAlign = 'left';
+  const rotulos = [];
   for (let k = -8; k <= 8; k++){
     const v = base + k*10;
     if (v < 0) continue;
@@ -9880,14 +9889,25 @@ function fitaAltura(){
     h2.strokeStyle = chao ? 'rgba(255,170,120,.95)'
                           : 'rgba(140,255,190,' + (gr ? '.9' : '.45') + ')';
     h2.lineWidth = chao ? 2.6 : (gr ? 2 : 1.2);
-    const c = chao ? larg*0.46 : (gr ? larg*0.34 : larg*0.20);
+    /* o risco atravessa a fita inteira, como os da bússola: com a fita fina
+       não há espaço para risco curto E número lado a lado lá dentro */
+    const c = chao ? larg - 4 : (gr ? larg*0.66 : larg*0.38);
     h2.beginPath();
     h2.moveTo(cx - larg/2 + 2, y); h2.lineTo(cx - larg/2 + 2 + c, y); h2.stroke();
-    if (gr){
-      h2.fillStyle = chao ? 'rgba(255,200,170,1)' : 'rgba(140,255,190,.75)';
-      h2.font = '800 ' + Math.max(8, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
-      h2.fillText(String(v), cx - larg/2 + 4 + larg*0.38, y + 4);
-    }
+    if (gr) rotulos.push([v, y, chao]);
+  }
+  h2.restore();
+  /* OS NÚMEROS FICAM DO LADO DE FORA, à direita. Dentro de uma fita da
+     espessura da bússola eles não cabem — "295" pede mais largura do que a
+     fita inteira tem. Na bússola eles cabem porque lá a fita é comprida no
+     sentido em que o texto corre; aqui o texto corre atravessado. Do lado de
+     fora ficam legíveis sem engordar a fita, que era o pedido. */
+  h2.save();
+  h2.textAlign = 'left';
+  h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
+  for (const [v, y, chao] of rotulos){
+    h2.fillStyle = chao ? 'rgba(255,200,170,1)' : 'rgba(140,255,190,.8)';
+    h2.fillText(String(v), cx + larg/2 + 5, y + 4);
   }
   h2.restore();
 
@@ -9982,7 +10002,7 @@ function radarOnde(){
   /* a fita da altura é desenhada na lona, não é elemento nenhum do documento —
      então ela precisa entrar na lista à mão, senão o disco passa por cima */
   const fa = fitaAlturaOnde();
-  if (fa) obst.push({ left: fa.cx - fa.larg/2 - 30, right: fa.cx + fa.larg/2 + 10,
+  if (fa) obst.push({ left: fa.cx - fa.larg/2 - 30, right: fa.cx + fa.larg/2 + 44,
                       top: fa.cy - fa.meia - 10, bottom: fa.cy + fa.meia + 34 });
   if (cockpit){
     const g = reguasOnde();
