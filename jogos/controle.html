@@ -626,7 +626,56 @@ function conectar(codigo){
   peer.on('disconnected', () => { try { peer.reconnect(); } catch(e){} });
 }
 
-function vibra(ms){ try { navigator.vibrate && navigator.vibrate(ms); } catch(e){} }
+/* =============================================================================
+   TREMOR NO IPHONE
+
+   O Safari do iPhone não tem `navigator.vibrate` — a API nunca existiu lá, e
+   todo o tremor deste controle não fazia nada num iPhone.
+
+   O que ele tem, do iOS 17.4 em diante, é o retorno háptico do INTERRUPTOR:
+   um `<input type="checkbox" switch>` dá um toque no motorzinho ao mudar de
+   estado, e clicar no rótulo dele por código provoca esse toque.
+
+   É menos do que a vibração do Android: dá para bater UM tique, não uma
+   duração. Um padrão [45, 35, 130] — "vibra 45, pausa 35, vibra 130" — vira
+   "dois tiques, 80 ms entre eles". O ritmo sobrevive; a força, não. É por isso
+   que os padrões do jogo foram escritos com ritmos diferentes entre si, e não
+   com intensidades diferentes: o ritmo atravessa os dois mundos.
+   ========================================================================== */
+const Vibra = (function(){
+  const V = { tem:false, como:'nenhum' };
+  if (typeof navigator !== 'undefined' && navigator.vibrate){
+    V.tem = true; V.como = 'vibrate';
+    V.bate = p => { try{ navigator.vibrate(p); }catch(e){} };
+    V.para = () => { try{ navigator.vibrate(0); }catch(e){} };
+    return V;
+  }
+  let rotulo = null, relogios = [];
+  try{
+    const cx = document.createElement('div');
+    cx.style.cssText = 'position:fixed;left:-200px;top:-200px;width:1px;height:1px;opacity:0;pointer-events:none';
+    cx.innerHTML = '<input type="checkbox" switch id="tiqueHap"><label for="tiqueHap" id="tiqueRot"></label>';
+    document.body.appendChild(cx);
+    rotulo = cx.querySelector('#tiqueRot');
+  }catch(e){}
+  if (!rotulo) return Object.assign(V, { bate(){}, para(){} });
+  V.tem = true; V.como = 'interruptor';
+  const tique = () => { try{ rotulo.click(); }catch(e){} };
+  V.bate = p => {
+    for (const r of relogios) clearTimeout(r);
+    relogios = [];
+    const lista = Array.isArray(p) ? p : [p];
+    if (lista.length === 1 && lista[0] === 0) return;
+    let t = 0, n = 0;
+    for (let i = 0; i < lista.length && n < 8; i++){
+      if (i % 2 === 0){ relogios.push(setTimeout(tique, t)); n++; }
+      t += lista[i];
+    }
+  };
+  V.para = () => { for (const r of relogios) clearTimeout(r); relogios = []; };
+  return V;
+})();
+function vibra(ms){ if (ms === 0) Vibra.para(); else Vibra.bate(ms); }
 
 /* --- TREMOR: o controle sente o que o avião faz --------------------------
    Pedido: "quando eu solto o míssil, ou atiro, ou metralho, tem que tremer o
@@ -666,7 +715,7 @@ const Tremor = (function(){
   function paraContinuo(qual){
     if (relogios[qual]){ clearInterval(relogios[qual]); relogios[qual] = null; }
     // só corta a vibração se não houver outro contínuo tocando
-    if (!Object.values(relogios).some(Boolean)) vibra(0);
+    if (!Object.values(relogios).some(Boolean)) Vibra.para();
   }
   function comecaContinuo(qual){
     const c = CONTINUO[qual];

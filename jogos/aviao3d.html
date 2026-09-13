@@ -17,7 +17,7 @@
   #hud{pointer-events:none;z-index:2}
   .painel{position:fixed;z-index:3;pointer-events:none;background:rgba(8,12,26,.55);
           border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:9px 13px;
-          font-variant-numeric:tabular-nums;backdrop-filter:blur(6px)}
+          font-variant-numeric:tabular-nums;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
   .rot{font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:#8fa3c8;font-weight:700}
   .val{font-size:26px;font-weight:800;line-height:1.1}
   .val small{font-size:12px;color:#9fb4d8;font-weight:600}
@@ -78,7 +78,7 @@
   body.dedos #dedos{display:block}
   #dedos > *{position:fixed;z-index:6;user-select:none;-webkit-user-select:none;touch-action:none}
   .dedoM{border-radius:14px;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.5);
-         backdrop-filter:blur(6px);overflow:hidden;
+         -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);overflow:hidden;
          width:min(13vw,58px);height:min(56vh,200px);top:46%;transform:translateY(-50%)}
   #dAcel{right:calc(8px + env(safe-area-inset-right))}
   #dNitro{left:calc(8px + env(safe-area-inset-left));display:flex;align-items:center;justify-content:center}
@@ -101,7 +101,7 @@
   #dArma{left:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-left));
          bottom:calc(10px + env(safe-area-inset-bottom));
          width:min(32vw,180px);height:min(19vw,86px);border-radius:14px;
-         border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.5);backdrop-filter:blur(6px);
+         border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.5);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
          display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab}
   #dArma b{font:900 min(3.4vw,16px)/1.1 inherit;letter-spacing:1.5px;color:#ffc24d}
   #dArma i{font-style:normal;font:700 min(2.6vw,12px)/1 inherit;color:#9fb0cc;margin-top:4px}
@@ -146,6 +146,16 @@
   body.dedos #cDist,body.dedos #cRec{padding:6px 10px}
   body.dedos #cDist .val,body.dedos #cRec .val,body.dedos #cVida .val{font-size:18px}
   body.dedos #cPontos{top:76px} body.dedos #cVida{top:76px}
+
+  #gire{display:none;position:fixed;inset:0;z-index:99;background:#0b1020;
+        align-items:center;justify-content:center;text-align:center;
+        padding:calc(20px + env(safe-area-inset-top)) 24px}
+  body.empe #gire{display:flex}
+  #gire b{display:block;font-size:64px;color:#5cc8ff;line-height:1;
+          animation:giradica 1.6s ease-in-out infinite}
+  #gire p{margin-top:18px;font-size:20px;font-weight:800;color:#e6edf9;line-height:1.35}
+  #gire span{font-size:14px;font-weight:600;color:#8fa3c8}
+  @keyframes giradica{ 0%,100%{transform:rotate(-12deg)} 50%{transform:rotate(78deg)} }
 
   #aviso{position:fixed;z-index:4;top:38%;left:0;right:0;text-align:center;font-size:clamp(20px,4vw,40px);
          font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s;pointer-events:none}
@@ -245,6 +255,10 @@
     <button class="dBt" id="dZerar">zerar</button>
   </div>
 </div>
+<!-- O iPhone não deixa travar a tela em paisagem (nem `screen.orientation.lock`
+     nem tela cheia existem no Safari do iPhone). Então, em pé, o jogo pede
+     para virar em vez de se espremer num retrato que não cabe. -->
+<div id="gire"><div><b>&#8635;</b><p>Vire o celular<br><span>o avião voa deitado</span></p></div></div>
 <div id="aviso"></div>
 <div id="convite" title="outro celular pode entrar a qualquer momento">
   <canvas id="qrJogo" width="180" height="180"></canvas>
@@ -9741,8 +9755,16 @@ function fim(){
 }
 
 function erro(msg){ const e = $('erro'); e.textContent = msg; e.style.display = 'block'; }
+/* UM contexto de áudio só. Isto criava um novo a cada clique — e no iPhone,
+   onde o contexto só acorda dentro de um toque, o segundo clique trocava o
+   contexto por baixo do motor, que ficava tocando no antigo (mudo). Agora
+   cria uma vez e só manda acordar nas vezes seguintes, que é o que o iPhone
+   precisa mesmo. */
 function ligaAudio(){
-  try { audio = new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch(e){}
+  try {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+  } catch(e){}
 }
 function telaCheia(){
   try{
@@ -9780,7 +9802,61 @@ $('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque
    Eles só aparecem quando NÃO há um celular separado fazendo de controle: com
    controle seriam dois donos do mesmo avião, um brigando com o outro.
    ========================================================================== */
-function vibraAqui(p){ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} }
+/* =============================================================================
+   TREMOR NO IPHONE
+
+   O Safari do iPhone NÃO tem `navigator.vibrate` — a API de vibração
+   simplesmente não existe lá, e nunca existiu. Todo o tremor que eu escrevi
+   não fazia absolutamente nada num iPhone.
+
+   O que o iPhone tem, desde o iOS 17.4, é o retorno háptico do INTERRUPTOR:
+   um `<input type="checkbox" switch>` dá um toque no motorzinho quando muda
+   de estado. Clicando no rótulo dele por código, ganha-se um tique.
+
+   É bem menos do que a vibração do Android: dá para bater UM toque, não uma
+   duração. Então um padrão como [45, 35, 130] — que no Android é "vibra 45,
+   pausa 35, vibra 130" — vira aqui "dois tiques, com 80 ms entre eles". O
+   ritmo sobrevive; a força, não. Para um padrão contínuo, os tiques se
+   repetem no compasso dele.
+
+   Num iPhone mais antigo nem isso existe e o jogo segue sem tremor, sem
+   reclamar — é o que dá para fazer.
+   ========================================================================== */
+const Vibra = (function(){
+  const V = { tem:false, como:'nenhum' };
+  if (typeof navigator !== 'undefined' && navigator.vibrate){
+    V.tem = true; V.como = 'vibrate';
+    V.bate = p => { try{ navigator.vibrate(p); }catch(e){} };
+    V.para = () => { try{ navigator.vibrate(0); }catch(e){} };
+    return V;
+  }
+  // plano do iPhone: o interruptor háptico
+  let rotulo = null, relogios = [];
+  try{
+    const cx = document.createElement('div');
+    cx.style.cssText = 'position:fixed;left:-200px;top:-200px;width:1px;height:1px;opacity:0;pointer-events:none';
+    cx.innerHTML = '<input type="checkbox" switch id="tiqueHap"><label for="tiqueHap" id="tiqueRot"></label>';
+    document.body.appendChild(cx);
+    rotulo = cx.querySelector('#tiqueRot');
+  }catch(e){}
+  if (!rotulo) return Object.assign(V, { bate(){}, para(){} });
+  V.tem = true; V.como = 'interruptor';
+  const tique = () => { try{ rotulo.click(); }catch(e){} };
+  V.bate = p => {
+    for (const r of relogios) clearTimeout(r);
+    relogios = [];
+    const lista = Array.isArray(p) ? p : [p];
+    if (lista.length === 1 && lista[0] === 0) return;      // "pare" não é um tique
+    let t = 0, n = 0;
+    for (let i = 0; i < lista.length && n < 8; i++){
+      if (i % 2 === 0){ relogios.push(setTimeout(tique, t)); n++; }   // trecho de vibrar
+      t += lista[i];
+    }
+  };
+  V.para = () => { for (const r of relogios) clearTimeout(r); relogios = []; };
+  return V;
+})();
+function tremeAqui(p){ if (p === 0) Vibra.para(); else Vibra.bate(p); }
 /* Num aparelho de toque o navegador ainda dispara mouse DEPOIS do toque, por
    compatibilidade. Sem esta trava cada gesto valia duas vezes — um deslize no
    seletor pulava duas armas de uma vez. */
@@ -9805,7 +9881,7 @@ const Dedos = (function(){
     motor = v;
     barra.style.height = (v*100).toFixed(1) + '%';
     num.textContent = Math.round(v*100) + '%';
-    if (comToque && Math.round(v*10) !== antes) vibraAqui(12);
+    if (comToque && Math.round(v*10) !== antes) tremeAqui(12);
   }
   function valorDoDedo(x, y){
     const r = acel.getBoundingClientRect();
@@ -9832,7 +9908,7 @@ const Dedos = (function(){
     if (e) e.preventDefault();
     if (nitroBotao === liga) return;
     nitroBotao = liga; nit.classList.toggle('ligado', liga);
-    if (liga) vibraAqui([22,40,22]); };
+    if (liga) tremeAqui([22,40,22]); };
   nit.addEventListener('touchstart', poeNitro(true), {passive:false});
   nit.addEventListener('touchend', poeNitro(false), {passive:false});
   nit.addEventListener('touchcancel', poeNitro(false));
@@ -9842,7 +9918,7 @@ const Dedos = (function(){
 
   /* ---- gatilho ---- */
   const fogo = el('dFogo');
-  const puxa = v => e => { if (eDoMouse(e)) return; e.preventDefault(); atirando = v; if (v) vibraAqui(15); };
+  const puxa = v => e => { if (eDoMouse(e)) return; e.preventDefault(); atirando = v; if (v) tremeAqui(15); };
   fogo.addEventListener('touchstart', puxa(true), {passive:false});
   fogo.addEventListener('touchend', puxa(false), {passive:false});
   fogo.addEventListener('touchcancel', puxa(false));
@@ -9856,7 +9932,7 @@ const Dedos = (function(){
   function vaiArma(passo){
     const i = (ORDEM.indexOf(arma) + passo + ORDEM.length) % ORDEM.length;
     trocaArma(ORDEM[i]);
-    vibraAqui(TOQUES[ORDEM[i]]);
+    tremeAqui(TOQUES[ORDEM[i]]);
     cxArma.classList.add('trocou');
     setTimeout(() => cxArma.classList.remove('trocou'), 160);
   }
@@ -9880,9 +9956,9 @@ const Dedos = (function(){
   window.addEventListener('mouseup', () => { if (x0 !== null) soltaA(); });
 
   /* ---- trem, flapes e zerar ---- */
-  el('dTrem').onclick = e => { e.preventDefault(); mexeTrem(); vibraAqui(35); };
-  el('dFlap').onclick = e => { e.preventDefault(); mexeFlap(); vibraAqui([18,40,18]); };
-  el('dZerar').onclick = e => { e.preventDefault(); Controle.calibrar(); vibraAqui(25); };
+  el('dTrem').onclick = e => { e.preventDefault(); mexeTrem(); tremeAqui(35); };
+  el('dFlap').onclick = e => { e.preventDefault(); mexeFlap(); tremeAqui([18,40,18]); };
+  el('dZerar').onclick = e => { e.preventDefault(); Controle.calibrar(); tremeAqui(25); };
 
   D.mostra = liga => {
     D.ligado = !!liga;
@@ -9902,6 +9978,27 @@ const Dedos = (function(){
   };
   return D;
 })();
+
+/* --- em pé, no celular: pede para virar e segura o jogo ------------------
+   Não dá para travar a tela no iPhone, e um jogo de avião em retrato não
+   cabe: o horizonte some e os comandos empilham. Em pé, o jogo pausa; ao
+   virar, volta de onde parou. */
+let pausadoDePe = false;
+function olhaOrientacao(){
+  const toque = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  const emPe = toque && window.innerHeight > window.innerWidth * 1.05;
+  document.body.classList.toggle('empe', emPe);
+  if (emPe && jogando){ pausadoDePe = true; jogando = false; Motor.desliga(); Controles.calaTudo(); }
+  else if (!emPe && pausadoDePe){
+    pausadoDePe = false; jogando = true; Motor.liga();
+    ultimoT = performance.now(); sobrando = 0; tQuadro = ultimoT; quadros = 0;
+    requestAnimationFrame(quadro);
+  }
+  redimensiona();
+}
+addEventListener('resize', olhaOrientacao);
+addEventListener('orientationchange', () => setTimeout(olhaOrientacao, 250));
+olhaOrientacao();
 
 function estadoBatalha(classe, txt){
   const e = $('estadoBatalha'); if (!e) return;
@@ -10102,7 +10199,7 @@ const Controles = {
     buffet:   { padrao:[16, 26],  ciclo:42,  vezes:10 },
     estol:    { padrao:[130,120], ciclo:250, vezes:3  }
   },
-  vibraAqui(p){ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} },
+  vibraAqui(p){ tremeAqui(p); },
   paraAqui(qual){
     if (this._relogios[qual]){ clearInterval(this._relogios[qual]); this._relogios[qual] = null; }
     if (!Object.values(this._relogios).some(Boolean)) this.vibraAqui(0);

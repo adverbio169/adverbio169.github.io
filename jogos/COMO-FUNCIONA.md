@@ -1464,3 +1464,79 @@ comportamento antigo. E, ao corrigi-lo, aprendi outra coisa: pôr
 `noChao = false` não basta para "estar no ar", porque a 150 do chão o jogo
 pousa de novo no quadro seguinte. Que é a prova, de graça, de que o pouso
 funciona.
+
+---
+
+## Fazer funcionar no iPhone
+
+Três buracos, e o primeiro é grande.
+
+### O iPhone não tem vibração
+
+O Safari do iPhone **não tem `navigator.vibrate`**. A API de vibração nunca
+existiu lá. Todo o tremor que eu escrevi — míssil, metralhadora, estol, tremor
+aerodinâmico, batida — não fazia absolutamente nada num iPhone.
+
+O que ele tem, do iOS 17.4 em diante, é o **retorno háptico do interruptor**:
+um `<input type="checkbox" switch>` dá um toque no motorzinho ao mudar de
+estado, e clicar no rótulo dele por código provoca esse toque. Fica escondido
+fora da tela e serve de tique.
+
+É bem menos do que a vibração do Android: dá para bater **um tique**, não uma
+duração. Um padrão como `[45, 35, 130]` — no Android "vibra 45, pausa 35,
+vibra 130" — vira aqui "dois tiques, com 80 ms entre eles".
+
+**O ritmo sobrevive; a força, não.** E aqui uma decisão antiga pagou sozinha:
+os padrões foram escritos com **ritmos diferentes entre si**, não com
+intensidades diferentes — a metralhadora é miúda e rápida, o estol é lento e
+pesado, o míssil é curto-e-longo. Isso atravessa os dois mundos. Se eu tivesse
+diferenciado por força, no iPhone tudo soaria igual.
+
+Num iPhone mais antigo nem o interruptor existe, e o jogo segue sem tremor,
+sem reclamar. E o Android continua no caminho de sempre, com o padrão inteiro
+— conferido.
+
+### O contexto de áudio era novo a cada clique
+
+`ligaAudio()` criava um `AudioContext` **novo** toda vez que era chamado — e
+ele é chamado no botão de jogar, no de dedo e no de entrar na batalha.
+
+No computador isso passava batido. No iPhone, onde o contexto só acorda dentro
+de um toque, o segundo clique trocava o contexto **por baixo do motor**, que
+continuava tocando no antigo — mudo. Agora cria uma vez e nas seguintes só
+manda acordar, que é exatamente o que o iPhone precisa.
+
+### O iPhone não deixa travar a tela
+
+Nem `screen.orientation.lock` nem tela cheia existem no Safari do iPhone. O
+`controle.html` já contornava isso girando a página por CSS, mas o **jogo**
+não tinha tratamento nenhum: em pé, o horizonte sumia e os comandos
+empilhavam.
+
+Girar por CSS uma tela de WebGL é outra conversa — muda o tamanho do quadro e
+as coordenadas do toque. Então o jogo faz o honesto: em pé, **pede para virar
+e segura o jogo**; ao virar, volta de onde parou. No computador, onde não há
+toque, o aviso não aparece nunca, por mais alta que seja a janela.
+
+### Medido num iPhone de mentira
+
+Um navegador com `navigator.vibrate` apagado, sem `requestFullscreen` e sem
+`orientation.lock`:
+
+```
+caminho de tremor escolhido ............ interruptor háptico  ✔
+o jogo começa sem tela cheia ........... jogando               ✔
+ligaAudio() de novo -> MESMO contexto .. sim                   ✔
+soltar o míssil ........................ 2 tiques              ✔
+metralhar .............................. 11 tiques, e para ao soltar ✔
+girar para retrato ..................... pede para virar e segura ✔
+girar de volta ......................... volta de onde parou   ✔
+o controle.html ........................ mesmo caminho, 2 tiques ✔
+Android (com vibrate) .................. padrão inteiro, como antes ✔
+computador em janela alta .............. sem aviso de girar    ✔
+```
+
+**O que eu não consigo garantir daqui:** se o iOS exige que o clique no
+interruptor esteja dentro de um gesto do dedo para soltar o háptico. Se
+exigir, o tremor vai sair nos toques e não nos eventos do jogo. Isso só um
+iPhone de verdade responde.
