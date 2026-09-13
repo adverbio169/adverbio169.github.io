@@ -1070,3 +1070,80 @@ Duas vezes seguidas o modelo do teste estava errado e o código, certo. A
 lição é a mesma da escada de arfagem: quando o número não bate, o suspeito não
 é só o código — o instrumento de medida também erra, e ele é escrito com a
 mesma cabeça que escreveu o código.
+
+---
+
+## Batalha aérea: gente de verdade no mesmo céu
+
+> *"quando tiver alguém jogando e outra pessoa for no jogo, poder mostrar
+> quantas pessoas on-line, e poder entrar também. E poderá me derrubar."*
+
+Cada tela do jogo já abria uma sala, para o celular entrar como controle. A
+batalha reaproveita exatamente isso: **quem já está voando tem um código, e
+outra pessoa digita esse código para cair no mesmo céu**.
+
+### A forma é uma estrela
+
+Quem abriu a sala é o anfitrião e serve de central: cada um manda o seu estado
+para ele, e ele reparte para todo mundo. Com meia dúzia de aviões é de longe o
+mais simples que funciona — malha completa exigiria cada um encontrar cada um,
+e o encontro pelo PeerJS já é trabalho suficiente para uma ligação só.
+
+### Quem decide o tiro é quem atira
+
+Essa é a decisão que faz a coisa ser jogável. O acerto é testado **na tela de
+quem apertou o gatilho**, contra a posição que ela recebeu, e o resultado vai
+como recado: *"te acertei, tanto de dano"*. A vítima acredita e desconta.
+
+Se fosse a vítima a julgar, com 80 ms de atraso de rede o avião que ela vê na
+tela de quem atirou já não está mais lá quando a bala chega, e ninguém
+acertaria nada. Entre amigos, confiar em quem atira é a escolha certa — e é o
+que quase todo jogo de tiro faz, pelo mesmo motivo.
+
+Cada avião tem 100 de fuselagem. Metralhadora tira 7, míssil tira 45, e a
+nuclear leva todo mundo no raio.
+
+### Uma conexão que chega pode ser um CELULAR ou um AVIÃO
+
+Não dá para saber pelo evento de conexão — dá para saber pela primeira
+mensagem. Então a ligação fica em observação: quem diz `{t:'entra'}` é
+jogador, qualquer outra coisa é celular, e quem não disser nada em 4 segundos
+é celular (que é o caso comum). Sem isso, o avião de outra pessoa entrava como
+**artilheiro** e tomava a torre.
+
+### Dois erros que só apareceram com dois navegadores abertos
+
+**Quem estava caindo sumia do mundo.** O `atualiza` desvia para a queda logo no
+começo e volta — e ali dentro ninguém mandava estado. Resultado: o abatido
+congelava no céu dos outros até a varredura de silêncio apagá-lo cinco
+segundos depois. Ninguém via a queda. Uma linha dentro de `atualizaQueda`.
+
+**A contagem piscava.** Eu contava os aviões desenhados no céu. Só que quem
+está na tela de capa, ou caindo, não manda posição — e a conta caía para 1
+sozinha. Agora a contagem vem do anfitrião, que é quem sabe quantas ligações
+tem, e viaja junto com o estado dele.
+
+### E um bug antigo que a batalha revelou
+
+O CSS tinha `canvas{ position:fixed; inset:0 }`, escrito para as duas telas
+grandes do jogo. Só que ele pegava **todos** os canvas — inclusive os QR
+pequenos dentro de caixinhas. O código do convite ia parar grudado no canto de
+cima da tela, longe da sua própria legenda. Estava assim desde que o convite
+existe; eu só reparei olhando uma foto de teste da batalha.
+
+### O que dá para medir
+
+O servidor de encontro público está bloqueado aqui, mas o `peer` roda local —
+então o teste é com **dois navegadores de verdade**, cada um com a sua sala,
+conversando por WebRTC:
+
+```
+A e B abrem salas próprias, B entra na de A
+1) A anfitrião, B convidado, cada um vê o outro        ✔
+2) contagem: A diz 2, B diz 2                          ✔
+3) A vai para (5000,3000,-2000): B vê (5000,3000,-1997) ✔
+4) A metralha B: fuselagem de B 100 -> 44, e A concorda ✔
+5) dano até o fim: B cai, e A vê B cair                ✔
+6) um celular entra na sala de A: vira PILOTO, e o
+   avião do B continua contando como jogador           ✔
+```

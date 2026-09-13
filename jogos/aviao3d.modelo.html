@@ -10,6 +10,10 @@
   html,body{height:100%;overflow:hidden;background:#0b1020;color:#e6edf9;
             font-family:system-ui,"Segoe UI",Arial,sans-serif;overscroll-behavior:none;touch-action:none}
   canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+  /* ...menos os QR, que são canvas pequenos DENTRO de caixas. A regra de cima
+     foi escrita para as duas telas do jogo e pegava eles também: o código do
+     convite ia parar grudado no canto de cima, longe da sua legenda. */
+  #qr, #qrJogo{position:static;inset:auto}
   #hud{pointer-events:none;z-index:2}
   .painel{position:fixed;z-index:3;pointer-events:none;background:rgba(8,12,26,.55);
           border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:9px 13px;
@@ -27,10 +31,30 @@
   /* motor: potência e nitro, do lado oposto aos botões de baixo */
   #cMotor{bottom:14px;right:14px;text-align:right;min-width:152px}
   /* trem, flape e velocidade: o painel do pouso */
+  #batalha{width:100%;display:flex;flex-direction:column;gap:6px;
+           border-top:1px solid rgba(255,255,255,.10);padding-top:12px}
+  #codBatalha{flex:1;min-width:0;font:900 22px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.28em;
+        text-align:center;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.06);
+        border:2px solid rgba(255,255,255,.18);border-radius:10px;padding:10px 6px 10px 14px;outline:none}
+  #codBatalha:focus{border-color:#5cc8ff}
+  #btBatalha{flex:0 0 auto}
   #ondeComeca{display:flex;gap:8px;width:100%}
   #ondeComeca .op{flex:1;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);
         color:#9fb1cf;border-radius:10px;padding:10px 8px;font:700 13px/1 inherit;cursor:pointer}
   #ondeComeca .op.ligado{background:rgba(92,200,255,.16);border-color:rgba(92,200,255,.55);color:#dff1ff}
+  #cVida{top:96px;right:14px;text-align:right;min-width:150px}
+  #barraV{height:7px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden;margin:5px 0}
+  #barraV i{display:block;height:100%;width:100%;background:#5eff9a;border-radius:99px;transition:width .12s}
+  #cVida.ferido{border-color:rgba(255,106,106,.7);box-shadow:0 0 18px rgba(255,106,106,.35)}
+  /* quantos estão no ar: só aparece quando há batalha */
+  /* embaixo dos pontos, à esquerda: no meio de cima ele batia na bússola */
+  #cGente{display:none;top:186px;left:14px;
+          font-size:12.5px;color:#cfe0f5;letter-spacing:.4px;padding:7px 13px}
+  #cGente.ver{display:block}
+  #cGente b{font-size:16px;font-weight:900;color:#fff}
+  #cGente .pt{display:inline-block;width:8px;height:8px;border-radius:50%;background:#5eff9a;
+              margin-right:7px;box-shadow:0 0 8px #5eff9a}
+  #cGente #salaGente{color:#8fa3c8;margin-left:8px}
   #cPouso{bottom:14px;left:128px;min-width:186px}
   #cPouso .lin{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;
                font-weight:700;color:#8fa3c8;margin-top:3px}
@@ -72,9 +96,11 @@
   .salaTxt .cod{font:800 38px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.22em;color:#fff}
   .salaTxt .rot{margin-bottom:4px}
   #url{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:#9fd8ff;word-break:break-all}
-  #convite{position:fixed;z-index:3;bottom:62px;left:14px;display:none;align-items:center;gap:10px;
+  /* o convite morava em baixo à esquerda, em cima do painel do pouso. Subiu
+     para a direita, debaixo da fuselagem, que é a coluna mais vazia */
+  #convite{position:fixed;z-index:3;top:214px;right:14px;display:none;align-items:center;gap:10px;
            background:rgba(8,12,26,.55);border:1px solid rgba(255,255,255,.14);border-radius:12px;
-           padding:8px 12px 8px 8px;transition:opacity .4s,transform .3s;transform-origin:left bottom}
+           padding:8px 12px 8px 8px;transition:opacity .4s,transform .3s;transform-origin:right top}
   #convite.ver{display:flex}
   #convite.discreto{opacity:.42;transform:scale(.72)}
   #convite:hover{opacity:1;transform:scale(1)}
@@ -111,6 +137,11 @@
   <div class="val"><span id="vComb">100</span><small>%</small></div></div>
 <div class="painel" id="cArma"><div class="rot">Arma (1 2 3 · espaço atira)</div>
   <div class="val" style="font-size:19px"><span id="vArma">NUCLEAR</span> <small>x<span id="vMun">6</span></small></div></div>
+<div class="painel" id="cVida"><div class="rot">Fuselagem</div>
+  <div id="barraV"><i id="vidaBarra"></i></div>
+  <div class="val"><span id="vVida">100</span><small>%</small></div></div>
+<div class="painel" id="cGente"><span class="pt"></span><b id="vGente">1</b> no ar
+  <span id="salaGente"></span></div>
 <div class="painel" id="cPouso"><div class="rot">Velocidade</div>
   <div class="val"><span id="vVel">0</span><small>· mín <span id="vVmin">640</span></small></div>
   <div class="lin">Trem <b id="vTrem">EMBAIXO</b></div>
@@ -151,6 +182,19 @@
              ou abra <b id="url">…</b> e digite o código.</p>
         </div>
       </div>
+    </div>
+
+    <!-- BATALHA: entrar no céu de outra pessoa -->
+    <div id="batalha">
+      <div class="rot">Batalha aérea</div>
+      <p class="txt" style="text-align:left;font-size:12.5px;margin:6px 0 8px">
+        Quem já está voando tem um <b>código</b> na tela. Digite o dele aqui para
+        cair no mesmo céu — e poder derrubar e ser derrubado.</p>
+      <div class="salaLinha" style="gap:8px">
+        <input id="codBatalha" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD">
+        <button class="op" id="btBatalha">Entrar na batalha</button>
+      </div>
+      <div class="estado" id="estadoBatalha"><i class="luz"></i><span id="estadoBatalhaTxt">voando sozinho</span></div>
     </div>
 
     <div id="erro"></div>
@@ -508,6 +552,7 @@ let rumo=0, inclinacao=0, arfagem=0, leme=0;
 let voo=VOO_BASE, turbo=0, combustivel=100, distancia=0, recorde=0;
 let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
 let noChao=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0;
+let vida=100;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
 let jogando=false, caindo=false, giroQueda=0, vq=0, motivoQueda='';
@@ -1439,6 +1484,14 @@ function fazCogumelo(x, z){
   cena.add(g);
   cogumelos.push({ no:g, t:0, col:col, chapeu:chapeu, nucleo:nucleo, anel:anel, marca:marca });
 }
+/* a nuclear nao escolhe: quem estiver no raio leva */
+function pegaNaNuclear(x, z){
+  for (const o of Batalha.outros.values()){
+    if (o.vivo === false) continue;
+    if (Math.hypot(o.x-x, o.z-z) < RAIO_NUKE)
+      Batalha.paraTodos({ t:'tiro', para:o.id, de:Batalha.eu, dano:DANO.bomba }, null);
+  }
+}
 function nuclear(x, z){
   fazCogumelo(x, z); somNuclear();
   clarao = 1.0;
@@ -1643,7 +1696,9 @@ function atingeAlvo(x, z, raio){
   }
   return false;
 }
-function atingeAr(x, y, z, raio){
+function atingeAr(x, y, z, raio, dano){
+  // gente de verdade primeiro: e o alvo que interessa numa batalha
+  if (Batalha.acerta(x, y, z, raio, dano || 10)) return true;
   for (const o of obstaculos){
     if (!o.vivo) continue;
     const r = (o.tipo === 'aviao' ? RAIO_AVIAO : RAIO_POMBO) + raio;
@@ -1694,12 +1749,13 @@ function atualizaTiros(dt){
         f.scale.set(1, 0.8 + Math.random()*0.5, 1);
         f.material.opacity = 0.6 + Math.random()*0.35;
       }
-      if (atingeAr(b.x,b.y,b.z,260) || atingeAlvo(b.x,b.z,300)) b.morto = true;
+      if (atingeAr(b.x,b.y,b.z,260,DANO.missil) || atingeAlvo(b.x,b.z,300)) b.morto = true;
       if (b.vida <= 0) b.morto = true;
       if (b.morto) explode(b.x, b.y, b.z, 0.9);
     } else {
       b.vy -= dt*1400; b.y += b.vy*dt;
-      if (b.y <= CHAO){ b.morto = true; explode(b.x, CHAO+200, b.z, 2.4); nuclear(b.x, b.z); }
+      if (b.y <= CHAO){ b.morto = true; explode(b.x, CHAO+200, b.z, 2.4); nuclear(b.x, b.z);
+                        pegaNaNuclear(b.x, b.z); }
     }
     b.no.position.set(b.x, b.y, b.z);
     b.no.lookAt(b.x + b.vx, b.y + b.vy, b.z + b.vz);
@@ -1708,7 +1764,7 @@ function atualizaTiros(dt){
   bombas = bombas.filter(b => { if (b.morto){ cena.remove(b.no); return false; } return true; });
   for (const t of tiros){
     t.x += t.dx*t.v*dt; t.y += t.dy*t.v*dt; t.z += t.dz*t.v*dt; t.vida -= dt;
-    if (atingeAr(t.x,t.y,t.z,320)) t.vida = 0;
+    if (atingeAr(t.x,t.y,t.z,320,DANO.metralha)) t.vida = 0;
     t.no.position.set(t.x, t.y, t.z);
     t.no.lookAt(t.x + t.dx, t.y + t.dy, t.z + t.dz);
     t.no.rotateX(Math.PI/2);
@@ -1722,7 +1778,8 @@ function derruba(motivo){
   if (caindo) return;
   caindo = true; noChao = false; motivoQueda = motivo; vq = 0;
   explode(aviaoX, aviaoY, aviaoZ, motivo === 'combustivel' ? 0.6 : 1.4);
-  mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL' : 'BATEU!', '#ff8080', 1400);
+  mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL'
+            : motivo === 'abatido' ? 'ABATIDO!' : 'BATEU!', '#ff8080', 1400);
 }
 function atualizaQueda(dt){
   giroQueda += dt*3.4;
@@ -1734,6 +1791,10 @@ function atualizaQueda(dt){
   aviaoX += eixoF.x*voo*dt; aviaoZ += eixoF.z*voo*dt;
   voo *= 0.985; distancia += voo*dt;
   poeCamera(dt);
+  /* Continuar mandando estado enquanto cai. Sem isto, quem era abatido
+     sumia do `atualiza` inteiro e os outros nunca viam a queda — só viam o
+     avião congelado no ar até a varredura de silêncio apagá-lo 5 s depois. */
+  Batalha.passo(dt);
   if (aviaoY <= CHAO + 120){
     aviaoY = CHAO + 120;
     if (motivoQueda !== 'acabou'){ explode(aviaoX, aviaoY, aviaoZ, 2.0); motivoQueda = 'acabou'; Motor.desliga(); setTimeout(fim, 900); }
@@ -1840,6 +1901,7 @@ function rolaNoChao(dt, e){
 
   poeCamera(dt);
   atualizaTiros(dt);
+  Batalha.passo(dt);
   Motor.ajusta();
 }
 
@@ -2021,6 +2083,7 @@ function atualiza(dt){
   distancia += voo*dt;
   poeCamera(dt);
   atualizaTiros(dt);
+  Batalha.passo(dt);
 
   for (const n of nuvens) if (Math.hypot(n.x-aviaoX, n.z-aviaoZ) > 44000) recolocaNuvem(n, false);
 
@@ -2195,6 +2258,15 @@ function bussola(y){
   marcaBussola(cx, meia, y + H*0.056, maisPerto(alvos, a => a.vivo), '#ff6a5a', true);
   // a cabeceira do sul: sem ela ninguém acha a pista para voltar
   if (!noChao) marcaBussola(cx, meia, y + H*0.052, { x: 0, z: PISTA_Z0 + 2400 }, '#7fffa8', false);
+  if (Batalha.ligada){
+    let perto = null, dp = 1e9;
+    for (const o of Batalha.outros.values()){
+      if (o.vivo === false || o.x === undefined) continue;
+      const d = Math.hypot(o.x-aviaoX, o.z-aviaoZ);
+      if (d < dp){ dp = d; perto = o; }
+    }
+    if (perto) marcaBussola(cx, meia, y + H*0.056, perto, '#ff7a64', true);
+  }
   h2.fillStyle = 'rgba(230,245,255,.95)';
   h2.beginPath(); h2.moveTo(cx, y-H*0.030); h2.lineTo(cx-6, y-H*0.044); h2.lineTo(cx+6, y-H*0.044);
   h2.closePath(); h2.fill();
@@ -2311,6 +2383,34 @@ function desenhaHUD(){
     regua('NIT  ' + Math.round(nitroCarga), nitroCarga/100, nitroBotao && nitroCarga > 0, 1);
   }
 
+  /* --- OS OUTROS AVIÕES: uma marca em cima de cada um ---------------------
+     Sem isso, num céu deste tamanho ninguém se acha. A marca traz o nome e a
+     distância, e fica vermelha quando o avião está perto o bastante para
+     valer o tiro. */
+  if (Batalha.ligada && jogando && !caindo){
+    h2.textAlign = 'center';
+    for (const o of Batalha.outros.values()){
+      if (o.vivo === false || o.x === undefined) continue;
+      const v2 = new THREE.Vector3(o.x, o.y, o.z).project(cam);
+      if (v2.z > 1) continue;
+      const x = (v2.x*0.5+0.5)*W, y = (-v2.y*0.5+0.5)*H;
+      if (x < -60 || x > W+60 || y < -60 || y > H+60) continue;
+      const d = Math.hypot(o.x-aviaoX, o.y-aviaoY, o.z-aviaoZ);
+      const perto = d < 12000;
+      const r = Math.max(10, Math.min(70, 900000/Math.max(900, d)));
+      h2.strokeStyle = perto ? 'rgba(255,120,100,.95)' : 'rgba(255,255,255,.55)';
+      h2.lineWidth = 2;
+      h2.strokeRect(x-r, y-r, r*2, r*2);
+      h2.fillStyle = h2.strokeStyle;
+      h2.font = '800 ' + Math.max(9, H*0.018).toFixed(0) + 'px system-ui, sans-serif';
+      h2.fillText(o.nome, x, y - r - 6);
+      h2.font = '700 ' + Math.max(8, H*0.015).toFixed(0) + 'px ui-monospace, monospace';
+      h2.fillText(Math.round(d/METRO) + 'm · ' + Math.round(o.vida === undefined ? 100 : o.vida) + '%',
+                  x, y + r + 14);
+    }
+    h2.textAlign = 'left';
+  }
+
   /* --- A CAIXA DO BUSCADOR ------------------------------------------------
      Enquanto procura, um quadrado aberto que se fecha conforme a trava
      carrega — a barra é o próprio tamanho do quadrado, sem número nenhum.
@@ -2386,7 +2486,8 @@ function desenhaHUD(){
     // atravessava a caixa da arma
     h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
     h2.textAlign = 'left'; h2.fillStyle = 'rgba(127,216,255,.7)';
-    h2.fillText('TESTE · combustível infinito (tecla I)', 16, Math.max(190, H*0.30));
+    h2.fillText('TESTE · combustível infinito (tecla I)', 16,
+                Math.max(Batalha.ligada && Batalha.quantos() > 1 ? 246 : 190, H*0.34));
   }
 }
 
@@ -2416,6 +2517,11 @@ function pinta(){
   $('vFlap').textContent = flap === 0 ? '—' : String(flap);
   $('vFlap').className = flap ? 'ok' : '';
   $('cPouso').classList.toggle('estol', !noChao && voo < velMin());
+  const pv = Math.max(0, Math.min(100, vida));
+  $('vidaBarra').style.width = pv.toFixed(0) + '%';
+  $('vidaBarra').style.background = pv < 30 ? '#ff5a5a' : pv < 65 ? '#ffc24d' : '#5eff9a';
+  $('vVida').textContent = Math.round(pv);
+  $('cVida').classList.toggle('ferido', pv < 30);
   // a barra do leme cresce do meio para o lado em que o nariz é chutado
   const bl = $('barraLeme'), lp = Math.max(-1, Math.min(1, leme));
   bl.style.width = (Math.abs(lp)*50).toFixed(1) + '%';
@@ -2535,7 +2641,7 @@ function reinicia(){
   camPos.set(aviaoX, aviaoY + 210, aviaoZ - CAMD);
   turbo = 0; combustivel = 100; distancia = 0;
   nitroCarga = 100; nitroBotao = false; turbinando = false;
-  avisouEstol = 0; pousos = 0;
+  avisouEstol = 0; pousos = 0; vida = VIDA_CHEIA;
   pontos = 0; alvosDestruidos = 0; venceu = false;
   arma = 'bomba'; recarga = 0; atirando = false; leme = 0; miraX = 0; miraY = 0;
   municao = {}; for (const k in ARMAS) municao[k] = ARMAS[k].municao;
@@ -2602,6 +2708,29 @@ $('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque
   ba.onclick = () => poe(false);
   pinta();
 })();
+
+function estadoBatalha(classe, txt){
+  const e = $('estadoBatalha'); if (!e) return;
+  e.className = 'estado ' + classe;
+  $('estadoBatalhaTxt').textContent = txt;
+}
+function pintaBatalha(){
+  const n = Batalha.quantos();
+  const c = $('cGente');
+  if (c){
+    c.classList.toggle('ver', Batalha.ligada && n > 1);
+    $('vGente').textContent = n;
+    $('salaGente').textContent = Batalha.anfitriao ? 'sala ' + codigo : '';
+  }
+}
+(function(){
+  const el = $('codBatalha'), bt = $('btBatalha');
+  if (!el || !bt) return;
+  el.addEventListener('input', () => { el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4); });
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') bt.click(); });
+  bt.onclick = () => { ligaAudio(); Batalha.entra(el.value); };
+})();
+setInterval(pintaBatalha, 1000);
 
 $('btSensor').onclick = async () => {
   ligaAudio();
@@ -2761,6 +2890,244 @@ setInterval(() => {
       Date.now() - (Controle.ultimo||0) > 2000) pausa();
 }, 300);
 
+/* =============================================================================
+   BATALHA AÉREA — outros jogadores no mesmo céu
+
+   A forma é uma ESTRELA: quem abriu a sala é o anfitrião e serve de central.
+   Cada um manda o seu estado para ele, e ele reparte para todo mundo. Com
+   meia dúzia de aviões isso é de longe o mais simples que funciona — malha
+   completa exigiria cada um conhecer cada um, e o PeerJS já é bastante
+   trabalho de encontro para uma coisa só.
+
+   QUEM DECIDE O TIRO É QUEM ATIRA. O acerto é testado na tela de quem
+   apertou o gatilho, contra a posição que ela recebeu, e o resultado vai
+   como recado ("te acertei, tanto de dano"). É o jeito que perdoa o atraso
+   da rede: se fosse a vítima a julgar, com 80 ms de atraso ninguém acertava
+   nada. Num jogo entre amigos, confiar em quem atira é a escolha certa.
+
+   Cada avião tem 100 de vida. Metralhadora tira 7, míssil tira 45, e a
+   nuclear leva quem estiver no raio.
+   ========================================================================== */
+const CORES_JOGADOR = [0x5cc8ff, 0xffb03a, 0x7fffa8, 0xff7ad6, 0xc9a7ff, 0xff6a5a];
+const VIDA_CHEIA = 100;
+const DANO = { metralha: 7, missil: 45, bomba: 100 };
+const Batalha = {
+  ligada: false, anfitriao: false, conn: null,     // conn: ligação com o anfitrião
+  eu: '', nome: '', cor: 0, outros: new Map(), conexoes: [],
+  _t: 0, _tLimpa: 0,
+
+  /* ---- entrar como anfitrião: é só assumir, a sala já está aberta ---- */
+  hospeda(){
+    if (this.ligada) return;
+    this.ligada = true; this.anfitriao = true;
+    this.eu = 'a:' + codigo;
+    this.nome = meuNome();
+    this.cor = CORES_JOGADOR[0];
+    vida = VIDA_CHEIA;
+    pintaBatalha();
+  },
+  /* ---- ou entrar na batalha de outra pessoa ---- */
+  entra(cod){
+    if (!peer || typeof Peer !== 'function') return;
+    cod = String(cod||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
+    if (cod.length !== 4){ estadoBatalha('nao', 'o código tem 4 letras'); return; }
+    if (cod === codigo){ estadoBatalha('nao', 'esse é o código desta tela'); return; }
+    estadoBatalha('meio', 'procurando a batalha ' + cod + '…');
+    const c = peer.connect('aviao-rr-' + cod, { reliable:false, serialization:'json' });
+    this.conn = c; this.ligada = true; this.anfitriao = false;
+    this.nome = meuNome();
+    vida = VIDA_CHEIA;
+    c.on('open', () => {
+      estadoBatalha('ok', 'na batalha ' + cod);
+      c.send({ t:'entra', nome:this.nome });
+      pintaBatalha();
+    });
+    c.on('data', d => this.recebe(d, null));
+    c.on('close', () => { estadoBatalha('nao', 'a batalha caiu'); this.solta(); });
+    c.on('error', () => {});
+    setTimeout(() => { if (!c.open) estadoBatalha('nao', 'batalha ' + cod + ' não encontrada'); }, 8000);
+  },
+  /* ---- no anfitrião: chegou um jogador ---- */
+  aceita(c, d){
+    this.hospeda();
+    const id = 'j:' + Math.random().toString(36).slice(2, 8);
+    const cor = CORES_JOGADOR[(this.conexoes.length + 1) % CORES_JOGADOR.length];
+    const j = { c, id, nome: (d && d.nome) || 'visitante', cor, ultimo: Date.now() };
+    this.conexoes.push(j);
+    c.on('close', () => this.saiu(id));
+    c.on('error', () => {});
+    c.on('data', m => this.recebe(m, j));
+    try{ c.send({ t:'sejabem', id, cor, nome:this.nome, cod: codigo }); }catch(e){}
+    mostraAviso(j.nome + ' ENTROU NA BATALHA', '#7fd8ff', 1600);
+    pintaBatalha();
+  },
+  saiu(id){
+    const i = this.conexoes.findIndex(j => j.id === id);
+    if (i >= 0){ mostraAviso(this.conexoes[i].nome + ' saiu', '#9fb4d8', 1200); this.conexoes.splice(i,1); }
+    this.tira(id);
+    pintaBatalha();
+  },
+  tira(id){
+    const o = this.outros.get(id);
+    if (o && o.no){ cena.remove(o.no); }
+    this.outros.delete(id);
+  },
+  solta(){
+    for (const id of [...this.outros.keys()]) this.tira(id);
+    this.conexoes = []; this.conn = null; this.ligada = this.anfitriao;
+    pintaBatalha();
+  },
+
+  /* ---- o correio ---- */
+  paraTodos(o, menos){
+    if (this.anfitriao){
+      for (const j of this.conexoes){ if (j.id === menos) continue;
+        if (j.c && j.c.open) try{ j.c.send(o); }catch(e){} }
+    } else if (this.conn && this.conn.open){
+      try{ this.conn.send(o); }catch(e){}
+    }
+  },
+  recebe(d, de){
+    if (!d || !d.t) return;
+    if (de) de.ultimo = Date.now();
+    switch (d.t){
+      case 'sejabem':
+        this.eu = d.id; this.cor = d.cor;
+        estadoBatalha('ok', 'na batalha de ' + (d.nome||'alguém'));
+        pintaBatalha();
+        break;
+      case 'eu': {
+        if (d.anf && d.n) this.nRede = d.n;      // a contagem que o anfitrião conta
+        // estado de um avião. No anfitrião, repassa para os outros.
+        const id = de ? de.id : d.id;
+        if (!id || id === this.eu) break;
+        this.poe(id, d, de ? de.nome : d.nome, de ? de.cor : d.cor);
+        if (this.anfitriao){ d.id = id; d.nome = de ? de.nome : d.nome; d.cor = de ? de.cor : d.cor;
+                             this.paraTodos(d, id); }
+        break;
+      }
+      case 'mundo':
+        for (const j of (d.js||[])){ if (j.id !== this.eu) this.poe(j.id, j, j.nome, j.cor); }
+        break;
+      case 'tiro': {
+        if (d.para === this.eu) this.levaTiro(d);
+        else if (this.anfitriao) this.paraTodos(d, de ? de.id : null);
+        break;
+      }
+      case 'saiu': this.tira(d.id); break;
+    }
+  },
+  /* guarda/atualiza o avião de outra pessoa */
+  poe(id, d, nome, cor){
+    let o = this.outros.get(id);
+    if (!o){
+      const no = modeloOutro.clone(true);
+      /* uma faixa larga da cor do jogador em cima da fuselagem e nas derivas.
+         Pintar o avião inteiro exigiria clonar todos os materiais de todas as
+         peças a cada jogador; a faixa dá para reconhecer de longe e custa
+         três caixas. */
+      const cor2 = cor || CORES_JOGADOR[1];
+      const matCor = new THREE.MeshPhongMaterial({ color: cor2, shininess: 60 });
+      const faixa = new THREE.Mesh(new THREE.BoxGeometry(34, 8, 90), matCor);
+      faixa.position.set(0, 16, -40); no.add(faixa);
+      for (const lado of [-1, 1]){
+        const d2 = new THREE.Mesh(new THREE.BoxGeometry(6, 40, 26), matCor);
+        d2.position.set(lado*38, 58, -122); no.add(d2);
+      }
+      cena.add(no);
+      o = { id, no, nome: nome || 'visitante', cor: cor || CORES_JOGADOR[1] };
+      this.outros.set(id, o);
+      pintaBatalha();
+    }
+    o.x = d.x; o.y = d.y; o.z = d.z;
+    o.F = { x:d.fx, y:d.fy, z:d.fz };
+    o.C = { x:d.cx, y:d.cy, z:d.cz };
+    o.vida = d.v === undefined ? VIDA_CHEIA : d.v;
+    o.vivo = !d.k;                              // k = caiu
+    o.nome = nome || o.nome;
+    o.t = Date.now();
+  },
+  /* o meu estado, 20 vezes por segundo */
+  passo(dt){
+    if (!this.ligada) return;
+    this._t -= dt;
+    if (this._t <= 0){
+      this._t = 0.05;
+      const meu = { t:'eu', id:this.eu, nome:this.nome, cor:this.cor,
+                    x:Math.round(aviaoX), y:Math.round(aviaoY), z:Math.round(aviaoZ),
+                    fx:+eixoF.x.toFixed(3), fy:+eixoF.y.toFixed(3), fz:+eixoF.z.toFixed(3),
+                    cx:+eixoC.x.toFixed(3), cy:+eixoC.y.toFixed(3), cz:+eixoC.z.toFixed(3),
+                    v:Math.round(vida), k: caindo ? 1 : 0 };
+      /* A CONTAGEM vem do anfitrião, não de quem está desenhado no céu: quem
+         está na tela de capa, ou caindo, não manda posição, e a conta feita
+         pelos aviões visíveis piscava para menos toda hora. O anfitrião sabe
+         quantas ligações tem, e diz. */
+      if (this.anfitriao){ meu.anf = 1; meu.n = this.conexoes.length + 1; }
+      if (this.anfitriao) this.paraTodos(meu, null);
+      else if (this.conn && this.conn.open) try{ this.conn.send(meu); }catch(e){}
+    }
+    // quem parou de falar há mais de 5 s sumiu
+    this._tLimpa -= dt;
+    if (this._tLimpa <= 0){
+      this._tLimpa = 1;
+      const ag = Date.now();
+      for (const [id, o] of [...this.outros]) if (ag - o.t > 5000) this.tira(id);
+    }
+    // põe os aviões dos outros no lugar
+    for (const o of this.outros.values()){
+      if (!o.no) continue;
+      o.no.visible = o.vivo !== false;
+      const D = vcruz(o.F, o.C);
+      poeMalha(o.no, o.x, o.y, o.z, D, o.C, o.F);
+    }
+  },
+  /* levei um tiro: quem atirou já decidiu que acertou */
+  levaTiro(d){
+    if (caindo || !jogando) return;
+    vida -= d.dano || 10;
+    clarao = Math.max(clarao, 0.25);
+    bip(180, 0.08, 'square', 0.06);
+    solta(aviaoX, aviaoY, aviaoZ, 6, 0xffb86b, 26, 260);
+    mostraAviso('ATINGIDO! ' + Math.max(0, Math.round(vida)) + '%', '#ff8080', 800);
+    if (vida <= 0){
+      vida = 0;
+      mostraAviso('VOCÊ FOI ABATIDO', '#ff6a5a', 1800);
+      derruba('abatido');
+    }
+  },
+  /* um tiro meu encostou em alguém? devolve true se acertou */
+  acerta(x, y, z, raio, dano){
+    if (!this.ligada) return false;
+    for (const o of this.outros.values()){
+      if (o.vivo === false) continue;
+      if (Math.hypot(o.x-x, o.y-y, o.z-z) > raio + RAIO_AVIAO) continue;
+      this.paraTodos({ t:'tiro', para:o.id, de:this.eu, dano }, null);
+      pontos += dano;
+      mostraAviso('ACERTOU ' + o.nome.toUpperCase(), '#7fffa8', 700);
+      return true;
+    }
+    return false;
+  },
+  quantos(){
+    if (this.anfitriao) return 1 + this.conexoes.length;
+    return Math.max(this.nRede || 0, 1 + this.outros.size);
+  },
+  nRede: 0
+};
+/* o buscador do míssil também enxerga gente de verdade */
+function inimigosRede(){
+  const r = [];
+  for (const o of Batalha.outros.values()) if (o.vivo !== false) r.push(o);
+  return r;
+}
+function meuNome(){
+  try{ const n = localStorage.getItem('aviao3d.nome'); if (n) return n; }catch(e){}
+  const n = 'piloto ' + Math.floor(Math.random()*90 + 10);
+  try{ localStorage.setItem('aviao3d.nome', n); }catch(e){}
+  return n;
+}
+const modeloOutro = montaAviao(0xe6e9f0, 0x7b8699, 0x3f6c9e);
+
 function abrirSala(){
   if (typeof Peer !== 'function'){ estadoSala('nao', 'a biblioteca de conexão não carregou'); return; }
   codigo = novoCodigo();
@@ -2782,7 +3149,24 @@ function abrirSala(){
     }
     estadoSala('meio', 'esperando o celular…');
   });
-  peer.on('connection', c => Tripulacao.entra(c));
+  /* Uma conexão que chega pode ser um CELULAR (controle) ou outro JOGADOR
+     (batalha). Não dá para saber pelo `connection` — dá para saber pela
+     PRIMEIRA mensagem. Então a conexão fica em observação até se identificar:
+     quem diz `{t:'entra'}` é jogador, qualquer outra coisa é celular. Sem
+     isso, o avião de outra pessoa entrava como artilheiro e roubava a torre. */
+  peer.on('connection', c => {
+    let decidido = false;
+    const decide = d => {
+      if (decidido) return;
+      decidido = true;
+      c.off && c.off('data', decide);
+      if (d && d.t === 'entra') Batalha.aceita(c, d);
+      else { Tripulacao.entra(c); Tripulacao.recebe(Tripulacao.membros[Tripulacao.membros.length-1], d); }
+    };
+    c.on('data', decide);
+    // se em 4 s ninguém falou nada, trata como celular (é o caso comum)
+    setTimeout(() => { if (!decidido){ decidido = true; Tripulacao.entra(c); } }, 4000);
+  });
   peer.on('error', e => {
     if (e.type === 'unavailable-id'){ try{ peer.destroy(); }catch(x){} abrirSala(); return; }
     if (e.type === 'network' || e.type === 'server-error') estadoSala('nao', 'sem acesso ao servidor de encontro. Esta tela tem internet?');
