@@ -117,7 +117,7 @@
     <h1>Corrida da Vitória</h1>
     <p class="instr">O desenho da Vitória saiu do papel e foi correr.<br>Ela corre sozinha: pule os buracos, pegue os corações<br>e desvie dos blocos vermelhos.</p>
     <div class="chaves">
-      <div class="chave"><span class="icone">📱</span><span><b>Incline o celular para a direita</b> para correr mais rápido, para a esquerda para segurar</span></div>
+      <div class="chave"><span class="icone">📱</span><span><b>Incline o celular</b>: para a direita ela vai para frente, para a esquerda ela volta</span></div>
       <div class="chave"><span class="icone">👆</span><span><b>Toque na tela</b> para pular</span></div>
       <div class="chave"><span class="icone">⌨️</span><span>No computador: <b>→</b> acelera, <b>←</b> segura e <b>espaço</b> pula</span></div>
     </div>
@@ -170,13 +170,13 @@
   /* ============================ constantes ============================ */
   var COR = {
     papel: 0xFDFCF8, tinta: 0x18181C, ceu: 0xCFE7F2,
-    vermelho: 0xDE1C1C, grama: 0x8FC98A, gramaEsc: 0x7BB878, tronco: 0xB98A5E,
-    mola: 0xF7C948, cabelo: 0x6B4A32, rosa: 0xE94C6A, terra: 0xE3D6BF
+    vermelho: 0xDE1C1C, grama: 0x7CC275, gramaEsc: 0x5FA45C, tronco: 0xA9703F,
+    mola: 0xF7C948, cabelo: 0x6B4A32, rosa: 0xE94C6A, terra: 0xD2A972
   };
   var CORACOES = [0xE94C6A, 0xF79A3C, 0x5EB0D6, 0x7EC474, 0xC476D0];
 
   var GRAV = 42, PULO = 15.2, MOLA = 24.5;
-  var VEL0 = 9.5, VELMAX = 16.5, ACEL = 0.16;
+  var VELMAX = 13.5;                // velocidade máxima, para os dois lados
   var MEIO = 0.46;            // meia largura da personagem
   var ALTURA = 3.1;           // altura da personagem
   var DEGRAU = 1.35;          // altura que ela sobe sozinha
@@ -187,9 +187,10 @@
   var heroi, sombra, corpoTodo, tronco, cabecaG, chapeuG, saia;
   var ombroE, ombroD, cotoveloE, cotoveloD, coxaE, coxaD, joelhoE, joelhoD;
   var solidos = [], blocos = [], coracoes = [], molas = [], decors = [];
-  var jogador = { x: 0, y: 0, vy: 0, vel: VEL0, noChao: true, giro: 0, girando: false, passo: 0 };
+  var jogador = { x: 0, y: 0, vy: 0, vel: 0, noChao: true, giro: 0, girando: false, passo: 0 };
   var estado = "menu";
-  var velBase = VEL0, dist = 0, pontos = 0, vidas = 3;
+  var dist = 0, pontos = 0, vidas = 3, xMax = 0, limiteTras = -12;
+  var olhando = Math.PI / 2, adianteAtual = 3;
   var invencivel = 0, tremor = 0, proxX = 0, tempo = 0, chaoAbaixo = 0;
   var seguro = { x: 0, y: 0 };
   var inclinacao = 0, neutro = null, temSensor = false;
@@ -369,6 +370,7 @@
     var sy = 1 + 2 * esp / Math.max(0.02, tam.y);
     var sz = 1 + 2 * esp / Math.max(0.02, tam.z);
     var casca = new THREE.Mesh(g, matTinta());
+    casca.userData.casca = true;
     casca.scale.set(sx, sy, sz);
     casca.position.set(cen.x * (1 - sx), cen.y * (1 - sy), cen.z * (1 - sz));
     malha.add(casca);
@@ -544,7 +546,7 @@
     /* ---- sombrinha no chão ---- */
     sombra = new THREE.Mesh(
       new THREE.CircleGeometry(0.62, 22),
-      new THREE.MeshBasicMaterial({ color: 0x2a2a30, transparent: true, opacity: 0.2 })
+      new THREE.MeshBasicMaterial({ color: 0x2a2a30, transparent: true, opacity: 0.12 })
     );
     sombra.rotation.x = -Math.PI / 2;
     sombra.position.y = 0.02;
@@ -557,12 +559,36 @@
   /* ===================== chão, plataformas e enfeites ================= */
   function novoSolido() {
     var g = new THREE.Group();
-    var base = peca(new THREE.BoxGeometry(1, 1, 3.4), COR.terra, 0, 0, 0);
-    var topo = peca(new THREE.BoxGeometry(1, 0.3, 3.6), COR.grama, 0, 0, 0);
+    var base = peca(new THREE.BoxGeometry(1, 1, 4.2), COR.terra, 0, 0, 0);
+    var topo = peca(new THREE.BoxGeometry(1, 0.44, 4.8), COR.grama, 0, 0, 0);
+    base.castShadow = base.receiveShadow = true;
+    topo.castShadow = topo.receiveShadow = true;
     g.add(base); g.add(topo);
+
+    var enfeites = [];                          // tufos de grama e florzinhas no topo
+    for (var i = 0; i < 4; i++) {
+      var e = new THREE.Group();
+      var tufo = peca(new THREE.ConeGeometry(0.17, 0.46, 5), COR.gramaEsc, 0, 0.23, 0);
+      tufo.castShadow = true;
+      e.add(tufo);
+      if (i % 2) {
+        var caule = peca(new THREE.CylinderGeometry(0.025, 0.03, 0.4, 5), COR.gramaEsc, 0.18, 0.2, 0.1);
+        var flor = peca(new THREE.SphereGeometry(0.1, 8, 6), CORACOES[i % CORACOES.length], 0.18, 0.44, 0.1);
+        flor.castShadow = true;
+        e.add(caule); e.add(flor);
+      }
+      e.visible = false;
+      g.add(e); enfeites.push(e);
+    }
+    var pedra = peca(new THREE.SphereGeometry(0.3, 8, 6), 0xCFC4AC, 0, 0, 2.15);
+    pedra.scale.set(1, 0.7, 0.6);
+    pedra.castShadow = true;
+    pedra.visible = false;
+    g.add(pedra);
+
     g.visible = false;
     cena.add(g);
-    return { obj: g, base: base, topo: topo, ativo: false, x0: 0, x1: 0, y: 0 };
+    return { obj: g, base: base, topo: topo, enfeites: enfeites, pedra: pedra, ativo: false, x0: 0, x1: 0, y: 0 };
   }
 
   function novoBloco() {
@@ -570,6 +596,7 @@
     g.add(parte(geoCaixa(1.5, 1.6, 1.5, 0.25), COR.vermelho, 0, 0.8, 0, 0.035));
     g.add(parte(new THREE.SphereGeometry(0.09, 8, 6), COR.papel, -0.3, 1.0, 0.78, 0));
     g.add(parte(new THREE.SphereGeometry(0.09, 8, 6), COR.papel, 0.3, 1.0, 0.78, 0));
+    g.traverse(function (o) { if (o.isMesh && !o.userData.casca) { o.castShadow = true; o.receiveShadow = true; } });
     g.visible = false;
     cena.add(g);
     return { obj: g, ativo: false, x: 0, y: 0 };
@@ -596,6 +623,25 @@
     return g;
   }
 
+  function criarMato() {
+    var g = new THREE.Group();
+    var cor = 0x4E8A52;
+    [[0, 0, 0, 1.0], [0.85, -0.25, 0.3, 0.7], [-0.8, -0.2, -0.2, 0.75]].forEach(function (b) {
+      var m = peca(new THREE.SphereGeometry(b[3], 10, 8), cor, b[0], b[1], b[2]);
+      g.add(m);
+    });
+    cena.add(g);
+    return g;
+  }
+
+  function criarMontanha() {
+    var g = new THREE.Group();
+    g.add(peca(new THREE.ConeGeometry(7, 9, 7), 0xC3DCDA, 0, 4.5, 0));
+    g.add(peca(new THREE.ConeGeometry(4.6, 6, 7), 0xCFE4E0, 6.5, 3, -2));
+    cena.add(g);
+    return g;
+  }
+
   function criarMorro() {
     var g = new THREE.Group();
     var m = peca(new THREE.SphereGeometry(6, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), COR.grama, 0, 0, 0);
@@ -613,11 +659,21 @@
     var alt = espessura || 1.3;
     s.ativo = true; s.obj.visible = true;
     s.x0 = x0; s.x1 = x0 + comp; s.y = topoY;
-    s.base.scale.set(comp, alt, 1);
-    s.base.position.set(0, topoY - 0.3 - alt / 2, 0);
+    s.base.scale.set(comp - 0.5, alt, 1);
+    s.base.position.set(0, topoY - 0.44 - alt / 2, 0);
     s.topo.scale.set(comp, 1, 1);
-    s.topo.position.set(0, topoY - 0.15, 0);
+    s.topo.position.set(0, topoY - 0.22, 0);
     s.obj.position.set(x0 + comp / 2, 0, 0);
+    for (var i = 0; i < s.enfeites.length; i++) {
+      var mostra = comp > 4 + i * 2.6;
+      s.enfeites[i].visible = mostra;
+      if (mostra) {
+        s.enfeites[i].position.set((i - 1.5) * comp * 0.24, topoY, -1.2 + (i % 3) * 1.3);
+        s.enfeites[i].rotation.y = i * 1.7;
+      }
+    }
+    s.pedra.visible = comp > 7;
+    s.pedra.position.set(comp * 0.18, topoY - 0.1, 2.15);
   }
 
   function porBloco(x, topoY) {
@@ -703,9 +759,9 @@
     porSolido(-14, 34, 0);                           // chão firme para começar
     proxX = 20;
     while (proxX < VISTA) proxX += gerarTrecho(proxX);
-    decors.forEach(function (d, i) {
+    decors.forEach(function (d) {
       d.obj.visible = true;
-      reposicionarDecor(d, -20 + (i / decors.length) * (VISTA + 30));
+      reposicionarDecor(d, -24 + Math.random() * (VISTA + 36));
     });
   }
 
@@ -714,6 +770,14 @@
       var e = 0.8 + Math.random() * 0.6;
       d.obj.scale.set(e, e, e);
       d.obj.position.set(x, -1.4 - Math.random() * 1.0, -11 - Math.random() * 11);
+    } else if (d.tipo === "mato") {              // primeiro plano: passa rápido
+      var em = 0.75 + Math.random() * 0.55;
+      d.obj.scale.set(em, em, em * 0.8);
+      d.obj.position.set(x, -0.75 - Math.random() * 0.4, 4.2 + Math.random() * 1.1);
+    } else if (d.tipo === "montanha") {
+      var eq = 0.9 + Math.random() * 0.8;
+      d.obj.scale.set(eq, eq, eq);
+      d.obj.position.set(x, -5, -52 - Math.random() * 14);
     } else if (d.tipo === "morro") {
       var e2 = 0.9 + Math.random() * 1.4;
       d.obj.scale.set(e2, e2, e2);
@@ -725,8 +789,17 @@
     }
   }
 
-  function animarCorrida(dt, v) {
-    if (v > 0.5) {                       // correndo
+  function animarCorrida(dt, v, noAr) {
+    if (noAr) {                          // no ar
+      coxaE.rotation.x = -0.95; joelhoE.rotation.x = -1.15;
+      coxaD.rotation.x = -0.3; joelhoD.rotation.x = -1.75;
+      ombroE.rotation.x = -2.3; ombroD.rotation.x = -2.3;
+      cotoveloE.rotation.x = -0.45; cotoveloD.rotation.x = -0.45;
+      tronco.position.y = 1.15;
+      tronco.rotation.x = -0.12; tronco.rotation.z = 0;
+      cabecaG.rotation.set(0.08, 0, 0);
+      saia.rotation.x = 0.06; saia.rotation.z = 0;
+    } else if (v > 0.6) {                // correndo
       jogador.passo += dt * (4.4 + v * 0.28);
       var s = Math.sin(jogador.passo), c = Math.cos(jogador.passo);
 
@@ -747,15 +820,16 @@
       cabecaG.rotation.z = -s * 0.05;
       saia.rotation.x = -0.05 - Math.abs(c) * 0.04;
       saia.rotation.z = s * 0.07;
-    } else {                             // no ar
-      coxaE.rotation.x = -0.95; joelhoE.rotation.x = -1.15;
-      coxaD.rotation.x = -0.3; joelhoD.rotation.x = -1.75;
-      ombroE.rotation.x = -2.3; ombroD.rotation.x = -2.3;
-      cotoveloE.rotation.x = -0.45; cotoveloD.rotation.x = -0.45;
-      tronco.position.y = 1.15;
-      tronco.rotation.x = -0.12; tronco.rotation.z = 0;
-      cabecaG.rotation.set(0.08, 0, 0);
-      saia.rotation.x = 0.06; saia.rotation.z = 0;
+    } else {                             // paradinha, respirando
+      var r = Math.sin(tempo * 2.1);
+      coxaE.rotation.x = 0; coxaD.rotation.x = 0;
+      joelhoE.rotation.x = -0.05; joelhoD.rotation.x = -0.05;
+      ombroE.rotation.x = r * 0.08; ombroD.rotation.x = -r * 0.08;
+      cotoveloE.rotation.x = -0.12; cotoveloD.rotation.x = -0.12;
+      tronco.position.y = 1.15 + r * 0.02;
+      tronco.rotation.x = 0; tronco.rotation.z = 0;
+      cabecaG.rotation.set(r * 0.03, 0, 0);
+      saia.rotation.x = 0; saia.rotation.z = 0;
     }
     // o chapéu balança um pouquinho atrás do movimento
     chapeuG.rotation.z = Math.sin(jogador.passo * 0.5) * 0.035;
@@ -763,12 +837,14 @@
   }
 
   /* ============================ montagem ============================= */
-  var fundo;
+  var fundo, sol;
 
   function iniciar() {
     var canvas = document.getElementById("cena");
     render3d = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     render3d.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    render3d.shadowMap.enabled = true;
+    render3d.shadowMap.type = THREE.PCFSoftShadowMap;
     render3d.setSize(window.innerWidth, window.innerHeight);
 
     cena = new THREE.Scene();
@@ -778,12 +854,19 @@
     camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 300);
     camera.position.set(0, 5, 20);
 
-    cena.add(new THREE.HemisphereLight(0xFFFFFF, 0xBFD9C8, 0.95));
-    var sol = new THREE.DirectionalLight(0xFFF6E2, 0.7);
-    sol.position.set(6, 14, 12);
-    cena.add(sol);
+    cena.add(new THREE.HemisphereLight(0xFFFFFF, 0xC6DED0, 0.72));
+    sol = new THREE.DirectionalLight(0xFFF6E2, 0.85);
+    sol.position.set(-7, 18, 13);
+    sol.castShadow = true;
+    sol.shadow.mapSize.width = 1024;
+    sol.shadow.mapSize.height = 1024;
+    sol.shadow.bias = -0.0014;
+    var sc = sol.shadow.camera;
+    sc.left = -22; sc.right = 22; sc.top = 20; sc.bottom = -16; sc.near = 1; sc.far = 80;
+    sc.updateProjectionMatrix();
+    cena.add(sol); cena.add(sol.target);
 
-    fundo = new THREE.Mesh(new THREE.PlaneGeometry(400, 80), matPapel(0xBCE2B4));
+    fundo = new THREE.Mesh(new THREE.PlaneGeometry(400, 80), matPapel(0xC9E6C4));
     fundo.position.set(0, -38.7, -34);
     cena.add(fundo);
 
@@ -791,12 +874,16 @@
     relogio = new THREE.Clock();
     heroi = criarHeroi();
     heroi.rotation.y = Math.PI / 2;              // de frente para a direita
+    heroi.traverse(function (o) {                // só as peças, não as cascas de contorno
+      if (o.isMesh && !o.userData.casca && o !== sombra) o.castShadow = true;
+    });
 
     for (var i = 0; i < 26; i++) solidos.push(novoSolido());
     for (var j = 0; j < 14; j++) blocos.push(novoBloco());
     for (var c = 0; c < 80; c++) {
       var cm = new THREE.Mesh(GEO_CORACAO, new THREE.MeshLambertMaterial({ color: CORACOES[c % CORACOES.length] }));
       cm.scale.setScalar(0.8);
+      cm.castShadow = true;
       cm.visible = false; cena.add(cm);
       coracoes.push({ obj: cm, ativo: false });
     }
@@ -808,6 +895,8 @@
     for (var a = 0; a < 16; a++) decors.push({ obj: criarArvore(), tipo: "arvore" });
     for (var n = 0; n < 8; n++) decors.push({ obj: criarNuvem(), tipo: "nuvem" });
     for (var h = 0; h < 5; h++) decors.push({ obj: criarMorro(), tipo: "morro" });
+    for (var q = 0; q < 4; q++) decors.push({ obj: criarMontanha(), tipo: "montanha" });
+    for (var t2 = 0; t2 < 10; t2++) decors.push({ obj: criarMato(), tipo: "mato" });
     decors.forEach(function (d) { d.obj.visible = false; });
 
     try { recorde = parseInt(localStorage.getItem("vitoria.recorde") || "0", 10) || 0; } catch (e) { recorde = 0; }
@@ -836,9 +925,9 @@
   function ajustarCamera() {
     var asp = window.innerWidth / window.innerHeight;
     camera.aspect = asp;
-    var larg = asp < 0.85 ? 11 : 16;             // quanto de pista cabe na tela
+    var larg = asp < 0.85 ? 8.5 : 15;            // quanto de pista cabe na tela
     var d = (larg / 2) / (Math.tan(camera.fov * Math.PI / 360) * asp);
-    DIST_CAM = Math.max(13, Math.min(34, d));
+    DIST_CAM = Math.max(11, Math.min(30, d));
     ADIANTE = asp < 0.85 ? 1.9 : 3.2;
     camera.updateProjectionMatrix();
   }
@@ -930,15 +1019,15 @@
   /* =========================== fluxo do jogo ========================= */
   function comecar() {
     estado = "jogando";
-    velBase = VEL0; dist = 0; pontos = 0; vidas = 3;
-    invencivel = 0; tremor = 0; tempo = 0;
-    jogador.x = 0; jogador.y = 0; jogador.vy = 0; jogador.vel = VEL0;
+    dist = 0; pontos = 0; vidas = 3; xMax = 0; limiteTras = -12;
+    invencivel = 0; tremor = 0; tempo = 0; olhando = Math.PI / 2; adianteAtual = 3;
+    jogador.x = 0; jogador.y = 0; jogador.vy = 0; jogador.vel = 0;
     jogador.giro = 0; jogador.girando = false; jogador.passo = 0; jogador.noChao = true;
     seguro.x = 0; seguro.y = 0;
     neutro = null; inclinacao = 0; alvoToque = null;
     heroi.position.set(0, 0, 0);
     corpoTodo.rotation.set(0, 0, 0); corpoTodo.position.set(0, 0, 0);
-    camera.position.set(ADIANTE, 2.9, DIST_CAM);
+    camera.position.set(0, 2.9, DIST_CAM);
     prepararMundo();
     atualizarVidas(); atualizarHud();
     el.inicio.classList.remove("on");
@@ -946,8 +1035,8 @@
     el.hud.classList.add("ativo");
     var deitado = window.innerWidth / window.innerHeight >= 0.85;
     var noComputador = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
-    el.aviso.textContent = noComputador ? "→ acelera, ← segura, espaço pula"
-      : (deitado ? "Incline para a direita e acelere. Toque para pular."
+    el.aviso.textContent = noComputador ? "→ e ← andam, espaço pula"
+      : (deitado ? "Incline o celular para andar. Um toque pula."
                  : "Vire o celular deitado para ver mais pista");
     setTimeout(function () { if (estado === "jogando") el.aviso.textContent = ""; }, 4600);
     Som.musica(true);
@@ -986,8 +1075,7 @@
     vidas--;
     invencivel = 1.5;
     tremor = 0.5;
-    velBase = Math.max(VEL0, velBase - 2.5);
-    jogador.vel = Math.max(3, jogador.vel * 0.45);
+    jogador.vel *= 0.2;
     Som.efeito("batida");
     atualizarVidas();
     if (vidas <= 0) terminar();
@@ -1045,7 +1133,7 @@
     sombra.visible = true;
     sombra.position.y = 0.03 - Math.abs(Math.sin(tempo * 2.2)) * 0.1;
     sombra.scale.setScalar(1);
-    animarCorrida(dt, 6);
+    animarCorrida(dt, 6, false);
     var ax = jogador.x + 1.2;
     camera.position.set(ax, jogador.y + 2.6, DIST_CAM * 0.72);
     camera.lookAt(ax - 1.2, jogador.y + 2.1, 0);
@@ -1053,22 +1141,24 @@
 
   function passo(dt) {
     tempo += dt;
-    velBase = Math.min(VELMAX, velBase + ACEL * dt);
 
-    /* ---- acelerar ou segurar ---- */
-    var f = 1;
+    /* ---- o ângulo do celular manda: frente e trás ---- */
+    var alvo = 0;
     if (temSensor && alvoToque === null) {
-      var t = clamp(inclinacao, -26, 26);
-      if (Math.abs(t) < 2.5) t = 0;
-      f = 1 + clamp(t / 20, -1, 1) * 0.72;
+      var t = clamp(inclinacao, -28, 28);
+      if (Math.abs(t) < 3) t = 0;
+      alvo = clamp(t / 20, -1, 1) * VELMAX;
     }
-    if (alvoToque !== null) f = 1 + alvoToque * 0.72;
-    if (teclas.dir) f = 1.72;
-    if (teclas.esq) f = 0.34;
-    jogador.vel += (velBase * f - jogador.vel) * Math.min(1, dt * 3.5);
-    jogador.vel = Math.max(2, jogador.vel);
+    if (alvoToque !== null) alvo = clamp(alvoToque, -1, 1) * VELMAX;
+    if (teclas.dir) alvo = VELMAX;
+    if (teclas.esq) alvo = -VELMAX;
+    jogador.vel += (alvo - jogador.vel) * Math.min(1, dt * 5);
+    if (Math.abs(jogador.vel) < 0.05) jogador.vel = 0;
     jogador.x += jogador.vel * dt;
-    dist += jogador.vel * dt * 0.55;
+
+    if (jogador.x > xMax) { dist += (jogador.x - xMax) * 0.55; xMax = jogador.x; }
+    limiteTras = Math.max(limiteTras, xMax - 34);   // até onde o mundo ainda existe atrás
+    if (jogador.x < limiteTras) { jogador.x = limiteTras; jogador.vel = Math.max(0, jogador.vel); }
 
     /* ---- gravidade, chão e degraus ---- */
     jogador.vy -= GRAV * dt;
@@ -1103,7 +1193,9 @@
 
     /* ---- a Vitória na tela ---- */
     heroi.position.set(jogador.x, jogador.y, 0);
-    heroi.rotation.y = Math.PI / 2;
+    if (jogador.vel > 0.6) olhando += (Math.PI / 2 - olhando) * Math.min(1, dt * 9);
+    else if (jogador.vel < -0.6) olhando += (-Math.PI / 2 - olhando) * Math.min(1, dt * 9);
+    heroi.rotation.y = olhando;
     if (jogador.girando) {                       // mortal para a frente
       jogador.giro = Math.min(Math.PI * 2, jogador.giro + dt * 8.5);
       var hh = 1.5;
@@ -1123,7 +1215,10 @@
       sombra.scale.setScalar(clamp(1 - (jogador.y - chaoAbaixo) * 0.08, 0.45, 1));
     }
 
-    animarCorrida(dt, jogador.noChao ? jogador.vel : 0);
+    animarCorrida(dt, jogador.noChao ? Math.abs(jogador.vel) : 0, !jogador.noChao);
+    sol.position.set(jogador.x - 7, 18, 13);
+    sol.target.position.set(jogador.x, jogador.y, 0);
+    sol.target.updateMatrixWorld();
     moverMundo();
     checarColisoes();
     posicionarCamera(dt);
@@ -1132,19 +1227,19 @@
 
   function moverMundo() {
     var x = jogador.x;
-    while (proxX < x + VISTA) proxX += gerarTrecho(proxX);
+    while (proxX < xMax + VISTA) proxX += gerarTrecho(proxX);
 
-    solidos.forEach(function (s) { if (s.ativo && s.x1 < x - 26) { s.ativo = false; s.obj.visible = false; } });
-    blocos.forEach(function (b) { if (b.ativo && b.x < x - 26) { b.ativo = false; b.obj.visible = false; } });
+    solidos.forEach(function (s) { if (s.ativo && s.x1 < xMax - 44) { s.ativo = false; s.obj.visible = false; } });
+    blocos.forEach(function (b) { if (b.ativo && b.x < xMax - 44) { b.ativo = false; b.obj.visible = false; } });
     coracoes.forEach(function (c) {
       if (!c.ativo) return;
       c.obj.rotation.y += 0.045;
-      if (c.obj.position.x < x - 26) { c.ativo = false; c.obj.visible = false; }
+      if (c.obj.position.x < xMax - 44) { c.ativo = false; c.obj.visible = false; }
     });
     molas.forEach(function (m) {
       if (!m.ativo) return;
       m.obj.scale.y = 1 + Math.sin(tempo * 6 + m.x) * 0.14;
-      if (m.x < x - 26) { m.ativo = false; m.obj.visible = false; }
+      if (m.x < xMax - 44) { m.ativo = false; m.obj.visible = false; }
     });
     decors.forEach(function (d) {
       if (d.obj.position.x < x - 34) reposicionarDecor(d, x + VISTA + Math.random() * 26);
@@ -1178,15 +1273,17 @@
       if (!b.ativo) continue;
       if (Math.abs(b.x - px) < MEIO + 0.72 && py < b.y + 1.6 - 0.4 && py + ALTURA > b.y + 0.1) {
         perderVida();
-        jogador.x = b.x - MEIO - 0.85;            // empurra para trás do bloco
+        jogador.x = b.x + (jogador.vel >= 0 ? -1 : 1) * (MEIO + 0.95);
         return;
       }
     }
   }
 
   function posicionarCamera(dt) {
-    var ax = jogador.x + ADIANTE;
-    var ay = 2.6 + Math.max(-1, jogador.y) * 0.6;
+    var dir = jogador.vel > 0.6 ? 1 : (jogador.vel < -0.6 ? -1 : 0);
+    adianteAtual += (ADIANTE * dir - adianteAtual) * Math.min(1, dt * 2.2);
+    var ax = jogador.x + adianteAtual;
+    var ay = 3.1 + Math.max(-1, jogador.y) * 0.6;
     camera.position.x += (ax - camera.position.x) * Math.min(1, dt * 9);
     camera.position.y += (ay - camera.position.y) * Math.min(1, dt * 4);
     camera.position.z = DIST_CAM;
@@ -1194,7 +1291,7 @@
       camera.position.x += (Math.random() - 0.5) * tremor * 0.6;
       camera.position.y += (Math.random() - 0.5) * tremor * 0.5;
     }
-    camera.lookAt(jogador.x + 0.4, camera.position.y - 0.55, 0);
+    camera.lookAt(jogador.x + adianteAtual * 0.12, camera.position.y - 1.55, 0);
   }
 
   carregarThree(0);

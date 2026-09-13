@@ -48,9 +48,10 @@ olhinhos quadrados, a saia — com sombreado *cel shading* e contorno de tinta,
 para parecer o desenho ganhando volume. Tem braços e pernas articulados
 (cotovelo e joelho), cabelo com maria-chiquinhas e sapatinhos vermelhos.
 
-- **Controle por acelerômetro**: incline o celular para a direita para correr
-  mais rápido, para a esquerda para segurar. No iPhone o navegador pede
-  permissão do sensor no primeiro toque em Começar.
+- **Controle por acelerômetro**: o ângulo do aparelho manda no movimento —
+  incline para a direita e ela anda para frente, para a esquerda e ela volta;
+  no meio, ela fica parada. Quanto maior a inclinação, mais rápido. No iPhone
+  o navegador pede permissão do sensor no primeiro toque em Começar.
 - **Toque na tela** para pular (ela dá um mortal no ar). No computador:
   **→** acelera, **←** segura e **espaço** pula.
 - Pule os buracos, suba nas plataformas, pegue corações, desvie dos blocos
@@ -59,5 +60,8 @@ para parecer o desenho ganhando volume. Tem braços e pernas articulados
   salvo no aparelho.
 - A música e os efeitos são sintetizados na hora pelo próprio navegador
   (Web Audio), sem nenhum arquivo de áudio.
+- O cenário tem sombras projetadas de verdade (shadow map), chão com beirada
+  de grama, tufos e florzinhas, mato passando em primeiro plano e camadas de
+  árvores, morros e montanhas ao fundo, para dar profundidade.
 - O 3D usa a biblioteca Three.js, carregada de CDN — precisa de internet na
   primeira abertura.
