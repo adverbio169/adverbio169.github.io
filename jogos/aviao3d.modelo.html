@@ -23,7 +23,10 @@
   #euSou b{color:#fff}
   .rotG{font-size:13px;letter-spacing:.6px;color:#9fd4ff;text-transform:none;font-weight:800}
   #sala.chama{border-color:rgba(92,200,255,.6);box-shadow:0 0 0 2px rgba(92,200,255,.18)}
-  #btAbreSala{display:none;left:50%;transform:translateX(-50%);top:14px;bottom:auto;
+  /* Estava em `top:14;left:50%` — exatamente onde mora a caixa do combustível,
+     e as duas se sobrepunham: "SALA CUNN" escrito por cima do 100%. Desceu
+     para baixo dela. */
+  #btAbreSala{display:none;left:50%;transform:translateX(-50%);top:74px;bottom:auto;
               font:800 13px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.16em}
   #btAbreSala.ver{display:block}
   #painelSala{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;
@@ -3267,6 +3270,188 @@ function bussola(y){
   h2.restore(); h2.textAlign = 'left';
 }
 
+/* =============================================================================
+   O MAPINHA REDONDO
+
+   Até aqui o jogo tinha bússola (para onde o nariz aponta) e seta de alvo
+   (onde está o próximo), e nenhuma resposta para a pergunta que vem antes das
+   duas: ONDE EU ESTOU. Voando em cima de uma cidade que se repete, sem isso a
+   pessoa fica girando à toa procurando a pista.
+
+   Três decisões:
+
+   1. NARIZ PARA CIMA, não norte para cima. Mapa de papel aponta o norte; mapa
+      de avião aponta para onde se está indo, senão a pessoa tem de girar a
+      cabeça para traduzir. O norte vira um risquinho que passeia pela borda —
+      é ele que gira, não o mundo.
+
+   2. SÓ O QUE SE PROCURA. A pista, os adversários e os alvos que faltam. Os
+      tambores e os pombos ficam de fora: são dezenas, e um radar cheio de
+      pontinhos não responde pergunta nenhuma.
+
+   3. QUEM ESTÁ FORA DO ALCANCE FICA NA BORDA, e menorzinho. Sumir com o
+      adversário porque ele está a 30 km é justamente esconder a informação de
+      que ele existe e de que lado ele vem.
+   ========================================================================== */
+const RADAR_KM = 26000;                 // o mesmo alcance do buscador do míssil
+/* ONDE O DISCO CABE — uma função à parte porque o desenho e o teste precisam
+   da MESMA resposta. Com o lugar escrito na mão em dois lugares, mudar o
+   desenho fazia o teste ler pixels de onde o radar não estava mais e acusar
+   defeito que não existia.
+
+   Eu tinha chutado "14 do canto, 62 do rodapé" — e caiu bem em cima da caixa
+   da velocidade, que mora no canto de baixo à esquerda e muda de altura
+   conforme o que mostra (trem, flapes, leme). Chute nenhum sobrevive a um
+   painel que cresce, então o disco PERGUNTA à caixa onde ela está e se encosta
+   logo acima dela. */
+/* ONDE O DISCO CABE — e por que ele PROCURA em vez de ter um lugar.
+
+   Três tentativas de escolher o lugar na mão, três atropelamentos:
+
+   1. "14 do canto, 62 do rodapé" — caiu dentro da caixa da velocidade.
+   2. "olhe os painéis colados na borda esquerda" — a caixa da velocidade não é
+      colada (começa em 135), e voltou a ser atropelada.
+   3. "olhe quem cruza a faixa da esquerda" — funcionou no computador e, no
+      celular, o disco foi parar DEBAIXO do seletor de armas: desenhado e
+      invisível, o pior dos dois mundos, porque custa desenho e não mostra nada.
+
+   O erro é sempre o mesmo: eu decidindo de antemão onde há espaço, numa tela
+   cujo conteúdo muda com o modo (dedo ou sensor), com o tamanho e com o que o
+   avião está fazendo. A tela sabe melhor do que eu. Então o disco experimenta
+   os quatro cantos, do maior raio para o menor, e fica no primeiro em que não
+   encosta em nada — e no maior, se nenhum couber inteiro. Painel nenhum
+   precisa ser nomeado e o que aparecer amanhã já entra na conta.
+
+   A busca não roda a cada quadro: a arrumação da tela só muda quando a janela
+   muda ou quando um botão aparece, então meio segundo de memória basta e o
+   custo some. */
+let _radar = null, _radarQuando = 0;
+function radarOnde(){
+  const agora = performance.now();
+  if (_radar !== undefined && agora - _radarQuando < 500) return _radar;
+  _radarQuando = agora;
+
+  const obst = [];
+  for (const el of document.querySelectorAll(
+        '.painel, .bt, #convite, #dArma, #dFogo, .dedoM, #dCima')){
+    if (el.id === 'btAbreSala' || getComputedStyle(el).display === 'none') continue;
+    const q = el.getBoundingClientRect();
+    if (q.width > 0 && q.height > 0) obst.push(q);
+  }
+  const encosta = (q, cx, cy, r) => {
+    const px = Math.max(q.left, Math.min(cx, q.right));
+    const py = Math.max(q.top,  Math.min(cy, q.bottom));
+    return Math.hypot(cx-px, cy-py) < r;
+  };
+  /* Só encolher no canto não resolve: o canto é justamente onde os painéis
+     moram, e o disco encolhia até 40 sem nunca sair de dentro deles. Ele tem
+     de DESLIZAR pela borda — de baixo para cima, que é onde um radar se
+     espera — até achar a faixa livre. Encolher é o último recurso, não o
+     primeiro. */
+  /* E nem a borda basta: no modo de dedo as tiras do acelerador e do nitro
+     ocupam os dois lados de cima a baixo, então NENHUMA posição encostada na
+     borda fica livre — num celular o disco simplesmente não aparecia. A busca
+     entra para dentro também, de fora para o meio, ficando o mais longe do
+     centro que der (o meio da tela é por onde se olha para voar). */
+  const m = 12, rMax = Math.max(46, Math.min(W, H) * 0.115);
+  for (let r = rMax; r >= 40; r -= 4){
+    const dentro = [];
+    for (let k = 0; k <= 7; k++){                        // 0 = colado na borda
+      dentro.push(m + r + k*r*0.55);                     // vindo da esquerda
+      dentro.push(W - m - r - k*r*0.55);                 // e da direita
+    }
+    for (const cx of dentro){
+      if (cx - r < 0 || cx + r > W) continue;
+      for (let cy = H - m - r; cy >= m + r; cy -= 8){    // subindo do rodapé
+        if (obst.some(q => encosta(q, cx, cy, r))) continue;
+        _radar = { cx, cy, r };
+        return _radar;
+      }
+    }
+  }
+  _radar = null;
+  return null;
+}
+/* a arrumação mudou: esquece o que estava decorado */
+addEventListener('resize', () => { _radarQuando = 0; });
+
+function desenhaRadar(){
+  const onde = radarOnde();
+  if (!onde) return;
+  const { cx, cy, r } = onde;
+
+  h2.save();
+  h2.beginPath(); h2.arc(cx, cy, r, 0, 7);
+  h2.fillStyle = 'rgba(8,12,26,.62)'; h2.fill();
+  h2.clip();                                      // tudo o que segue mora no disco
+
+  const esc = r / RADAR_KM;
+  const rv = rumoVisto();
+  /* de um ponto do mundo para o disco: o ângulo é o mesmo que a bússola usa
+     para achar o alvo, e aqui ele vira posição em vez de seta */
+  const poe = (x, z) => {
+    const dx = x - aviaoX, dz = z - aviaoZ;
+    const d = Math.hypot(dx, dz);
+    const a = Math.atan2(-dx, dz) - rv;
+    return { x: cx + Math.sin(a)*d*esc, y: cy - Math.cos(a)*d*esc, d };
+  };
+
+  // a pista: a coisa que mais se procura quando se está perdido
+  const p0 = poe(0, PISTA_Z0), p1 = poe(0, PISTA_Z1);
+  h2.strokeStyle = 'rgba(150,170,200,.75)'; h2.lineWidth = Math.max(2, r*0.055);
+  h2.beginPath(); h2.moveTo(p0.x, p0.y); h2.lineTo(p1.x, p1.y); h2.stroke();
+
+  // os alvos que faltam
+  h2.fillStyle = 'rgba(255,196,90,.9)';
+  for (const a of alvos){
+    if (!a.vivo) continue;      // o campo é `vivo`; `destruido` não existe e o
+                                // radar mostrava alvo já derrubado como se faltasse
+    const q = poe(a.x, a.z);
+    if (q.d > RADAR_KM) continue;
+    h2.fillRect(q.x-2, q.y-2, 4, 4);
+  }
+
+  // os outros aviões, e os de fora do alcance encostados na borda
+  for (const o of Batalha.outros.values()){
+    if (o.vivo === false) continue;
+    const q = poe(o.x, o.z);
+    const fora = q.d > RADAR_KM;
+    let px = q.x, py = q.y;
+    if (fora){
+      const ang = Math.atan2(q.y - cy, q.x - cx);
+      px = cx + Math.cos(ang)*(r-4); py = cy + Math.sin(ang)*(r-4);
+    }
+    h2.fillStyle = fora ? 'rgba(255,120,100,.75)' : 'rgba(255,90,70,.95)';
+    h2.beginPath(); h2.arc(px, py, fora ? 2.6 : 4.2, 0, 7); h2.fill();
+  }
+
+  // o norte, passeando pela borda
+  h2.strokeStyle = 'rgba(120,200,255,.9)'; h2.lineWidth = 2;
+  h2.beginPath();
+  h2.moveTo(cx + Math.sin(-rv)*(r-2),  cy - Math.cos(-rv)*(r-2));
+  h2.lineTo(cx + Math.sin(-rv)*(r-9),  cy - Math.cos(-rv)*(r-9));
+  h2.stroke();
+
+  h2.restore();
+
+  // a borda e o anel do meio-alcance, por cima do recorte
+  h2.strokeStyle = 'rgba(255,255,255,.22)'; h2.lineWidth = 1.4;
+  h2.beginPath(); h2.arc(cx, cy, r, 0, 7); h2.stroke();
+  h2.beginPath(); h2.arc(cx, cy, r*0.5, 0, 7); h2.stroke();
+
+  // e o avião, sempre no meio e sempre apontando para cima
+  h2.fillStyle = 'rgba(150,255,190,.95)';
+  h2.beginPath();
+  h2.moveTo(cx, cy - 7); h2.lineTo(cx - 5, cy + 5); h2.lineTo(cx + 5, cy + 5);
+  h2.closePath(); h2.fill();
+
+  /* a etiqueta do alcance por DENTRO da borda: embaixo do disco ela caía atrás
+     da caixa da velocidade e não se lia nunca */
+  h2.font = '700 ' + Math.max(8, r*0.16).toFixed(0) + 'px system-ui, sans-serif';
+  h2.textAlign = 'center'; h2.fillStyle = 'rgba(190,205,230,.6)';
+  h2.fillText(Math.round(RADAR_KM/METRO/100)/10 + ' km', cx, cy + r - Math.max(5, r*0.10));
+}
+
 function desenhaHUD(){
   h2.clearRect(0,0,W,H);
   if (clarao > 0){
@@ -3515,6 +3700,8 @@ function desenhaHUD(){
     g4.addColorStop(1, 'rgba(255,40,40,0)');
     h2.fillStyle = g4; h2.fillRect(W-esp,0,esp,H);
   }
+
+  if (jogando && !caindo) desenhaRadar();
 
   if ((infinito || munInfinita) && jogando){
     // no canto de cima à esquerda, abaixo dos painéis: no rodapé ele

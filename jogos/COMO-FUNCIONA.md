@@ -2141,3 +2141,84 @@ verdade em redes diferentes — um no wi-fi, outro no 4G — precisam de um serv
 TURN para atravessar o NAT, e o PeerJS público não dá isso. Se continuar sem
 entrar com os dois longe um do outro, é esse o próximo lugar para olhar, e não
 a tela.
+
+---
+
+## O mapinha redondo
+
+> *"Tem que ter um mapinha redondo no canto."*
+
+O jogo tinha bússola (para onde o nariz aponta) e seta de alvo (onde está o
+próximo), e nenhuma resposta para a pergunta que vem antes das duas: **onde eu
+estou**. Voando sobre uma cidade que se repete, sem isso a pessoa fica girando
+à toa procurando a pista.
+
+Três decisões mandaram no desenho:
+
+1. **Nariz para cima, não norte para cima.** Mapa de papel aponta o norte; mapa
+   de avião aponta para onde se está indo, senão é preciso girar a cabeça para
+   traduzir. O norte virou um risquinho que passeia pela borda — é ele que
+   gira, não o mundo.
+2. **Só o que se procura:** a pista, os adversários e os alvos que faltam. Os
+   tambores e os pombos ficaram de fora; são dezenas, e um radar cheio de
+   pontinhos não responde pergunta nenhuma.
+3. **Quem está fora do alcance fica na borda**, menorzinho. Sumir com o
+   adversário porque ele está a 30 km é esconder justamente a informação de que
+   ele existe e de que lado ele vem.
+
+### A geometria, lida dos pixels
+
+Sinal trocado é o erro que mais me pegou neste projeto, então o teste não
+confere a conta: ele **põe um avião no mundo, manda desenhar e procura o ponto
+vermelho** dentro do disco.
+
+```
+o outro avião à frente (+z)  aparece EM CIMA   ✔
+o outro avião atrás  (-z)    aparece EMBAIXO   ✔
+o outro avião à direita      aparece DIREITA   ✔
+o outro avião à esquerda     aparece ESQUERDA  ✔
+virei o nariz 90° para a DIREITA:
+   quem estava à frente foi para a ESQUERDA    ✔ o mundo gira, o avião não
+a 50.000 (o alcance é 26.000): fica na borda   ✔
+alvo destruído: some do mapa                   ✔
+```
+
+O último saiu de uma leitura do código, não do teste: eu tinha escrito
+`if (a.destruido) continue` e o campo chama-se `vivo`. `destruido` é sempre
+`undefined`, então o radar mostrava alvo já derrubado como se ainda faltasse.
+
+### Onde o disco cabe: três palpites e uma busca
+
+O pedido dizia "no canto". O canto é o único lugar onde ele **não** cabe.
+
+| tentativa | o que aconteceu |
+|---|---|
+| "14 do canto, 62 do rodapé" | caiu dentro da caixa da velocidade |
+| "olhe os painéis colados na borda esquerda" | a caixa da velocidade começa em 135, não é colada — atropelado de novo |
+| "olhe quem cruza a faixa da esquerda" | certo no computador; no celular o disco foi parar **debaixo** do seletor de armas — desenhado e invisível |
+| encolher no canto até caber | o canto é onde os painéis moram: encolhia até 40 sem nunca sair de dentro deles |
+| deslizar pela borda, de baixo para cima | certo no computador; no celular as tiras do acelerador e do nitro ocupam os dois lados **de cima a baixo** |
+
+O erro foi sempre o mesmo: **eu decidindo de antemão onde há espaço**, numa
+tela cujo conteúdo muda com o modo (dedo ou sensor), com o tamanho e com o que
+o avião está fazendo. A tela sabe melhor do que eu.
+
+Então o disco procura. Do maior raio para o menor, de fora para dentro, de
+baixo para cima, ele para no primeiro lugar em que não encosta em nada. Painel
+nenhum precisa ser nomeado, e o que aparecer amanhã já entra na conta. A busca
+não roda a cada quadro — a arrumação só muda quando a janela muda ou quando um
+botão aparece, então meio segundo de memória basta.
+
+```
+iPhone deitado  844×390 -> disco de 46 em (235, 244)  ✔ sem encostar em nada
+Android         915×412 -> 47 em (138, 265)           ✔
+iPhone pequeno  667×375 -> 46 em (235, 229)           ✔
+computador     1280×800 -> 92 em (104, 568)           ✔ canto de baixo, como se espera
+quadros por segundo: 6,6 -> 5,6 (o mesmo de antes do radar)
+```
+
+### E um encontrão que já estava lá
+
+O botão `SALA` nasceu em `top:14; left:50%` — exatamente onde mora a caixa do
+combustível. As duas se sobrepunham, com "SALA CUNN" escrito por cima do 100%.
+Desceu para baixo dela.
