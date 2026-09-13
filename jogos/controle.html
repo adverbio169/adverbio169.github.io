@@ -988,6 +988,22 @@ function diagTremor(){
   linhas.push('um buzz simples de 500 ms: ' + direto);
   if (app) linhas.push('⚠ navegador de dentro de app quase nunca vibra — '
                      + 'abra o link no Chrome (menu ⋮ → "Abrir no Chrome")');
+  /* --- O CASO "ACEITA" -------------------------------------------------------
+     Foi o que voltou do aparelho de verdade: Samsung Internet, `vibrate`
+     existe, página em foco, buzz ACEITO — e nada se sente. Aceito quer dizer
+     que o navegador pegou o pedido e passou adiante; daí para baixo é o
+     Android, e página nenhuma tem como ver ou mexer nisso.
+
+     Parar no dado seria deixar a pessoa com um relatório e sem resposta. Então
+     quando é esse caso o diagnóstico diz ONDE olhar — e a primeira suspeita é
+     sempre a mesma: a intensidade da vibração para toque, que num Samsung vem
+     num controle separado do toque de chamada e pode estar no zero. */
+    if (!app && direto === 'aceita')
+      linhas.push('⚠ o navegador ACEITOU: daqui para baixo é o Android, o jogo não alcança.\n'
+                + 'Se não sentiu nada, veja Configurações → Sons e vibração →\n'
+                + 'Intensidade da vibração → "Interação por toque" (não pode estar no zero),\n'
+                + 'e confira se o aparelho não está no silencioso.'
+                + (nome === 'Chrome' ? '' : '\nVale abrir o mesmo endereço no Chrome, para comparar.'));
   return linhas.join('\n');
 }
 

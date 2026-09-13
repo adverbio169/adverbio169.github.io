@@ -2434,3 +2434,40 @@ aparelho não fez"*, que são dois problemas com dois donos diferentes.
 
 Seis navegadores são reconhecidos no teste: Chrome no Android, WebView do
 WhatsApp, Instagram, Facebook, Samsung Internet e Safari no iPhone.
+
+### O que o aparelho respondeu
+
+```
+navegador: Samsung Internet · Android
+navigator.vibrate: existe · a página está em foco: sim
+um buzz simples de 500 ms: aceita
+```
+
+**Aceita.** Não é WebView, não é falta de gesto do dedo, não é recusa do
+navegador, não é o padrão curto demais. O navegador pegou o pedido e passou
+adiante — daqui para baixo é o Android, e página nenhuma tem como ver ou mexer
+nisso.
+
+Ou seja: o caminho todo do jogo está certo, e estava certo antes dos dois
+consertos de verdade que saíram desta caçada (a metade dos tremores que caía no
+chão, e os pulsos curtos demais). Os dois eram reais; nenhum dos dois era ESTE.
+
+Parar no dado seria deixar a pessoa com um relatório e sem resposta, então
+quando o buzz vem `aceita` o diagnóstico passa a dizer **onde olhar**:
+
+```
+⚠ o navegador ACEITOU: daqui para baixo é o Android, o jogo não alcança.
+Se não sentiu nada, veja Configurações → Sons e vibração →
+Intensidade da vibração → "Interação por toque" (não pode estar no zero),
+e confira se o aparelho não está no silencioso.
+```
+
+Num Samsung essa intensidade vem num controle **separado** do toque de chamada e
+das notificações — dá para ter o telefone vibrando em chamada e mudo para
+interação por toque, que é exatamente o estado em que uma página não vibra.
+
+**A lição, que vale mais que o conserto:** eu passei três rodadas consertando
+código a partir de *"não tremeu"*. Dois dos consertos eram necessários, mas
+nenhum era a causa — e eu só descobri isso quando **fiz o código contar o que
+acontecia**. Um `try/catch` mudo custou mais tempo que todos os defeitos que ele
+escondia.
