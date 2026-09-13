@@ -7087,6 +7087,7 @@ let rumo=0, inclinacao=0, arfagem=0, leme=0;
 let voo=VOO_BASE, turbo=0, combustivel=100, distancia=0, recorde=0;
 let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
 let noChao=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0, estolando=false;
+let estresse=0;
 let vida=100;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
@@ -7676,6 +7677,13 @@ function montaPombos(){
    PARTE 4 — VOO, REGRAS E CÂMERA
    ========================================================================== */
 let tremAnim = 1, flapAnim = 0;
+/* SACOLEJO DA CÂMERA. `sacode(f)` guarda o maior susto do momento e ele
+   desce sozinho; o desenho soma um deslocamento aleatório em cima da posição
+   da câmera. É o que transforma "um aviso na tela" em "a cabine está
+   sofrendo". Usado pelo tremor aerodinâmico, pelo estol, pelos tiros, pelas
+   explosões e por levar chumbo. */
+let sacudida = 0, sacudidaFixa = 0;
+function sacode(f){ sacudida = Math.max(sacudida, f); }
 let camPos = new THREE.Vector3(), camF={x:0,y:0,z:1}, camC={x:0,y:1,z:0}, camD={x:1,y:0,z:0};
 const CAMD = 620;
 
@@ -7683,6 +7691,16 @@ function giraPar(u, v, ang){
   const c = Math.cos(ang), s = Math.sin(ang);
   return [ {x:u.x*c + v.x*s, y:u.y*c + v.y*s, z:u.z*c + v.z*s},
            {x:v.x*c - u.x*s, y:v.y*c - u.y*s, z:v.z*c - u.z*s} ];
+}
+/* giro de um vetor em torno de um eixo QUALQUER (fórmula de Rodrigues).
+   O `giraPar` só sabe girar dentro do plano de dois vetores do próprio avião;
+   para o estol eu preciso girar em torno de um eixo do MUNDO. */
+function giraEmTorno(v, k, ang){
+  const c = Math.cos(ang), s = Math.sin(ang);
+  const kv = vcruz(k, v), kd = vponto(k, v)*(1-c);
+  return { x: v.x*c + kv.x*s + k.x*kd,
+           y: v.y*c + kv.y*s + k.y*kd,
+           z: v.z*c + kv.z*s + k.z*kd };
 }
 function lemeTecla(){ return (tecla.lemeE?-1:0) + (tecla.lemeD?1:0); }
 /* ---------------------------------------------------------------------------
@@ -7756,7 +7774,15 @@ function poeCamera(dt){
                                    aviaoZ - eixoF.z*CAMD + eixoC.z*210);
     camPos.lerp(alvo, Math.min(1, dt*12));
   }
-  cam.position.copy(camPos);
+  /* o sacolejo entra DEPOIS da posição calculada: a câmera continua
+     perseguindo o avião direitinho, só que com a mão tremendo */
+  const tr = Math.max(sacudida, sacudidaFixa);
+  if (tr > 0.002){
+    const a = tr*tr*70;                       // ao quadrado: leve some, forte sacode
+    cam.position.set(camPos.x + (Math.random()-0.5)*a,
+                     camPos.y + (Math.random()-0.5)*a,
+                     camPos.z + (Math.random()-0.5)*a);
+  } else cam.position.copy(camPos);
   /* A câmera do three.js olha pelo -Z dela. Montar a matriz na mão com
      (direita, cima, -frente) dá uma base ESPELHADA — e o resultado é o avião
      indo parar atrás da câmera. lookAt monta a base certa a partir do "para
@@ -7950,6 +7976,42 @@ function somTravado(liga){
        AFLITO. Sem o tremor era só barulho; com ele, é urgência.
    E ela só para quando o avião voltar a voar.
    -------------------------------------------------------------------------- */
+/* --- O TREMOR AERODINÂMICO (o aviso ANTES do estol) ------------------------
+   Avião de verdade avisa antes de largar: a asa começa a descolar o ar perto
+   da ponta e a cabine inteira TREME. É o "buffet", e é o aviso mais honesto
+   que existe, porque você sente antes de ler qualquer instrumento.
+
+   Aqui ele é um ronco grave e sujo — ruído por um passa-baixa que abre
+   conforme aperta — com a intensidade ligada ao quanto falta para o estol.
+   Junto com ele a câmera treme e o celular treme. Quando o ronco vira buzina,
+   já é tarde: isso é o estol.
+   -------------------------------------------------------------------------- */
+let roncoBuffet = null;
+function somBuffet(nivel){
+  if (!audio) return;
+  try{
+    if (nivel > 0.01 && !roncoBuffet){
+      const f = ruido(); if (!f) return;
+      const lp = audio.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 220; lp.Q.value = 1.4;
+      const g = audio.createGain(); g.gain.value = 0.0001;
+      f.connect(lp); lp.connect(g); g.connect(audio.destination);
+      f.start();
+      roncoBuffet = { f, g, lp };
+    }
+    if (roncoBuffet){
+      const t = audio.currentTime;
+      roncoBuffet.g.gain.setTargetAtTime(nivel*0.20, t, 0.08);
+      roncoBuffet.lp.frequency.setTargetAtTime(150 + nivel*420, t, 0.08);
+      if (nivel <= 0.01){
+        const { f, g } = roncoBuffet; roncoBuffet = null;
+        g.gain.setTargetAtTime(0.0001, t, 0.06);
+        f.stop(t + 0.3);
+      }
+    }
+  }catch(e){ roncoBuffet = null; }
+}
+
 let buzinaEstol = null;
 function somEstol(liga){
   if (!audio) return;
@@ -8251,6 +8313,7 @@ function dispara(){
     bombas.push({ no:m, tipo:'bomba', x:aviaoX, y:aviaoY-60, z:aviaoZ,
                   vx:eixoF.x*voo, vy:eixoF.y*voo - 60, vz:eixoF.z*voo });
     bip(150, 0.12, 'sawtooth', 0.1);
+    sacode(0.12);
     Controles.bate('bomba');
   } else if (arma === 'missil'){
     const m = montaMissil(); cena.add(m);
@@ -8261,6 +8324,7 @@ function dispara(){
                   vx:T.x*vel, vy:T.y*vel, vz:T.z*vel, vida:6.0,
                   segue: perseguido, fumaca: 0 });
     somMissil();
+    sacode(0.16);
     Controles.bate('missil');
     if (perseguido) mostraAviso('MÍSSIL A CAMINHO', '#ff9a6b', 900);
     // trava gasta: um míssil, um alvo
@@ -8272,6 +8336,7 @@ function dispara(){
     tiros.push({ no:m, x:aviaoX + eixoD.x*lado, y:aviaoY + eixoD.y*lado, z:aviaoZ + eixoD.z*lado,
                  dx:T.x, dy:T.y, dz:T.z, v:voo*6, vida:1.1 });
     somTiro();
+    sacode(0.05);                 // o coice da metralhadora
   }
 }
 function atingeAlvo(x, z, raio){
@@ -8379,6 +8444,9 @@ function derruba(motivo){
   if (caindo) return;
   caindo = true; noChao = false; motivoQueda = motivo; vq = 0;
   if (estolando){ estolando = false; somEstol(false); Controles.treme('estol', false); }
+  estresse = 0; somBuffet(0); sacudidaFixa = 0;
+  Controles.treme('buffet', false);
+  sacode(0.7);
   explode(aviaoX, aviaoY, aviaoZ, motivo === 'combustivel' ? 0.6 : 1.4);
   mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL'
             : motivo === 'abatido' ? 'ABATIDO!' : 'BATEU!', '#ff8080', 1400);
@@ -8669,11 +8737,46 @@ function atualiza(dt){
   /* ESTOL: abaixo da velocidade mínima a asa não segura mais o avião, e o
      nariz cai sozinho. É o que dá sentido aos flapes — eles baixam essa
      velocidade, e é por isso que se pousa com eles. */
+  /* ESTRESSE AERODINÂMICO: de 1,22x a velocidade mínima até ela, sobe de 0 a
+     1. É a faixa em que a asa ainda segura, mas já reclama. */
+  estresse = jogando && !caindo && !noChao
+           ? Math.max(0, Math.min(1, (velMin()*1.22 - voo)/(velMin()*0.22)))
+           : 0;
+  somBuffet(estresse*estresse);                 // ao quadrado: só aperta no fim
+  sacudidaFixa = estresse*0.22 + (estolando ? 0.34 : 0);
+  Controles.treme('buffet', estresse > 0.35 && !estolando);
+  if (estresse > 0 && !estolando) sacode(estresse*0.10);
+
   // o nariz cai, mas não vira mergulho vertical: passando de uns 50° para
   // baixo o avião já está descendo o bastante para ganhar o que precisa
   if (voo < velMin() && arfagem > -0.9){
     const falta = Math.min(1, (velMin() - voo)/240);
-    const r2 = giraPar(eixoF, eixoC, -falta*1.1*dt); eixoF = r2[0]; eixoC = r2[1];
+    /* ----------------------------------------------------------------------
+       O NARIZ CAI PARA A TERRA, não para a barriga do avião.
+
+       Estava `giraPar(eixoF, eixoC, ...)`, que baixa o nariz na direção do
+       CHÃO DA CABINE. Voando normal dá no mesmo; de cabeça para baixo o chão
+       da cabine aponta para o céu, e o estol atirava o avião para CIMA. Foi o
+       que o Brunno pegou: "eu estava de cabeça para baixo e o estol me chocou
+       para cima".
+
+       Asa que para de sustentar não sabe onde fica a barriga do avião — ela
+       simplesmente larga, e quem manda dali em diante é a gravidade. Então o
+       giro é em torno de um eixo HORIZONTAL perpendicular ao nariz, no
+       sentido que abaixa o bico, seja qual for a posição do avião. Os três
+       eixos giram juntos: é o corpo inteiro caindo de bico sem mudar a
+       inclinação das asas.
+       ------------------------------------------------------------------- */
+    let h = vcruz(eixoF, {x:0,y:1,z:0});
+    const nh = Math.hypot(h.x, h.y, h.z);
+    if (nh > 0.06){
+      h = vmul(h, 1/nh);
+      // com h = nariz × cima, o ângulo NEGATIVO sempre abaixa o nariz
+      const ang = -falta*1.1*dt;
+      eixoF = giraEmTorno(eixoF, h, ang);
+      eixoC = giraEmTorno(eixoC, h, ang);
+      eixoD = giraEmTorno(eixoD, h, ang);
+    }
     endireitaEixos();
     if (!estolando){ estolando = true; somEstol(true); Controles.treme('estol', true); }
     avisouEstol -= dt;
@@ -9086,6 +9189,26 @@ function desenhaHUD(){
     }
   }
 
+  /* O AVISO ANTES: uma faixa amarela nas bordas, que aperta conforme a asa
+     reclama. Quando ela vira vermelha e pulsa, já é estol. */
+  if (estresse > 0.02 && !estolando && jogando && !caindo){
+    const esp = Math.min(W,H)*0.075*estresse;
+    const al = (estresse*0.34).toFixed(2);
+    for (const [x0,y0,x1,y1,w2,h2b] of [[0,0,0,esp,W,esp],[0,H,0,H-esp,W,esp]]){
+      const g = h2.createLinearGradient(x0,y0,x1,y1);
+      g.addColorStop(0, 'rgba(255,190,60,' + al + ')');
+      g.addColorStop(1, 'rgba(255,190,60,0)');
+      h2.fillStyle = g; h2.fillRect(0, y0 === 0 ? 0 : H-esp, W, esp);
+    }
+    if (estresse > 0.45){
+      h2.font = '900 ' + Math.max(11, H*0.022).toFixed(0) + 'px system-ui, sans-serif';
+      h2.textAlign = 'center';
+      h2.fillStyle = 'rgba(255,200,90,' + (0.5 + 0.5*Math.abs(Math.sin(Date.now()/160))).toFixed(2) + ')';
+      h2.fillText('VELOCIDADE BAIXA', W/2, H*0.30);
+      h2.textAlign = 'left';
+    }
+  }
+
   /* ESTOL na tela: uma borda vermelha que pulsa junto com a buzina. O aviso
      de texto sozinho se perde no meio de uma manobra. */
   if (estolando && jogando && !caindo){
@@ -9162,6 +9285,7 @@ const PASSO = 1/60;
 function quadro(t){
   if (!jogando) return;
   const dt = Math.min(0.1, (t-ultimoT)/1000 || PASSO);
+  sacudida *= Math.pow(0.02, dt);              // o susto desce sozinho
   ultimoT = t; sobrando += dt;
   while (sobrando > PASSO){ atualiza(PASSO); sobrando -= PASSO; }
   arruma();
@@ -9296,7 +9420,9 @@ function comeca(){
 function fim(){
   jogando = false;
   if (estolando){ estolando = false; somEstol(false); }
+  estresse = 0; somBuffet(0); sacudidaFixa = 0; sacudida = 0;
   Controles.treme('metralha', false); Controles.treme('estol', false);
+  Controles.treme('buffet', false);
   const m = Math.round(distancia/METRO);
   if (m > recorde){ recorde = m; try{ localStorage.setItem('aviao.recorde', String(m)); }catch(e){} }
   const t = venceu ? 'Missão cumprida! Todos os alvos no chão.'
@@ -9507,13 +9633,19 @@ const Tripulacao = {
    contínuo é o celular.
    ========================================================================== */
 const Controles = {
-  _metra: false,
+  _liga: {},
   manda(o){ Tripulacao.envia(o); },
   bate(arma){ this.manda({ t:'tremer', a:arma }); },
-  /* liga/desliga um tremor contínuo (metralhadora, estol) */
+  /* Liga/desliga um tremor CONTÍNUO (metralhadora, tremor aerodinâmico,
+     estol). Só manda quando MUDA — isto é chamado a cada quadro, e sem a
+     trava saíam 60 mensagens por segundo entupindo o canal e reiniciando o
+     padrão do vibrador antes de ele tocar. A trava valia só para a
+     metralhadora; agora vale para todos. */
   treme(qual, liga){
-    if (qual === 'metralha'){ if (this._metra === liga) return; this._metra = liga; }
-    this.manda({ t:'tremer', a:qual, on: !!liga });
+    liga = !!liga;
+    if (this._liga[qual] === liga) return;
+    this._liga[qual] = liga;
+    this.manda({ t:'tremer', a:qual, on: liga });
   }
 };
 
@@ -9529,7 +9661,9 @@ function pausa(){
   if (!jogando || pausado) return;
   pausado = true; jogando = false; Motor.desliga();
   if (estolando){ estolando = false; somEstol(false); }
+  estresse = 0; somBuffet(0); sacudidaFixa = 0;
   Controles.treme('metralha', false); Controles.treme('estol', false);
+  Controles.treme('buffet', false);
   mostraAviso('SEM SINAL DO CELULAR', '#ffb86b', 4000);
 }
 function retoma(){
@@ -9744,6 +9878,7 @@ const Batalha = {
     bip(180, 0.08, 'square', 0.06);
     solta(aviaoX, aviaoY, aviaoZ, 6, 0xffb86b, 26, 260);
     mostraAviso('ATINGIDO! ' + Math.max(0, Math.round(vida)) + '%', '#ff8080', 800);
+    sacode(0.42);
     Controles.bate('levou');
     if (vida <= 0){
       vida = 0;

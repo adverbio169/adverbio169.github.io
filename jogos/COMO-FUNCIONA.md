@@ -1232,3 +1232,79 @@ espionado: míssil chega `[45,35,130]`, bomba `[180]`, metralhadora manda 4
 padrões contínuos em 1,6 s e **manda `0` ao soltar o gatilho** (que é o que
 cala o motorzinho). No estol, a buzina liga junto com o tremor e os dois
 calam quando a potência volta.
+
+---
+
+## O estol jogava para cima quando se estava de cabeça para baixo
+
+> *"eu estava de cabeça para baixo e o ESTOL me chocou para cima e não para o
+> chão."*
+
+O código era:
+
+```js
+giraPar(eixoF, eixoC, -falta*1.1*dt)     // baixa o nariz na direção do
+                                          // CHÃO DA CABINE
+```
+
+Voando normal dá no mesmo, porque o chão da cabine aponta para a Terra. De
+cabeça para baixo ele aponta para o céu — e o estol atirava o avião para cima.
+
+**Asa que para de sustentar não sabe onde fica a barriga do avião.** Ela
+simplesmente larga, e quem manda dali em diante é a gravidade. Então o giro
+passou a ser em torno de um eixo **horizontal** perpendicular ao nariz, no
+sentido que abaixa o bico, seja qual for a posição do avião:
+
+```js
+let h = vcruz(eixoF, {x:0,y:1,z:0});      // eixo horizontal, perpendicular ao nariz
+// com h = nariz × cima, o ângulo NEGATIVO sempre abaixa o nariz
+eixoF = giraEmTorno(eixoF, h, -falta*1.1*dt);
+eixoC = giraEmTorno(eixoC, h, -falta*1.1*dt);
+eixoD = giraEmTorno(eixoD, h, -falta*1.1*dt);
+```
+
+Os três eixos giram juntos: é o corpo inteiro caindo de bico, sem torcer as
+asas. Precisou de uma função nova — `giraEmTorno`, a fórmula de Rodrigues —
+porque o `giraPar` só sabe girar dentro do plano de dois vetores do próprio
+avião, e aqui o eixo é do **mundo**.
+
+Medido em seis atitudes: nivelado, de cabeça para baixo, de faca para os dois
+lados, inclinado 45° e subindo 30°. Em todas o nariz cai e o avião perde
+altura, e a inclinação das asas não muda (45° antes, 45° depois).
+
+## O tremor aerodinâmico — o aviso ANTES do estol
+
+> *"quero mais desespero na cabine. O controle tem que tremer nos tiros, tem
+> que tremer quando estiver perto do estresse aerodinâmico."*
+
+Avião de verdade avisa antes de largar: a asa começa a descolar o ar perto da
+ponta e a cabine inteira **treme**. É o aviso mais honesto que existe, porque
+você sente antes de ler qualquer instrumento.
+
+De 1,22× a velocidade mínima até ela, um número `estresse` sobe de 0 a 1 e
+aciona quatro coisas ao mesmo tempo:
+
+| | |
+|---|---|
+| **som** | ronco grave e sujo — ruído por um passa-baixa que abre conforme aperta |
+| **câmera** | sacolejo que cresce com o quadrado do estresse (leve some, forte sacode) |
+| **celular** | tremor rápido e miúdo, diferente do estol (lento e pesado), para dar para saber qual é qual na mão |
+| **tela** | faixa amarela nas bordas que aperta, e "VELOCIDADE BAIXA" piscando |
+
+Quando o ronco vira buzina e a faixa vira vermelha, já é tarde: isso é o
+estol.
+
+O sacolejo da câmera virou coisa geral, e agora a cabine também sacode ao
+disparar (leve na metralhadora, forte no míssil), ao levar chumbo e ao bater.
+
+### O erro que o teste não pegaria
+
+`Controles.treme()` é chamado **a cada quadro**. A trava que evita mandar
+recado repetido existia só para a metralhadora — o tremor aerodinâmico e o
+estol estavam mandando **60 mensagens por segundo**, entupindo o canal e
+reiniciando o padrão do vibrador antes de ele chegar a tocar. Agora a trava
+vale para todos: uma mensagem por *mudança*.
+
+Medido com um celular de verdade ligado: 3 segundos dentro do tremor
+aerodinâmico geram **2 pedidos** ao vibrador. Mandando por quadro seriam 180
+mensagens e mais de cem pedidos.
