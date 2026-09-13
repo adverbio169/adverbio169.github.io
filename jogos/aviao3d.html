@@ -7362,6 +7362,9 @@ const TAXA_ESTERCA = 0.85;                    // o leme esterça no chão
    passar. Assim dá uns 6 s de corrida, que é o bastante para parecer uma
    decolagem sem virar espera. */
 const ACEL_CHAO = 86*VEL, FREIO_CHAO = 330*VEL;
+/* O quanto o avião AFUNDA na faixa de estresse, antes do estol declarado.
+   Escala com a velocidade do jogo: é uma velocidade, como as outras. */
+const AFUNDA = 900*VEL;
 /* uma tarja folgada em volta do asfalto, onde não nasce prédio nem alvo */
 function perto_da_pista(x, z){
   return Math.abs(x) < PISTA_MEIA + 2600 && z > PISTA_Z0 - 3000 && z < PISTA_Z1 + 3000;
@@ -9394,6 +9397,10 @@ function rolaNoChao(dt, e){
      Quanto o nariz sobe depende do ar que passa pela cauda, então começa a
      valer lá pelos 40% da velocidade mínima e cresce daí.
      ------------------------------------------------------------------- */
+  /* rolando no chão não existe estresse aerodinâmico. Sem zerar aqui, o valor
+     do último quadro de voo ficava congelado — e um avião que estolou de volta
+     para a pista continuava com o buffet roncando parado no asfalto. */
+  estresse = 0;
   const força = Math.max(0, Math.min(1, (voo/(velMin()*0.45)) - 0.2));
   const querArf = Math.max(0, e.ver) * ARF_CHAO * força;
   arfChao += (querArf - arfChao) * Math.min(1, dt*ARF_TAXA);
@@ -9562,7 +9569,27 @@ function atualiza(dt){
   let r = giraPar(eixoD, eixoC, -rol*dt); eixoD = r[0]; eixoC = r[1];
 
   let cab = e.ver * TAXA_ARF;
-  if (Math.abs(e.ver) < 0.05 && Math.abs(arfagem) < 0.45 && Math.abs(inclinacao) < 30) cab = -arfagem*0.8;
+  /* MÃO SOLTA, O AVIÃO VOLTA AO NIVELADO — menos quando está estolado.
+
+     Este endireitamento é o que torna o avião dócil: soltou o manche, o nariz
+     procura o horizonte. Mas ele estava brigando com o estol e ganhando. O
+     traço medido de uma manete fechada, sem flape, mão solta:
+
+        nariz cai a -17°, velocidade volta, estol sai,
+        o endireitamento traz o nariz para -4°, a velocidade cai,
+        estola de novo... e recomeça.
+
+     Isso é um FUGÓIDE, e um avião solto porpoteia mesmo — o problema não era a
+     oscilação, era ela nascer de um profundor que continuava mandando com a
+     asa estolada. Asa estolada tira autoridade da cauda: é por isso que num
+     estol de verdade o manche fica mole e o nariz só sobe de novo depois que a
+     velocidade voltou.
+
+     Com o endireitamento calado durante o estol, o nariz cai e FICA caído até
+     a velocidade voltar de verdade — que é a recuperação de estol de manual, e
+     é o que devolve o susto que o Brunno tinha gostado. */
+  if (Math.abs(e.ver) < 0.05 && Math.abs(arfagem) < 0.45 && Math.abs(inclinacao) < 30
+      && !estolando) cab = -arfagem*0.8;
   r = giraPar(eixoF, eixoC, cab*dt); eixoF = r[0]; eixoC = r[1];
 
   /* 1/9 de segundo de filtro fazia sentido quando o leme era um CHUTE que
@@ -9630,6 +9657,48 @@ function atualiza(dt){
   if (trem) vooAlvo = Math.min(vooAlvo, TREM_TETO);
   voo += (vooAlvo - voo) * Math.min(1, dt*2.5);
 
+  /* --- SUBIR CUSTA, DESCER DEVOLVE -------------------------------------------
+     "O estol tem que acontecer quando abaixa muito a potência, e ao subir
+     muito tem que estolar também. São a física básica da aviação."
+
+     Estava faltando metade dela. Até aqui a velocidade dependia SÓ da manete:
+     o avião subia a 80° sem perder um nó, e o estol só chegava quem fechasse a
+     potência. Faltava o principal — quem sobe troca velocidade por altura, e
+     quem desce troca altura por velocidade.
+
+     É um termo só, e ele resolve as três coisas de uma vez:
+       · fechar a manete derruba a velocidade, e o estol vem;
+       · subir demais derruba a velocidade TAMBÉM, e o estol vem sem ninguém
+         ter tocado na manete;
+       · e baixar o nariz devolve velocidade — que é como se sai de um estol,
+         a única saída que existe num avião de verdade.
+
+     O número não é a gravidade de verdade (que na escala do jogo seria 196 e
+     sumiria ao lado da resposta da manete). É o custo da subida, escolhido
+     pela ESCADA que ele produz, que é o que se sente ao voar:
+
+        manete     45°        55°        vertical
+        cruzeiro   no limite  ESTOLA     ESTOLA
+        cheia      sobe       sobe       sobe
+
+     Com potência de cruzeiro, passar de uns 50° mata o avião. Com a manete
+     cheia dá para subir reto — e isto NÃO é falha: caça com empuxo maior que o
+     peso sobe na vertical mesmo, é o que se vê em qualquer demonstração aérea.
+     O que mata é puxar sem potência, que é o erro de verdade.
+
+     O primeiro valor que eu pus, 8000, fazia até a vertical com manete cheia
+     estolar — e de quebra matava a DECOLAGEM: com o trem fora o motor só
+     entrega 2.800, e a subida de 35° que a rotação produz sozinha custava mais
+     do que isso. O avião saía da pista, estolava e voltava a assentar nela.
+     Medido, quadro a quadro, antes de escolher o número. */
+  const SUBIDA_CUSTO = 6800;
+  voo -= SUBIDA_CUSTO * eixoF.y * dt;
+  /* o mergulho ganha velocidade, mas não sem fim: acima do turbo o avião
+     entraria em números que nenhuma outra parte do jogo espera */
+  voo = Math.max(0, Math.min(VOO_TURBO, voo));
+
+
+
   /* ESTOL: abaixo da velocidade mínima a asa não segura mais o avião, e o
      nariz cai sozinho. É o que dá sentido aos flapes — eles baixam essa
      velocidade, e é por isso que se pousa com eles. */
@@ -9638,6 +9707,18 @@ function atualiza(dt){
   estresse = jogando && !caindo && !noChao
            ? Math.max(0, Math.min(1, (velMin()*1.22 - voo)/(velMin()*0.22)))
            : 0;
+  /* --- E A ASA QUE JÁ NÃO SEGURA ---------------------------------------------
+     "Tem que tender o avião a baixar." Antes do estol declarado existe a faixa
+     em que a asa ainda sustenta mas já está no limite — e ali um avião de
+     verdade AFUNDA, mesmo com o nariz apontando para cima. Sem isso o voo
+     lento era mágico: dava para ficar pendurado no ar a qualquer velocidade
+     até o estol estourar de repente.
+
+     Ao quadrado, como o buffet: no começo da faixa quase não se nota, e no fim
+     o avião está descendo de verdade com o nariz para cima — que é a cara do
+     voo no limite. Fica DEPOIS da conta do estresse de propósito; posto antes,
+     ele usaria o valor do quadro passado. */
+  if (estresse > 0) aviaoY -= AFUNDA * estresse * estresse * dt;
   somBuffet(estresse*estresse);                 // ao quadrado: só aperta no fim
   sacudidaFixa = estresse*0.22 + (estolando ? 0.34 : 0);
   Controles.treme('buffet', estresse > 0.35 && !estolando);
@@ -9645,8 +9726,24 @@ function atualiza(dt){
 
   // o nariz cai, mas não vira mergulho vertical: passando de uns 50° para
   // baixo o avião já está descendo o bastante para ganhar o que precisa
-  if (voo < velMin() && arfagem > -0.9){
-    const falta = Math.min(1, (velMin() - voo)/240);
+  /* --- O ESTOL TEM DE COMPROMETER --------------------------------------------
+     Com o mergulho devolvendo velocidade, o estol virou um chacoalho: o nariz
+     caía um grau, a velocidade voltava um fio, a asa "sustentava" outra vez e
+     tudo recomeçava. Medido: em voo nivelado com a manete fechada o nariz
+     baixava 4° e ficava ali, oscilando em volta do limite. Isso não é estolar,
+     é ficar cutucando o estol.
+
+     Asa estolada não volta a sustentar no instante em que recupera um nó — o
+     fluxo tem de colar de novo, e isso pede uma margem. É histerese, e existe
+     em avião de verdade: entra-se no estol na velocidade mínima e sai-se dele
+     bem acima dela. Aqui: entra em `velMin()`, só solta em 1,15 vez isso.
+
+     É essa margem que devolve o estol dramático que o Brunno gostou, agora
+     sem brigar com a física nova. */
+  const SAI_ESTOL = 1.15;
+  const estolado = voo < velMin()*(estolando ? SAI_ESTOL : 1);
+  if (estolado && arfagem > -0.9){
+    const falta = Math.min(1, (velMin()*SAI_ESTOL - voo)/(velMin()*0.22));
     /* ----------------------------------------------------------------------
        O NARIZ CAI PARA A TERRA, não para a barriga do avião.
 

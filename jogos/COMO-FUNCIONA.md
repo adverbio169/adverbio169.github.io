@@ -2656,3 +2656,102 @@ antes era "de bem acima do estol até encostar nele" — e virou uma lista intei
 
 É o mesmo erro nas duas: **o teste guardava o número em vez da intenção.**
 Enquanto a escala não muda, os dois jeitos parecem iguais.
+
+---
+
+## A física básica da aviação
+
+> *"O estol tem que acontecer quando abaixa muito a potência, e tem que tender o
+> avião a baixar. E ao subir muito tem que estolar também. São a física básica
+> da aviação."*
+
+Faltava metade dela. Até aqui a velocidade dependia **só da manete**: o avião
+subia a 80° sem perder um nó, e o estol só chegava a quem fechasse a potência.
+Faltava o principal — **quem sobe troca velocidade por altura, e quem desce
+troca altura por velocidade**.
+
+É um termo só, e resolve as três coisas de uma vez:
+
+```js
+voo -= SUBIDA_CUSTO * eixoF.y * dt;   // eixoF.y é o seno do ângulo de subida
+```
+
+- fechar a manete derruba a velocidade, e o estol vem;
+- **subir demais derruba a velocidade também**, e o estol vem sem ninguém ter
+  tocado na manete;
+- e baixar o nariz **devolve** velocidade — que é como se sai de um estol, a
+  única saída que existe num avião de verdade.
+
+### O número saiu da escada, não do chute
+
+O primeiro valor que pus, 8000, fazia até a vertical com manete cheia estolar —
+e de quebra **matava a decolagem**: com o trem fora o motor só entrega 2.800, e
+a subida de 35° que a rotação produz sozinha custava mais do que isso. Medido
+quadro a quadro: o avião saía da pista, estolava e voltava a assentar nela.
+
+Com 6.800:
+
+```
+ 0° cruzeiro -> 3392  aguenta
+30° cruzeiro -> 2032  aguenta
+45° cruzeiro -> 1469  aguenta, no limite (estresse 0,33)
+55° cruzeiro -> 1164  ESTOLA
+60° cruzeiro -> 1036  ESTOLA
+45° cheia    -> 2477  aguenta
+80° cheia    -> 1721  aguenta
+90° cheia    -> 1680  aguenta
+```
+
+Com manete cheia dá para subir reto, e isto **não é falha**: caça com empuxo
+maior que o peso sobe na vertical mesmo. O que mata é puxar **sem potência**,
+que é o erro de verdade.
+
+### "Tender a baixar"
+
+Antes do estol declarado existe a faixa em que a asa ainda sustenta mas já está
+no limite — e ali um avião de verdade **afunda**, com o nariz apontando para
+cima. Sem isso o voo lento era mágico: dava para ficar pendurado no ar até o
+estol estourar de repente. Agora a altura começa a cair sozinha antes de
+qualquer alarme: **583 num segundo**, no meio da faixa.
+
+### O estol tem de comprometer
+
+Com o mergulho devolvendo velocidade, o estol virou um chacoalho: o nariz caía
+um grau, a velocidade voltava um fio, a asa "sustentava" outra vez, e recomeçava.
+
+Duas correções, as duas de manual:
+
+**Histerese.** Asa estolada não volta a sustentar no instante em que recupera um
+nó — o fluxo tem de colar de novo, e isso pede margem. Entra no estol em
+`velMin()`, só sai em **1,15 vez** isso.
+
+**O profundor perde autoridade.** O endireitamento de arfagem ("mão solta, o
+nariz procura o horizonte") estava brigando com o estol e ganhando. Numa asa
+estolada a cauda também perde ar — é por isso que num estol de verdade o manche
+fica mole. Calado durante o estol, o nariz cai e **fica** caído até a velocidade
+voltar.
+
+### O fugóide, e três testes que mediam o instante errado
+
+Com o mergulho devolvendo velocidade, o avião solto passou a **porpotear**: cai,
+recupera, sobe, cai de novo. Isso é o **fugóide**, e todo avião solto faz.
+
+E derrubou três testes que não tinham nada de errado com o jogo — todos mediam
+**um instante de uma oscilação**:
+
+| teste | media | passou a medir |
+|---|---|---|
+| estol sem flape | a arfagem aos 2,5 s exatos | estolou em algum momento? perdeu altura? |
+| as seis atitudes | o nariz no último quadro | o nariz **mais baixo** da passagem |
+| a escada de estresse | velocidades fixas de 1200 a 640 | múltiplos do estol |
+
+O padrão é sempre o mesmo, e já apareceu três vezes neste arquivo: **o teste
+guardava o número em vez da intenção.** Enquanto nada muda, os dois jeitos
+parecem iguais.
+
+```
+manete fechada, mão solta, sem flape: estolou, nariz a -20°, perdeu 2.935  ✔
+a mesma com flape 2: não estolou, nariz a 0°                               ✔
+as seis atitudes, inclusive de cabeça para baixo: todas caem de bico       ✔
+mergulhando 40°: 5.140 contra 3.392 nivelado                               ✔
+```
