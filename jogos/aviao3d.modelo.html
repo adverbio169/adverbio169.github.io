@@ -688,6 +688,7 @@ let rumo=0, inclinacao=0, arfagem=0, leme=0;
 let voo=VOO_BASE, turbo=0, combustivel=100, distancia=0, recorde=0;
 let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
 let noChao=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0, estolando=false;
+let arfChao=0, rumoChao=0;
 let estresse=0;
 let vida=100;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
@@ -1423,25 +1424,72 @@ function mostraAviso(txt, cor, ms){
 
 /* --- som: motor e estouros ------------------------------------------------ */
 let audio = null;
+/* ---------------------------------------------------------------------------
+   O SOM DO AVIÃO
+
+   Eram três osciladores (62, 124 e 372 Hz) tocando juntos: dava um ZUMBIDO de
+   abelha grande, não um avião. Turbina tem três partes bem distintas, e é a
+   mistura delas que o ouvido reconhece:
+
+     1. O SOPRO — de longe o mais importante, e o que não existia. É RUÍDO por
+        um passa-banda: o ar sendo rasgado. Sem ele nenhuma quantidade de
+        oscilador soa como avião.
+     2. O RONCO grave da combustão, uma dente-de-serra lá embaixo.
+     3. O ASSOBIO agudo do compressor, um seno fino por cima. É a parte que
+        mais sobe com a manete, e é ele que dá a sensação de potência.
+
+     As três andam com a velocidade, mas em proporções diferentes: o assobio
+     quase dobra de frequência do mínimo ao turbo, o ronco sobe pouco, e o
+     sopro abre o filtro em vez de mudar de tom. É essa diferença que faz
+     acelerar SOAR como acelerar em vez de só ficar mais alto.
+   ------------------------------------------------------------------------ */
 const Motor = {
-  ligado:false, osc:[], ganho:null,
+  ligado:false, ganho:null, partes:null,
   liga(){
     if (!audio || this.ligado) return;
     this.ganho = audio.createGain(); this.ganho.gain.value = 0.0001;
     this.ganho.connect(audio.destination);
-    for (const [f, tipo, v] of [[62,'sawtooth',0.5],[124,'sawtooth',0.3],[372,'square',0.12]]){
-      const o = audio.createOscillator(), g = audio.createGain();
-      o.type = tipo; o.frequency.value = f; g.gain.value = v;
-      o.connect(g); g.connect(this.ganho); o.start();
-      this.osc.push({o:o, base:f});
-    }
+
+    // 1) o sopro
+    const fonte = ruido();
+    if (!fonte){ this.ligado = false; return; }
+    const bp = audio.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = 0.55;
+    const gSopro = audio.createGain(); gSopro.gain.value = 0.85;
+    fonte.connect(bp); bp.connect(gSopro); gSopro.connect(this.ganho);
+    fonte.start();
+
+    // 2) o ronco
+    const ronco = audio.createOscillator(), gRonco = audio.createGain();
+    ronco.type = 'sawtooth'; ronco.frequency.value = 58;
+    const lp = audio.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 240;
+    gRonco.gain.value = 0.34;
+    ronco.connect(lp); lp.connect(gRonco); gRonco.connect(this.ganho); ronco.start();
+
+    // 3) o assobio
+    const assob = audio.createOscillator(), gAssob = audio.createGain();
+    assob.type = 'sine'; assob.frequency.value = 900;
+    gAssob.gain.value = 0.05;
+    assob.connect(gAssob); gAssob.connect(this.ganho); assob.start();
+
+    this.partes = { fonte, bp, gSopro, ronco, gRonco, assob, gAssob };
     this.ligado = true;
   },
   ajusta(){
-    if (!this.ligado || !audio) return;
-    const f = 0.55 + (voo - VOO_BASE*0.5)/(VOO_TURBO - VOO_BASE*0.5)*0.7;
-    for (const x of this.osc) x.o.frequency.setTargetAtTime(x.base*f, audio.currentTime, 0.08);
-    this.ganho.gain.setTargetAtTime(jogando && !caindo ? 0.16 : 0.02, audio.currentTime, 0.15);
+    if (!this.ligado || !audio || !this.partes) return;
+    const t = audio.currentTime;
+    const p = this.partes;
+    // 0 na marcha lenta, 1 no turbo
+    const q = Math.max(0, Math.min(1.15, (voo - VOO_MIN)/(VOO_TURBO - VOO_MIN)));
+    p.bp.frequency.setTargetAtTime(420 + q*1350, t, 0.10);
+    p.bp.Q.setTargetAtTime(0.5 + q*0.5, t, 0.10);
+    p.gSopro.gain.setTargetAtTime(0.55 + q*0.55, t, 0.10);
+    p.ronco.frequency.setTargetAtTime(52 + q*46, t, 0.12);
+    p.assob.frequency.setTargetAtTime(760 + q*1180, t, 0.09);
+    p.gAssob.gain.setTargetAtTime(0.02 + q*0.10, t, 0.12);
+    // no chão o som é mais abafado: o avião ainda não está cortando o ar
+    const alto = jogando && !caindo ? (noChao ? 0.11 : 0.17) : 0.02;
+    this.ganho.gain.setTargetAtTime(alto, t, 0.15);
   },
   desliga(){ if (this.ganho && audio) this.ganho.gain.setTargetAtTime(0.0001, audio.currentTime, 0.2); }
 };
@@ -1651,24 +1699,33 @@ function somEstol(liga){
   }catch(e){ buzinaEstol = null; }
 }
 
-function somNuclear(){
+/* `esc` encolhe o estouro sem mudar o caráter: o míssil usa um quinto dele,
+   e continua sendo claramente da mesma família da bomba grande */
+function somNuclear(esc){
   if (!audio) return;
+  const E = Math.max(0.15, Math.min(1, esc === undefined ? 1 : esc));
   try{
-    const t0 = audio.currentTime, n = audio.sampleRate*3.2;
+    const t0 = audio.currentTime, n = audio.sampleRate*(3.2*(0.35 + 0.65*E));
     const buf = audio.createBuffer(1, n, audio.sampleRate), d = buf.getChannelData(0);
     for (let i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/n, 1.6);
     const fonte = audio.createBufferSource(); fonte.buffer = buf;
+    const dur = 3.2*(0.35 + 0.65*E), grave = 2.4*(0.3 + 0.7*E);
     const f = audio.createBiquadFilter(); f.type='lowpass';
-    f.frequency.setValueAtTime(2200, t0); f.frequency.exponentialRampToValueAtTime(90, t0+2.8);
+    f.frequency.setValueAtTime(2200, t0);
+    f.frequency.exponentialRampToValueAtTime(90 + (1-E)*260, t0 + dur*0.88);
     const g = audio.createGain();
-    g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.55,t0+0.06);
-    g.gain.exponentialRampToValueAtTime(0.0001,t0+3.2);
+    g.gain.setValueAtTime(0.0001,t0);
+    g.gain.exponentialRampToValueAtTime(0.55*(0.45 + 0.55*E), t0+0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     fonte.connect(f); f.connect(g); g.connect(audio.destination); fonte.start(t0);
     const o = audio.createOscillator(), go = audio.createGain();
-    o.type='sine'; o.frequency.setValueAtTime(120,t0); o.frequency.exponentialRampToValueAtTime(24,t0+1.8);
-    go.gain.setValueAtTime(0.0001,t0); go.gain.exponentialRampToValueAtTime(0.5,t0+0.04);
-    go.gain.exponentialRampToValueAtTime(0.0001,t0+2.4);
-    o.connect(go); go.connect(audio.destination); o.start(t0); o.stop(t0+2.5);
+    o.type='sine';
+    o.frequency.setValueAtTime(120 + (1-E)*90, t0);
+    o.frequency.exponentialRampToValueAtTime(24 + (1-E)*40, t0 + grave*0.75);
+    go.gain.setValueAtTime(0.0001,t0);
+    go.gain.exponentialRampToValueAtTime(0.5*(0.4 + 0.6*E), t0+0.04);
+    go.gain.exponentialRampToValueAtTime(0.0001, t0 + grave);
+    o.connect(go); go.connect(audio.destination); o.start(t0); o.stop(t0 + grave + 0.1);
   }catch(e){}
 }
 
@@ -1716,6 +1773,18 @@ function explode(x, y, z, e){
   solta(x,y,z, Math.round(14*e), 0xff3b2f, 150*e, 500);
   bip(90, 0.4, 'sawtooth', 0.16);
 }
+/* o cogumelo do míssil: mesma peça, um quinto do tamanho, e nasce na altura
+   do estouro em vez de brotar do chão */
+function cogumelinho(x, y, z){
+  const antes = cogumelos.length;
+  fazCogumelo(x, z);
+  const c = cogumelos[antes];
+  if (!c) return;
+  c.no.scale.setScalar(NUKE_MISSIL);
+  c.no.position.y = y - CHAO - 600*NUKE_MISSIL;
+  c.t = 3.2;                 // já nasce meio aberto: é um estouro, não um cogumelo lento
+  c.pequeno = true;
+}
 function fazCogumelo(x, z){
   const g = new THREE.Group();
   const matN = new THREE.MeshLambertMaterial({ color: 0xb9b0a2 });
@@ -1743,6 +1812,46 @@ function pegaNaNuclear(x, z){
     if (Math.hypot(o.x-x, o.z-z) < RAIO_NUKE)
       Batalha.paraTodos({ t:'tiro', para:o.id, de:Batalha.eu, dano:DANO.bomba }, null);
   }
+}
+/* o estouro nuclear sacode a cabine inteira e o aparelho, conforme a
+   distância — é o maior caos que o jogo tem */
+/* ---------------------------------------------------------------------------
+   O MÍSSIL COM UMA PORÇÃO NUCLEAR
+
+   Pedido: "nossos mísseis agora têm que ter uma pequena porção nuclear".
+   Então o estouro dele deixou de ser uma bolinha de faíscas e virou uma
+   nuclear em miniatura: clarão, bola de fogo, anel de choque, um cogumelo
+   pequeno e o mesmo baixo grave da grande, só que curto.
+
+   A diferença para a bomba não é de tipo, é de TAMANHO — um quinto do raio e
+   um terço do tempo. É o que dá para sentir que é da mesma família sem virar
+   o fim do mundo a cada tiro.
+   ------------------------------------------------------------------------ */
+const NUKE_MISSIL = 0.22;                  // fração da nuclear grande
+function estouraMissil(x, y, z){
+  explode(x, y, z, 1.5);
+  clarao = Math.max(clarao, 0.42);
+  solta(x, y, z, 26, 0xffd9a0, 90, 900);
+  solta(x, y, z, 14, 0xff8a3a, 130, 600);
+  cogumelinho(x, y, z);
+  somNuclear(NUKE_MISSIL);
+  const d = Math.hypot(aviaoX-x, aviaoY-y, aviaoZ-z);
+  const f = Math.max(0, 1 - d/(RAIO_NUKE*NUKE_MISSIL*2.2));
+  if (f > 0.02){ sacode(0.2 + f*0.6); Controles.bate('explode'); }
+  // e leva junto quem estiver colado, como uma nuclear pequena faria
+  const raio = RAIO_NUKE*NUKE_MISSIL;
+  for (const o of Batalha.outros.values()){
+    if (o.vivo === false) continue;
+    if (Math.hypot(o.x-x, o.y-y, o.z-z) < raio)
+      Batalha.paraTodos({ t:'tiro', para:o.id, de:Batalha.eu, dano:DANO.missil }, null);
+  }
+  atingeAr(x, y, z, raio*0.5, DANO.missil);
+}
+
+function sacodeNuclear(x, z){
+  const d = Math.hypot(aviaoX-x, aviaoZ-z);
+  const f = Math.max(0, 1 - d/(RAIO_NUKE*1.6));
+  if (f > 0.02){ sacode(0.25 + f*0.75); Controles.bate('explode'); }
 }
 function nuclear(x, z){
   fazCogumelo(x, z); somNuclear();
@@ -1907,6 +2016,15 @@ const Mira = {
 function inimigosRede(){ return []; }
 function dispara(){
   if (caindo || !jogando || recarga > 0) return;
+  /* Nuclear com as rodas no chão é suicídio de graça: a bomba cai a dois
+     palmos do avião e o cogumelo abre em cima de quem soltou. Dava para se
+     explodir parado na pista, na primeira coisa que se aperta no jogo. */
+  if (arma === 'bomba' && noChao){
+    bip(120, 0.10, 'square', 0.05);
+    mostraAviso('NUCLEAR SÓ NO AR', '#ffb86b', 900);
+    recarga = 0.4;
+    return;
+  }
   if (municao[arma] <= 0){ bip(120,0.08,'square',0.05); mostraAviso('SEM MUNIÇÃO', '#ff8080', 700); return; }
   municao[arma]--; recarga = ARMAS[arma].recarga;
   if (arma === 'bomba'){
@@ -1948,6 +2066,7 @@ function atingeAlvo(x, z, raio){
       if (a.no) a.no.visible = false;
       explode(a.x, CHAO+200, a.z, 2.2);
       mostraAviso('ALVO DESTRUÍDO! ' + alvosDestruidos + '/' + alvosTotal, '#ffd257', 1500);
+      Controles.bate('alvo'); sacode(0.30);
       if (alvosDestruidos >= alvosTotal){ venceu = true; Motor.desliga(); fim(); }
       return true;
     }
@@ -1965,6 +2084,7 @@ function atingeAr(x, y, z, raio, dano){
       pontos += o.tipo === 'aviao' ? 200 : 50;
       explode(o.x, o.y, o.z, o.tipo === 'aviao' ? 1.2 : 0.5);
       mostraAviso(o.tipo === 'aviao' ? 'AVIÃO ABATIDO! +200' : '+50', '#ffd257', 800);
+      Controles.bate(o.tipo === 'aviao' ? 'alvo' : 'pegou'); sacode(o.tipo === 'aviao' ? 0.22 : 0.08);
       return true;
     }
   }
@@ -2011,11 +2131,11 @@ function atualizaTiros(dt){
       }
       if (atingeAr(b.x,b.y,b.z,260,DANO.missil) || atingeAlvo(b.x,b.z,300)) b.morto = true;
       if (b.vida <= 0) b.morto = true;
-      if (b.morto) explode(b.x, b.y, b.z, 0.9);
+      if (b.morto) estouraMissil(b.x, b.y, b.z);
     } else {
       b.vy -= dt*1400; b.y += b.vy*dt;
       if (b.y <= CHAO){ b.morto = true; explode(b.x, CHAO+200, b.z, 2.4); nuclear(b.x, b.z);
-                        pegaNaNuclear(b.x, b.z); }
+                        pegaNaNuclear(b.x, b.z); sacodeNuclear(b.x, b.z); }
     }
     b.no.position.set(b.x, b.y, b.z);
     b.no.lookAt(b.x + b.vx, b.y + b.vy, b.z + b.vz);
@@ -2046,7 +2166,8 @@ function derruba(motivo){
   caindo = true; noChao = false; motivoQueda = motivo; vq = 0;
   if (estolando){ estolando = false; somEstol(false); Controles.treme('estol', false); }
   estresse = 0; somBuffet(0); sacudidaFixa = 0;
-  Controles.treme('buffet', false);
+  Controles.treme('buffet', false); Controles.treme('metralha', false);
+  Controles.bate('bateu');
   sacode(0.7);
   explode(aviaoX, aviaoY, aviaoZ, motivo === 'combustivel' ? 0.6 : 1.4);
   mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL'
@@ -2089,6 +2210,10 @@ function atualizaQueda(dt){
 function aterra(queda){
   noChao = true;
   aviaoY = PISTA_Y + RODA;
+  // toca com o nariz ainda um pouco em cima, como um pouso de verdade, e o
+  // bico desce sozinho na corrida
+  arfChao = Math.max(0, Math.min(ARF_CHAO, arfagem));
+  rumoChao = Math.atan2(eixoF.x, eixoF.z);
   eixoF = vnorm({ x: eixoF.x, y: 0, z: eixoF.z });
   eixoC = { x: 0, y: 1, z: 0 };
   endireitaEixos();
@@ -2096,12 +2221,15 @@ function aterra(queda){
   const macio = queda < 240;
   pousos++;
   pontos += macio ? 400 : 150;
+  Controles.bate('tocou'); sacode(macio ? 0.10 : 0.28);
   mostraAviso(macio ? 'POUSO DE MANUAL! +400' : 'POUSOU! +150', macio ? '#7fffa8' : '#ffd257', 1800);
   solta(aviaoX, PISTA_Y + 40, aviaoZ, 14, 0xd8d8d8, 40, 260);
   bip(220, 0.10, 'square', 0.05);
   setTimeout(() => bip(160, 0.16, 'square', 0.04), 90);
 }
 
+/* quanto o nariz levanta na pista, em radianos, e quão depressa */
+const ARF_CHAO = 0.20, ARF_TAXA = 2.4;
 function rolaNoChao(dt, e){
   /* Esterçar: o leme gira o avião em torno da vertical, e só com a roda
      andando. O AILERON também esterça, com meia força: no chão inclinar o
@@ -2114,10 +2242,36 @@ function rolaNoChao(dt, e){
   if (Math.abs(gira) > 1e-5){
     const c = Math.cos(gira), sn = Math.sin(gira);
     const fx = eixoF.x*c + eixoF.z*sn, fz = -eixoF.x*sn + eixoF.z*c;
-    eixoF = { x: fx, y: 0, z: fz };
-    eixoC = { x: 0, y: 1, z: 0 };
-    endireitaEixos();
+    // o rumo gira no plano; a arfagem no chão é reposta logo abaixo
+    const h = Math.hypot(fx, fz) || 1;
+    rumoChao = Math.atan2(fx/h, fz/h);
   }
+
+  /* ----------------------------------------------------------------------
+     A ROTAÇÃO — levantar o nariz ainda no chão.
+
+     Antes o manche não fazia NADA na pista até a velocidade de decolagem, e
+     aí o avião pulava para 15° de uma vez. Dois problemas de uma vez: sem
+     velocidade não acontecia nada (parecia que o comando tinha morrido) e com
+     velocidade a saída do chão era um salto.
+
+     Avião de verdade ROTACIONA: puxando, a roda do nariz sai primeiro e o
+     avião corre um pedaço apoiado só nas rodas de trás, de bico para cima. Se
+     não tiver velocidade para voar, é só isso que acontece — e é o que o
+     Brunno pediu: "se não tiver velocidade suficiente, tem que pelo menos
+     levantar o nariz".
+
+     Quanto o nariz sobe depende do ar que passa pela cauda, então começa a
+     valer lá pelos 40% da velocidade mínima e cresce daí.
+     ------------------------------------------------------------------- */
+  const força = Math.max(0, Math.min(1, (voo/(velMin()*0.45)) - 0.2));
+  const querArf = Math.max(0, e.ver) * ARF_CHAO * força;
+  arfChao += (querArf - arfChao) * Math.min(1, dt*ARF_TAXA);
+  const cr = Math.cos(rumoChao), sr = Math.sin(rumoChao);
+  const ca = Math.cos(arfChao), sa = Math.sin(arfChao);
+  eixoF = { x: sr*ca, y: sa, z: cr*ca };
+  eixoC = { x: -sr*sa, y: ca, z: -cr*sa };
+  endireitaEixos();
   leme += ((e.leme || 0) - leme) * Math.min(1, dt*22);
 
   if (tecla.mais)  motor = Math.min(1, motor + dt*0.65);
@@ -2137,7 +2291,8 @@ function rolaNoChao(dt, e){
   if (alvo === 0 && voo < 8) voo = 0;
 
   aviaoX += eixoF.x*voo*dt; aviaoZ += eixoF.z*voo*dt;
-  aviaoY = PISTA_Y + RODA;
+  // de bico para cima o avião gira em torno das rodas de trás, e a barriga sobe
+  aviaoY = PISTA_Y + RODA + Math.sin(arfChao)*150;
   distancia += voo*dt;
   if (!infinito) combustivel -= dt * GASTO*(0.30 + 0.5*motor);
   if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
@@ -2148,15 +2303,17 @@ function rolaNoChao(dt, e){
     voo = 0;
   }
 
-  // DECOLAR: velocidade mínima com margem, e o manche puxado
+  /* DECOLAR. A atitude já é a que o avião ganhou rotacionando, então sair do
+     chão não muda nada de posição: é só deixar de estar apoiado. Antes havia
+     um giro de 0,26 rad aplicado no instante da saída — era o "pulo" entre o
+     chão e o ar. */
   const vDecola = velMin()*DECOLA;
-  if (voo >= vDecola && e.ver > 0.22){
+  if (voo >= vDecola && arfChao > ARF_CHAO*0.45){
     noChao = false;
-    const r2 = giraPar(eixoF, eixoC, 0.26); eixoF = r2[0]; eixoC = r2[1];
-    endireitaEixos();
-    aviaoY = PISTA_Y + RODA + 30;
-    mostraAviso('NO AR! recolha o trem (G)', '#7fd8ff', 1700);
-  } else if (voo >= vDecola){
+    aviaoY += 12;
+    Controles.bate('tocou');
+    mostraAviso('NO AR! recolha o trem', '#7fd8ff', 1700);
+  } else if (voo >= vDecola && e.ver <= 0.05){
     mostraAviso('PUXE PARA DECOLAR', '#ffd257', 500);
   }
 
@@ -2401,7 +2558,7 @@ function atualiza(dt){
     if (t.pego) continue;
     const dx = aviaoX-t.x, dy = aviaoY-t.y, dz = aviaoZ-t.z;
     if (dx*dx + dy*dy + dz*dz > RP2) continue;
-    t.pego = true; someTambor(t);
+    t.pego = true; someTambor(t); Controles.bate('pegou');
     combustivel = Math.min(100, combustivel + (t.azul ? DA_AZUL : DA_NORMAL));
     if (t.azul){
       turbo = TURBO_SEG; clarao = 0.55; nitroCarga = 100;
@@ -2986,6 +3143,7 @@ function reinicia(){
   if (naPistaAoComecar){
     aviaoX = 0; aviaoZ = PISTA_Z0 + 1200; aviaoY = PISTA_Y + RODA;
     noChao = true; trem = true; flap = 1; motor = 0; voo = 0; parado = 0;
+    arfChao = 0; rumoChao = 0;
   } else {
     aviaoX = 0; aviaoZ = 0; aviaoY = 1500;
     noChao = false; trem = false; flap = 0; motor = MOTOR_PADRAO; voo = VOO_BASE;
@@ -3000,7 +3158,9 @@ function reinicia(){
   avisouEstol = 0; pousos = 0; vida = VIDA_CHEIA;
   if (estolando){ estolando = false; somEstol(false); }
   pontos = 0; alvosDestruidos = 0; venceu = false;
-  arma = 'bomba'; recarga = 0; atirando = false; leme = 0; miraX = 0; miraY = 0;
+  // nasce na METRALHADORA: a nuclear como arma inicial fazia a primeira coisa
+  // que se aperta no jogo ser a mais destrutiva (e, na pista, fatal)
+  arma = 'metralha'; recarga = 0; atirando = false; leme = 0; miraX = 0; miraY = 0;
   municao = {}; for (const k in ARMAS) municao[k] = ARMAS[k].municao;
   caindo = false; giroQueda = 0; vq = 0; clarao = 0; motivoQueda = '';
   for (const b of bombas) cena.remove(b.no); bombas = [];
@@ -3378,9 +3538,53 @@ const Tripulacao = {
    contínuo é o celular.
    ========================================================================== */
 const Controles = {
-  _liga: {},
+  _liga: {}, _relogios: {},
+  /* ------------------------------------------------------------------------
+     O TREMOR TAMBÉM VALE AQUI.
+
+     Isto mandava o recado só para os celulares LIGADOS COMO CONTROLE. Jogando
+     sozinho no próprio celular não existe controle nenhum — e o aparelho não
+     tremia com nada, que foi o que o Brunno pegou: "o celular não treme com
+     nada, o jogo tem que tomar as rédeas do tremor".
+
+     Agora cada recado vai para os dois lados: para quem estiver de controle,
+     pela rede, E para o vibrador DESTE aparelho. No computador o
+     `navigator.vibrate` não existe ou não faz nada, e sai de graça.
+     --------------------------------------------------------------------- */
+  PADROES: {
+    missil:  [45, 35, 130],
+    bomba:   [180],
+    travou:  [22, 55, 22, 55, 22],
+    levou:   [90, 60, 90],
+    explode: [60, 40, 120],
+    bateu:   [300, 80, 200, 80, 400],
+    tocou:   [70, 50, 110],
+    pegou:   [30],
+    alvo:    [40, 50, 40, 50, 90]
+  },
+  CONTINUO: {
+    metralha: { padrao:[26, 34],  ciclo:60,  vezes:8  },
+    buffet:   { padrao:[16, 26],  ciclo:42,  vezes:10 },
+    estol:    { padrao:[130,120], ciclo:250, vezes:3  }
+  },
+  vibraAqui(p){ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} },
+  paraAqui(qual){
+    if (this._relogios[qual]){ clearInterval(this._relogios[qual]); this._relogios[qual] = null; }
+    if (!Object.values(this._relogios).some(Boolean)) this.vibraAqui(0);
+  },
+  comecaAqui(qual){
+    const c = this.CONTINUO[qual];
+    if (!c || this._relogios[qual]) return;
+    const bate = () => { const p = []; for (let i=0;i<c.vezes;i++) p.push(...c.padrao); this.vibraAqui(p); };
+    bate();
+    // reprograma antes de acabar: navigator.vibrate não tem laço
+    this._relogios[qual] = setInterval(bate, c.ciclo*c.vezes - 40);
+  },
   manda(o){ Tripulacao.envia(o); },
-  bate(arma){ this.manda({ t:'tremer', a:arma }); },
+  bate(arma){
+    this.manda({ t:'tremer', a:arma });
+    if (this.PADROES[arma]) this.vibraAqui(this.PADROES[arma]);
+  },
   /* Liga/desliga um tremor CONTÍNUO (metralhadora, tremor aerodinâmico,
      estol). Só manda quando MUDA — isto é chamado a cada quadro, e sem a
      trava saíam 60 mensagens por segundo entupindo o canal e reiniciando o
@@ -3391,8 +3595,16 @@ const Controles = {
     if (this._liga[qual] === liga) return;
     this._liga[qual] = liga;
     this.manda({ t:'tremer', a:qual, on: liga });
+    if (liga) this.comecaAqui(qual); else this.paraAqui(qual);
+  },
+  /* a aba sumiu com o dedo no gatilho: não deixa o aparelho tremendo sozinho */
+  calaTudo(){
+    for (const k in this._relogios) this.paraAqui(k);
+    for (const k in this._liga) this._liga[k] = false;
   }
 };
+document.addEventListener('visibilitychange', () => { if (document.hidden) Controles.calaTudo(); });
+addEventListener('pagehide', () => Controles.calaTudo());
 
 function mandaEstado(){
   Tripulacao.envia({ t:'estado', jogando, acabou: !jogando, dist: Math.round(distancia/METRO),

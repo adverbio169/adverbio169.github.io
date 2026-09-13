@@ -1378,3 +1378,89 @@ teste tinha aberto a manete a 95% com o avião **parado na pista**, ele correu,
 saiu da pista, bateu — e a tela de capa voltou e cobriu os botões. O
 `elementFromPoint` no ponto do toque devolvia `codigo`, que é um elemento da
 capa. Foi o que entregou.
+
+---
+
+## Seis coisas depois de jogar sozinho no celular
+
+### O celular não tremia com nada
+
+E o motivo era bobo: o recado de tremer ia **só para os celulares ligados como
+controle**. Jogando sozinho no próprio aparelho não existe controle nenhum —
+o recado saía e não chegava a lugar algum.
+
+Agora cada recado vai para os dois lados: pela rede, para quem estiver de
+controle, **e** para o vibrador deste aparelho. No computador o
+`navigator.vibrate` não existe ou não faz nada, e sai de graça.
+
+E treme em mais coisa, que era o pedido ("ele tem que tremer no caos"): pegar
+tambor, derrubar alvo, abater avião, tocar na pista, sair do chão, o estouro
+do míssil, a nuclear (conforme a distância) e a batida — essa com um padrão
+longo e feio, de cinco trancos.
+
+### A nuclear na pista
+
+Dava para soltar a bomba parado no chão. Ela caía a dois palmos do avião e o
+cogumelo abria em cima de quem soltou: suicídio de graça, e na **primeira
+coisa que se aperta no jogo**, porque a arma inicial era justamente a nuclear.
+
+Duas correções: a bomba é recusada com as rodas no chão, e o avião passou a
+nascer na **metralhadora**.
+
+### A decolagem: agora o avião ROTACIONA
+
+Era o pulo mais feio do jogo. Na pista o manche não fazia **nada** até a
+velocidade de decolagem — e aí o avião saltava para 15° de uma vez
+(`giraPar(eixoF, eixoC, 0.26)` no instante da saída).
+
+Dois problemas de uma vez: sem velocidade, puxar não fazia nada e parecia que
+o comando tinha morrido; com velocidade, sair do chão era um salto.
+
+Avião de verdade **rotaciona**: puxando, a roda do nariz sai primeiro e ele
+corre um pedaço apoiado só nas rodas de trás, de bico para cima. Se não tiver
+velocidade para voar, é só isso que acontece — que é exatamente o que o
+Brunno pediu. Quanto o nariz sobe depende do ar que passa pela cauda, então
+começa a valer lá pelos 40% da velocidade mínima e cresce daí.
+
+E sair do chão deixou de mudar a posição: a atitude já é a que o avião ganhou
+rotacionando, então largar o apoio não muda nada. Medido: **0,00° de mudança
+de arfagem no quadro da decolagem** (antes, 15°).
+
+### O míssil ganhou uma porção nuclear
+
+O estouro dele era uma bolinha de faíscas. Virou uma nuclear em miniatura:
+clarão, bola de fogo, anel, um cogumelo pequeno e o mesmo baixo grave da
+grande, só que curto. A diferença para a bomba não é de tipo, é de
+**tamanho** — 22% do raio e um terço do tempo. É o que dá para sentir que é
+da mesma família sem virar o fim do mundo a cada tiro.
+
+Para isso o `somNuclear` ganhou uma escala: o mesmo desenho de som, encolhido.
+
+### O som do avião
+
+Eram três osciladores tocando juntos (62, 124 e 372 Hz). Dava um **zumbido de
+abelha grande**, não um avião.
+
+Turbina tem três partes bem distintas, e é a mistura delas que o ouvido
+reconhece:
+
+1. **o sopro** — de longe o mais importante, e o que não existia. É RUÍDO por
+   um passa-banda: o ar sendo rasgado. Sem ele, nenhuma quantidade de
+   oscilador soa como avião;
+2. **o ronco** grave da combustão, uma dente-de-serra lá embaixo;
+3. **o assobio** agudo do compressor, um seno fino por cima.
+
+As três andam com a velocidade, mas **em proporções diferentes**: o assobio
+quase dobra de frequência da marcha lenta ao turbo (992 → 1854 Hz medidos), o
+ronco sobe pouco, e o sopro abre o filtro em vez de mudar de tom. É essa
+diferença que faz acelerar *soar* como acelerar, em vez de só ficar mais alto.
+No chão o conjunto é mais abafado: o avião ainda não está cortando o ar.
+
+### O teste que estava velho
+
+O botão do trem "falhou" — e estava certo: recolher o trem com as rodas
+apoiadas é recusado de propósito. O teste é que ainda esperava o
+comportamento antigo. E, ao corrigi-lo, aprendi outra coisa: pôr
+`noChao = false` não basta para "estar no ar", porque a 150 do chão o jogo
+pousa de novo no quadro seguinte. Que é a prova, de graça, de que o pouso
+funciona.
