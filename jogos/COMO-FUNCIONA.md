@@ -965,3 +965,108 @@ outro lado souber pousar: o pacote de estado traz `pousa:true`, e assim o
 mesmo `controle.html` continua servindo os jogos em 2D sem dois botões mortos
 na tela. E mandam o valor que querem (`v`), não "troque" — num canal que perde
 pacote, um "troque" perdido deixaria os dois lados discordando para sempre.
+
+---
+
+## O leme: de deslizar para APONTAR
+
+> *"temos que pensar como controlar o leme do avião agora, pois faz falta kkkk"*
+
+O leme era o deslize do aparelho para o lado, e eu já sabia por que ele era
+ruim — está escrito lá em cima: **acelerômetro não sente posição, só mudança
+de movimento**. Deslocar e segurar parado à esquerda é, para ele, igual a
+estar parado no meio. O que dava para medir era o chute, e chute morre
+sozinho.
+
+Enquanto o jogo era só voar e bombardear, dava para levar. Depois que passou
+a ter pista, não dá: manter o avião no eixo na corrida de decolagem e na
+corrida de pouso é justamente segurar um leme **firme**, por segundos.
+
+### O terceiro movimento
+
+Os outros dois comandos usam dois giros do aparelho:
+
+- **rolar** (em torno do eixo que sai da tela) = aileron
+- **puxar/empurrar a borda de cima** (em torno do eixo comprido) = profundor
+
+Sobra exatamente um giro: **apontar o conjunto para o lado**, girando com o
+corpo, como quem mira. Não mexe em nenhum dos dois outros, e é uma posição —
+dá para segurar. Virou o leme.
+
+### Como se mede
+
+Das três leituras do sensor sai a orientação inteira do aparelho, e dela eu
+tiro **o eixo que sai pelas costas da tela**. Esse eixo tem duas propriedades
+que são exatamente o que o leme precisa:
+
+1. **rolar o celular não o move** — rolagem é giro em torno dele mesmo. Isso
+   não é aproximação, é identidade: girar em torno de um eixo deixa o eixo
+   onde estava. Medido: apontado 20°, rolando de 0° a 270°, o leme leu
+   `0,481` nas seis medidas. O mesmo número, sem uma casa de diferença.
+2. **puxar e empurrar só o levantam ou abaixam**, sem mudar o rumo dele.
+   Medido: ±25° de profundor, leme sempre `0,481`.
+
+O rumo desse eixo no plano horizontal mede o apontar, e só o apontar.
+
+Não dá para usar o `alpha` cru, que seria o caminho óbvio: ele trava quando o
+aparelho aponta para cima ou para baixo — a velha trava de cardan, a mesma que
+estragou o aileron lá no começo. O vetor não trava.
+
+### A fuga lenta do zero
+
+No Android o `alpha` não tem norte de verdade: é giroscópio integrado, e
+escorrega alguns graus por minuto. Sem tratar, o avião ia derivando sozinho
+com a mão parada.
+
+A saída: enquanto o pedido de leme estiver **pequeno**, o zero persegue a
+leitura bem devagar — constante de uns 20 segundos. Rápido o bastante para
+comer a escorregada (a 4°/min ela se estabiliza em menos de 1° de erro, muito
+dentro da folga de 7°), lento o bastante para não roubar um leme que a pessoa
+esteja segurando de propósito. Perto do talo não vaza nada.
+
+Medido: 13 s de escorregada a 4°/min terminam com leme `0,000`; um leme de
+28° segurado pelo mesmo tempo continua em `0,78`.
+
+### E no chão, o aileron também esterça
+
+Rolando na pista, inclinar o celular para o lado não tinha para que servir — e
+"deitar para o lado que quero ir" é o gesto que sai sozinho. Então o aileron
+esterça junto com o leme, com meia força. Duas consequências boas: o gesto
+natural funciona, e dá para se manter na pista mesmo se o apontar não estiver
+indo bem no aparelho de alguém.
+
+### O que dá para medir
+
+```
+apontei 25° para a direita  -> leme +0,67 (direita)   ✔
+apontei 25° para a esquerda -> leme -0,67 (esquerda)  ✔
+apontei 4° (a folga é 7°)   -> leme 0,00              ✔
+apontei 40° (curso de 34°)  -> leme 1,00, no talo     ✔
+rolando 0→270°  : 0,481 0,481 0,481 0,481 0,481 0,481 ✔ nem um pouco
+arfando ±25°    : 0,481 0,481 0,481 0,481 0,481       ✔ nem um pouco
+apontando ±30°, o aileron e o profundor leram 0,0     ✔ nos dois sentidos
+na pista, leme e aileron esterçam para o lado certo   ✔
+corrida torta corrigida com o leme: x=101 -> x=0      ✔ (a pista tem ±620)
+```
+
+### Dois erros meus, os dois no TESTE
+
+O código saiu certo na primeira; o teste é que mentiu duas vezes, e vale
+anotar porque é o mesmo tipo de engano das outras vezes.
+
+**O sinal.** Eu supus que apontar para a direita fazia o `alpha` crescer. É o
+contrário: o `alpha` do padrão cresce girando para a **esquerda**. Só que a
+conta que eu escrevi produz um rumo de bússola, que cresce para a direita — e
+aí o menos que eu tinha posto "para corrigir" era justamente o erro. Medir
+resolveu em uma rodada.
+
+**O eixo da arfagem.** O primeiro teste acusou "o profundor vaza no leme", com
+o leme indo de 0,00 a 1,00 ao arfar. Não vazava nada: eu tinha modelado a
+arfagem como giro em torno do eixo **curto** do aparelho, que deitado aponta
+para **baixo** — ou seja, o meu "arfar" era mais apontar. Trocando para o eixo
+certo, o vazamento sumiu inteiro.
+
+Duas vezes seguidas o modelo do teste estava errado e o código, certo. A
+lição é a mesma da escada de arfagem: quando o número não bate, o suspeito não
+é só o código — o instrumento de medida também erra, e ele é escrito com a
+mesma cabeça que escreveu o código.

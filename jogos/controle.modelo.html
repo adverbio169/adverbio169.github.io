@@ -90,6 +90,16 @@
   #mira:before{content:"";position:absolute;left:18%;right:18%;top:50%;height:3px;margin-top:-1px;background:#ffc24d;
                border-radius:2px;clip-path:polygon(0 0,36% 0,36% 100%,0 100%,0 0,64% 0,100% 0,100% 100%,64% 100%,64% 0)}
   #mira:after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#ffc24d}
+  /* o leme, mostrado: sem ver, não dá para saber se o apontar está pegando */
+  #lemeTira{position:relative;width:min(56vw,240px);height:14px;border-radius:99px;
+            background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);overflow:hidden}
+  #lemeTira::before{content:'';position:absolute;left:50%;top:2px;bottom:2px;width:1px;background:rgba(255,255,255,.4)}
+  #lemeTira i{position:absolute;top:2px;bottom:2px;left:50%;width:0;background:#ffc24d;border-radius:99px}
+  /* o rótulo encosta na borda esquerda: no meio, a própria barra o cobria */
+  #lemeTira span{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-start;
+            padding-left:7px;font:800 8px/1 inherit;letter-spacing:2px;color:#8fa3c8;
+            text-shadow:0 1px 3px #000;pointer-events:none}
+  body.artilheiro #lemeTira{display:none}
   .placar{display:flex;gap:18px;font-variant-numeric:tabular-nums}
   .placar div{text-align:center}
   .placar .rot{font-size:9.5px;letter-spacing:1.6px;text-transform:uppercase;color:#8fa3c8;font-weight:700}
@@ -198,7 +208,9 @@ body.paisagem #controle.ver,
                --d:min(30vw,56vh,190px);width:var(--d);height:var(--d)}
   body.paisagem #estadoRede{top:8px;left:50%;transform:translateX(-50%);width:auto;max-width:40vw}
   body.paisagem #posto{top:8px;right:calc(10px + env(safe-area-inset-right));padding:5px 10px;font-size:10.5px;letter-spacing:1.5px}
-  body.paisagem .placar{top:calc(44% + min(15vw,28vh,95px) + 10px);left:50%;transform:translateX(-50%);gap:16px}
+  body.paisagem #lemeTira{top:calc(44% + min(15vw,28vh,95px) + 6px);left:50%;transform:translateX(-50%);
+            width:min(30vw,190px);height:12px}
+  body.paisagem .placar{top:calc(44% + min(15vw,28vh,95px) + 26px);left:50%;transform:translateX(-50%);gap:16px}
   body.paisagem .placar .val2{font-size:16px}
   body.paisagem #giroLinha{bottom:8px;left:50%;transform:translateX(-50%);font-size:11px}
   /* polegar esquerdo */
@@ -270,6 +282,7 @@ body.paisagem #controle.ver,
   <div id="posto"><span id="postoTxt">PILOTO</span></div>
   <div id="horizonte"><div id="ceu"></div><div id="gradeTorre"></div>
        <div id="alvoTorre"></div><div id="mira"></div></div>
+  <div id="lemeTira"><i id="lemeBarra"></i><span>LEME</span></div>
   <div class="placar">
     <div><div class="rot">Distância</div><div class="val" id="pDist">0</div></div>
     <div><div class="rot">Combustível</div><div class="val" id="pComb">&ndash;</div></div>
@@ -299,7 +312,8 @@ body.paisagem #controle.ver,
     <button id="btVisaoC">cabine</button></div>
   <div id="dica"><b>Girar de lado</b> = aileron, roda as asas (segure inclinado e ele dá a volta inteira).
     <b>Puxar a borda de cima</b> = profundor, levanta o nariz.
-    <b>Deslizar para o lado</b> = leme. <b>Zerar</b> torna a posição da sua mão o voo reto.</div>
+    <b>Apontar o aparelho para o lado</b> = leme, chuta o nariz.
+    <b>Zerar</b> torna a posição da sua mão o voo reto.</div>
 </div>
 
 <!-- PeerJS (WebRTC com sinalização), embutido para a página ser um arquivo só -->
@@ -321,6 +335,12 @@ __PEERJS__
    A parte do sensor (Controle) é a mesma dos outros jogos.
    ========================================================================== */
 function voltaCurta(g){ while (g > 180) g -= 360; while (g < -180) g += 360; return g; }
+/* curso de comando com folga no meio: 0 dentro da folga, cresce até 1 no talo */
+function grausParaEixo(graus, maximo, zonaMorta){
+  const s = Math.sign(graus), v = Math.abs(graus);
+  if (v <= zonaMorta) return 0;
+  return s * Math.min(1, (v - zonaMorta) / (maximo - zonaMorta));
+}
 const Controle = {
   modo: 'nenhum', volante: 0, manche: 0, zeroVolante: 0, zeroManche: 0,
   recebeu: false, escutando: false, ultimaLeitura: 0, _volanteBruto: 0, _mancheBruto: 0,
@@ -357,9 +377,71 @@ const Controle = {
     Controle._mancheBruto  = -Math.asin(Math.max(-1, Math.min(1, uz))) * G;
     Controle.volante = voltaCurta(Controle._volanteBruto - Controle.zeroVolante);
     Controle.manche  = Controle._mancheBruto - Controle.zeroManche;
+    Controle.lemeApontado(e, b, g);
     Controle.recebeu = true;
     Controle.ultimaLeitura = Date.now();
     Controle.modo = 'sensor';
+  },
+
+  /* -------------------------------------------------------------------------
+     O LEME, por APONTAR o celular para o lado.
+
+     Este é o terceiro eixo, e é o único movimento que os outros dois não usam:
+     rolar o celular é o aileron (gira em torno do eixo que sai da tela),
+     puxar a borda de cima é o profundor (gira em torno do eixo comprido), e
+     APONTAR o conjunto para a esquerda ou para a direita — girar o corpo
+     junto, como quem mira — não mexe em nenhum dos dois. Três movimentos
+     independentes, um para cada comando.
+
+     A conta: das três leituras do sensor sai a orientação inteira do
+     aparelho, e dela eu tiro o eixo que sai pelas COSTAS da tela. Esse eixo
+     tem duas propriedades que são exatamente o que o leme precisa:
+
+       · rolar o celular NÃO o move (rolagem é giro em torno dele mesmo), e
+       · puxar/empurrar só o levanta ou abaixa um pouco.
+
+     Então o rumo dele no plano horizontal mede o apontar, e só o apontar.
+
+     Por que não o `alpha` puro: ele trava quando o aparelho aponta para cima
+     ou para baixo (a velha trava de cardan). O vetor não trava.
+
+     A FUGA LENTA DO ZERO: no Android o `alpha` não tem norte de verdade, é
+     giroscópio integrado, e escorrega alguns graus por minuto. Sem tratar,
+     o avião ia derivando sozinho. Então, enquanto o pedido de leme estiver
+     PEQUENO, o zero persegue a leitura bem devagar (uns 20 s de constante):
+     rápido o bastante para comer a escorregada, lento o bastante para não
+     roubar um leme que a pessoa esteja segurando de propósito. Perto do
+     talo não vaza nada.
+     --------------------------------------------------------------------- */
+  _psi: 0, _psiZero: 0, temPsi: false, _tPsi: 0,
+  LEME_CHEIO: 34, LEME_MORTO: 7,
+  lemeApontado(e, b, g){
+    if (e.alpha === null || e.alpha === undefined) return;
+    const R = Math.PI/180, G = 180/Math.PI;
+    const a = e.alpha*R;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const cb = Math.cos(b), sb = Math.sin(b), cg = Math.cos(g), sg = Math.sin(g);
+    // o eixo que sai das costas da tela, escrito no mundo (a 3ª coluna de
+    // Rz(alpha)·Rx(beta)·Ry(gama), que é como o padrão monta a orientação)
+    const zx = ca*sg + sa*sb*cg;
+    const zy = sa*sg - ca*sb*cg;
+    if (Math.hypot(zx, zy) < 0.25) return;      // tela virada para cima: sem rumo
+    const psi = Math.atan2(zx, zy) * G;
+
+    const agora = Date.now();
+    const dt = Math.min(0.5, Math.max(0.004, (agora - (this._tPsi || agora))/1000));
+    this._tPsi = agora;
+    if (!this.temPsi){ this._psiZero = psi; this.temPsi = true; }
+    this._psi = psi;
+
+    const fora = voltaCurta(psi - this._psiZero);
+    if (Math.abs(fora) < this.LEME_MORTO*2.2) this._psiZero += fora * Math.min(1, dt*0.05);
+
+    /* psi é um rumo de bússola: cresce girando para a DIREITA visto de cima
+       (o `alpha` do padrão cresce ao contrário, para a esquerda, e é por isso
+       que a conta acima não é simplesmente o alpha). Medido: apontando 25°
+       para a direita sai +0,67; para a esquerda, -0,67. */
+    this.leme = grausParaEixo(voltaCurta(psi - this._psiZero), this.LEME_CHEIO, this.LEME_MORTO);
   },
   // iOS pede permissão SEPARADA para orientação e para movimento. Sem a de
   // movimento o evento devicemotion nunca dispara, a gravidade não chega e o
@@ -446,12 +528,17 @@ const Controle = {
     }
     this._chute *= Math.pow(0.5, dtReal/0.5);
     if (Math.abs(this._chute) < 0.02) this._chute = 0;
-    this.leme = this._chute;
+    // PLANO B: só manda no leme se o apontar não estiver funcionando. O
+    // deslize nunca foi bom — acelerômetro não sente posição, então ele só
+    // dava um chute que morria sozinho, e agora que dá para pousar isso
+    // faltava de verdade para segurar o avião na pista.
+    if (!this.temPsi) this.leme = this._chute;
   },
 
   calibrar(){
     this.zeroVolante = this._volanteBruto || 0; this.zeroManche = this._mancheBruto || 0;
-    this.volante = 0; this.manche = 0;   // vale já, não só na próxima leitura
+    this._psiZero = this._psi || 0;      // o "reto" do leme é para onde a mão aponta agora
+    this.volante = 0; this.manche = 0; this.leme = 0;
   }
 };
 
@@ -576,6 +663,12 @@ assumePosto('piloto', 1);
     $('alvoTorre').style.transform = 'translate(' + (x*120).toFixed(1) + '%,' + (-y*120).toFixed(1) + '%)';
   } else {
     $('ceu').style.transform = 'rotate(' + (-v) + 'deg) translateY(' + (m * 1.4) + '%)';
+  }
+  const lb = $('lemeBarra');
+  if (lb){
+    const l = Math.max(-1, Math.min(1, Controle.leme || 0));
+    lb.style.width = (Math.abs(l)*50).toFixed(1) + '%';
+    lb.style.left = l >= 0 ? '50%' : (50 - Math.abs(l)*50).toFixed(1) + '%';
   }
   requestAnimationFrame(anima);
 })();

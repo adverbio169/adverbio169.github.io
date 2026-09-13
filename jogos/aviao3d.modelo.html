@@ -36,6 +36,13 @@
                font-weight:700;color:#8fa3c8;margin-top:3px}
   #cPouso .lin b{font-weight:800;color:#dce5f5}
   #cPouso .lin b.ok{color:#5eff9a} #cPouso .lin b.nao{color:#ffb86b}
+  /* o leme sai do MEIO para os lados, então a barra é ancorada no centro */
+  #cPouso .tira{height:7px;border-radius:99px;background:rgba(255,255,255,.16);
+                overflow:hidden;margin:5px 0;position:relative}
+  #cPouso .tira.leme::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;
+                background:rgba(255,255,255,.45)}
+  #cPouso .tira.leme i{position:absolute;top:0;bottom:0;left:50%;width:0;
+                background:#ffc24d;border-radius:99px;transition:none}
   #cPouso.estol{border-color:rgba(255,106,106,.7);box-shadow:0 0 18px rgba(255,106,106,.35)}
   #cPouso.estol .rot{color:#ff8f8f}
   #cMotor .tira{height:7px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden;margin:5px 0}
@@ -107,7 +114,9 @@
 <div class="painel" id="cPouso"><div class="rot">Velocidade</div>
   <div class="val"><span id="vVel">0</span><small>· mín <span id="vVmin">640</span></small></div>
   <div class="lin">Trem <b id="vTrem">EMBAIXO</b></div>
-  <div class="lin">Flapes <b id="vFlap">0</b></div></div>
+  <div class="lin">Flapes <b id="vFlap">0</b></div>
+  <div class="rot" style="margin-top:5px">Leme</div>
+  <div class="tira leme"><i id="barraLeme"></i></div></div>
 <div class="painel" id="cMotor"><div class="rot">Potência (W/S · Shift nitro)</div>
   <div class="val"><span id="vMotor">67</span><small>%</small></div>
   <div class="tira"><i id="barraMotor"></i></div>
@@ -154,6 +163,9 @@
     <p class="txt" style="font-size:12.5px;color:#7d8cab">No computador: setas voam, <b>A</b> e <b>D</b> são o leme,
        <b>W</b> e <b>S</b> são o acelerador, <b>Shift</b> é o nitro, <b>G</b> o trem de pouso,
        <b>F</b> os flapes, <b>espaço</b> atira, <b>V</b> troca a vista, <b>1 2 3</b> trocam de arma.</p>
+    <p class="txt" style="font-size:12.5px;color:#7d8cab">No celular, cada movimento é um comando:
+       <b>girar de lado</b> = aileron, <b>puxar a borda de cima</b> = profundor,
+       <b>apontar o aparelho para o lado</b> = leme.</p>
   </div>
 </div>
 
@@ -1420,9 +1432,14 @@ function aterra(queda){
 }
 
 function rolaNoChao(dt, e){
-  // esterçar: o leme gira o avião em torno da vertical, e só com a roda andando
+  /* Esterçar: o leme gira o avião em torno da vertical, e só com a roda
+     andando. O AILERON também esterça, com meia força: no chão inclinar o
+     celular para o lado não tem para que servir, e "deitar para o lado que
+     quero ir" é o gesto que sai sozinho. Com isso dá para se manter na pista
+     mesmo que o leme do aparelho não esteja indo bem. */
   const manda = Math.min(1, voo/500);
-  const gira = (e.leme || 0) * TAXA_ESTERCA * manda * dt;
+  const pedido = Math.max(-1, Math.min(1, (e.leme || 0) + (e.lat || 0)*0.55));
+  const gira = pedido * TAXA_ESTERCA * manda * dt;
   if (Math.abs(gira) > 1e-5){
     const c = Math.cos(gira), sn = Math.sin(gira);
     const fx = eixoF.x*c + eixoF.z*sn, fz = -eixoF.x*sn + eixoF.z*c;
@@ -2023,6 +2040,10 @@ function pinta(){
   $('vFlap').textContent = flap === 0 ? '—' : String(flap);
   $('vFlap').className = flap ? 'ok' : '';
   $('cPouso').classList.toggle('estol', !noChao && voo < velMin());
+  // a barra do leme cresce do meio para o lado em que o nariz é chutado
+  const bl = $('barraLeme'), lp = Math.max(-1, Math.min(1, leme));
+  bl.style.width = (Math.abs(lp)*50).toFixed(1) + '%';
+  bl.style.left = lp >= 0 ? '50%' : (50 - Math.abs(lp)*50).toFixed(1) + '%';
 }
 
 /* --- o laço --- */
