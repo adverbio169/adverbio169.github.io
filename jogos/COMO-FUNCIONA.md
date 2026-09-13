@@ -835,3 +835,133 @@ o jeito padrão de um HUD dizer onde fica o chão.
 sinal. Foi preciso medir as três coisas separadamente — onde está o horizonte,
 para onde anda a espinha da escada, e com que ângulo cada degrau é desenhado —
 para ver que duas estavam certas e só a terceira estava errada.
+
+---
+
+## Fazer 180 e 360: o aileron virou VELOCIDADE
+
+> *"uma situação que tô sentindo dificuldade é de fazer 180 graus ou 360
+> graus. Tem que ter bem definido o que mexe no profundor e o que mexe no
+> aileron."*
+
+O aileron era um comando **absoluto**: 30° de mão eram 30° de asa. Preciso
+para voar reto — e, sem querer, uma prisão: para dar 360° na asa a pessoa
+teria de girar o pulso 360°. Não dava, e nunca ia dar.
+
+Pior, os dois eixos tinham gramáticas DIFERENTES. O profundor sempre foi
+velocidade (puxou, o nariz sobe enquanto estiver puxado), o aileron era
+ângulo. Uma mão pedia posição e a outra pedia taxa. É exatamente o "não está
+bem definido o que mexe no quê".
+
+Agora os dois pedem **velocidade**:
+
+| gesto | comando | o que faz |
+|---|---|---|
+| girar o celular de lado | **aileron** | roda as asas enquanto estiver inclinado |
+| puxar/empurrar a borda de cima | **profundor** | levanta/baixa o nariz enquanto estiver puxado |
+| deslizar o celular para o lado | **leme** | chuta o nariz para o lado |
+
+### Três detalhes que fazem a diferença
+
+**1. A resposta é curva, não reta.** `taxa = (curso)^1,6`. Perto do meio o
+avião rola devagar e dá para corrigir fino; a rolagem cheia (195°/s, um tonô
+em menos de dois segundos) só vem no fim do curso. Com a resposta reta um
+tranquinho de mão já jogava o avião de lado.
+
+**2. Soltar endireita — mas só até 32° de banco.** Esse limite não é enfeite,
+e eu só descobri que precisava dele porque o teste cobrou: sem ele, o comando
+por velocidade **tira a curva do jogo**. A pessoa inclina para entrar na
+curva, endireita a mão para parar de rolar, e o nivelador desfaz a curva
+inteira. Com o limite, inclinar e soltar deixa o avião pousado numa curva
+firme — que é como se voa de verdade — e perto do nivelado ele continua se
+endireitando sozinho, que é o que salva quem está começando.
+
+**3. Passando de 32°, o avião segura o que tem.** É o que permite voar de
+cabeça para baixo depois de meio tonô.
+
+Medido: 45° de celular segurados por 4 s giram **779°** nas asas (duas voltas
+e pouco); manche puxado por 5 s leva o nariz por **430°** (a cambalhota
+inteira e sobra); banco de 24° com a mão solta volta a **0°**; banco de 136°
+com a mão solta fica em **136°**.
+
+## Pista, trem de pouso, flapes, decolagem e pouso
+
+> *"também quero poder pousar. Quero flaps, trem de pouso, quero poder decolar
+> e aterrissar."*
+
+Tem uma pista de 22.000 unidades correndo de sul para norte a partir da
+origem, com asfalto, tracejado do meio, cabeceiras e as faixas do ponto de
+toque. Nenhum prédio, alvo ou tambor nasce perto dela, e o campo em volta
+ficou com a grama aparada de aeroporto. O jogo **começa parado nela** (dá para
+escolher "começar já no ar" na capa, e a escolha fica guardada).
+
+### Os números, e por que são esses
+
+```
+marcha lenta ................. 520      \  a marcha lenta tem de ficar ABAIXO
+estol sem flape .............. 640      /  do estol, senão nunca se estola
+estol com flape 1 ............ 540
+estol com flape 2 ............ 450
+teto com o trem embaixo ..... 1400
+teto com flape 2 ............ 1150
+velocidade máxima no toque .. 1250
+```
+
+Duas dessas linhas nasceram de erro meu, apanhado pelo teste:
+
+**A marcha lenta era 700 e o estol 640.** Ou seja: era impossível estolar, o
+código do estol era letra morta e os flapes não serviam para nada. Baixando a
+marcha lenta para 520, fechar a manete sem flape faz o nariz cair — e com
+flape não faz. É exatamente para isso que os flapes existem, e agora eles
+existem.
+
+**O limite de velocidade no toque era 1500, e o teto do trem é 1400.** O
+avião com o trem fora nunca chegava a 1500, então a checagem nunca disparava.
+Com 1250 dá para estourar o pouso chegando com a manete aberta e sem flape —
+e reduzir ou baixar flape passa a ser uma decisão.
+
+### O pouso
+
+Tocar na pista é pouso se o trem estiver embaixo, o banco abaixo de 22°, a
+velocidade abaixo de 1250 e a descida abaixo de 620 por segundo. Qualquer
+outra coisa é batida, e o aviso diz qual das quatro foi. Pouso macio vale 400
+pontos, pouso duro 150.
+
+### Três erros do caminho
+
+**A corrida de decolagem durava meio segundo.** Eu reaproveitei a fórmula da
+velocidade do ar (`voo += (alvo - voo) * dt*2,5`), que existe para a
+velocidade "assentar" depois de mexer na manete. Como corrida de decolagem ela
+é absurda: o avião saltava para a velocidade de rotação antes de a pista
+começar a passar. No chão a velocidade passou a ganhar e perder POR SEGUNDO
+(86 de aceleração, 330 de freio), e a corrida ficou em 6 s e 1.940 de pista.
+
+**O avião parado nunca saía do lugar.** Havia um `if (voo < 8) voo = 0` para
+o avião encostar em zero ao frear. Só que ele valia sempre — e zerava, a cada
+quadro, o empurrãozinho de 1,8 que a aceleração acabara de dar. Agora o corte
+só vale para quem está freando.
+
+**Bater com o avião no chão deixava `noChao` ligado.** O `derruba()` não
+mexia nessa marca, e o avião "caía" achando que estava rolando na pista. Uma
+linha, mas contaminou uma rodada inteira de teste antes de eu ver.
+
+### O que dá para medir
+
+```
+começa parado na pista, trem embaixo, flape 1                    ✔
+corrida até a rotação: 6,0 s e 1.940 de pista (a pista tem 22.000) ✔
+puxou -> decolou usando 2.386                                     ✔
+aproximação com trem e flape 2, pilotada só pelo manche -> POUSOU ✔
+freando com a manete fechada: parou em 2,5 s e 1.018 de pista     ✔
+sem trem de pouso ............ bateu  ✔      asa a 40° ......... bateu  ✔
+manete aberta e sem flape .... bateu  ✔      descendo como pedra  bateu  ✔
+manete fechada sem flape: nariz caiu a -52°  ✔ (estolou)
+a mesma manete com flape 2:   nariz em 0°    ✔ (é para isso que servem)
+```
+
+No celular apareceram dois botões, **TREM** e **FLAPE**, na fileira de cima —
+que é onde mora o que se usa duas vezes por voo. Eles só aparecem se o jogo do
+outro lado souber pousar: o pacote de estado traz `pousa:true`, e assim o
+mesmo `controle.html` continua servindo os jogos em 2D sem dois botões mortos
+na tela. E mandam o valor que querem (`v`), não "troque" — num canal que perde
+pacote, um "troque" perdido deixaria os dois lados discordando para sempre.
