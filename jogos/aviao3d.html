@@ -7362,9 +7362,29 @@ const TAXA_ROL = 3.4, TAXA_ARF = 1.5, TAXA_LEME = 0.55;
 /* AILERON: quanto de celular vale rolagem cheia, e a folga do meio. Ver o
    comentário grande em `eixos()` sobre por que virou VELOCIDADE. */
 const ROL_CHEIO = 40, ROL_MORTO = 6, NIVELA = 1.5, NIVELA_ATE = 32;
+const ARF_CHEIO = 28, ARF_MORTO = 3;   // curso do profundor, em graus de celular
 const RAIO_PEGA = 340, GASTO = 3.0, GASTO_TURBO = 4.6;
 const DA_NORMAL = 20, DA_AZUL = 32, TURBO_SEG = 5;
 const RAIO_NUKE = 9000, RAIO_POMBO = 170, RAIO_AVIAO = 430, RAIO_HELI = 400;
+/* --- O TREM -----------------------------------------------------------------
+   "Quero mais alvos no chão, inclusive em movimento. Coloca um trem com vagões
+   para servir de alvo para treinar os movimentos."
+
+   É o melhor alvo de treino que existe, e por um motivo específico: ele anda
+   depressa, anda RETO e anda no chão. Alvo parado ensina a apontar; alvo que
+   manobra é frustrante; alvo que corre em linha reta ensina exatamente a coisa
+   que falta — dar dianteira. Você erra atrás, corrige, erra na frente, corrige,
+   e em três passagens a mão aprende.
+
+   E ele reaproveita tudo: cada vagão é um obstáculo como qualquer outro, então
+   já entra de graça no radar, no travamento do míssil, na solução de tiro da
+   metralhadora, na pontuação e na colisão. Só a POSIÇÃO é que não é a do
+   obstáculo comum — ela vem do trem, senão os vagões se desgarravam um do
+   outro ao dar a volta no fim do mapa. */
+const TRILHO_X = 9000;            // a linha corre paralela à pista, à direita
+const VAGOES = 9;                 // uma locomotiva e oito vagões
+const VAGAO_COMP = 900, VAGAO_VAO = 260;
+const RAIO_VAGAO = 300;
 
 /* ===========================================================================
    PISTA, TREM DE POUSO E FLAPES
@@ -7499,6 +7519,26 @@ function endireitaEixos(){
   inclinacao = Math.atan2(-eixoD.y, eixoC.y) * 180/Math.PI;
 }
 
+/* --- A FERROVIA: um trem só, que anda reto e não se desgarra -------------- */
+/* Chama-se `Ferrovia` e não `Trem` por um motivo prático: neste jogo `trem` já
+   é o trem de POUSO, e há um `mexeTrem()` a poucas linhas daqui. Duas coisas
+   com o mesmo nome, uma com maiúscula e outra sem, é bug esperando acontecer. */
+const Ferrovia = {
+  s: 0, vel: 1150, vivo: true,
+  /* A posição de cada vagão sai daqui, não do passo genérico do obstáculo.
+     Se cada um andasse por conta, ao dar a volta no fim do mapa um viraria
+     antes do outro e o trem se partiria no meio. */
+  passo(dt, cars){
+    this.s += this.vel*dt;
+    const volta = MAPA + VAGOES*(VAGAO_COMP + VAGAO_VAO);
+    if (this.s > volta) this.s = -volta;
+    for (const o of cars){
+      o.z = this.s - o.iVagao*(VAGAO_COMP + VAGAO_VAO);
+      o.x = TRILHO_X; o.y = CHAO + 250; o.rumo = 0;
+    }
+  }
+};
+
 /* --- o mapa, montado uma vez --- */
 let predios=[], tambores=[], alvos=[], obstaculos=[];
 function montaMapa(){
@@ -7540,6 +7580,14 @@ function montaMapa(){
           x0:0, y0:0, vivo:true });
       }
     }
+  /* o trem: a locomotiva e os vagões entram na mesma lista dos outros
+     obstáculos, e por isso ganham radar, trava e pontuação sem uma linha a
+     mais em nenhum desses lugares */
+  Ferrovia.s = -MAPA*0.4; Ferrovia.vivo = true;
+  for (let i = 0; i < VAGOES; i++)
+    obstaculos.push({ tipo: i === 0 ? 'locomotiva' : 'vagao', iVagao: i,
+                      x:TRILHO_X, y:CHAO + 250, z:0, fase:0, deriva:0, rumo:0,
+                      vel:0, giro:0, x0:TRILHO_X, y0:CHAO + 250, vivo:true });
   for (const o of obstaculos){ o.x0 = o.x; o.y0 = o.y; }
 
   const QUADRA = 1600, RUA = 520, P = QUADRA + RUA;
@@ -7549,6 +7597,7 @@ function montaMapa(){
       if (Math.abs(xx - rioX(zz)) < 1100) continue;
       if (Math.abs(zz - estradaZ(xx)) < 700) continue;
       if (Math.abs(xx - estradaXv(zz)) < 700) continue;
+      if (Math.abs(xx - TRILHO_X) < 1400) continue;      // a linha férrea
       if (perto_da_pista(xx, zz)) continue;          // o aeroporto é plano
       if (Math.random() < 0.20) continue;
       /* --- BAIRROS ---------------------------------------------------------
@@ -7571,7 +7620,9 @@ function montaMapa(){
     }
 
   let tent = 0;
-  while (alvos.length < 18 && tent < 6000){
+  /* Eram 18. "Quero mais alvos no chão": 26. O mapa dobrou de tamanho faz
+     pouco e continuava com a mesma conta de alvos — havia espaço sobrando. */
+  while (alvos.length < 26 && tent < 6000){
     tent++;
     const ax = (Math.random()-0.5)*MAPA*1.8, az = (Math.random()-0.5)*MAPA*1.8;
     if (!ehCidade(ax, az)) continue;
@@ -8457,6 +8508,89 @@ function montaInimigos(){
     const n = montaHelicoptero();
     o.no = n; o.rotor = n.userData.rotor; cena.add(n); inimigos.push(n);
   }
+  for (const o of obstaculos){
+    if (o.iVagao === undefined) continue;
+    const n = o.tipo === 'locomotiva' ? montaLocomotiva() : montaVagao(o.iVagao);
+    o.no = n; cena.add(n); inimigos.push(n);
+  }
+}
+
+/* --- O TREM, peça por peça --------------------------------------------------
+   Caixas. Um vagão de carga É uma caixa sobre rodas, e insistir em detalhe
+   aqui seria gastar triângulo onde ninguém olha — o trem é visto de cima, a
+   150 metros, passando a 1.150 por segundo. O que precisa ser legível é o
+   COMPRIMENTO (para dar a dianteira) e a cor de cada vagão (para ver que são
+   vários, e qual já foi). A locomotiva é mais escura, mais alta e tem chaminé:
+   é ela que diz de que lado o trem anda.
+   ------------------------------------------------------------------------- */
+const CORES_VAGAO = [0x8a4b2a, 0x2f5d7c, 0x6b6f4a, 0x7a3b46, 0x3f6b52, 0x6a5a7a];
+function rodasDoVagao(g, comp, mat){
+  for (const z of [-comp*0.34, comp*0.34])
+    for (const x of [-150, 150]){
+      const r = new THREE.Mesh(new THREE.CylinderGeometry(70, 70, 40, 8), mat);
+      r.rotation.z = Math.PI/2; r.position.set(x, -160, z); g.add(r);
+    }
+}
+function montaVagao(i){
+  const g = new THREE.Group();
+  const mC = new THREE.MeshLambertMaterial({ color: CORES_VAGAO[i % CORES_VAGAO.length] });
+  const mE = new THREE.MeshLambertMaterial({ color: 0x2a2f38 });
+  const caixa = new THREE.Mesh(new THREE.BoxGeometry(340, 300, VAGAO_COMP), mC);
+  caixa.position.y = 40; caixa.castShadow = true; g.add(caixa);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(360, 60, VAGAO_COMP + 60), mE);
+  base.position.y = -120; g.add(base);
+  rodasDoVagao(g, VAGAO_COMP, mE);
+  return g;
+}
+function montaLocomotiva(){
+  const g = new THREE.Group();
+  const mC = new THREE.MeshLambertMaterial({ color: 0x22262e });
+  const mV = new THREE.MeshLambertMaterial({ color: 0xc9433a });
+  const corpo = new THREE.Mesh(new THREE.BoxGeometry(360, 340, VAGAO_COMP), mC);
+  corpo.position.y = 50; corpo.castShadow = true; g.add(corpo);
+  const cabine = new THREE.Mesh(new THREE.BoxGeometry(380, 200, 320), mC);
+  cabine.position.set(0, 300, -VAGAO_COMP*0.28); g.add(cabine);
+  const chamine = new THREE.Mesh(new THREE.CylinderGeometry(60, 74, 190, 10), mC);
+  chamine.position.set(0, 300, VAGAO_COMP*0.32); g.add(chamine);
+  const frente = new THREE.Mesh(new THREE.BoxGeometry(380, 120, 70), mV);
+  frente.position.set(0, -40, VAGAO_COMP*0.5); g.add(frente);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(380, 60, VAGAO_COMP + 60),
+                              new THREE.MeshLambertMaterial({ color: 0x2a2f38 }));
+  base.position.y = -120; g.add(base);
+  rodasDoVagao(g, VAGAO_COMP, mC);
+  return g;
+}
+
+/* --- E A LINHA FÉRREA, que é o que faz o trem parecer um trem ---------------
+   Sem trilho, nove caixas correndo pelo campo são nove caixas correndo pelo
+   campo. Com trilho, o olho entende antes de pensar — e ainda ganha uma
+   referência reta e infinita no chão, que ajuda a julgar a própria velocidade.
+
+   Custa três ordens de desenho: dois trilhos compridos e UM `InstancedMesh`
+   com os dormentes, que é o mesmo truque da cidade. */
+let viaFerrea = null;
+function montaTrilhos(){
+  if (viaFerrea) cena.remove(viaFerrea);
+  viaFerrea = new THREE.Group();
+  const mT = new THREE.MeshLambertMaterial({ color: 0x6b6257 });
+  const mD = new THREE.MeshLambertMaterial({ color: 0x4a4038 });
+  const brita = new THREE.Mesh(new THREE.BoxGeometry(760, 30, MAPA*2), 
+                               new THREE.MeshLambertMaterial({ color: 0x585349 }));
+  brita.position.set(TRILHO_X, CHAO + 15, 0); viaFerrea.add(brita);
+  for (const dx of [-150, 150]){
+    const t = new THREE.Mesh(new THREE.BoxGeometry(50, 40, MAPA*2), mT);
+    t.position.set(TRILHO_X + dx, CHAO + 50, 0); viaFerrea.add(t);
+  }
+  const quantos = 900, passo = MAPA*2/quantos;
+  const dorm = new THREE.InstancedMesh(new THREE.BoxGeometry(620, 34, 130), mD, quantos);
+  const m4 = new THREE.Matrix4();
+  for (let i = 0; i < quantos; i++){
+    m4.makeTranslation(TRILHO_X, CHAO + 28, -MAPA + i*passo);
+    dorm.setMatrixAt(i, m4);
+  }
+  dorm.instanceMatrix.needsUpdate = true;
+  viaFerrea.add(dorm);
+  cena.add(viaFerrea);
 }
 
 /* --- O HELICÓPTERO ----------------------------------------------------------
@@ -8640,7 +8774,7 @@ const MAO = -1;
 function eixos(){
   if (Controle.modo === 'sensor')
     return { lat: MAO * Math.max(-1, Math.min(1, voltaCurta(Controle.volante)/180)),
-             ver: grausParaEixo(Controle.manche, 22, 3),
+             ver: grausParaEixo(Controle.manche, ARF_CHEIO, ARF_MORTO),
              leme: MAO * (Controle.leme || 0), absoluto: true };
   if (usandoToque) return { lat: MAO*toqueX, ver: toqueY, leme: MAO*lemeTecla() };
   return { lat: MAO * ((tecla.esq?-1:0) + (tecla.dir?1:0)),
@@ -8803,32 +8937,32 @@ const Cabeca = {
   }
 };
 /* --- e a câmera do jogo obedece -------------------------------------------
-   Um giro só, aplicado ao trio da câmera, serve às duas vistas:
+   A PRIMEIRA VERSÃO ORBITAVA, E ESTAVA ERRADA. Na vista de fora eu fazia a
+   câmera dar a volta em torno do avião e continuar apontada para ele. No
+   papel era bonito — "check six", você vê o seu avião e quem vem atrás. Na
+   mão foi outra coisa: "olhei para a esquerda e ele fez a tela girar para a
+   direita".
 
-   · NA CABINE é o que se espera — o piloto vira a cabeça e o mundo passa.
-   · DE FORA, girar só a mira jogaria o próprio avião para fora da tela. Mas a
-     câmera de fora já olha exatamente para o ponto `avião + cima*210`: ela
-     está a `CAMD` atrás dele, na direção de `camF`. Então basta reancorar a
-     câmera nesse mesmo ponto depois de girar o trio, mantendo a distância: ela
-     ORBITA o avião e continua apontada para ele. É o "check six" — você olha
-     para trás e vê o seu avião e quem vem atrás.
+   E é exatamente o que acontece. Mantendo a mira colada no avião, ele fica
+   CRAVADO no meio da tela e o mundo inteiro roda em volta dele. O olho não lê
+   isso como "virei a cabeça", lê como "a tela girou" — porque virar a cabeça,
+   na vida real, deixa o mundo parado e faz as COISAS passarem pelo campo de
+   visão.
+
+   Então agora é o mesmo giro nas duas vistas, e só o giro: a câmera fica onde
+   está e o olhar é que vira. O mundo fica parado, o seu avião escorrega para
+   o lado e sai de cena quando você olha para trás — que é o certo, porque
+   olhar para trás é justamente deixar de olhar para a frente. E para não se
+   perder, o HUD diz de que lado ficou o nariz.
    -------------------------------------------------------------------------- */
 function olhaComACabeca(){
   if (!Cabeca.ligada || (Math.abs(Cabeca.x) < 0.15 && Math.abs(Cabeca.y) < 0.15)) return;
   const oy = Cabeca.x*Math.PI/180, op = Cabeca.y*Math.PI/180;
-  let alvoX = 0, alvoY = 0, alvoZ = 0, dist = 0;
-  if (!cockpit){
-    alvoX = camPos.x + camF.x*CAMD; alvoY = camPos.y + camF.y*CAMD; alvoZ = camPos.z + camF.z*CAMD;
-    dist = Math.hypot(camPos.x-alvoX, camPos.y-alvoY, camPos.z-alvoZ);
-  }
   let r = giraPar(camF, camD, oy); camF = r[0]; camD = r[1];
   r = giraPar(camF, camC, op);     camF = r[0]; camC = r[1];
   camF = vnorm(camF);
   camC = vnorm(vsub(camC, vmul(camF, vponto(camC, camF))));
   camD = vcruz(camC, camF);
-  if (!cockpit && dist > 1){
-    camPos.set(alvoX - camF.x*dist, alvoY - camF.y*dist, alvoZ - camF.z*dist);
-  }
 }
 function poeCamera(dt){
   if (cockpit){
@@ -9721,7 +9855,7 @@ const MiraTiro = {
     const d = direcaoDaMira();
     const vBala = voo*6, alcance = alcanceBala();
     let melhor = null, melhorErro = 1;
-    const olha = (x, y, z, vx, vy, vz, raio) => {
+    const olha = (quem, x, y, z, vx, vy, vz, raio) => {
       // duas passadas: o tempo de voo depende de onde o alvo vai estar
       let t = Math.hypot(x-aviaoX, y-aviaoY, z-aviaoZ)/vBala;
       let px = x, py = y, pz = z;
@@ -9738,17 +9872,20 @@ const MiraTiro = {
       const erro = fora/((raio + 320)*TIRO_FOLGA);
       if (erro < 1 && erro < melhorErro){
         melhorErro = erro;
-        melhor = { px, py, pz, ax:x, ay:y, az:z, dist };
+        melhor = { px, py, pz, ax:x, ay:y, az:z, dist, alvo:quem };
       }
     };
     for (const o of obstaculos){
       if (!o.vivo) continue;
       const v = o.vel || 0;
-      olha(o.x, o.y, o.z, Math.sin(o.rumo || 0)*v, 0, Math.cos(o.rumo || 0)*v,
-           o.tipo === 'aviao' ? RAIO_AVIAO : o.tipo === 'helicoptero' ? RAIO_HELI : RAIO_POMBO);
+      const vz = o.iVagao !== undefined ? Ferrovia.vel : Math.cos(o.rumo || 0)*v;
+      const vx = o.iVagao !== undefined ? 0 : Math.sin(o.rumo || 0)*v;
+      olha(o, o.x, o.y, o.z, vx, 0, vz,
+           o.tipo === 'aviao' ? RAIO_AVIAO : o.tipo === 'helicoptero' ? RAIO_HELI
+           : o.iVagao !== undefined ? RAIO_VAGAO : RAIO_POMBO);
     }
     for (const o of inimigosRede())
-      olha(o.x, o.y, o.z, o.vx || 0, o.vy || 0, o.vz || 0, RAIO_AVIAO);
+      olha(o, o.x, o.y, o.z, o.vx || 0, o.vy || 0, o.vz || 0, RAIO_AVIAO);
 
     if (melhor){
       this._perdeu = 0;
@@ -9892,15 +10029,19 @@ function atingeAr(x, y, z, raio, dano){
   for (const o of obstaculos){
     if (!o.vivo) continue;
     const r = (o.tipo === 'aviao' ? RAIO_AVIAO
-             : o.tipo === 'helicoptero' ? RAIO_HELI : RAIO_POMBO) + raio;
+             : o.tipo === 'helicoptero' ? RAIO_HELI
+             : o.iVagao !== undefined ? RAIO_VAGAO : RAIO_POMBO) + raio;
     if (Math.abs(o.y-y) < r && Math.hypot(o.x-x, o.z-z) < r){
       o.vivo = false; if (o.no) o.no.visible = false;
       /* o helicóptero está parado: é o alvo fácil, e vale menos que o avião,
          que obriga a mirar adiante */
-      pontos += o.tipo === 'aviao' ? 200 : o.tipo === 'helicoptero' ? 120 : 50;
-      explode(o.x, o.y, o.z, o.tipo === 'pombo' ? 0.5 : 1.2);
+      pontos += o.tipo === 'aviao' ? 200 : o.tipo === 'helicoptero' ? 120
+              : o.tipo === 'locomotiva' ? 300 : o.tipo === 'vagao' ? 150 : 50;
+      explode(o.x, o.y, o.z, o.tipo === 'pombo' ? 0.5 : o.iVagao !== undefined ? 1.5 : 1.2);
       mostraAviso(o.tipo === 'aviao' ? 'AVIÃO ABATIDO! +200'
-                : o.tipo === 'helicoptero' ? 'HELICÓPTERO ABATIDO! +120' : '+50', '#ffd257', 800);
+                : o.tipo === 'helicoptero' ? 'HELICÓPTERO ABATIDO! +120'
+                : o.tipo === 'locomotiva' ? 'LOCOMOTIVA! +300'
+                : o.tipo === 'vagao' ? 'VAGÃO! +150' : '+50', '#ffd257', 800);
       Controles.bate(o.tipo === 'pombo' ? 'pegou' : 'alvo'); sacode(o.tipo === 'pombo' ? 0.08 : 0.22);
       return true;
     }
@@ -10338,7 +10479,23 @@ function atualiza(dt){
 
   let r = giraPar(eixoD, eixoC, -rol*dt); eixoD = r[0]; eixoC = r[1];
 
-  let cab = e.ver * TAXA_ARF * autoridade;
+  /* --- O PROFUNDOR TAMBÉM PRECISA DE CURVA ------------------------------------
+     "O piloto não consegue ficar com o nariz voltado para cima."
+
+     Medido, e a culpa não era do estol: era o profundor ser RETO enquanto o
+     aileron já tinha curva. Inclinando o celular só 8° e segurando 2 segundos,
+     o nariz ia parar a 40°; a 11°, ia a 55°. Não dá para escolher 20° de
+     subida com um comando desses — passa-se direto, e aí sim vem o estol, que
+     levava a culpa.
+
+     Agora ele tem a mesma gramática do aileron: perto do meio o avião levanta
+     o nariz devagar, e a taxa cheia só vem no fim do curso. O expoente 1,5 e
+     o curso de 28° saíram da medição — abaixo disso continuava grosso, acima
+     ficava mole para manobrar. A taxa MÁXIMA não mudou: cambalhota continua
+     fechando no mesmo tempo. */
+  const pedidoArf = grausParaEixo(e.absoluto ? Controle.manche : e.ver*ARF_CHEIO, ARF_CHEIO, ARF_MORTO);
+  const arfCurva = Math.sign(pedidoArf) * Math.pow(Math.abs(pedidoArf), 1.5);
+  let cab = arfCurva * TAXA_ARF * autoridade;
   /* MÃO SOLTA, O AVIÃO VOLTA AO NIVELADO — menos quando está estolado.
 
      Este endireitamento é o que torna o avião dócil: soltou o manche, o nariz
@@ -10358,8 +10515,29 @@ function atualiza(dt){
      Com o endireitamento calado durante o estol, o nariz cai e FICA caído até
      a velocidade voltar de verdade — que é a recuperação de estol de manual, e
      é o que devolve o susto que o Brunno tinha gostado. */
-  if (Math.abs(e.ver) < 0.05 && Math.abs(arfagem) < 0.45 && Math.abs(inclinacao) < 30
-      && !estolando) cab = -arfagem*0.8;
+  /* --- E O NIVELADOR DEIXA DE TER PENHASCO -----------------------------------
+     A outra metade do mesmo problema, e esta eu só vi medindo: o nivelador
+     valia até 26° de nariz e ali PARAVA de repente. O resultado era um jogo
+     sem meio-termo — puxar até 19° e soltar levava o nariz de volta a 2°, e
+     puxar até 28° deixava o nariz cravado em 28° para sempre. Não existia
+     "subir um pouco".
+
+     Agora ele desvanece: força cheia até uns 8° de nariz, e some por volta dos
+     35°. Perto do horizonte o avião continua dócil, que é o que salva o
+     iniciante; numa subida ele deixa de brigar, e o nariz fica onde você
+     pôs — descendo devagar, como um avião fora de compensação. */
+  if (Math.abs(e.ver) < 0.05 && Math.abs(inclinacao) < 30 && !estolando){
+    const a = Math.abs(arfagem);
+    const forca = Math.max(0, Math.min(1, (0.61 - a)/(0.61 - 0.14)));
+    /* E é ASSIMÉTRICO de propósito. Nariz para BAIXO com a mão solta é a coisa
+       que mata o iniciante — ali o endireitamento continua firme, e é ele que
+       salva. Nariz para CIMA com a mão solta é INTENÇÃO: quem soltou o manche
+       apontando para o céu quis subir. Puxar o nariz de volta contra a vontade
+       do piloto era o que dava a sensação de "não consigo ficar com o nariz
+       para cima". Subindo, o avião só desce o bico devagarinho, como um avião
+       fora de compensação. */
+    if (forca > 0) cab = -arfagem*(arfagem > 0 ? 0.20 : 0.75)*forca;
+  }
   r = giraPar(eixoF, eixoC, cab*dt); eixoF = r[0]; eixoC = r[1];
 
   /* 1/9 de segundo de filtro fazia sentido quando o leme era um CHUTE que
@@ -10643,10 +10821,13 @@ function atualiza(dt){
     }
   }
 
+  Ferrovia.passo(dt, obstaculos.filter(o => o.iVagao !== undefined));
   for (const o of obstaculos){
     if (!o.vivo) continue;
     o.fase += dt*2;
-    if (o.tipo === 'aviao'){
+    if (o.iVagao !== undefined){
+      // já posicionado pelo trem; aqui ele só existe para a colisão logo abaixo
+    } else if (o.tipo === 'aviao'){
       /* AVIÃO DE ROTA: anda no rumo, curva manso e dá a volta pelo outro lado
          do mapa quando chega ao fim. Sem a volta, em dois minutos o céu ficava
          vazio de um lado e entupido do outro. */
@@ -10671,7 +10852,8 @@ function atualiza(dt){
       o.y = o.y0 + Math.cos(o.fase*1.1)*220;
     }
     const raio = (o.tipo === 'aviao' ? RAIO_AVIAO
-                : o.tipo === 'helicoptero' ? RAIO_HELI : RAIO_POMBO) + 150;
+                : o.tipo === 'helicoptero' ? RAIO_HELI
+                : o.iVagao !== undefined ? RAIO_VAGAO : RAIO_POMBO) + 150;
     const dx = aviaoX-o.x, dy = aviaoY-o.y, dz = aviaoZ-o.z;
     if (dx*dx + dy*dy + dz*dz < raio*raio){ derruba(o.tipo); return; }
   }
@@ -11494,69 +11676,41 @@ function desenhaHUD(){
   }
 
   /* --- A MIRA DA METRALHADORA -------------------------------------------------
-     "A metralhadora também tem que ter um HUD de disparo verde, projetando
-     para onde vão os tiros."
+     Três versões até acertar, e as três estão contadas aqui porque cada erro
+     ensinou o seguinte.
 
-     Fazia falta: a mira do meio da tela diz para onde o NARIZ aponta, e os
-     tiros saem por ali mas morrem a uma distância certa. Sem ver o alcance,
-     atira-se muito longe e não se entende por que não acerta.
+     1ª — LINHA CURTA, DO NARIZ ATÉ O ALCANCE. Trinta pixels parados no meio da
+          tela: "o HUD ficou muito curto e não acompanha o movimento".
+     2ª — LINHA LONGA, começando colada no cano. Ficou comprida e varria a tela
+          ao manobrar, mas: "está com um rastro fixo e grande; não é isso, o
+          rastro se forma dependendo do movimento do avião".
+     3ª — esta. E o pedido, relido, é uma ideia melhor do que as duas minhas:
+          o rastro não é para ser DESENHADO, é para ser MEDIDO.
 
-     Isto desenha o caminho real da bala — a mesma direção que `dispara()` usa,
-     a mesma velocidade, o mesmo tempo de vida — projetado pela câmera do jogo.
-     Os traços marcam os quartos do alcance e o círculo é onde a bala acaba:
-     alvo além do círculo é alvo que não vai ser atingido, e isso passa a ser
-     visível em vez de adivinhado. Em verde, como o resto do HUD da cabine.
+     Então o HUD passou a ter duas peças, com papéis separados:
 
-     --- E POR QUE A LINHA É RETA ------------------------------------------------
-     Houve uma versão giroscópica aqui: a linha era encurvada para trás de
-     `ω·t`, para acompanhar o rastro que se vê saindo do cano numa curva. Ela
-     foi MEDIDA e estava errada, e a medição vale mais do que o raciocínio que
-     a produziu. O teste soltou UMA bala e foi ver onde ela parou:
+       O ANEL, sempre presente e pequeno, onde o cano aponta. É a mira: o ponto
+       do meio é por onde a bala passa, o anel dá o tamanho angular do alvo, o
+       número diz até onde a bala chega. Nada de trilho comprido atravessando a
+       tela quando não se está atirando.
 
-         em linha reta : 399 da mira reta · 399 da giroscópica (alcance 14247)
-         em curva leve : 249 da mira reta · 1950 da giroscópica (alcance 9803)
-         em curva forte: 496 da mira reta · 5946 da giroscópica (alcance 14990)
+       O RASTRO, só quando há bala no ar, desenhado pelas posições REAIS das
+       balas que estão voando. Voando reto ele sai reto; numa curva ele
+       encurva sozinho, porque as balas ficaram para trás de verdade — não é
+       efeito, é o estado do mundo lido e projetado. Aparece quando o dedo
+       aperta e some quando solta.
 
-     A bala que sai AGORA viaja reta a partir de agora — o nariz continuar
-     girando depois não a entorta. A curva giroscópica mostrava onde estão as
-     balas do passado, que é justamente o rastro torto que se enxerga; mas o
-     que a mira precisa dizer é onde vai a próxima. Ela é reta.
-
-     O que estava REALMENTE errado no "o tiro não vai onde se dispara" era
-     outra coisa, e está corrigido em `dispara()`: as balas nasciam espalhadas
-     de lado e saíam PARALELAS, sem nunca cruzar a linha da mira. Agora elas
-     convergem — é a harmonização das metralhadoras de caça. */
+     A média móvel de três pontos existe porque as balas nascem espalhadas até
+     110 para o lado (os canos são nas asas): sem ela a linha ficava serrilhada
+     de perto. */
   if (jogando && !caindo && arma === 'metralha' && municao.metralha > 0){
     const T = direcaoDaMira();
     const alcance = alcanceBala();
     const v3 = new THREE.Vector3();
-    const naTela3 = k => {
-      const d = alcance*k;
-      v3.set(aviaoX + T.x*d, aviaoY + T.y*d, aviaoZ + T.z*d).project(cam);
-      return { x:(v3.x*0.5+0.5)*W, y:(-v3.y*0.5+0.5)*H, atras: v3.z > 1, k };
-    };
-    /* --- POR QUE A LINHA COMEÇA COLADA NO NARIZ --------------------------------
-       "O HUD da metralhadora ficou muito curto, e a extensão dele não acompanha
-       o movimento do avião."
-
-       A linha ia de 28% a 100% do alcance — e esse trecho inteiro vive perto do
-       ponto de fuga, onde tudo se amontoa: dava um risquinho de trinta pixels
-       parado no meio da tela. Perspectiva é assim: o que está longe se junta, o
-       que está perto se espalha.
-
-       Agora ela começa a 2,5% — praticamente no cano — e vai até o fim do
-       alcance. O pedaço perto do avião abre bastante na tela, então a linha
-       nasce no nariz e sobe até o horizonte; e como o começo dela está COLADO
-       no avião e o fim está longe, virar o avião varre a linha inteira pela
-       tela. É exatamente o "acompanhar o movimento" que faltava.
-
-       Os passos dobram (2,5 · 6 · 13 · 26 · 50 · 100%) porque na tela a
-       distância anda com o INVERSO da profundidade: passos que dobram no mundo
-       dão pedaços parecidos no vidro. */
-    const pontos4 = [0.025, 0.06, 0.13, 0.26, 0.5, 1].map(naTela3);
     const preso = MiraTiro.bom;
-    /* onde está a solução na tela — calculada ANTES, porque é ela que decide
-       se ainda cabe escrever o alcance embaixo do círculo */
+
+    /* onde está a solução na tela — calculada antes, porque é ela que decide
+       se ainda cabe escrever o alcance embaixo do anel */
     let sol = null;
     if (preso && MiraTiro.solucao){
       const S = MiraTiro.solucao;
@@ -11567,101 +11721,66 @@ function desenhaHUD(){
         sol.ax = (v3.x*0.5+0.5)*W; sol.ay = (-v3.y*0.5+0.5)*H;
       }
     }
-    /* --- E QUANDO A LINHA NÃO CABE NA TELA -------------------------------------
-       "Na visão de simulação parece que está no zero: só aparece o central,
-       não aparece o rastro."
 
-       Também está certo, e não é defeito de desenho — é geometria. Na cabine a
-       câmera fica DENTRO do avião, olhando exatamente ao longo do cano. Uma
-       linha vista de ponta é um ponto: os 700 metros de trajetória caem todos
-       no mesmo pixel. Não há como esticar isso; é o mesmo motivo pelo qual você
-       não enxerga o comprimento de uma flecha que vem na sua direção.
+    /* --- O RASTRO DE VERDADE ------------------------------------------------ */
+    if (tiros.length >= 2){
+      const pts = [];
+      for (const t of tiros){
+        v3.set(t.x, t.y, t.z).project(cam);
+        if (v3.z > 1) continue;
+        pts.push({ x:(v3.x*0.5+0.5)*W, y:(-v3.y*0.5+0.5)*H });
+      }
+      if (pts.length >= 2){
+        const liso = pts.map((q, i) => {
+          const a = pts[Math.max(0, i-1)], b = pts[Math.min(pts.length-1, i+1)];
+          return { x:(a.x + q.x + b.x)/3, y:(a.y + q.y + b.y)/3 };
+        });
+        h2.lineWidth = 2.2; h2.lineCap = 'round';
+        for (let i = 0; i < liso.length-1; i++){
+          // a ponta nova é a mais viva; a velha vai apagando
+          const f = (i+1)/liso.length;
+          h2.strokeStyle = 'rgba(150,255,190,' + (0.18 + f*0.62).toFixed(3) + ')';
+          h2.beginPath(); h2.moveTo(liso[i].x, liso[i].y);
+          h2.lineTo(liso[i+1].x, liso[i+1].y); h2.stroke();
+        }
+        h2.lineCap = 'butt';
+      }
+    }
 
-       Então na cabine a mira troca de forma, como troca num caça de verdade: em
-       vez do rastro, um ANEL com o ponto no meio — o "pipper". O anel dá o
-       tamanho angular do alvo (alvo que enche o anel está na distância de
-       tiro), o ponto diz onde a bala passa, e o número embaixo diz até onde ela
-       chega. A informação é a mesma; muda o desenho, porque mudou o ponto de
-       vista.
-
-       A escolha é medida, não chutada: se a linha inteira couber em menos de 5%
-       da altura da tela, ela não é linha — é ponto, e vira anel. */
-    const p0 = pontos4[0], pf = pontos4[pontos4.length-1];
-    const vaoLinha = Math.hypot(pf.x-p0.x, pf.y-p0.y);
-    if (!pontos4.some(q => q.atras) && vaoLinha < H*0.05){
-      const r = Math.max(14, H*0.055);
+    /* --- O ANEL ------------------------------------------------------------- */
+    v3.set(aviaoX + T.x*alcance, aviaoY + T.y*alcance, aviaoZ + T.z*alcance).project(cam);
+    if (v3.z <= 1){
+      const px = (v3.x*0.5+0.5)*W, py = (-v3.y*0.5+0.5)*H;
+      const r = Math.max(13, H*0.05);
       h2.strokeStyle = preso ? 'rgba(150,255,190,.95)' : 'rgba(120,255,170,.6)';
       h2.lineWidth = preso ? 2.4 : 1.6;
-      for (let i = 0; i < 4; i++){          // quatro arcos com folga entre eles
+      for (let i = 0; i < 4; i++){          // quatro arcos, com folga entre eles
         h2.beginPath();
-        h2.arc(pf.x, pf.y, r, i*Math.PI/2 + 0.16, (i+1)*Math.PI/2 - 0.16);
+        h2.arc(px, py, r, i*Math.PI/2 + 0.16, (i+1)*Math.PI/2 - 0.16);
         h2.stroke();
       }
       h2.strokeStyle = 'rgba(120,255,170,.85)'; h2.lineWidth = 2;
-      for (const a of [0, Math.PI/2, Math.PI, -Math.PI/2]){   // os riscos do anel
+      for (const a of [0, Math.PI/2, Math.PI, -Math.PI/2]){
         const cx = Math.cos(a), sy = Math.sin(a);
         h2.beginPath();
-        h2.moveTo(pf.x + cx*r*0.72, pf.y + sy*r*0.72);
-        h2.lineTo(pf.x + cx*r*0.94, pf.y + sy*r*0.94);
+        h2.moveTo(px + cx*r*0.72, py + sy*r*0.72);
+        h2.lineTo(px + cx*r*0.94, py + sy*r*0.94);
         h2.stroke();
       }
       h2.fillStyle = 'rgba(150,255,190,.95)';
-      h2.beginPath(); h2.arc(pf.x, pf.y, Math.max(2, H*0.005), 0, 7); h2.fill();
+      h2.beginPath(); h2.arc(px, py, Math.max(2, H*0.005), 0, 7); h2.fill();
       h2.textAlign = 'center';
       h2.font = '700 ' + Math.max(8, H*0.014).toFixed(0) + 'px ui-monospace, monospace';
       h2.fillStyle = 'rgba(120,255,170,.75)';
-      if (!sol || Math.hypot(sol.x-pf.x, sol.y-pf.y) > r*1.6)
-        h2.fillText(Math.round(alcance/METRO) + 'm', pf.x, pf.y + r + Math.max(14, H*0.028));
-      h2.textAlign = 'left';
-    } else if (!pontos4.some(q => q.atras)){
-      h2.strokeStyle = preso ? 'rgba(150,255,190,.95)' : 'rgba(120,255,170,.55)';
-      h2.lineWidth = preso ? 2.4 : 1.4;
-      h2.beginPath();
-      h2.moveTo(pontos4[0].x, pontos4[0].y);
-      for (const q of pontos4) h2.lineTo(q.x, q.y);
-      h2.stroke();
-      /* os traços, cada vez menores: é isso que dá a profundidade. São
-         perpendiculares à LINHA, não horizontais — numa curva a linha deita, e
-         traço horizontal em linha deitada vira escada torta. */
-      h2.strokeStyle = 'rgba(120,255,170,.8)'; h2.lineWidth = 2;
-      pontos4.forEach((q, i) => {
-        if (i === pontos4.length-1) return;
-        const p2 = pontos4[i+1];
-        let dx = p2.x - q.x, dy = p2.y - q.y;
-        const n = Math.hypot(dx, dy) || 1; dx /= n; dy /= n;
-        const t = Math.max(4, H*0.020*(1 - i*0.15));
-        h2.beginPath();
-        h2.moveTo(q.x + dy*t, q.y - dx*t); h2.lineTo(q.x - dy*t, q.y + dx*t);
-        h2.stroke();
-      });
-      // e o fim do alcance
-      const f = pontos4[pontos4.length-1];
-      h2.strokeStyle = 'rgba(150,255,190,.95)'; h2.lineWidth = 2;
-      h2.beginPath(); h2.arc(f.x, f.y, Math.max(5, H*0.013), 0, 7); h2.stroke();
-      h2.textAlign = 'center';
-      h2.font = '700 ' + Math.max(8, H*0.014).toFixed(0) + 'px ui-monospace, monospace';
-      h2.fillStyle = 'rgba(120,255,170,.75)';
-      /* com o losango da solução em cima, o número do alcance vira rabisco
-         por baixo dele: some, que o que importa naquele instante é atirar */
-      if (!sol || Math.hypot(sol.x-f.x, sol.y-f.y) > Math.max(26, H*0.055))
-        h2.fillText(Math.round(alcance/METRO) + 'm', f.x, f.y + Math.max(14, H*0.030));
+      if (!sol || Math.hypot(sol.x-px, sol.y-py) > r*1.6)
+        h2.fillText(Math.round(alcance/METRO) + 'm', px, py + r + Math.max(14, H*0.028));
       h2.textAlign = 'left';
     }
 
-    /* --- SOLUÇÃO DE TIRO: onde a bala e o alvo se encontram -------------------
-       "Tem que ter o mesmo alarme sonoro do travador do míssil quando a
-       projeção dos disparos estiver correta."
-
-       Quando `MiraTiro` acha uma solução, o alarme toca — e a tela mostra
-       ONDE ela está: um losango no ponto de encontro (o alvo adiantado do
-       tempo de voo da bala) e o traço que liga esse ponto ao alvo de agora.
-       Esse traço é a dianteira que se está dando ao alvo; ver o tamanho dele
-       ensina a mirar na frente sem ninguém explicar. */
+    /* --- E A SOLUÇÃO DE TIRO, quando existe --------------------------------- */
     if (sol){
-      // o traço da dianteira: do alvo agora até onde ele vai estar
       h2.strokeStyle = 'rgba(150,255,190,.45)'; h2.lineWidth = 1.4;
       h2.beginPath(); h2.moveTo(sol.ax, sol.ay); h2.lineTo(sol.x, sol.y); h2.stroke();
-      // o losango, piscando como o TRAVADO do míssil
       const pisca = Math.sin(Date.now()/90) > -0.4;
       const r = Math.max(9, H*0.026);
       h2.strokeStyle = pisca ? 'rgba(150,255,190,.98)' : 'rgba(150,255,190,.4)';
@@ -11952,6 +12071,7 @@ function reinicia(){
   for (const f of fumos) cena.remove(f.no); fumos = [];
   Mira.solta(); MiraTiro.solta();
   montaMapa(); montaChao(); montaPista(); montaCidade(); montaTambores(); montaAlvos();
+  montaTrilhos();
   montaInimigos(); montaPombos(); montaNuvens();
   poeCamera(1);
   Motor.liga();
@@ -13110,7 +13230,7 @@ abrirSala();
 
 /* desenha uma primeira imagem parada atrás da capa, para não abrir preto */
 montaMapa(); montaChao(); montaPista(); montaCidade(); montaTambores(); montaAlvos();
-montaInimigos(); montaPombos(); montaNuvens();
+montaTrilhos(); montaInimigos(); montaPombos(); montaNuvens();
 aviaoY = 2200; poeCamera(1); arruma(); redimensiona();
 rend.render(cena, cam);
 </script>

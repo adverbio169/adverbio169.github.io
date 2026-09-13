@@ -3376,3 +3376,129 @@ manche, está na mão sendo torcido e a câmera aponta para o teto. `C` liga; co
 olhar já ligado, `C` recalibra o "reto", que é o que se quer apertar depois de se
 acomodar melhor na cadeira. A imagem não sai do aparelho, e desligar solta a
 câmera na hora.
+
+---
+
+## Quatro correções, e duas delas eu tinha causado
+
+### 1. O rastro da metralhadora não é para ser desenhado — é para ser medido
+
+> *"Ela está com um rastro fixo e grande. Não é isso: o rastro se forma
+> dependendo do movimento do avião."*
+
+Terceira versão desta mira, e as três valem a pena ficar registradas:
+
+1. **linha curta**, de 28% a 100% do alcance — trinta pixels parados no meio da
+   tela: *"ficou muito curto e não acompanha o movimento"*;
+2. **linha longa**, começando colada no cano — varria a tela ao manobrar, mas
+   virou um trilho fixo atravessando tudo, atirando ou não;
+3. **esta** — e o pedido, relido, é uma ideia melhor do que as minhas duas.
+
+Agora são duas peças com papéis separados:
+
+**O anel**, sempre presente e pequeno, onde o cano aponta. É a mira: o ponto do
+meio é por onde a bala passa, o anel dá o tamanho angular do alvo, o número diz
+até onde ela chega. Nada de trilho quando não se está atirando.
+
+**O rastro**, só quando há bala no ar, desenhado pelas **posições reais** das
+balas que estão voando. Voando reto sai reto; numa curva encurva sozinho, porque
+as balas ficaram para trás de verdade. Não é efeito: é o estado do mundo lido e
+projetado na tela. Aparece quando o dedo aperta e some quando solta.
+
+*(A média móvel de três pontos existe porque as balas nascem espalhadas até 110
+para o lado — os canos são nas asas. Sem ela a linha ficava serrilhada de perto.)*
+
+### 2. A órbita da cabeça estava errada, e o erro era meu
+
+> *"O movimento da cabeça funcionou, mas ao olhar para a esquerda ele fez a tela
+> girar para a direita."*
+
+Na vista de fora eu fazia a câmera **orbitar** o avião e continuar apontada para
+ele. No papel era bonito — você vê o seu avião e quem vem atrás. Na mão é outra
+coisa: com a mira colada no avião, ele fica **cravado no meio da tela e o mundo
+inteiro roda em volta dele**. O olho não lê isso como "virei a cabeça"; lê como
+"a tela girou". Virar a cabeça, na vida real, deixa o mundo parado e faz as
+coisas passarem pelo campo de visão.
+
+Agora é o mesmo giro nas duas vistas, e **só** o giro: a câmera fica onde está e
+o olhar é que vira. Seu avião escorrega para o lado e sai de cena quando você
+olha para trás — que é o certo, porque olhar para trás é deixar de olhar para a
+frente. O risco no canto continua dizendo de que lado ficou o nariz.
+
+```
+de fora, olhando 150° para trás: a câmera andou 0          ✔ o mundo não roda
+olhando 50° à esquerda, a vista aponta para a esquerda     ✔
+```
+
+### 3. Um trem, com vagões
+
+> *"Quero mais alvos no chão, inclusive em movimento. Coloca um trem com vagões
+> para servir de alvo para treinar os movimentos."*
+
+É o melhor alvo de treino que existe, e por um motivo específico: anda depressa,
+anda **reto** e anda no chão. Alvo parado ensina a apontar; alvo que manobra é
+frustrante; alvo que corre em linha reta ensina exatamente o que falta — **dar
+dianteira**. Erra atrás, corrige, erra na frente, corrige, e em três passagens a
+mão aprende.
+
+Uma locomotiva e oito vagões, na linha férrea que corre paralela à pista. Cada
+vagão é um **obstáculo como qualquer outro**, então entrou de graça no radar, no
+travamento do míssil, na solução de tiro, na pontuação (150 o vagão, 300 a
+locomotiva) e na colisão. Só a *posição* não vem do passo genérico: vem do trem,
+senão ao dar a volta no fim do mapa um vagão viraria antes do outro e o trem se
+partiria no meio.
+
+E os alvos de chão passaram de **18 para 26** — o mapa tinha dobrado de tamanho e
+continuado com a mesma conta.
+
+*(Ele se chama `Ferrovia` no código, e não `Trem`, porque neste jogo `trem` já é
+o trem de POUSO e existe um `mexeTrem()` a poucas linhas dali.)*
+
+**E aqui o teste me corrigiu.** Eu tinha escrito uma prova ingênua: "mirar no
+vagão parado não deve travar; mirar adiante deve". Ela falhou — travava nos dois
+casos. O jogo estava certo e a pergunta estava errada: mirando no vagão nº 1
+parado, a solução de tiro **é o vagão nº 2**, o de trás, porque é ele que vai
+estar ali quando a bala chegar. A prova passou a perguntar *qual* vagão a mira
+escolhe:
+
+```
+mirando no vagão 1 parado, a solução é o vagão 2;
+mirando 997 à frente, é o vagão 1          ✔ a dianteira escolhe o vagão
+```
+
+### 4. O estol não tinha culpa: o profundor é que era reto
+
+> *"No estol de subida o piloto não consegue ficar com o nariz voltado para cima
+> por muito tempo; sempre o estol faz ele embicar."*
+
+Fui medir antes de mexer no estol, e ele era inocente. **Duas** coisas, as duas
+no comando:
+
+**O profundor era reto enquanto o aileron já tinha curva.** Inclinando o celular
+só 8° e segurando 2 segundos, o nariz ia parar a 40°; a 11°, ia a 55°. Não dá
+para escolher 20° de subida com um comando desses — passa-se direto, e aí sim vem
+o estol, que levava a culpa. Agora ele tem a mesma gramática do aileron: perto do
+meio o avião levanta o nariz devagar, e a taxa cheia só vem no fim do curso. A
+taxa **máxima** não mudou — cambalhota fecha no mesmo tempo.
+
+**E o nivelador automático tinha um penhasco.** Esta eu só vi medindo: ele valia
+até 26° de nariz e ali parava de repente. O resultado era um jogo sem meio-termo
+— puxar até 19° e soltar levava o nariz de volta a 2°; puxar até 28° deixava o
+nariz cravado em 28° para sempre. Não existia "subir um pouco". Agora ele
+desvanece entre 8° e 35°, e é **assimétrico**: nariz para baixo com a mão solta é
+o que mata o iniciante, e ali o endireitamento continua firme; nariz para cima é
+**intenção**, e ali o avião só abaixa o bico devagarinho, como um avião fora de
+compensação.
+
+```
+inclinando o celular 0,5 s e soltando, o nariz assenta em:
+   antes:  5°→0°    8°→1°    11°→2°    15°→28°   22°→41°
+   agora:  5°→1°    8°→2°    11°→5°    15°→9°    22°→24°
+
+segurando 2 s:
+   antes:  8°→40°   11°→55°   22°→87°
+   agora:  8°→10°   11°→26°   22°→73°
+```
+
+De brinde, a decolagem ficou muito melhor: o traço quadro a quadro sobe suave de
+8° a 16° de nariz, onde antes rampava até 39° e estolava.
