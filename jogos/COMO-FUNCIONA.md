@@ -2286,3 +2286,67 @@ na pista, em batalha: z de -7.630 a -3.258, todos no asfalto . ✔
 cabine a 2.000 m: o altímetro verde aparece .................. ✔
 a 60 m do chão: fica vermelho ................................ ✔
 ```
+
+---
+
+## A altura virou fita, e a sala saiu do meio
+
+> *"O HUD de altura pode ser no mesmo estilo do HUD de lateralidade, só que
+> vertical. O nome da sala pode ficar num canto e não no meio da tela."*
+
+### Caixa não é HUD
+
+O que eu tinha feito era uma **caixa com o número dentro**, e caixa de número
+diz onde se está e não diz para onde se vai. A fita diz as duas coisas com o
+mesmo traço: os riscos correm para baixo quando se sobe, e a **velocidade com
+que correm é a razão de subida** — dá para ler sem ler o número.
+
+É a bússola virada em pé, de propósito: mesma caixa escura de cantos redondos,
+mesmo verde, mesmos riscos curtos e compridos, mesmo ponteiro branco. **Duas
+fitas com o mesmo desenho leem-se sem aprender a segunda.**
+
+O teto do jogo é 5.200 e o chão −700: a faixa inteira em que se voa tem menos de
+300 metros. Então a janela é de 60 para cada lado, risco a cada 10 e número a
+cada 50 — mais fino vira grade, mais grosso não mostra nada mexendo. O chão
+ganhou um traço alaranjado grosso: é o único risco da fita que se deve evitar.
+
+### O que o teste mediu
+
+Não a conta — os **pixels**, procurando o risco do chão dentro da fita:
+
+```
+a 10 m o risco do chão está a 20 px do ponteiro; a 40 m, a 87  ✔ subindo, o chão desce
+30 m valeram 67 px (a escala manda 67) ........................ ✔ escala certa
+a 200 m: o chão sai de cena em vez de grudar na borda ......... ✔
+o número do ponteiro fica vermelho só perto do chão ........... ✔
+a razão de subida aparece nos dois sentidos ................... ✔
+a fita também existe na vista de fora ......................... ✔
+```
+
+### O meio da tela é por onde se olha
+
+O botão da sala já morou em cima da caixa do combustível e depois logo abaixo
+dela — no meio. **Meio de tela é por onde se olha para voar, e nada que não seja
+de voar deveria morar ali.** Foi para o canto de baixo à esquerda, na fileira dos
+outros botõezinhos (olho, qualidade), que é onde moram os comandos que não são
+do voo.
+
+### O terceiro desenho que não é elemento
+
+O mapinha desvia de tudo sozinho — mas só sabe de **elementos do documento**, e
+a fita da altura e as réguas do motor da cabine são desenhadas na lona. Resultado:
+o disco plantou-se em cima das réguas.
+
+As duas ganharam uma função que **diz onde elas estão** (`fitaAlturaOnde`,
+`reguasOnde`), e o mapinha lê as três listas: os elementos, a fita e as réguas.
+O mesmo padrão do radar — quem sabe onde está é quem desenha —, agora valendo
+para o que não tem caixa no documento. E trocar de vista esquece a memória de
+meio segundo, senão o disco fica um instante no lugar da vista anterior.
+
+```
+na cabine, nada encosta em nada: nenhuma sobreposição  ✔
+```
+
+(Esse teste pegou de brinde a fita encostando na caixa da FUSELAGEM: ela desceu
+para o meio exato da tela e encolheu um fio — perde seis metros de janela e
+ganha não brigar com um painel que está ali desde sempre.)

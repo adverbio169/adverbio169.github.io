@@ -23,10 +23,12 @@
   #euSou b{color:#fff}
   .rotG{font-size:13px;letter-spacing:.6px;color:#9fd4ff;text-transform:none;font-weight:800}
   #sala.chama{border-color:rgba(92,200,255,.6);box-shadow:0 0 0 2px rgba(92,200,255,.18)}
-  /* Estava em `top:14;left:50%` — exatamente onde mora a caixa do combustível,
-     e as duas se sobrepunham: "SALA CUNN" escrito por cima do 100%. Desceu
-     para baixo dela. */
-  #btAbreSala{display:none;left:50%;transform:translateX(-50%);top:74px;bottom:auto;
+  /* Este botão já morou em `top:14;left:50%` — em cima da caixa do combustível —
+     e depois logo abaixo dela, no meio da tela. Meio de tela é por onde se
+     OLHA para voar, e nada que não seja de voar deveria morar ali. Foi para o
+     canto de baixo, na fileira dos outros botõezinhos (olho, qualidade), que é
+     onde moram os comandos que não são do voo. */
+  #btAbreSala{display:none;left:14px;bottom:60px;top:auto;transform:none;
               font:800 13px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.16em}
   #btAbreSala.ver{display:block}
   #painelSala{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;
@@ -3277,6 +3279,101 @@ function bussola(y){
   h2.restore(); h2.textAlign = 'left';
 }
 
+/* As réguas do motor da cabine também são desenhadas na lona. Como a fita da
+   altura, elas precisam poder DIZER onde estão, senão o mapinha — que só sabe
+   de elementos do documento — se planta em cima delas. Foi o que aconteceu. */
+function reguasOnde(){
+  const bh = Math.max(8, H*0.018), cor = Math.max(10, H*0.021);
+  return { bx: W*0.075, bw: Math.max(62, W*0.12), bh, cor,
+           passo: bh + cor + Math.max(9, H*0.016), topo: H*0.63 };
+}
+
+/* --- A FITA DA ALTURA --------------------------------------------------------
+   "O HUD de altura pode ser no mesmo estilo do HUD de lateralidade, só que
+   vertical."
+
+   A primeira versão era uma CAIXA com o número dentro, e caixa de número não é
+   HUD: diz onde se está e não diz para onde se vai. A fita diz as duas coisas
+   com o mesmo traço — os riscos correm para baixo quando se sobe, e a
+   velocidade com que correm é a razão de subida, sem precisar lê-la.
+
+   É a bússola virada em pé, de propósito: mesma caixa escura de cantos
+   redondos, mesmo verde, mesmos riscos curtos e compridos, mesmo ponteiro
+   branco. Duas fitas com o mesmo desenho leem-se sem aprender a segunda.
+
+   O TETO do jogo é 5.200 e o chão -700: a faixa inteira em que se voa tem
+   menos de 300 metros. Então a janela é de 60 para cada lado, risco a cada 10
+   e número a cada 50 — mais fino que isso vira grade, mais grosso não mostra
+   nada mexendo. Abaixo de zero não existe altura, e o chão ganha um traço
+   grosso: é o único risco da fita que se deve evitar.
+   ------------------------------------------------------------------------- */
+const ALT_JANELA = 60;                 // metros visíveis para cada lado
+function fitaAlturaOnde(){
+  /* Centrada em 0,47 da altura e com meia-fita de 0,21 ela encostava por cima
+     na caixa da FUSELAGEM, que mora no alto à direita. Desceu para o meio
+     exato e encolheu um fio: a fita perde seis metros de janela e ganha não
+     brigar com um painel que está ali desde sempre. */
+  const meia = Math.min(H*0.19, W*0.26);
+  if (meia < 40) return null;
+  return { cx: W - Math.max(46, W*0.085), cy: H*0.50, meia, larg: Math.max(34, W*0.055) };
+}
+function fitaAltura(){
+  const o = fitaAlturaOnde();
+  if (!o) return;
+  const { cx, cy, meia, larg } = o;
+  const alt = (aviaoY - CHAO) / METRO;
+
+  h2.save();
+  h2.fillStyle = 'rgba(9,15,25,.5)';
+  h2.beginPath();
+  if (h2.roundRect) h2.roundRect(cx - larg/2, cy - meia, larg, meia*2, 4);
+  else h2.rect(cx - larg/2, cy - meia, larg, meia*2);
+  h2.fill();
+  h2.strokeStyle = 'rgba(120,255,170,.3)'; h2.lineWidth = 1; h2.stroke();
+  h2.clip();
+
+  const base = Math.round(alt/10)*10;
+  h2.textAlign = 'left';
+  for (let k = -8; k <= 8; k++){
+    const v = base + k*10;
+    if (v < 0) continue;
+    const y = cy - ((v - alt)/ALT_JANELA)*meia;
+    if (y < cy - meia - 2 || y > cy + meia + 2) continue;
+    const gr = v % 50 === 0, chao = v === 0;
+    h2.strokeStyle = chao ? 'rgba(255,170,120,.95)'
+                          : 'rgba(140,255,190,' + (gr ? '.9' : '.45') + ')';
+    h2.lineWidth = chao ? 2.6 : (gr ? 2 : 1.2);
+    const c = chao ? larg*0.46 : (gr ? larg*0.34 : larg*0.20);
+    h2.beginPath();
+    h2.moveTo(cx - larg/2 + 2, y); h2.lineTo(cx - larg/2 + 2 + c, y); h2.stroke();
+    if (gr){
+      h2.fillStyle = chao ? 'rgba(255,200,170,1)' : 'rgba(140,255,190,.75)';
+      h2.font = '800 ' + Math.max(8, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
+      h2.fillText(String(v), cx - larg/2 + 4 + larg*0.38, y + 4);
+    }
+  }
+  h2.restore();
+
+  // o ponteiro e o número, na mesma tinta branca da agulha da bússola
+  h2.save();
+  h2.fillStyle = 'rgba(230,245,255,.95)';
+  h2.beginPath();
+  h2.moveTo(cx - larg/2, cy); h2.lineTo(cx - larg/2 - 13, cy - 6); h2.lineTo(cx - larg/2 - 13, cy + 6);
+  h2.closePath(); h2.fill();
+  h2.textAlign = 'right';
+  h2.font = '800 ' + Math.max(10, H*0.021).toFixed(0) + 'px ui-monospace, monospace';
+  const m = Math.max(0, Math.round(alt));
+  h2.fillStyle = m < 25 ? 'rgba(255,150,120,1)' : 'rgba(230,245,255,.95)';
+  h2.fillText(m + 'm', cx - larg/2 - 17, cy + 5);
+  // e a razão de subida, embaixo da fita: é o que diz se o chão está chegando
+  const vsi = Math.round(subida / METRO);
+  h2.textAlign = 'center';
+  h2.font = '700 ' + Math.max(9, H*0.016).toFixed(0) + 'px ui-monospace, monospace';
+  h2.fillStyle = 'rgba(140,255,190,.85)';
+  h2.fillText((vsi >= 0 ? '+' : '') + vsi + ' m/s', cx, cy + meia + Math.max(13, H*0.028));
+  h2.restore(); h2.textAlign = 'left';
+}
+
 /* =============================================================================
    O MAPINHA REDONDO
 
@@ -3341,9 +3438,19 @@ function radarOnde(){
   const obst = [];
   for (const el of document.querySelectorAll(
         '.painel, .bt, #convite, #dArma, #dFogo, .dedoM, #dCima')){
-    if (el.id === 'btAbreSala' || getComputedStyle(el).display === 'none') continue;
+    if (getComputedStyle(el).display === 'none') continue;
     const q = el.getBoundingClientRect();
     if (q.width > 0 && q.height > 0) obst.push(q);
+  }
+  /* a fita da altura é desenhada na lona, não é elemento nenhum do documento —
+     então ela precisa entrar na lista à mão, senão o disco passa por cima */
+  const fa = fitaAlturaOnde();
+  if (fa) obst.push({ left: fa.cx - fa.larg/2 - 30, right: fa.cx + fa.larg/2 + 10,
+                      top: fa.cy - fa.meia - 10, bottom: fa.cy + fa.meia + 34 });
+  if (cockpit){
+    const g = reguasOnde();
+    obst.push({ left: g.bx - 12, right: g.bx + g.bw + 14,
+                top: g.topo - g.cor - 10, bottom: g.topo + g.passo*2 + 8 });
   }
   const encosta = (q, cx, cy, r) => {
     const px = Math.max(q.left, Math.min(cx, q.right));
@@ -3381,6 +3488,8 @@ function radarOnde(){
 }
 /* a arrumação mudou: esquece o que estava decorado */
 addEventListener('resize', () => { _radarQuando = 0; });
+/* trocar cabine/vista de fora muda o que está desenhado na lona */
+function esqueceRadar(){ _radarQuando = 0; }
 
 function desenhaRadar(){
   const onde = radarOnde();
@@ -3468,6 +3577,7 @@ function desenhaHUD(){
   // um degrau mais abaixo: com a fita mais alta, o número do rumo ficava
   // escondido atrás da caixa do combustível
   bussola(cockpit ? H*0.175 : H*0.205);
+  if (jogando && !caindo) fitaAltura();
 
   if (cockpit){
     // mira do canhão e escada de arfagem, projetadas pelo mesmo three.js
@@ -3546,10 +3656,7 @@ function desenhaHUD(){
     /* as duas réguas do motor, na mesma tinta verde do resto do HUD: a de
        cima é o acelerador, a de baixo é a carga do nitro. Ficam na canhoto
        da tela, onde não atrapalham a mira. */
-    const bx = W*0.075, bw = Math.max(62, W*0.12), bh = Math.max(8, H*0.018);
-    const cor = Math.max(10, H*0.021);           // altura da letra
-    const passo = bh + cor + Math.max(9, H*0.016);
-    const topo = H*0.63;
+    const { bx, bw, bh, cor, passo, topo } = reguasOnde();
     // um vidro escuro atrás, senão o verde some em cima da cidade branca
     h2.fillStyle = 'rgba(4,10,14,.42)';
     h2.fillRect(bx - 9, topo - cor - 8, bw + 20, passo*2 + 6);
@@ -3566,40 +3673,6 @@ function desenhaHUD(){
     regua(turbinando ? 'PWR  MAX' : 'PWR  ' + Math.round(motor*100), turbinando ? 1 : motor, turbinando, 0);
     regua('NIT  ' + Math.round(nitroCarga), nitroCarga/100, nitroBotao && nitroCarga > 0, 1);
 
-    /* --- A ALTITUDE ---------------------------------------------------------
-       O jogo não tinha altímetro em lugar nenhum — nem na cabine, nem nos
-       painéis de fora. Dava para saber a velocidade, o combustível, a
-       fuselagem e a distância voada, e não dava para saber a que altura se
-       está, que é o número que decide se dá para puxar ou não.
-
-       Na cabine ele vai à DIREITA, do outro lado da mira, porque é ali que o
-       olho de quem voa procura altitude — e porque a esquerda já é do motor.
-       Mesma tinta verde e mesmo vidro escuro atrás: o verde do HUD some em
-       cima da cidade branca, e o painel do motor já tinha aprendido isso.
-
-       Duas linhas: os metros grandes, e embaixo a subida ou descida em metros
-       por segundo, com sinal. A segunda é o que diz se o chão está chegando —
-       um número parado de altitude não conta isso. */
-    const ah = Math.max(11, H*0.030);            // altura do número grande
-    const aw = Math.max(84, W*0.135);
-    const ax = W - W*0.075 - aw, ay = H*0.63;
-    h2.fillStyle = 'rgba(4,10,14,.42)';
-    h2.fillRect(ax - 10, ay - ah - 6, aw + 20, ah + Math.max(10, H*0.021) + 18);
-    h2.textAlign = 'right';
-    h2.font = '700 ' + Math.max(9, H*0.017).toFixed(0) + 'px ui-monospace, monospace';
-    h2.fillStyle = 'rgba(120,255,170,.8)';
-    h2.fillText('ALT', ax + aw, ay - ah - Math.max(-2, -H*0.002));
-    const metros = Math.max(0, Math.round((aviaoY - CHAO) / METRO));
-    /* vermelho quando está baixo: a mesma altura em que o trem de pouso pode
-       sair e em que uma nuclear larga em cima da própria cabeça */
-    h2.fillStyle = metros < 120 ? 'rgba(255,150,120,.98)' : 'rgba(150,255,190,.98)';
-    h2.font = '800 ' + ah.toFixed(0) + 'px ui-monospace, monospace';
-    h2.fillText(String(metros), ax + aw, ay + 2);
-    const vsi = Math.round(subida / METRO);
-    h2.font = '700 ' + Math.max(9, H*0.016).toFixed(0) + 'px ui-monospace, monospace';
-    h2.fillStyle = 'rgba(120,255,170,.85)';
-    h2.fillText((vsi >= 0 ? '+' : '') + vsi + ' m/s', ax + aw, ay + Math.max(14, H*0.030));
-    h2.textAlign = 'left';
   }
 
   /* --- OS OUTROS AVIÕES: uma marca em cima de cada um ---------------------
@@ -3842,7 +3915,7 @@ document.addEventListener('keydown', e => {
   if (e.key==='1') trocaArma('bomba');
   if (e.key==='2') trocaArma('missil');
   if (e.key==='3') trocaArma('metralha');
-  if (e.key==='v'||e.key==='V') cockpit = !cockpit;
+  if (e.key==='v'||e.key==='V'){ cockpit = !cockpit; esqueceRadar(); }
   if (e.key==='g'||e.key==='G') mexeTrem();
   if (e.key==='f'||e.key==='F') mexeFlap();
   if (e.key==='w'||e.key==='W') tecla.mais=true;
@@ -3890,7 +3963,7 @@ addEventListener('touchend', () => {
   toqueIni = null; toqueX = 0; toqueY = 0;
 }, {passive:true});
 
-$('btVisao').onclick = () => { cockpit = !cockpit; };
+$('btVisao').onclick = () => { cockpit = !cockpit; esqueceRadar(); };
 $('btQual').onclick = () => poeQualidade((qualidade + 2) % 3);
 
 /* Começar NA PISTA ou JÁ NO AR. Quem quer só sair bombardeando não tem de
@@ -4511,7 +4584,7 @@ const Tripulacao = {
       case 'botao': if (d.b === 'comecar' && !jogando && !pausado) comeca(); break;
       case 'arma':  trocaArma(d.a); break;
       case 'fogo':  atirando = !!d.v; break;
-      case 'visao': cockpit = !cockpit; break;
+      case 'visao': cockpit = !cockpit; esqueceRadar(); break;
       case 'trem':  if (m.papel === 'piloto') mexeTrem(d.v); break;
       case 'flap':  if (m.papel === 'piloto') mexeFlap(d.v); break;
     }
