@@ -10756,11 +10756,22 @@ $('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque
    Num iPhone mais antigo nem isso existe e o jogo segue sem tremor, sem
    reclamar — é o que dá para fazer.
    ========================================================================== */
+/* Este módulo ERA SURDO: `try{ navigator.vibrate(p) }catch(e){}` jogava fora
+   as duas respostas que importam — o `false` de quando o navegador recusa, e a
+   exceção. Recusado e aceito ficavam iguais daqui, e foi por isso que três
+   relatos de "não tremeu" não renderam uma única evidência. Agora ele conta. */
 const Vibra = (function(){
-  const V = { tem:false, como:'nenhum' };
+  const V = { tem:false, como:'nenhum', ultimo:'ainda não tentei' };
   if (typeof navigator !== 'undefined' && navigator.vibrate){
     V.tem = true; V.como = 'vibrate';
-    V.bate = p => { try{ navigator.vibrate(p); }catch(e){} };
+    V.bate = p => {
+      try {
+        const r = navigator.vibrate(p);
+        V.ultimo = r === false ? 'chamei e o navegador RECUSOU (devolveu false)'
+                               : 'chamei e o navegador aceitou';
+        return r !== false;
+      } catch(e){ V.ultimo = 'a chamada deu erro: ' + (e && e.message || e); return false; }
+    };
     V.para = () => { try{ navigator.vibrate(0); }catch(e){} };
     return V;
   }
@@ -10773,9 +10784,11 @@ const Vibra = (function(){
     document.body.appendChild(cx);
     rotulo = cx.querySelector('#tiqueRot');
   }catch(e){}
-  if (!rotulo) return Object.assign(V, { bate(){}, para(){} });
+  if (!rotulo) return Object.assign(V, { ultimo:'este aparelho não tem por onde vibrar',
+                                        bate(){ return false; }, para(){} });
   V.tem = true; V.como = 'interruptor';
-  const tique = () => { try{ rotulo.click(); }catch(e){} };
+  const tique = () => { try{ rotulo.click(); V.ultimo = 'cliquei no interruptor háptico'; }
+                       catch(e){ V.ultimo = 'o interruptor deu erro: ' + (e && e.message || e); } };
   V.bate = p => {
     for (const r of relogios) clearTimeout(r);
     relogios = [];
@@ -10786,6 +10799,12 @@ const Vibra = (function(){
       if (i % 2 === 0){ relogios.push(setTimeout(tique, t)); n++; }   // trecho de vibrar
       t += lista[i];
     }
+    /* dito AQUI e não dentro do `tique`: os tiques são agendados, e quem
+       pergunta logo depois do toque ainda não viu nenhum acontecer — o relato
+       saía "ainda não tentei" justamente na vez em que mais importa saber */
+    V.ultimo = n ? ('agendei ' + n + ' tique(s) no interruptor háptico')
+                 : 'não havia nada para tocar';
+    return n > 0;
   };
   V.para = () => { for (const r of relogios) clearTimeout(r); relogios = []; };
   return V;
@@ -10997,15 +11016,19 @@ $('btSensor').onclick = async () => {
         Dedos.mostra(Tripulacao.membros.length === 0); comeca(); }
   catch(e){ erro(e.message + ' Dá para jogar com o dedo ou com o teclado.'); }
 };
+function caminhoTremor(){
+  return Vibra.como === 'vibrate'     ? 'pelo vibrador (Android)'
+       : Vibra.como === 'interruptor' ? 'pelo háptico do iPhone'
+       : 'este aparelho não tem vibrador';
+}
 $('btTestaTremor').onclick = () => {
   /* Longo de propósito: um pulso de jogo tem de ser curto para caber no ritmo,
      este aqui tem é de ser SENTIDO. Se este não passa, nenhum passa. */
   tremeAqui([220, 120, 220, 120, 420]);
   Controles.manda({ t:'tremer', a:'prova', p:[220, 120, 220, 120, 420] });
+  $('tremorComo').textContent = caminhoTremor() + ' — ' + Vibra.ultimo;
 };
-$('tremorComo').textContent = Vibra.como === 'vibrate'     ? 'pelo vibrador (Android)'
-                            : Vibra.como === 'interruptor' ? 'pelo háptico do iPhone'
-                            : 'este aparelho não tem vibrador';
+$('tremorComo').textContent = caminhoTremor();
 Controle.escutar();
 
 

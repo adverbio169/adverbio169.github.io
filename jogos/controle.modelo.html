@@ -684,11 +684,36 @@ function conectar(codigo){
    que os padrões do jogo foram escritos com ritmos diferentes entre si, e não
    com intensidades diferentes: o ritmo atravessa os dois mundos.
    ========================================================================== */
+/* --- POR QUE ESTE MÓDULO AGORA FALA ----------------------------------------
+   Relato depois de duas rodadas de conserto: "não tremeu nada" — nem o botão
+   de teste, que é um dedo direto no vidro. Isso mata as duas explicações que
+   eu tinha (padrão fraco demais, recado que não chega) e sobra uma: a chamada
+   sai e o aparelho não faz nada.
+
+   E eu não tinha como saber, porque este código ERA SURDO:
+
+       V.bate = p => { try{ navigator.vibrate(p); }catch(e){} };
+
+   `navigator.vibrate` devolve `false` quando o navegador RECUSA o pedido, e
+   pode lançar. Aquele `try/catch` jogava fora as duas respostas: recusado e
+   aceito ficavam exatamente iguais daqui. Três rodadas de "não tremeu" sem
+   uma única evidência, porque eu tinha escrito um código que não conta.
+
+   Agora `bate` devolve o que aconteceu, e o botão de teste escreve na tela.
+   O próximo relato deixa de ser uma impressão e vira um fato.
+   ------------------------------------------------------------------------ */
 const Vibra = (function(){
-  const V = { tem:false, como:'nenhum' };
+  const V = { tem:false, como:'nenhum', ultimo:'ainda não tentei' };
   if (typeof navigator !== 'undefined' && navigator.vibrate){
     V.tem = true; V.como = 'vibrate';
-    V.bate = p => { try{ navigator.vibrate(p); }catch(e){} };
+    V.bate = p => {
+      try {
+        const r = navigator.vibrate(p);
+        V.ultimo = r === false ? 'chamei e o navegador RECUSOU (devolveu false)'
+                               : 'chamei e o navegador aceitou';
+        return r !== false;
+      } catch(e){ V.ultimo = 'a chamada deu erro: ' + (e && e.message || e); return false; }
+    };
     V.para = () => { try{ navigator.vibrate(0); }catch(e){} };
     return V;
   }
@@ -700,9 +725,11 @@ const Vibra = (function(){
     document.body.appendChild(cx);
     rotulo = cx.querySelector('#tiqueRot');
   }catch(e){}
-  if (!rotulo) return Object.assign(V, { bate(){}, para(){} });
+  if (!rotulo) return Object.assign(V, { ultimo:'este aparelho não tem por onde vibrar',
+                                        bate(){ return false; }, para(){} });
   V.tem = true; V.como = 'interruptor';
-  const tique = () => { try{ rotulo.click(); }catch(e){} };
+  const tique = () => { try{ rotulo.click(); V.ultimo = 'cliquei no interruptor háptico'; }
+                       catch(e){ V.ultimo = 'o interruptor deu erro: ' + (e && e.message || e); } };
   V.bate = p => {
     for (const r of relogios) clearTimeout(r);
     relogios = [];
@@ -713,6 +740,12 @@ const Vibra = (function(){
       if (i % 2 === 0){ relogios.push(setTimeout(tique, t)); n++; }
       t += lista[i];
     }
+    /* dito AQUI e não dentro do `tique`: os tiques são agendados, e quem
+       pergunta logo depois do toque ainda não viu nenhum acontecer — o relato
+       saía "ainda não tentei" justamente na vez em que mais importa saber */
+    V.ultimo = n ? ('agendei ' + n + ' tique(s) no interruptor háptico')
+                 : 'não havia nada para tocar';
+    return n > 0;
   };
   V.para = () => { for (const r of relogios) clearTimeout(r); relogios = []; };
   return V;
@@ -897,15 +930,18 @@ function salaValida(){
 }
 $('btSala').onclick = () => { if (salaValida()) mostraPasso('papel'); };
 $('btTrocaSala').onclick = () => { mostraPasso('sala'); elCodigo.focus(); elCodigo.select(); };
-$('btTestaTremor').onclick = () => { Tremor.testa(); };
-(function(){
+function contaTremor(depois){
   const e = $('estadoTremor'), t = $('estadoTremorTxt');
   if (!e) return;
-  e.className = 'estado ' + (Vibra.tem ? 'ok' : 'nao');
-  t.textContent = Vibra.como === 'vibrate'     ? 'tremor: pelo vibrador (Android)'
-                : Vibra.como === 'interruptor' ? 'tremor: pelo háptico do iPhone'
-                : 'tremor: este aparelho não tem';
-})();
+  const caminho = Vibra.como === 'vibrate'     ? 'vibrador (Android)'
+                : Vibra.como === 'interruptor' ? 'háptico do iPhone'
+                : 'nenhum';
+  e.className = 'estado ' + (Vibra.tem ? (depois ? 'ok' : '') : 'nao');
+  t.textContent = depois ? ('caminho ' + caminho + ' — ' + Vibra.ultimo)
+                         : ('tremor: ' + caminho);
+}
+$('btTestaTremor').onclick = () => { Tremor.testa(); contaTremor(true); };
+contaTremor(false);
 
 $('btConectar').onclick = async () => {
   const codigo = salaValida();

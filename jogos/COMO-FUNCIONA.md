@@ -2350,3 +2350,51 @@ na cabine, nada encosta em nada: nenhuma sobreposição  ✔
 (Esse teste pegou de brinde a fita encostando na caixa da FUSELAGEM: ela desceu
 para o meio exato da tela e encolheu um fio — perde seis metros de janela e
 ganha não brigar com um painel que está ali desde sempre.)
+
+---
+
+## O código que não contava
+
+Terceiro relato seguido sobre a mesma coisa: **"não tremeu nada"** — e desta vez
+nem o botão de teste, que é um dedo direto no vidro. Isso mata as duas
+explicações que eu já tinha consertado: não é padrão fraco demais (o do teste é
+longo de propósito) e não é recado que não chega (o botão fala com o próprio
+aparelho). Sobra: a chamada sai e nada acontece.
+
+E eu não tinha como saber qual dos casos era, porque este código era **surdo**:
+
+```js
+V.bate = p => { try{ navigator.vibrate(p); }catch(e){} };
+```
+
+`navigator.vibrate` devolve `false` quando o navegador **recusa** o pedido, e
+pode lançar. Aquele `try/catch` jogava fora as duas respostas: recusado, aceito
+e explodido ficavam exatamente iguais vistos daqui. Três rodadas de conserto sem
+uma única evidência — porque eu tinha escrito um código que não conta o que
+aconteceu.
+
+Agora ele conta, e o botão de teste escreve na tela:
+
+| o que o aparelho fez | o que aparece |
+|---|---|
+| aceitou | `caminho vibrador (Android) — chamei e o navegador aceitou` |
+| recusou | `… — chamei e o navegador RECUSOU (devolveu false)` |
+| lançou erro | `… — a chamada deu erro: <motivo>` |
+| não tem `vibrate` | `caminho háptico do iPhone — agendei 3 tique(s) no interruptor` |
+
+Os quatro casos são provados com o `navigator.vibrate` trocado por um de
+mentira que aceita, recusa e explode, e com ele apagado para virar iPhone.
+
+Um detalhe que o teste pegou: no caminho do iPhone o relato saía *"ainda não
+tentei"*, porque os tiques são **agendados** e quem pergunta logo depois do
+toque ainda não viu nenhum acontecer. O aviso passou a ser dito na hora de
+agendar, não na hora de tocar.
+
+**O que isto ainda não resolve:** se o relato vier `chamei e o navegador
+aceitou` e mesmo assim não se sentir nada, o problema está fora do jogo — a
+vibração do sistema desligada, o aparelho no silencioso, ou o "vibrar ao tocar"
+desligado nas configurações. E se vier o caminho do iPhone: o Safari **nunca**
+implementou a API de vibração, então lá o tremor depende inteiro do truque do
+interruptor háptico, que é hack e pode simplesmente não funcionar naquele iOS.
+Nesse caso a resposta honesta é que página nenhuma vibra num iPhone, e o que
+resta é o som e a sacudida da imagem.
