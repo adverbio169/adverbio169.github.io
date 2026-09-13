@@ -2844,3 +2844,125 @@ virar **NaN**, e dali em diante a posição inteira do bicho era NaN. É a mesma
 armadilha do `y` que faltava nos alvos de chão e que já tinha estourado a
 perseguição do míssil: **um campo ausente não avisa, só contamina.** Os dois
 ganharam `|| 0`.
+
+---
+
+## O degrau entre a pista e o céu
+
+> *"Parece que estou grudado no chão, e quando decola do nada parece um foguete.
+> É muito discrepante. Suavizar a decolagem e a aterrissagem."*
+
+### A teoria errada, e por que ela quebrou o jogo
+
+Minha primeira leitura foi a aceleração, e havia mesmo um degrau feio:
+
+```
+no chão   +215 por segundo
+no ar     +3.775 por segundo, no quadro seguinte
+```
+
+Dezessete vezes, no exato instante em que as rodas deixam o asfalto. Pus um
+**teto** na aceleração do ar — e **quebrei o jogo**: a escada de subida inteira
+passou a estolar, inclusive 30° com potência de cruzeiro.
+
+A razão é bonita e eu não a tinha visto. A perseguição `(alvo − voo)*2,5` não é
+só pressa: ela é o que **equilibra** o custo da subida. Quanto mais a subida
+drena velocidade, mais forte ela puxa de volta, e o avião assenta onde as duas se
+igualam — é dela que sai a escada de ângulos. Um teto fixo corta esse braço, e o
+avião não tem mais como pagar subida nenhuma.
+
+### O foguete era o manche
+
+Medido no traço quadro a quadro: a puxada de rotação, 0,6 s de manche, levava o
+nariz a **46°** — e o avião, recém-saído do chão a 1.300, apontava para o céu e
+subia 740 por segundo. *Isso* é o foguete.
+
+A causa é o comando ter a mesma força a qualquer velocidade. **Num avião não
+tem:** o profundor e os ailerons trabalham com o ar que passa por eles, e a força
+cresce com o **quadrado** da velocidade. Devagar o manche é mole, rápido é firme.
+É por isso que ninguém arranca um avião do chão em 46°.
+
+Com a autoridade amarrada à velocidade, três coisas se resolveram de uma vez e
+sem nenhum caso especial:
+
+- a **decolagem** fica mansa (rotação a 14° em vez de 46°);
+- o **pouso lento** fica delicado;
+- o **voo perto do estol** fica mole, que é exatamente como se sente um avião no
+  limite.
+
+A corrida no chão também ficou mais forte — 6 s viraram 3,6 —, que era a metade
+*"grudado"* da queixa.
+
+```
+rodou 3,6 s até 1.305 (rotação em 1.274)
+depois da rotação: 261 -> 489 -> 769 -> 1.083 de altura   (subida firme)
+antes:             329 -> 737 -> 1.073                    (salto)
+a cambalhota ainda fecha, em 6,1 s em vez de 5
+```
+
+### E a asa que nivelava num quadro
+
+No toque, `eixoC = (0,1,0)` era posto de uma vez: quem pousasse com 10° de banco
+via o avião **estalar** para o nivelado entre um quadro e o outro. Agora o banco
+do toque escorre para zero em meio segundo — é o amortecedor comprimindo e a asa
+assentando.
+
+---
+
+## O nitro, e a sensação de velocidade
+
+> *"Caprichar no efeito da turbina, que era só um cone. Ligar o nitro no chão
+> também tem que dar sensação de velocidade."*
+
+Três coisas, e as três somam:
+
+**A chama em camadas.** Cone sozinho não parece fogo — fogo tem **miolo**. Um
+núcleo branco curto e quase opaco colado no bocal, um envelope longo e
+transparente por fora somando luz, e os **anéis de choque** (aqueles losangos
+espaçados dentro do jato de um caça em pós-combustão). São a assinatura visual do
+troço, quase ninguém desenha porque não sabe que existem, e são o detalhe que faz
+alguém dizer *"esse fogo está certo"*. Tudo treme a cada quadro: chama parada é
+plástico.
+
+**As riscas.** O que faz uma tela parecer rápida não é o número na caixa da
+velocidade: é ter **coisas passando perto**. A cidade passa longe e no céu não há
+nada. Setenta riscos finos vivem num tubo em volta do avião, correm para trás na
+velocidade do voo e reaparecem na frente — e como andam **com o avião**, o truque
+vale igual no chão, que era o pedido. É **uma** ordem de desenho: um
+`LineSegments` com as pontas reescritas a cada quadro.
+
+**O soco de campo de visão.** É o truque mais forte que existe, e custa uma
+linha: no nitro a lente abre de 58° para 74°. O mundo nas bordas passa a correr
+muito mais depressa que no meio, que é o que o olho lê como *"estou
+acelerando"*. Vai e volta macio — abrir de repente enjoa.
+
+```
+nitro: campo de visão 58° -> 74°, riscas acesas a 0,55    ✔
+solto: volta a 58°, riscas somem                          ✔
+nitro na PISTA: noChao=true e as riscas acendem igual     ✔
+```
+
+---
+
+## Duas coisas do HUD
+
+**A marca dos outros aviões era um grandão.** A caixa crescia até 70 px de
+meio-lado — 140 de lado, num HUD onde nada passa de 30. De perto ela tomava o
+meio da tela e tapava justamente o avião que se está tentando acertar.
+
+O erro foi querer que a caixa **envolvesse** o alvo. Mira de caça não faz isso:
+ela aponta, e quem enxerga o avião é o olho. Virou uma marca pequena, de tamanho
+quase fixo, com **quatro cantos** em vez de um retângulo fechado.
+
+**A metralhadora não dizia onde atira.** A mira do meio da tela diz para onde o
+*nariz* aponta; os tiros saem por ali mas morrem a uma distância certa. Sem ver o
+alcance, atira-se longe demais e não se entende por que não acerta.
+
+Agora o HUD desenha o **caminho real da bala** — a mesma direção, velocidade e
+tempo de vida que o `dispara()` usa —, com traços nos quartos do alcance e um
+círculo onde a bala acaba. Alvo além do círculo é alvo que não vai ser atingido,
+e isso passa a ser visto em vez de adivinhado.
+
+*(Este teste pegou de brinde o `baque`: a prova de "o clarão acende a borda e
+deixa o meio limpo" passou a medir a mira nova, que mora no meio. Ela passou a
+medir com o míssil selecionado.)*
