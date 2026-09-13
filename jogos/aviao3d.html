@@ -7187,7 +7187,11 @@ const RAIO_NUKE = 9000, RAIO_POMBO = 170, RAIO_AVIAO = 430;
 const PISTA_Z0 = -9000, PISTA_Z1 = 13000;     // as duas cabeceiras
 const PISTA_MEIA = 620;                       // meia largura
 const PISTA_Y = CHAO + 8;                     // o asfalto, um palmo acima do campo
-const RODA = 150;                             // altura do eixo das rodas
+/* Altura do avião quando está apoiado. Tem de bater com o desenho do trem,
+   senão as rodas afundam no asfalto — era o caso: o trem antigo chegava a 196
+   abaixo do centro do avião, contra 150 daqui, e um palmo de roda ficava
+   enterrado na pista. Agora as três pontas terminam exatamente em -158. */
+const RODA = 158;                             // altura do centro do avião, apoiado
 /* Velocidade mínima para o ar sustentar o avião. Os flapes a derrubam: é para
    isso que eles existem, poder chegar devagar sem cair. */
 const ESTOL = [640, 540, 450];                // sem flape, flape 1, flape 2
@@ -7347,7 +7351,11 @@ cena.fog = new THREE.Fog(COR_CEU, 5000, 46000);
 const cam = new THREE.PerspectiveCamera(58, 1, 40, 130000);
 cena.add(cam);
 
-const luzCeu = new THREE.HemisphereLight(0xc3dcf2, 0x46603f, 1.9);
+/* A luz de baixo era VERDE-CAMPO (0x46603f), para o chão devolver a cor da
+   grama. Só que ela pinta toda face virada para baixo — e a barriga do avião
+   ficava verde-musgo, como se fosse pintada assim. Trocada por um cinza-terra
+   quente: ainda devolve luz de baixo, sem tingir o avião. */
+const luzCeu = new THREE.HemisphereLight(0xc3dcf2, 0x8a8d7e, 1.9);
 cena.add(luzCeu);
 const sol = new THREE.DirectionalLight(COR_SOL, 3.0);
 const solDir = { x: Math.sin(SOL_RUMO)*Math.cos(SOL_ALT), y: Math.sin(SOL_ALT), z: Math.cos(SOL_RUMO)*Math.cos(SOL_ALT) };
@@ -7733,8 +7741,11 @@ const tremNo = new THREE.Group();
 {
   const matPerna = new THREE.MeshPhongMaterial({ color: 0x8f9aad, shininess: 60 });
   const matPneu  = new THREE.MeshPhongMaterial({ color: 0x23262c, shininess: 10 });
-  // [x, z, comprimento da perna, raio da roda]
-  const pernas = [[0, 96, 116, 34], [-96, -34, 132, 42], [96, -34, 132, 42]];
+  /* [x, z, comprimento da perna, raio da roda]. As três somam o MESMO
+     22 + perna + raio = 158, que é o RODA lá de cima: assim o avião fica
+     assentado e nivelado, sem roda enterrada nem bico empinado. E as rodas
+     encolheram: com raio 42 elas eram mais gordas que a própria fuselagem. */
+  const pernas = [[0, 96, 110, 26], [-96, -34, 104, 32], [96, -34, 104, 32]];
   for (const [px, pz, comp, raio] of pernas){
     const p2 = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, comp, 8), matPerna);
     p2.position.set(px, -22 - comp/2, pz);
