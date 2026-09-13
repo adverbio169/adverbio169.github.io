@@ -791,3 +791,47 @@ horizonte, nada fora da tela, e o dedo a 2%, 50% e 98% da tira dando 2%, 50% e
 
 `W` e `S` mexem o acelerador, `Shift` é o nitro. Vale nas quatro versões,
 porque a conta mora no núcleo compartilhado.
+
+## A escada de arfagem do HUD estava deitada
+
+> *"o HUD (cabine) está errando: inclinando para a esquerda ele se comporta
+> como se estivesse indo para a direita"*
+
+Desta vez não era sinal trocado — e foi por isso que demorei a achar. O
+**lugar** de cada degrau estava certo: inclinando para a esquerda a escada
+sobe para a direita, que é exatamente o que se vê de dentro de um avião
+inclinado (inclinando a cabeça para a esquerda, o mundo parece girar para a
+direita). O errado era o **desenho**: cada degrau saía DEITADO na tela,
+sempre, enquanto o horizonte estava torto. Medido, com 40° de banco:
+
+```
+horizonte de verdade ......... 39°
+degrau desenhado ............... 0°   ✘
+```
+
+Uma escada de degraus retos marchando para cima e para a direita lê-se, para
+qualquer olho, como um avião inclinado para a DIREITA. O HUD contava uma
+história e o mundo contava outra.
+
+O conserto evita de propósito a conta de rolagem, que é justamente a de sinal
+duvidoso neste jogo: em vez de calcular o ângulo, o desenho projeta **um
+segundo ponto do mesmo degrau**, um pouco de lado. A direção entre os dois já
+é a do horizonte — com perspectiva e tudo, e sem trigonometria nenhuma para
+errar o sinal.
+
+```js
+const c  = naTela(rumo, a);           // o meio do degrau
+const d2 = naTela(rumo - 0.16, a);    // um palmo para a direita, no mesmo degrau
+// (c -> d2) é a direção do horizonte
+```
+
+Medido depois, nos dois bancos e em três alturas: diferença de 0° a 2° entre o
+degrau e o horizonte (os 2° são perspectiva de verdade — degraus acima e
+abaixo do horizonte convergem, como devem). Os números da escada passaram a
+girar junto, e cada degrau ganhou uma farpa apontando para o horizonte, que é
+o jeito padrão de um HUD dizer onde fica o chão.
+
+**A lição que ficou:** quando o mundo e o HUD discordam, o suspeito não é só o
+sinal. Foi preciso medir as três coisas separadamente — onde está o horizonte,
+para onde anda a espinha da escada, e com que ângulo cada degrau é desenhado —
+para ver que duas estavam certas e só a terceira estava errada.

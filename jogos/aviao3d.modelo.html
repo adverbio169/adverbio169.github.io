@@ -1512,24 +1512,66 @@ function desenhaHUD(){
     h2.moveTo(cx, cy - H*0.026); h2.lineTo(cx, cy - H*0.009);
     h2.stroke();
     h2.beginPath(); h2.arc(cx, cy, Math.max(4, H*0.010), 0, 7); h2.stroke();
+    /* ---------------------------------------------------------------------
+       A ESCADA DE ARFAGEM tem de ficar PARALELA AO HORIZONTE.
+
+       Ela estava sendo desenhada com cada degrau DEITADO na tela, sempre. O
+       lugar de cada degrau até estava certo — inclinando para a esquerda a
+       escada sobe para a direita, que é o que se vê de dentro de um avião
+       inclinado —, mas com os degraus retos o conjunto lia-se como se o avião
+       estivesse inclinado para o OUTRO lado. Foi o que o Brunno viu:
+       "inclinando para a esquerda ele se comporta como se estivesse indo para
+       a direita". Medido: com 40° de banco o horizonte ficava a 39° e o degrau
+       era desenhado a 0°.
+
+       Em vez de calcular o ângulo de rolagem (que é justamente a conta de
+       sinal duvidoso deste jogo), projeto um SEGUNDO ponto do mesmo degrau,
+       um pouco de lado: a direção entre os dois pontos já é a do horizonte,
+       com perspectiva e tudo. Nada de trigonometria para errar o sinal.
+       ------------------------------------------------------------------ */
     const v = new THREE.Vector3();
+    const naTela = (az, el) => {
+      const r = el*Math.PI/180, c = Math.cos(r);
+      v.set(Math.sin(az)*c, Math.sin(r), Math.cos(az)*c).add(cam.position).project(cam);
+      return { x:(v.x*0.5+0.5)*W, y:(-v.y*0.5+0.5)*H, atras: v.z > 1 };
+    };
     h2.font = '700 ' + Math.max(8, H*0.019).toFixed(0) + 'px ui-monospace, monospace';
     h2.fillStyle = 'rgba(120,255,170,.9)';
     for (let a = -60; a <= 60; a += 10){
-      const ra = a*Math.PI/180, ca = Math.cos(ra), sa = Math.sin(ra);
-      v.set(Math.sin(rumo)*ca, sa, Math.cos(rumo)*ca).add(cam.position).project(cam);
-      if (v.z > 1) continue;
-      const x = (v.x*0.5+0.5)*W, y = (-v.y*0.5+0.5)*H;
-      if (y < H*0.06 || y > H*0.78) continue;
+      const c = naTela(rumo, a);
+      if (c.atras || c.y < H*0.06 || c.y > H*0.78) continue;
+      // azimute MENOR anda para -x, e -x é a DIREITA da tela: o segundo ponto
+      // dá o sentido "para a direita ao longo do degrau"
+      const d2 = naTela(rumo - 0.16, a);
+      let ux = d2.x - c.x, uy = d2.y - c.y;
+      const n = Math.hypot(ux, uy);
+      if (!isFinite(n) || n < 0.5 || d2.atras){ ux = 1; uy = 0; } else { ux /= n; uy /= n; }
+      // o "para cima" do degrau, para as farpas apontarem para o horizonte
+      const cx2 = uy, cy2 = -ux;
       const meio = W*0.05, fora = a === 0 ? W*0.17 : W*0.11;
+      const farpa = a === 0 ? 0 : H*0.014 * (a > 0 ? -1 : 1);
       h2.setLineDash(a < 0 ? [6,5] : []);
       h2.lineWidth = a === 0 ? 2.4 : 1.6;
-      h2.beginPath(); h2.moveTo(x-fora, y); h2.lineTo(x-meio, y);
-      h2.moveTo(x+meio, y); h2.lineTo(x+fora, y); h2.stroke();
+      h2.beginPath();
+      for (const lado of [-1, 1]){
+        const ax = c.x + ux*fora*lado, ay = c.y + uy*fora*lado;
+        h2.moveTo(ax, ay);
+        h2.lineTo(c.x + ux*meio*lado, c.y + uy*meio*lado);
+        if (farpa){ h2.moveTo(ax, ay); h2.lineTo(ax + cx2*farpa, ay + cy2*farpa); }
+      }
+      h2.stroke();
       h2.setLineDash([]);
       if (a !== 0){
-        h2.textAlign='right'; h2.fillText(String(Math.abs(a)), x-fora-5, y+4);
-        h2.textAlign='left';  h2.fillText(String(Math.abs(a)), x+fora+5, y+4);
+        // o número acompanha a inclinação do degrau, senão briga com ele
+        const ang = Math.atan2(uy, ux);
+        for (const lado of [-1, 1]){
+          h2.save();
+          h2.translate(c.x + ux*(fora+7)*lado, c.y + uy*(fora+7)*lado);
+          h2.rotate(ang);
+          h2.textAlign = lado > 0 ? 'left' : 'right';
+          h2.fillText(String(Math.abs(a)), 0, 4);
+          h2.restore();
+        }
       }
     }
     h2.textAlign = 'left';
