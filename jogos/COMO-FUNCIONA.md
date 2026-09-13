@@ -577,3 +577,43 @@ Dois detalhes que fizeram diferença: um **fio escuro** no contorno de cada
 face (sem ele, com o avião pequeno na tela, a malha vira uma mancha só) e a
 **sombra no chão**, que é o que diz a altura de verdade. O avião inimigo usa a
 mesma malha, pintada de vermelho e virada para o rumo dele.
+
+## A versão com engine: aviao3d.html
+
+O desenho em canvas chegou no teto. Passar para uma engine 3D resolve o que
+não dava para fazer à mão: luz especular, sombra projetada, névoa de verdade e
+milhares de polígonos sem custar quadro.
+
+**Por que three.js e não Godot/Unity.** Uma engine de verdade exporta uma pasta
+com `.wasm` e dados, precisa de servidor e pesa dezenas de megabytes — e o jogo
+deixaria de abrir no navegador da TV. O three.js é uma biblioteca: vai
+**embutida no HTML** (725 KB, ~190 KB comprimidos pela rede) e o arquivo
+continua sendo um só. `montar.py` faz esse embutimento, igual já fazia com o
+PeerJS.
+
+**O que muda no código.** Na versão em canvas eu calculava à mão cada polígono,
+a ordem de desenho, a névoa e a luz. Aqui eu só **descrevo a cena** — o que
+existe, de que cor, onde está a luz — e a placa de vídeo desenha.
+
+| coisa | como ficou |
+|---|---|
+| terreno | uma malha só, cor por célula. **Desindexada**: pintando por vértice, a placa interpola entre um campo e o vizinho e o mosaico vira um borrão |
+| cidade | `InstancedMesh`: uma caixa e uma lista de posições, 700+ prédios numa passada só |
+| avião | fuselagem de revolução com normais suaves, asa extrudada, material com brilho especular |
+| luz | hemisférica (céu/chão) + sol direcional com sombra, e uma luz fraca presa na câmera para nada ficar preto |
+| névoa | `THREE.Fog`, que some com a cidade no horizonte de graça |
+| HUD | continua em canvas 2D, numa camada por cima: texto e linha fina é o que o 2D faz melhor |
+
+Três erros que custaram tempo, anotados para não repetir:
+
+1. **A câmera montada na mão ficava espelhada.** Montar a matriz com
+   (direita, cima, −frente) dá uma base inválida, e o resultado é o avião
+   aparecer *atrás* da câmera. `lookAt` monta a base certa.
+2. **Cor por vértice borra o terreno** — o mosaico precisa de malha desindexada.
+3. **O tamanho da célula não era o que eu supunha:** a malha divide o mapa em
+   partes iguais, então a célula mede `mapa/segmentos`, não o passo que eu
+   tinha em mente. Arredondar pelo número errado pinta a célula vizinha.
+
+O que **ainda não está** na versão 3D: o controle pelo celular em rede (sala,
+QR, copiloto). Isso continua só em `aviao.html` / `aviao-tv.html` até a versão
+3D provar que roda bem na TV.

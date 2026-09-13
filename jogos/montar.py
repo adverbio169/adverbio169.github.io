@@ -2,6 +2,7 @@
 """
 Monta tv.html e controle.html a partir das partes:
 
+  aviao3d.html  = aviao3d.modelo.html + three.js embutido
   aviao-tv.html = aviao-tv.modelo.html + PeerJS + gerador de QR + núcleo de aviao.html
                   (arquivo único: decide sozinho se é tela, controle ou os dois)
   tv.html       = tv.modelo.html  + PeerJS + gerador de QR + núcleo de aviao.html
@@ -56,6 +57,20 @@ open('tv.html', 'w', encoding='utf-8').write(tv)
 
 ct = open('controle.modelo.html', encoding='utf-8').read().replace('__PEERJS__', seguro(peer))
 open('controle.html', 'w', encoding='utf-8').write(ct)
+
+# --- a versão com three.js -------------------------------------------------
+# A biblioteca vai EMBUTIDA, e não por link de CDN, pelo mesmo motivo de sempre:
+# o jogo tem que abrir no navegador da TV sem depender de mais nada. São ~190 KB
+# pela rede depois de comprimido.
+tres_cam = os.path.join(AQUI, 'three.min.js')
+if os.path.exists(tres_cam):
+    tres = open(tres_cam, encoding='utf-8').read()
+    t3 = open('aviao3d.modelo.html', encoding='utf-8').read()
+    t3 = t3.replace('<script>/* THREE */</script>', '<script>' + seguro(tres) + '</script>')
+    open('aviao3d.html', 'w', encoding='utf-8').write(t3)
+    print('aviao3d.html: %d KB   (three.js embutido: %d KB)' % (len(t3)//1024, len(tres)//1024))
+else:
+    print('aviao3d.html: pulado (falta jogos/three.min.js)')
 
 print('aviao-tv.html: %d KB   tv.html: %d KB   controle.html: %d KB   (núcleo: linhas %d-%d de aviao.html)'
       % (len(um)//1024, len(tv)//1024, len(ct)//1024, i2+1, i4))

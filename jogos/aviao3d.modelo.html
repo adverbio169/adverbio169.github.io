@@ -1,0 +1,1579 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>Avião 3D &middot; Comissão</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#0b1020;color:#e6edf9;
+            font-family:system-ui,"Segoe UI",Arial,sans-serif;overscroll-behavior:none;touch-action:none}
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+  #hud{pointer-events:none;z-index:2}
+  .painel{position:fixed;z-index:3;pointer-events:none;background:rgba(8,12,26,.55);
+          border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:9px 13px;
+          font-variant-numeric:tabular-nums;backdrop-filter:blur(6px)}
+  .rot{font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:#8fa3c8;font-weight:700}
+  .val{font-size:26px;font-weight:800;line-height:1.1}
+  .val small{font-size:12px;color:#9fb4d8;font-weight:600}
+  #cDist{top:14px;left:14px}
+  #cRec{top:14px;right:14px;text-align:right}
+  #cPontos{top:96px;left:14px}
+  #cComb{top:14px;left:50%;transform:translateX(-50%);text-align:center;min-width:180px}
+  #barra{height:7px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden;margin-bottom:5px}
+  #barra i{display:block;height:100%;width:100%;background:#5eff9a;border-radius:99px;transition:width .15s}
+  #cArma{bottom:14px;left:50%;transform:translateX(-50%);text-align:center}
+  #aviso{position:fixed;z-index:4;top:38%;left:0;right:0;text-align:center;font-size:clamp(20px,4vw,40px);
+         font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s;pointer-events:none}
+  .bt{position:fixed;z-index:5;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.6);
+      color:#dce5f5;border-radius:10px;padding:9px 12px;font:700 14px/1 inherit;cursor:pointer}
+  #btVisao{left:14px;bottom:14px;font-size:22px;padding:7px 11px}
+  #btQual{left:70px;bottom:14px}
+  /* ---- capa ---- */
+  #capa{position:fixed;z-index:10;inset:0;display:flex;align-items:flex-start;justify-content:center;
+        overflow:auto;padding:24px 20px;background:radial-gradient(1200px 700px at 50% -10%,#16224a,#0b1020 60%)}
+  .cartao{max-width:520px;margin:auto;display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center}
+  .selo{font-size:10px;letter-spacing:2.6px;text-transform:uppercase;color:#5cc8ff;font-weight:800}
+  h1{font-size:30px;font-weight:800;line-height:1.1}
+  p.txt{font-size:14.5px;color:#aebbd4;line-height:1.6}
+  p.txt b{color:#e6edf9}
+  button.grande{width:100%;max-width:320px;border:0;border-radius:13px;padding:15px;font:800 16px/1 inherit;cursor:pointer}
+  .azul{background:#2d7dff;color:#fff}
+  .cinza{background:rgba(255,255,255,.09);color:#dce5f5;border:1px solid rgba(255,255,255,.16)}
+  #erro{display:none;background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.35);
+        border-radius:10px;padding:10px 13px;font-size:13px;color:#ffc9c9;line-height:1.5}
+  #placar{display:none;font-size:15px;line-height:1.9;color:#aebbd4}
+  #placar span{color:#5cc8ff;font-weight:800}
+  @media (max-height:480px){ h1{font-size:23px} p.txt{font-size:13px} .cartao{gap:10px} }
+</style>
+</head>
+<body>
+<canvas id="tela3d"></canvas>
+<canvas id="hud"></canvas>
+
+<div class="painel" id="cDist"><div class="rot">Distância</div><div class="val"><span id="vDist">0</span><small>m</small></div></div>
+<div class="painel" id="cRec"><div class="rot">Recorde</div><div class="val"><span id="vRec">0</span><small>m</small></div></div>
+<div class="painel" id="cPontos"><div class="rot">Pontos</div><div class="val" id="vPontos">0</div>
+  <div class="rot" style="margin-top:4px">Alvos <b id="vAlvos">0/0</b></div></div>
+<div class="painel" id="cComb"><div class="rot">Combustível</div><div id="barra"><i id="barraComb"></i></div>
+  <div class="val"><span id="vComb">100</span><small>%</small></div></div>
+<div class="painel" id="cArma"><div class="rot">Arma (1 2 3 · espaço atira)</div>
+  <div class="val" style="font-size:19px"><span id="vArma">NUCLEAR</span> <small>x<span id="vMun">6</span></small></div></div>
+<div id="aviso"></div>
+<button class="bt" id="btVisao" title="cabine / de fora (V)">&#128065;</button>
+<button class="bt" id="btQual" title="qualidade do desenho">alto</button>
+
+<div id="capa">
+  <div class="cartao">
+    <div class="selo">Comissão · jogo 3D</div>
+    <h1>Avião <span style="color:#5cc8ff">3D</span></h1>
+    <p class="txt">Mesmo jogo, desenhado com <b>three.js</b> e placa de vídeo: luz de verdade,
+       sombra no chão e névoa. Incline o celular para virar, puxe para levantar o nariz.</p>
+    <div id="placar"></div>
+    <div id="erro"></div>
+    <button class="grande azul" id="btSensor">Jogar com a inclinação do celular</button>
+    <button class="grande cinza" id="btToque">Jogar com o dedo / teclado</button>
+    <p class="txt" style="font-size:12.5px;color:#7d8cab">No computador: setas voam, <b>A</b> e <b>D</b> são o leme,
+       <b>espaço</b> atira, <b>V</b> troca a vista, <b>1 2 3</b> trocam de arma.</p>
+  </div>
+</div>
+
+<script>/* THREE */</script>
+<script>
+const Controle = {
+  modo: 'nenhum',
+  volante: 0, manche: 0, leme: 0,
+  zeroVolante: 0, zeroManche: 0,
+  recebeu: false,
+  escutando: false,
+  ultimaLeitura: 0,
+  esperandoSensor: false,
+  _volanteBruto: 0, _mancheBruto: 0,
+  _cima: {x:0, y:1, z:0},        // "para cima do mundo" visto pelo aparelho
+  _g: {x:0, y:0, z:0}, _temG: false, _ouvindoMov: false,
+  _aFiltro: 0, _chute: 0, _quieto: 1, _janela: 0, _dir: 0, ultimoMov: 0,
+
+  temSensor(){ return typeof DeviceOrientationEvent !== 'undefined'; },
+  precisaPermissao(){
+    return this.temSensor() && typeof DeviceOrientationEvent.requestPermission === 'function';
+  },
+
+  // Liga o ouvinte assim que a página abre. No Android não precisa de permissão,
+  // e ligar cedo dá tempo do sensor acordar antes de a pessoa tocar em Jogar.
+  escutar(){
+    if (!this.temSensor() || this.escutando) return;
+    window.addEventListener('deviceorientation', this._ler, true);
+    this.ouveMovimento();
+    this.escutando = true;
+  },
+
+  // chegou leitura agora há pouco? = o sensor está vivo neste exato momento
+  respondendo(){ return this.recebeu && (Date.now() - this.ultimaLeitura) < 2000; },
+
+  async ligarSensor(aoEsperar){
+    if (!this.temSensor()) throw new Error('Este navegador não expõe o sensor de inclinação.');
+    if (this.precisaPermissao()){
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== 'granted') throw new Error('Permissão de movimento negada. Em Ajustes ▸ Safari, ligue "Movimento e orientação".');
+      await this.pedeMovimento();          // iOS: a segunda permissão, a do devicemotion
+    }
+    this.escutar();
+
+    // Espera até 5 s pela primeira leitura. O sensor do Android às vezes leva
+    // alguns segundos para acordar; desistir rápido demais faz o jogo dizer que
+    // não tem sensor quando ele só estava demorando.
+    const t0 = Date.now();
+    while (!this.recebeu){
+      if (Date.now() - t0 > 5000){
+        // NÃO desliga o ouvinte: se o sensor acordar depois, _ler assume o
+        // controle sozinho, mesmo com o jogo já rodando no toque.
+        this.esperandoSensor = true;
+        throw new Error('O sensor não respondeu em 5 segundos.');
+      }
+      if (aoEsperar) aoEsperar((Date.now()-t0)/1000);
+      await new Promise(r => setTimeout(r, 100));
+    }
+    this.modo = 'sensor';
+    this.esperandoSensor = false;
+    this.calibrar();
+  },
+
+  // O CÁLCULO DOS EIXOS — refeito porque o antigo virava ao contrário
+  //
+  // Antes eu usava beta e gamma direto. Esse par tem trava de cardan: gamma
+  // só vai de -90 a +90, e passando disso a leitura DOBRA PARA TRÁS. Era o
+  // "quanto mais eu giro, depois de um ângulo ele volta para o outro lado".
+  //
+  // Agora eu monto o vetor "para cima do mundo" visto de dentro do aparelho
+  // e tiro dois números dele:
+  //   rolagem = atan2 dos dois eixos do plano da tela — dá volta inteira,
+  //             de -180 a 180, sem trava nenhuma;
+  //   arfagem = o quanto a tela está virada para o céu — não muda quando se
+  //             gira o aparelho na mão, então os dois eixos não se misturam.
+  // De quebra, isso não depende de saber se o celular está em pé ou deitado:
+  // a calibragem absorve a pegada, seja ela qual for.
+  _ler: (e) => {
+    if (e.beta === null && e.gamma === null) return;
+    const R = Math.PI/180, G = 180/Math.PI;
+    const b = (e.beta || 0)*R, g = (e.gamma || 0)*R;
+    const ux = -Math.cos(b)*Math.sin(g), uy = Math.sin(b), uz = Math.cos(b)*Math.cos(g);
+    Controle._cima = { x: ux, y: uy, z: uz };
+    Controle._volanteBruto = -Math.atan2(ux, uy) * G;
+    // O SINAL DO MANCHE: asin(uz) mede "a tela está virada para o céu", e
+    // empurrar a borda de cima para longe é que vira a tela para cima. Sem o
+    // menos, empurrar subia e puxar descia — invertido, como o Brunno sentiu.
+    // Com ele vale o manche de verdade: PUXAR a borda de cima levanta o nariz.
+    Controle._mancheBruto  = -Math.asin(Math.max(-1, Math.min(1, uz))) * G;
+    Controle.volante = voltaCurta(Controle._volanteBruto - Controle.zeroVolante);
+    Controle.manche  = Controle._mancheBruto - Controle.zeroManche;
+    Controle.recebeu = true;
+    Controle.ultimaLeitura = Date.now();
+    if (Controle.esperandoSensor){
+      Controle.esperandoSensor = false;
+      Controle.modo = 'sensor';
+      Controle.calibrar();
+      if (typeof mostraAviso === 'function') mostraAviso('SENSOR LIGADO', '#7dffb0');
+    }
+  },
+
+  // iOS pede permissão SEPARADA para orientação e para movimento.
+  permMovimento: null,
+  async pedeMovimento(){
+    try{
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function')
+        this.permMovimento = (await DeviceMotionEvent.requestPermission()) === 'granted';
+      else
+        this.permMovimento = true;
+    }catch(e){ this.permMovimento = false; }
+    if (this.permMovimento) this.ouveMovimento();
+    return this.permMovimento;
+  },
+  giroManual: null,
+
+  /* ---------------------------------------------------------------------
+     O LEME, pelo MOVIMENTO do aparelho para os lados
+
+     Os outros dois eixos vêm da INCLINAÇÃO, que o sensor mede direto. O leme
+     não: ele vem de DESLOCAR o celular para o lado. E aí tem um limite físico
+     que vale dizer — acelerômetro não sente POSIÇÃO, só mudança de movimento.
+     Deslocar e segurar parado na esquerda é, para ele, idêntico a estar parado
+     no meio. O que dá para medir é o DESLIZAR.
+
+     Então: tira a gravidade da leitura (por média lenta, porque nem todo
+     aparelho entrega a aceleração já limpa), projeta o que sobra no eixo
+     "para os lados" — que é perpendicular ao "para cima do mundo" e à tela,
+     então vale para qualquer pegada — e integra com vazamento. O resultado é
+     uma estimativa de velocidade lateral que sobe enquanto se desliza e volta
+     sozinha ao centro quando se para. Igual a pedal de leme: dá chute, não
+     posição fixa.
+     ------------------------------------------------------------------ */
+  ouveMovimento(){
+    if (this._ouvindoMov || typeof DeviceMotionEvent === 'undefined') return;
+    this._ouvindoMov = true;
+    window.addEventListener('devicemotion', e => Controle._movimento(e), true);
+  },
+  ouveGravidade(){ this.ouveMovimento(); },
+
+  _movimento(e){
+    const lin = e.acceleration, tot = e.accelerationIncludingGravity;
+    const dt = Math.min(0.08, Math.max(0.004, (e.interval || 16)/1000));
+    let ax, ay;
+    if (lin && lin.x != null && (lin.x || lin.y || lin.z)){
+      ax = lin.x; ay = lin.y;                    // já vem sem a gravidade
+    } else if (tot && tot.x != null){
+      if (!this._temG){ this._g = { x:tot.x, y:tot.y, z:tot.z }; this._temG = true; }
+      this._g.x += (tot.x - this._g.x)*0.05;     // média lenta = a gravidade
+      this._g.y += (tot.y - this._g.y)*0.05;
+      this._g.z += (tot.z - this._g.z)*0.05;
+      ax = tot.x - this._g.x; ay = tot.y - this._g.y;
+    } else return;
+    // o tempo tem que ser o do RELÓGIO, não o do sensor: se os avisos param de
+    // chegar (tela apagada, aba atrás), o intervalo real é maior, e sem isso a
+    // trava do gesto anterior engolia o começo do gesto seguinte
+    const agora = Date.now();
+    const dtReal = Math.min(0.6, Math.max(dt, (agora - (this.ultimoMov || agora))/1000));
+    this.ultimoMov = agora;
+
+    // eixo "para os lados": perpendicular ao "para cima do mundo" e à tela.
+    // Sai do vetor que a leitura de inclinação já calcula, então vale para
+    // qualquer pegada, sem precisar saber se o celular está em pé ou deitado.
+    const u = this._cima;
+    const sx = -u.y, sy = u.x;
+    const n = Math.hypot(sx, sy);
+    if (n < 0.15) return;                        // aparelho deitado: sem eixo lateral
+    const a = (ax*sx + ay*sy)/n;
+    // se houve um buraco entre as leituras, o filtro está velho: um gesto
+    // antigo guardado nele dispararia o leme para o lado errado no começo do
+    // gesto novo
+    if (dtReal > 0.1) this._aFiltro *= Math.pow(0.15, dtReal);
+    // buraco entre leituras conta como sossego: se o aparelho parou de mandar
+    // notícia, o próximo empurrão é gesto novo
+    if (dtReal > 0.08) this._quieto += dtReal;
+    this._aFiltro += (a - this._aFiltro) * 0.4;  // tira o tremor da mão
+    const af = this._aFiltro;
+
+    /* Por que DETECTAR O EMPURRÃO em vez de integrar a velocidade: todo
+       deslize termina com uma freada, de sinal contrário. Integrando, o leme
+       ia para o lado certo e VOLTAVA para o lado errado no fim do gesto.
+       Aqui o primeiro empurrão manda, e por um terço de segundo tudo que vier
+       no sentido contrário é ignorado — que é justamente a freada. */
+    /* COMO SEPARAR O EMPURRÃO DA FREADA. Tentei primeiro uma trava de tempo
+       depois de cada gesto, e não serve: deslizando várias vezes seguidas, a
+       freada de um deslize caía fora da trava e era lida como gesto novo — o
+       leme ia para o lado contrário. O que distingue de verdade os dois é o
+       SILÊNCIO ANTES: um empurrão começa depois de a mão estar parada; a
+       freada vem colada no empurrão, sem sossego nenhum no meio. */
+    this._janela = Math.max(0, this._janela - dtReal);
+    if (Math.abs(af) > LEME_MIN){
+      const dir = af > 0 ? 1 : -1;
+      const forca = Math.min(1, (Math.abs(af) - LEME_MIN) / (LEME_MAX - LEME_MIN));
+      if (this._quieto >= 0.09){          // vinha de mão parada: é gesto novo
+        this._dir = dir; this._chute = dir*forca;
+        this._janela = 0.13;              // ainda dá para pegar o pico dele
+      } else if (this._janela > 0 && dir === this._dir && forca > Math.abs(this._chute)){
+        this._chute = dir*forca;
+      }
+      this._quieto = 0;
+    } else {
+      this._quieto += dtReal;
+    }
+    this._chute *= Math.pow(0.5, dtReal/0.5);    // o chute vai sumindo sozinho
+    if (Math.abs(this._chute) < 0.02) this._chute = 0;
+    this.leme = this._chute;
+  },
+
+  calibrar(){
+    this.zeroVolante = this._volanteBruto || 0;
+    this.zeroManche  = this._mancheBruto  || 0;
+    this._aFiltro = 0; this._chute = 0; this._quieto = 1; this._janela = 0; this.leme = 0;
+    this.volante = 0; this.manche = 0;   // vale já, não só na próxima leitura
+  }
+};
+
+function grausParaEixo(graus, maximo, zonaMorta){
+  const s = Math.sign(graus), g = Math.abs(graus);
+  if (g <= zonaMorta) return 0;
+  return s * Math.min(1, (g - zonaMorta) / (maximo - zonaMorta));
+}
+/* --- contas de vetor, as poucas que o jogo precisa --- */
+function vsub(a,b){ return {x:a.x-b.x, y:a.y-b.y, z:a.z-b.z}; }
+function vmul(a,k){ return {x:a.x*k, y:a.y*k, z:a.z*k}; }
+function vsoma(a,b){ return {x:a.x+b.x, y:a.y+b.y, z:a.z+b.z}; }
+function vponto(a,b){ return a.x*b.x + a.y*b.y + a.z*b.z; }
+function vcruz(a,b){ return { x:a.y*b.z - a.z*b.y, y:a.z*b.x - a.x*b.z, z:a.x*b.y - a.y*b.x }; }
+function vnorm(a){ const m = Math.hypot(a.x,a.y,a.z) || 1; return {x:a.x/m, y:a.y/m, z:a.z/m}; }
+
+/* gira o par (u,v) em volta do eixo que falta, por `ang` radianos */
+function giraPar(u, v, ang){
+  const c = Math.cos(ang), s = Math.sin(ang);
+  return [ {x:u.x*c + v.x*s, y:u.y*c + v.y*s, z:u.z*c + v.z*s},
+           {x:v.x*c - u.x*s, y:v.y*c - u.y*s, z:v.z*c - u.z*s} ];
+}
+
+/* Depois de muitas rotações os três eixos escorregam e deixam de ser
+   perpendiculares. Isto os endireita a cada quadro — é barato e evita o avião
+   ir "derretendo" depois de uns minutos de manobra. */
+function endireitaEixos(){
+  eixoF = vnorm(eixoF);
+  eixoC = vnorm(vsub(eixoC, vmul(eixoF, vponto(eixoC, eixoF))));
+  eixoD = vcruz(eixoC, eixoF);
+  rumo = Math.atan2(eixoF.x, eixoF.z);
+  cosR = Math.cos(rumo); senR = Math.sin(rumo);
+  arfagem = Math.asin(Math.max(-1, Math.min(1, eixoF.y)));
+  // inclinação = quanto o teto da cabine está torto em relação ao céu
+  inclinacao = Math.atan2(-eixoD.y, eixoC.y) * 180/Math.PI;   // + = asa direita para baixo
+}
+
+
+/* =============================================================================
+   PARTE 2 — O MUNDO (os mesmos números do jogo em 2D, para o voo ficar igual)
+   ========================================================================== */
+const CHAO = -700, TETO = 5200;
+const VOO_BASE = 1700, VOO_TURBO = 3000;
+const MAPA = 60000, METRO = 20;
+const TAXA_ROL = 3.4, TAXA_ARF = 1.5, TAXA_LEME = 0.55;
+const RAIO_PEGA = 340, GASTO = 3.0, GASTO_TURBO = 4.6;
+const DA_NORMAL = 20, DA_AZUL = 32, TURBO_SEG = 5;
+const RAIO_NUKE = 9000, RAIO_POMBO = 170, RAIO_AVIAO = 430;
+const ARMAS = {
+  bomba:    { nome:'NUCLEAR',      municao:6,   recarga:2.2,  cor:'#ffc24d' },
+  missil:   { nome:'MÍSSIL',       municao:8,   recarga:0.85, cor:'#ff7a4d' },
+  metralha: { nome:'METRALHADORA', municao:400, recarga:0.07, cor:'#ffe98a' }
+};
+
+const rioX      = z => Math.sin(z/9000)*4200 + Math.sin(z/3100)*900;
+const estradaZ  = x => 8000 + Math.sin(x/11000)*2600;
+const estradaXv = z => -21000 + Math.sin(z/13000)*1800;
+function ehCidade(x, z){
+  const f = Math.sin(x/17000 + 0.6) + Math.sin(z/15000 - 0.4)
+          + Math.sin((x + z)/11000)*0.7 + Math.sin((x - z)/23000)*0.5;
+  return f > 0.62;
+}
+function baralha(a,b){ return Math.abs(Math.sin(a*127.1 + b*311.7) * 43758.5453) % 1; }
+
+/* --- estado do voo: a mesma atitude de três eixos do jogo em 2D --- */
+let aviaoX=0, aviaoY=1500, aviaoZ=0;
+let eixoF={x:0,y:0,z:1}, eixoC={x:0,y:1,z:0}, eixoD={x:1,y:0,z:0};
+let rumo=0, inclinacao=0, arfagem=0, leme=0;
+let voo=VOO_BASE, turbo=0, combustivel=100, distancia=0, recorde=0;
+let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
+let arma='bomba', municao={}, recarga=0, atirando=false;
+let jogando=false, caindo=false, giroQueda=0, vq=0, motivoQueda='';
+let cockpit=false, infinito=true, qualidade=2;
+let tecla={esq:false,dir:false,cima:false,baixo:false,lemeE:false,lemeD:false};
+let toqueX=0, toqueY=0, usandoToque=false;
+try { if (new URLSearchParams(location.search).get('infinito') === '0') infinito = false; } catch(e){}
+try { recorde = parseInt(localStorage.getItem('aviao.recorde') || '0', 10) || 0; } catch(e){}
+
+function endireitaEixos(){
+  eixoF = vnorm(eixoF);
+  eixoC = vnorm(vsub(eixoC, vmul(eixoF, vponto(eixoC, eixoF))));
+  eixoD = vcruz(eixoC, eixoF);
+  rumo = Math.atan2(eixoF.x, eixoF.z);
+  arfagem = Math.asin(Math.max(-1, Math.min(1, eixoF.y)));
+  inclinacao = Math.atan2(-eixoD.y, eixoC.y) * 180/Math.PI;
+}
+
+/* --- o mapa, montado uma vez --- */
+let predios=[], tambores=[], alvos=[], obstaculos=[];
+function montaMapa(){
+  predios = []; alvos = []; tambores = []; obstaculos = [];
+  const PASSO_T = 5200;
+  for (let x = -MAPA; x <= MAPA; x += PASSO_T)
+    for (let z = -MAPA; z <= MAPA; z += PASSO_T){
+      if (Math.random() < 0.42) continue;
+      const tx = x + (Math.random()-0.5)*PASSO_T*0.8, tz = z + (Math.random()-0.5)*PASSO_T*0.8;
+      tambores.push({ x:tx, y: 1200 + Math.random()*1800, z:tz,
+                      azul: Math.random() < 0.18, pego:false, giro:Math.random()*6.28 });
+      if (Math.random() < 0.5)
+        obstaculos.push({ tipo: Math.random() < 0.34 ? 'aviao' : 'pombo',
+          x: tx + (Math.random()-0.5)*3000, y: 900 + Math.random()*2200,
+          z: tz + (Math.random()-0.5)*3000, fase: Math.random()*6.28,
+          deriva:(Math.random()-0.5)*300, rumo: Math.random()*6.283, x0:0, y0:0, vivo:true });
+    }
+  for (const o of obstaculos){ o.x0 = o.x; o.y0 = o.y; }
+
+  const QUADRA = 1600, RUA = 520, P = QUADRA + RUA;
+  for (let zz = -MAPA; zz < MAPA; zz += P)
+    for (let xx = -MAPA; xx < MAPA; xx += P){
+      if (!ehCidade(xx, zz)) continue;
+      if (Math.abs(xx - rioX(zz)) < 1100) continue;
+      if (Math.abs(zz - estradaZ(xx)) < 700) continue;
+      if (Math.abs(xx - estradaXv(zz)) < 700) continue;
+      if (Math.random() < 0.20) continue;
+      predios.push({ x:xx + (Math.random()-0.5)*300, z:zz + (Math.random()-0.5)*300,
+                     w: 420 + Math.random()*520, d: 420 + Math.random()*520,
+                     h: 260 + Math.random()*Math.random()*1500, tom: Math.random(), vivo:true });
+    }
+
+  let tent = 0;
+  while (alvos.length < 14 && tent < 4000){
+    tent++;
+    const ax = (Math.random()-0.5)*MAPA*1.8, az = (Math.random()-0.5)*MAPA*1.8;
+    if (!ehCidade(ax, az)) continue;
+    if (Math.abs(ax - rioX(az)) < 1200) continue;
+    if (alvos.some(a => Math.hypot(a.x-ax, a.z-az) < 9000)) continue;
+    if (Math.hypot(ax, az) < 6000) continue;
+    alvos.push({ x:ax, z:az, r:520, vivo:true });
+  }
+  alvosTotal = alvos.length;
+  predios = predios.filter(p => !alvos.some(a => Math.hypot(a.x-p.x, a.z-p.z) < 1400));
+}
+
+/* =============================================================================
+   PARTE 3 — A CENA, agora com three.js e placa de vídeo
+
+   A diferença de fundo para a versão em canvas: lá eu calculava à mão cada
+   polígono, a ordem de desenho, a névoa e a luz. Aqui eu só DESCREVO a cena
+   (o que existe, de que cor, onde está a luz) e o cartão de vídeo desenha.
+   É o que permite ter luz especular, sombra projetada e névoa de verdade sem
+   custar quadro.
+   ========================================================================== */
+const COR_CEU = 0x9fc4e4, COR_SOL = 0xfff3d6, COR_CAMPO = 0x3f7a4a;
+const SOL_RUMO = 0.9, SOL_ALT = 0.42;
+
+const tela3d = document.getElementById('tela3d');
+const rend = new THREE.WebGLRenderer({ canvas: tela3d, antialias: true, powerPreference: 'high-performance' });
+rend.setClearColor(COR_CEU, 1);
+rend.shadowMap.enabled = true;
+rend.shadowMap.type = THREE.PCFSoftShadowMap;
+/* mapeamento de tons: sem isto o céu claro estoura e a lataria do avião fica
+   chapada. Com ele o brilho do sol na fuselagem tem para onde crescer. */
+rend.toneMapping = THREE.ACESFilmicToneMapping;
+rend.toneMappingExposure = 0.95;
+
+const cena = new THREE.Scene();
+cena.fog = new THREE.Fog(COR_CEU, 5000, 46000);
+const cam = new THREE.PerspectiveCamera(58, 1, 40, 130000);
+cena.add(cam);
+
+const luzCeu = new THREE.HemisphereLight(0xc3dcf2, 0x46603f, 1.9);
+cena.add(luzCeu);
+const sol = new THREE.DirectionalLight(COR_SOL, 3.0);
+const solDir = { x: Math.sin(SOL_RUMO)*Math.cos(SOL_ALT), y: Math.sin(SOL_ALT), z: Math.cos(SOL_RUMO)*Math.cos(SOL_ALT) };
+sol.castShadow = true;
+sol.shadow.mapSize.set(1024, 1024);
+sol.shadow.camera.near = 100; sol.shadow.camera.far = 30000;
+sol.shadow.camera.left = -7000; sol.shadow.camera.right = 7000;
+sol.shadow.camera.top = 7000; sol.shadow.camera.bottom = -7000;
+sol.shadow.bias = -0.0009;
+cena.add(sol); cena.add(sol.target);
+/* uma luz fraca presa na câmera, só para nada ficar preto quando o avião vira
+   a barriga para o sol */
+const luzPiloto = new THREE.DirectionalLight(0xdfeaff, 0.55);
+luzPiloto.position.set(0, 0.4, 1);
+cam.add(luzPiloto); cam.add(luzPiloto.target);
+luzPiloto.target.position.set(0, 0, -1);
+
+/* o sol desenhado: um disco muito longe, sempre no mesmo rumo do mapa */
+const discoSol = new THREE.Mesh(
+  new THREE.CircleGeometry(2600, 32),
+  new THREE.MeshBasicMaterial({ color: 0xfff8e0, fog: false, transparent: true, opacity: 0.95 }));
+cena.add(discoSol);
+const haloSol = new THREE.Mesh(
+  new THREE.CircleGeometry(7000, 32),
+  new THREE.MeshBasicMaterial({ color: 0xffeeb8, fog: false, transparent: true, opacity: 0.18 }));
+cena.add(haloSol);
+
+/* --- o céu: uma cúpula com degradê, feita num shader curtinho ------------- */
+const ceu = new THREE.Mesh(
+  new THREE.SphereGeometry(110000, 24, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { alto:{value:new THREE.Color(0x24528f)}, baixo:{value:new THREE.Color(COR_CEU)} },
+    vertexShader: 'varying float h; void main(){ h = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: 'uniform vec3 alto; uniform vec3 baixo; varying float h;\n' +
+      'void main(){ float t = clamp(h*1.7 + 0.06, 0.0, 1.0); gl_FragColor = vec4(mix(baixo, alto, t), 1.0); }'
+  }));
+cena.add(ceu);
+
+/* --- O TERRENO ------------------------------------------------------------
+   Uma malha só, com a cor em cada vértice. O xadrez de campos e quarteirões
+   que antes eu desenhava quadradinho por quadradinho agora é cor de vértice:
+   a placa de vídeo interpola sozinha e some o custo. */
+const PASSO_CH = 2200;
+const VERDES = [[42,92,51],[56,117,74],[36,80,41],[71,137,90],[87,150,79],
+                [107,143,60],[132,160,74],[47,107,62],[63,110,47],[83,127,54]];
+const CINZAS = [[96,100,105],[86,90,95],[104,107,110],[78,83,88],
+                [74,104,72],[110,104,92],[88,92,98],[99,95,88]];
+let chao = null;
+function montaChao(){
+  if (chao){ cena.remove(chao); chao.geometry.dispose(); }
+  /* A cor tem que ser POR CÉLULA. Pintando por vértice, a placa interpola
+     entre um campo e o vizinho e o mosaico vira um borrão aguado — foi o que
+     aconteceu na primeira tentativa. Com a malha desindexada cada triângulo
+     tem vértices só seus, e a cor fica chapada, igual ao jogo em 2D. */
+  const n = Math.round(MAPA*2/PASSO_CH);
+  let g = new THREE.PlaneGeometry(MAPA*2, MAPA*2, n, n);
+  g.rotateX(-Math.PI/2);
+  g = g.toNonIndexed();
+  const pos = g.attributes.position, cores = new Float32Array(pos.count*3);
+  for (let t = 0; t < pos.count; t += 3){
+    // o centro da CÉLULA, não o do triângulo: os dois triângulos de um mesmo
+    // quadrado têm que sair da mesma cor, senão o campo vira xadrez de agulhas
+    let cx = (pos.getX(t)+pos.getX(t+1)+pos.getX(t+2))/3;
+    let cz = (pos.getZ(t)+pos.getZ(t+1)+pos.getZ(t+2))/3;
+    const lado = MAPA*2/n;                    // o tamanho REAL da célula
+    const x = (Math.floor((cx + MAPA)/lado) + 0.5)*lado - MAPA;
+    const z = (Math.floor((cz + MAPA)/lado) + 0.5)*lado - MAPA;
+    let rgb;
+    if (ehCidade(x, z)) rgb = CINZAS[Math.floor(baralha(x*0.0017, z*0.0023)*CINZAS.length)];
+    else                rgb = VERDES[Math.floor(baralha(x*0.0013, z*0.0019)*VERDES.length)];
+    const dRio = Math.abs(x - rioX(z));
+    if (dRio < 620) rgb = [58, 118, 160];
+    else if (dRio < 860) rgb = [190, 180, 150];            // a areia da margem
+    if (Math.abs(z - estradaZ(x)) < 190 || Math.abs(x - estradaXv(z)) < 190) rgb = [104, 103, 97];
+    for (let k = 0; k < 3; k++){
+      cores[(t+k)*3] = rgb[0]/255; cores[(t+k)*3+1] = rgb[1]/255; cores[(t+k)*3+2] = rgb[2]/255;
+    }
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(cores, 3));
+  g.computeVertexNormals();
+  chao = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  chao.position.y = CHAO;
+  chao.receiveShadow = true;
+  cena.add(chao);
+}
+
+/* --- OS PRÉDIOS: uma caixa só, repetida ----------------------------------
+   InstancedMesh: a placa de vídeo recebe UMA caixa e uma lista de posições, e
+   desenha as centenas de prédios numa passada só. É o que deixa a cidade
+   inteira caber no orçamento de um quadro. */
+let cidade = null, cidadeIdx = [];
+const geoCaixa = new THREE.BoxGeometry(1, 1, 1);
+function montaCidade(){
+  if (cidade){ cena.remove(cidade); cidade.dispose(); }
+  const vivos = predios.filter(p => p.vivo);
+  cidade = new THREE.InstancedMesh(geoCaixa,
+    new THREE.MeshLambertMaterial({ vertexColors: false }), Math.max(1, vivos.length));
+  cidade.castShadow = true; cidade.receiveShadow = true;
+  cidade.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const m = new THREE.Matrix4(), cor = new THREE.Color();
+  cidadeIdx = [];
+  vivos.forEach((p, i) => {
+    m.makeScale(p.w, p.h, p.d);
+    m.setPosition(p.x, CHAO + p.h/2, p.z);
+    cidade.setMatrixAt(i, m);
+    const t = 0.62 + p.tom*0.3;
+    cor.setRGB(t*0.80, t*0.84, t*0.90);
+    cidade.setColorAt(i, cor);
+    cidadeIdx.push(p);
+  });
+  cidade.instanceMatrix.needsUpdate = true;
+  if (cidade.instanceColor) cidade.instanceColor.needsUpdate = true;
+  cena.add(cidade);
+}
+/* quando um prédio cai, some com ele encolhendo a instância para zero */
+function derrubaPredio(p){
+  p.vivo = false;
+  const i = cidadeIdx.indexOf(p);
+  if (i < 0 || !cidade) return;
+  const m = new THREE.Matrix4();
+  m.makeScale(0.0001, 0.0001, 0.0001); m.setPosition(p.x, CHAO, p.z);
+  cidade.setMatrixAt(i, m);
+  cidade.instanceMatrix.needsUpdate = true;
+}
+
+/* --- TAMBORES DE COMBUSTÍVEL --------------------------------------------- */
+let tamborMalha = null, tamborIdx = [];
+const geoTambor = new THREE.CylinderGeometry(95, 95, 210, 12);
+function montaTambores(){
+  if (tamborMalha){ cena.remove(tamborMalha); tamborMalha.dispose(); }
+  tamborMalha = new THREE.InstancedMesh(geoTambor,
+    new THREE.MeshLambertMaterial({}), Math.max(1, tambores.length));
+  tamborMalha.castShadow = true;
+  tamborMalha.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const m = new THREE.Matrix4(), cor = new THREE.Color();
+  tamborIdx = [];
+  tambores.forEach((t, i) => {
+    m.makeRotationY(t.giro); m.setPosition(t.x, t.y, t.z);
+    tamborMalha.setMatrixAt(i, m);
+    cor.set(t.azul ? 0x39a6ff : 0xffb43a);
+    tamborMalha.setColorAt(i, cor);
+    tamborIdx.push(t);
+  });
+  tamborMalha.instanceMatrix.needsUpdate = true;
+  if (tamborMalha.instanceColor) tamborMalha.instanceColor.needsUpdate = true;
+  cena.add(tamborMalha);
+}
+function someTambor(t){
+  const i = tamborIdx.indexOf(t);
+  if (i < 0 || !tamborMalha) return;
+  const m = new THREE.Matrix4();
+  m.makeScale(0.0001,0.0001,0.0001); m.setPosition(t.x, t.y, t.z);
+  tamborMalha.setMatrixAt(i, m);
+  tamborMalha.instanceMatrix.needsUpdate = true;
+}
+
+/* --- ALVOS: depósitos de combustível, com anel piscando ------------------- */
+let alvoGrupo = null;
+function montaAlvos(){
+  if (alvoGrupo) cena.remove(alvoGrupo);
+  alvoGrupo = new THREE.Group();
+  const matT = new THREE.MeshLambertMaterial({ color: 0xc94f3d });
+  const matA = new THREE.MeshBasicMaterial({ color: 0xff6a5a, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
+  const geoT = new THREE.CylinderGeometry(190, 190, 320, 14);
+  const geoA = new THREE.RingGeometry(520, 620, 36);
+  for (const a of alvos){
+    const g = new THREE.Group();
+    for (const dx of [-280, 0, 280]){
+      const t = new THREE.Mesh(geoT, matT);
+      t.position.set(dx, CHAO + 160, 0); t.castShadow = true;
+      g.add(t);
+    }
+    const anel = new THREE.Mesh(geoA, matA);
+    anel.rotation.x = -Math.PI/2; anel.position.y = CHAO + 15;
+    g.add(anel);
+    g.position.set(a.x, 0, a.z);
+    a.no = g;
+    alvoGrupo.add(g);
+  }
+  cena.add(alvoGrupo);
+}
+
+/* --- NUVENS: cartões virados para a câmera ------------------------------- */
+function texturaNuvem(){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(64,64,4, 64,64,62);
+  g.addColorStop(0,'rgba(255,255,255,.95)'); g.addColorStop(0.45,'rgba(255,255,255,.55)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0,0,128,128);
+  const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
+}
+let nuvens = [];
+function montaNuvens(){
+  for (const n of nuvens) cena.remove(n.no);
+  nuvens = [];
+  const mat = new THREE.SpriteMaterial({ map: texturaNuvem(), transparent: true, opacity: 0.85, depthWrite: false });
+  for (let i = 0; i < 26; i++){
+    const s = new THREE.Sprite(mat);
+    const n = { no: s };
+    recolocaNuvem(n, true);
+    cena.add(s); nuvens.push(n);
+  }
+}
+function recolocaNuvem(n, emVolta){
+  const a = rumo + (emVolta ? Math.random()*6.28 : (Math.random()-0.5)*2.4);
+  const d = 9000 + Math.random()*(emVolta ? 30000 : 26000);
+  const r = 3400 + Math.random()*5000;
+  n.x = aviaoX + Math.sin(a)*d; n.z = aviaoZ + Math.cos(a)*d;
+  n.y = 4200 + Math.random()*5200;
+  n.no.position.set(n.x, n.y, n.z);
+  n.no.scale.set(r, r*0.5, 1);
+}
+
+/* --- O AVIÃO --------------------------------------------------------------
+   Aqui é onde o three.js paga sozinho o bilhete. Na versão em canvas eu tinha
+   um punhado de triângulos chapados, porque cada face custava conta minha.
+   Agora a fuselagem é um SÓLIDO DE REVOLUÇÃO de 24 lados com normais suaves,
+   as asas saem de um perfil extrudado, e o material tem brilho especular — o
+   reflexo que corre pela lataria quando o avião vira. Nada disso eu conseguia
+   fazer à mão a 60 quadros.                                                */
+function perfilFuselagem(){
+  // raio da fuselagem ao longo do corpo (de z = -175 na cauda a z = +190 no bico)
+  const p = [[-178,13],[-160,20],[-120,26],[-60,31],[0,33],[60,31],[120,23],[168,12],[192,3],[196,0]];
+  return p.map(q => new THREE.Vector2(q[1], q[0]));
+}
+function fazAsa(pontos, esp, cor, x, y, z, giroZ){
+  const forma = new THREE.Shape();
+  forma.moveTo(pontos[0][0], pontos[0][1]);
+  for (let i = 1; i < pontos.length; i++) forma.lineTo(pontos[i][0], pontos[i][1]);
+  forma.closePath();
+  const g = new THREE.ExtrudeGeometry(forma, { depth: esp, bevelEnabled: true,
+              bevelThickness: esp*0.45, bevelSize: esp*0.6, bevelSegments: 2 });
+  g.translate(0, 0, -esp/2);
+  const m = new THREE.Mesh(g, cor);
+  m.position.set(x, y, z);
+  if (giroZ) m.rotation.z = giroZ;
+  m.castShadow = true;
+  return m;
+}
+function montaAviao(corpoCor, detalheCor, vidroCor){
+  const g = new THREE.Group();
+  const matCorpo   = new THREE.MeshPhongMaterial({ color: corpoCor, shininess: 55, specular: 0x93a4bd });
+  const matEscuro  = new THREE.MeshPhongMaterial({ color: detalheCor, shininess: 30, specular: 0x556070 });
+  const matVidro   = new THREE.MeshPhongMaterial({ color: vidroCor, shininess: 110, specular: 0xdfeaff,
+                                                   transparent: true, opacity: 0.92 });
+  const matBocal   = new THREE.MeshPhongMaterial({ color: 0x2a3038, shininess: 90, specular: 0x8895a8 });
+
+  // fuselagem: revolução com normais suaves
+  const fus = new THREE.Mesh(new THREE.LatheGeometry(perfilFuselagem(), 24), matCorpo);
+  fus.rotation.x = Math.PI/2;          // o eixo do torno passa a apontar para a frente
+  fus.castShadow = true; g.add(fus);
+
+  // asa em flecha (o perfil é desenhado no plano x-z e depois deitado)
+  const asaDir = [[20,74],[96,-6],[186,-52],[186,-84],[96,-66],[20,-64]];
+  const asaEsq = asaDir.map(p => [-p[0], p[1]]);
+  const asa1 = fazAsa(asaDir, 13, matCorpo, 0, 0, 0); asa1.rotation.x = Math.PI/2; g.add(asa1);
+  const asa2 = fazAsa(asaEsq, 13, matCorpo, 0, 0, 0); asa2.rotation.x = Math.PI/2; g.add(asa2);
+
+  // empenas
+  const empD = [[16,-118],[82,-150],[82,-174],[16,-160]];
+  const empE = empD.map(p => [-p[0], p[1]]);
+  const e1 = fazAsa(empD, 12, matCorpo, 0, 0, 0); e1.rotation.x = Math.PI/2; g.add(e1);
+  const e2 = fazAsa(empE, 12, matCorpo, 0, 0, 0); e2.rotation.x = Math.PI/2; g.add(e2);
+
+  /* Derivas duplas. O perfil é desenhado no plano (z, y) — comprimento por
+     altura — e o mesmo `fazAsa` serve: basta virar a peça um quarto de volta
+     em torno do eixo vertical. O caimento para fora fica num grupo por cima,
+     senão a ordem das rotações embaralha tudo. */
+  const der = [[-100, 0], [-128, 74], [-158, 74], [-172, 0]];
+  for (const lado of [-1, 1]){
+    const d = fazAsa(der, 10, matCorpo, 0, 0, 0);
+    d.rotation.y = -Math.PI/2;
+    const suporte = new THREE.Group();
+    suporte.add(d);
+    suporte.position.set(lado*30, 12, 0);
+    suporte.rotation.z = -lado*0.26;
+    g.add(suporte);
+  }
+
+  // motores, com bocal escuro
+  for (const lado of [-1, 1]){
+    const mot = new THREE.Mesh(new THREE.CylinderGeometry(17, 15, 190, 16), matCorpo);
+    mot.rotation.x = Math.PI/2; mot.position.set(lado*37, -9, -74); mot.castShadow = true; g.add(mot);
+    const boc = new THREE.Mesh(new THREE.CylinderGeometry(16, 18, 26, 16, 1, true), matBocal);
+    boc.rotation.x = Math.PI/2; boc.position.set(lado*37, -9, -176); g.add(boc);
+  }
+
+  // canopy: meia esfera achatada, com vidro brilhante
+  // meia esfera com a barriga para baixo e esticada para trás. Girar isto era
+  // o que fazia o canopy virar uma barbatana preta em pé.
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI*2, 0, Math.PI/2), matVidro);
+  cap.scale.set(23, 21, 64); cap.position.set(0, 18, 40);
+  g.add(cap);
+
+  // tomadas de ar coladas na fuselagem
+  for (const lado of [-1, 1]){
+    const t = new THREE.Mesh(new THREE.BoxGeometry(13, 22, 110), matEscuro);
+    t.position.set(lado*33, -6, 28); t.castShadow = true; g.add(t);
+  }
+  return g;
+}
+
+const aviao = montaAviao(0xdfe7f3, 0x8b97ab, 0x14243e);
+cena.add(aviao);
+
+/* faixas azuis nas asas, para o olho pegar a direção de longe */
+{
+  const matAzul = new THREE.MeshPhongMaterial({ color: 0x2d7dff, shininess: 70 });
+  for (const lado of [-1, 1]){
+    // em cima da asa, não dentro dela
+    const f = new THREE.Mesh(new THREE.BoxGeometry(56, 5, 22), matAzul);
+    f.position.set(lado*150, 8, -62);
+    aviao.add(f);
+  }
+}
+
+/* o fogo dos motores, dois cones que crescem no turbo */
+const jatos = [];
+for (const lado of [-1, 1]){
+  const j = new THREE.Mesh(new THREE.ConeGeometry(14, 120, 12, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.35,
+                                  fog: false, depthWrite: false, side: THREE.DoubleSide }));
+  j.rotation.x = Math.PI/2;              // a ponta tem que apontar para TRÁS
+  j.position.set(lado*37, -9, -250);
+  aviao.add(j); jatos.push(j);
+}
+
+/* --- inimigos: o mesmo avião, vermelho --------------------------------- */
+const modeloInimigo = montaAviao(0xc45a48, 0x7d3830, 0x20303f);
+const inimigos = [];
+for (const o of []) {}
+function montaInimigos(){
+  for (const n of inimigos) cena.remove(n);
+  inimigos.length = 0;
+  for (const o of obstaculos){
+    if (o.tipo !== 'aviao') continue;
+    const n = modeloInimigo.clone(true);
+    n.scale.setScalar(1.3);
+    o.no = n; cena.add(n); inimigos.push(n);
+  }
+}
+
+/* --- pombos: um corpo simples com duas asas que batem ------------------- */
+const pombos = [];
+function montaPombos(){
+  for (const n of pombos) cena.remove(n);
+  pombos.length = 0;
+  const mat = new THREE.MeshLambertMaterial({ color: 0x3b4150 });
+  for (const o of obstaculos){
+    if (o.tipo !== 'pombo') continue;
+    const g = new THREE.Group();
+    const corpo = new THREE.Mesh(new THREE.SphereGeometry(70, 10, 8), mat);
+    corpo.scale.set(1, 0.8, 1.5); g.add(corpo);
+    for (const lado of [-1, 1]){
+      const a = new THREE.Mesh(new THREE.BoxGeometry(190, 10, 80), mat);
+      a.position.set(lado*110, 10, 0);
+      g.add(a); a.userData.lado = lado;
+      if (!o.asas) o.asas = [];
+      o.asas.push(a);
+    }
+    o.no = g; cena.add(g); pombos.push(g);
+  }
+}
+
+/* =============================================================================
+   PARTE 4 — VOO, REGRAS E CÂMERA
+   ========================================================================== */
+let camPos = new THREE.Vector3(), camF={x:0,y:0,z:1}, camC={x:0,y:1,z:0}, camD={x:1,y:0,z:0};
+const CAMD = 620;
+
+function giraPar(u, v, ang){
+  const c = Math.cos(ang), s = Math.sin(ang);
+  return [ {x:u.x*c + v.x*s, y:u.y*c + v.y*s, z:u.z*c + v.z*s},
+           {x:v.x*c - u.x*s, y:v.y*c - u.y*s, z:v.z*c - u.z*s} ];
+}
+function lemeTecla(){ return (tecla.lemeE?-1:0) + (tecla.lemeD?1:0); }
+function eixos(){
+  if (Controle.modo === 'sensor')
+    return { lat: Math.max(-1, Math.min(1, voltaCurta(Controle.volante)/180)),
+             ver: grausParaEixo(Controle.manche, 22, 3),
+             leme: Controle.leme || 0, absoluto: true };
+  if (usandoToque) return { lat: toqueX, ver: toqueY, leme: lemeTecla() };
+  return { lat: (tecla.esq?-1:0) + (tecla.dir?1:0),
+           ver: (tecla.cima?1:0) + (tecla.baixo?-1:0), leme: lemeTecla() };
+}
+
+function poeCamera(dt){
+  if (cockpit){
+    camF = eixoF; camC = eixoC; camD = eixoD;
+    camPos.set(aviaoX + eixoF.x*40 + eixoC.x*26,
+               aviaoY + eixoF.y*40 + eixoC.y*26,
+               aviaoZ + eixoF.z*40 + eixoC.z*26);
+  } else {
+    const k = Math.min(1, dt*3.0);
+    camF = vnorm({ x: camF.x + (eixoF.x-camF.x)*k, y: camF.y + (eixoF.y-camF.y)*k, z: camF.z + (eixoF.z-camF.z)*k });
+    const kc = Math.min(1, dt*1.8);
+    const alvoC = { x: eixoC.x*0.5, y: eixoC.y*0.5 + 0.5, z: eixoC.z*0.5 };
+    camC = { x: camC.x + (alvoC.x-camC.x)*kc, y: camC.y + (alvoC.y-camC.y)*kc, z: camC.z + (alvoC.z-camC.z)*kc };
+    camC = vnorm(vsub(camC, vmul(camF, vponto(camC, camF))));
+    if (!isFinite(camC.x)) camC = {x:0,y:1,z:0};
+    camD = vcruz(camC, camF);
+    const alvo = new THREE.Vector3(aviaoX - eixoF.x*CAMD + eixoC.x*210,
+                                   aviaoY - eixoF.y*CAMD + eixoC.y*210,
+                                   aviaoZ - eixoF.z*CAMD + eixoC.z*210);
+    camPos.lerp(alvo, Math.min(1, dt*7));
+  }
+  cam.position.copy(camPos);
+  /* A câmera do three.js olha pelo -Z dela. Montar a matriz na mão com
+     (direita, cima, -frente) dá uma base ESPELHADA — e o resultado é o avião
+     indo parar atrás da câmera. lookAt monta a base certa a partir do "para
+     onde" e do "para cima", que é o que eu tenho. */
+  cam.up.set(camC.x, camC.y, camC.z);
+  cam.lookAt(camPos.x + camF.x*1000, camPos.y + camF.y*1000, camPos.z + camF.z*1000);
+  cam.updateMatrixWorld();
+
+  ceu.position.copy(camPos);
+  const dSol = new THREE.Vector3(solDir.x, solDir.y, solDir.z).multiplyScalar(90000).add(camPos);
+  discoSol.position.copy(dSol); discoSol.lookAt(camPos);
+  haloSol.position.copy(dSol); haloSol.lookAt(camPos);
+  sol.position.set(aviaoX + solDir.x*9000, aviaoY + solDir.y*9000, aviaoZ + solDir.z*9000);
+  sol.target.position.set(aviaoX, CHAO, aviaoZ);
+  sol.target.updateMatrixWorld();
+}
+
+/* põe a malha do avião na atitude certa */
+function poeMalha(no, px, py, pz, D, C, Fr){
+  no.position.set(px, py, pz);
+  const m = new THREE.Matrix4().makeBasis(
+    new THREE.Vector3(D.x, D.y, D.z),
+    new THREE.Vector3(C.x, C.y, C.z),
+    new THREE.Vector3(Fr.x, Fr.y, Fr.z));
+  no.quaternion.setFromRotationMatrix(m);
+}
+
+/* --- avisos na tela --- */
+let ultimoAviso = 0;
+function mostraAviso(txt, cor, ms){
+  const el = document.getElementById('aviso'); const dur = ms || 900;
+  if (el.textContent === txt && Date.now()-ultimoAviso < 400) return;
+  el.textContent = txt; el.style.color = cor; el.style.opacity = 1;
+  ultimoAviso = Date.now();
+  setTimeout(()=>{ if (Date.now()-ultimoAviso >= dur-60) el.style.opacity = 0; }, dur);
+}
+
+/* --- som: motor e estouros ------------------------------------------------ */
+let audio = null;
+const Motor = {
+  ligado:false, osc:[], ganho:null,
+  liga(){
+    if (!audio || this.ligado) return;
+    this.ganho = audio.createGain(); this.ganho.gain.value = 0.0001;
+    this.ganho.connect(audio.destination);
+    for (const [f, tipo, v] of [[62,'sawtooth',0.5],[124,'sawtooth',0.3],[372,'square',0.12]]){
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = tipo; o.frequency.value = f; g.gain.value = v;
+      o.connect(g); g.connect(this.ganho); o.start();
+      this.osc.push({o:o, base:f});
+    }
+    this.ligado = true;
+  },
+  ajusta(){
+    if (!this.ligado || !audio) return;
+    const f = 0.55 + (voo - VOO_BASE*0.5)/(VOO_TURBO - VOO_BASE*0.5)*0.7;
+    for (const x of this.osc) x.o.frequency.setTargetAtTime(x.base*f, audio.currentTime, 0.08);
+    this.ganho.gain.setTargetAtTime(jogando && !caindo ? 0.16 : 0.02, audio.currentTime, 0.15);
+  },
+  desliga(){ if (this.ganho && audio) this.ganho.gain.setTargetAtTime(0.0001, audio.currentTime, 0.2); }
+};
+function bip(freq, dur, tipo, vol){
+  if (!audio) return;
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.type = tipo||'sine'; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol||0.06, audio.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
+  o.connect(g); g.connect(audio.destination); o.start(); o.stop(audio.currentTime + dur);
+}
+function somNuclear(){
+  if (!audio) return;
+  try{
+    const t0 = audio.currentTime, n = audio.sampleRate*3.2;
+    const buf = audio.createBuffer(1, n, audio.sampleRate), d = buf.getChannelData(0);
+    for (let i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/n, 1.6);
+    const fonte = audio.createBufferSource(); fonte.buffer = buf;
+    const f = audio.createBiquadFilter(); f.type='lowpass';
+    f.frequency.setValueAtTime(2200, t0); f.frequency.exponentialRampToValueAtTime(90, t0+2.8);
+    const g = audio.createGain();
+    g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.55,t0+0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+3.2);
+    fonte.connect(f); f.connect(g); g.connect(audio.destination); fonte.start(t0);
+    const o = audio.createOscillator(), go = audio.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(120,t0); o.frequency.exponentialRampToValueAtTime(24,t0+1.8);
+    go.gain.setValueAtTime(0.0001,t0); go.gain.exponentialRampToValueAtTime(0.5,t0+0.04);
+    go.gain.exponentialRampToValueAtTime(0.0001,t0+2.4);
+    o.connect(go); go.connect(audio.destination); o.start(t0); o.stop(t0+2.5);
+  }catch(e){}
+}
+
+/* --- EXPLOSÕES E O COGUMELO --------------------------------------------- */
+const geoBola = new THREE.SphereGeometry(1, 8, 6);
+let faiscas = [], cogumelos = [];
+function solta(x, y, z, n, cor, raio, forca){
+  const mat = new THREE.MeshBasicMaterial({ color: cor, transparent: true, fog: true });
+  for (let i=0;i<n;i++){
+    const m = new THREE.Mesh(geoBola, mat);
+    const a = Math.random()*Math.PI*2, b = Math.random()*Math.PI*2;
+    m.position.set(x, y, z);
+    m.scale.setScalar(raio*(0.5+Math.random()));
+    cena.add(m);
+    faiscas.push({ no:m, vx:Math.cos(a)*forca*(0.3+Math.random()),
+                   vy:Math.sin(b)*forca*(0.3+Math.random()),
+                   vz:(Math.random()-0.3)*forca, vida:1 });
+  }
+}
+function explode(x, y, z, e){
+  solta(x,y,z, Math.round(26*e), 0xffd257, 90*e, 900);
+  solta(x,y,z, Math.round(20*e), 0xff7a2f, 120*e, 700);
+  solta(x,y,z, Math.round(14*e), 0xff3b2f, 150*e, 500);
+  bip(90, 0.4, 'sawtooth', 0.16);
+}
+function fazCogumelo(x, z){
+  const g = new THREE.Group();
+  const matN = new THREE.MeshLambertMaterial({ color: 0xb9b0a2 });
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(420, 620, 5200, 14), matN);
+  col.position.y = CHAO + 2600; g.add(col);
+  const chapeu = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), matN);
+  chapeu.scale.set(2300, 1100, 2300); chapeu.position.y = CHAO + 5600; g.add(chapeu);
+  const nucleo = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10),
+    new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.9, fog: false }));
+  nucleo.scale.setScalar(1400); nucleo.position.y = CHAO + 1200; g.add(nucleo);
+  const marca = new THREE.Mesh(new THREE.CircleGeometry(RAIO_NUKE*0.55, 36),
+    new THREE.MeshBasicMaterial({ color: 0x1a1614, transparent: true, opacity: 0.55 }));
+  marca.rotation.x = -Math.PI/2; marca.position.y = CHAO + 12; g.add(marca);
+  const anel = new THREE.Mesh(new THREE.RingGeometry(0.94, 1, 48),
+    new THREE.MeshBasicMaterial({ color: 0xfff2cf, transparent: true, opacity: 0.9, side: THREE.DoubleSide, fog: false }));
+  anel.rotation.x = -Math.PI/2; anel.position.y = CHAO + 40; g.add(anel);
+  g.position.set(x, 0, z);
+  cena.add(g);
+  cogumelos.push({ no:g, t:0, col:col, chapeu:chapeu, nucleo:nucleo, anel:anel, marca:marca });
+}
+function nuclear(x, z){
+  fazCogumelo(x, z); somNuclear();
+  clarao = 1.0;
+  const R2 = RAIO_NUKE*RAIO_NUKE;
+  for (const a of alvos){
+    if (!a.vivo) continue;
+    if ((a.x-x)*(a.x-x) + (a.z-z)*(a.z-z) > R2) continue;
+    a.vivo = false; alvosDestruidos++; pontos += 500;
+    if (a.no) a.no.visible = false;
+    mostraAviso('ALVO DESTRUÍDO! ' + alvosDestruidos + '/' + alvosTotal, '#ffd257', 1600);
+  }
+  for (const p of predios){
+    if (!p.vivo) continue;
+    if ((p.x-x)*(p.x-x) + (p.z-z)*(p.z-z) < R2) derrubaPredio(p);
+  }
+  for (const o of obstaculos){
+    if (!o.vivo) continue;
+    if ((o.x-x)*(o.x-x) + (o.z-z)*(o.z-z) < R2*0.5){ o.vivo = false; if (o.no) o.no.visible = false; pontos += 50; }
+  }
+  if (alvosDestruidos >= alvosTotal && alvosTotal > 0){ venceu = true; Motor.desliga(); fim(); return; }
+  if ((aviaoX-x)*(aviaoX-x) + (aviaoZ-z)*(aviaoZ-z) < R2*0.36 && aviaoY < CHAO + 3000) derruba('nuclear');
+}
+let clarao = 0;
+
+/* --- ARMAS --------------------------------------------------------------- */
+let bombas = [], tiros = [];
+const geoBomba = new THREE.CapsuleGeometry(26, 70, 4, 8);
+const matBomba = new THREE.MeshLambertMaterial({ color: 0x4a5160 });
+const geoTiro = new THREE.CylinderGeometry(9, 9, 420, 6);
+const matTiro = new THREE.MeshBasicMaterial({ color: 0xffec96, fog: false });
+function trocaArma(nova){
+  if (!ARMAS[nova] || arma === nova) return;
+  arma = nova; recarga = 0.2;
+  bip(700, 0.05, 'square', 0.05);
+}
+function dispara(){
+  if (caindo || !jogando || recarga > 0) return;
+  if (municao[arma] <= 0){ bip(120,0.08,'square',0.05); mostraAviso('SEM MUNIÇÃO', '#ff8080', 700); return; }
+  municao[arma]--; recarga = ARMAS[arma].recarga;
+  if (arma === 'bomba'){
+    const m = new THREE.Mesh(geoBomba, matBomba); m.castShadow = true; cena.add(m);
+    bombas.push({ no:m, tipo:'bomba', x:aviaoX, y:aviaoY-60, z:aviaoZ,
+                  vx:eixoF.x*voo, vy:eixoF.y*voo - 60, vz:eixoF.z*voo });
+    bip(150, 0.12, 'sawtooth', 0.1);
+  } else if (arma === 'missil'){
+    const m = new THREE.Mesh(geoBomba, new THREE.MeshLambertMaterial({ color: 0xff7a4d })); cena.add(m);
+    bombas.push({ no:m, tipo:'missil', x:aviaoX, y:aviaoY, z:aviaoZ,
+                  vx:eixoF.x*voo*3.2, vy:eixoF.y*voo*3.2, vz:eixoF.z*voo*3.2, vida:2.4 });
+    bip(900, 0.2, 'sawtooth', 0.08);
+  } else {
+    const lado = (Math.random()-0.5)*220;
+    const m = new THREE.Mesh(geoTiro, matTiro); cena.add(m);
+    tiros.push({ no:m, x:aviaoX + eixoD.x*lado, y:aviaoY + eixoD.y*lado, z:aviaoZ + eixoD.z*lado,
+                 dx:eixoF.x, dy:eixoF.y, dz:eixoF.z, v:voo*6, vida:1.1 });
+    bip(900 + Math.random()*300, 0.04, 'square', 0.04);
+  }
+}
+function atingeAlvo(x, z, raio){
+  for (const a of alvos){
+    if (!a.vivo) continue;
+    if (Math.hypot(a.x-x, a.z-z) < raio + a.r){
+      a.vivo = false; alvosDestruidos++; pontos += 500;
+      if (a.no) a.no.visible = false;
+      explode(a.x, CHAO+200, a.z, 2.2);
+      mostraAviso('ALVO DESTRUÍDO! ' + alvosDestruidos + '/' + alvosTotal, '#ffd257', 1500);
+      if (alvosDestruidos >= alvosTotal){ venceu = true; Motor.desliga(); fim(); }
+      return true;
+    }
+  }
+  return false;
+}
+function atingeAr(x, y, z, raio){
+  for (const o of obstaculos){
+    if (!o.vivo) continue;
+    const r = (o.tipo === 'aviao' ? RAIO_AVIAO : RAIO_POMBO) + raio;
+    if (Math.abs(o.y-y) < r && Math.hypot(o.x-x, o.z-z) < r){
+      o.vivo = false; if (o.no) o.no.visible = false;
+      pontos += o.tipo === 'aviao' ? 200 : 50;
+      explode(o.x, o.y, o.z, o.tipo === 'aviao' ? 1.2 : 0.5);
+      mostraAviso(o.tipo === 'aviao' ? 'AVIÃO ABATIDO! +200' : '+50', '#ffd257', 800);
+      return true;
+    }
+  }
+  return false;
+}
+function atualizaTiros(dt){
+  if (recarga > 0) recarga -= dt;
+  if (atirando) dispara();
+  for (const b of bombas){
+    b.x += b.vx*dt; b.z += b.vz*dt;
+    if (b.tipo === 'missil'){
+      b.y += b.vy*dt; b.vida -= dt;
+      if (atingeAr(b.x,b.y,b.z,260) || atingeAlvo(b.x,b.z,300)) b.morto = true;
+      if (b.vida <= 0) b.morto = true;
+    } else {
+      b.vy -= dt*1400; b.y += b.vy*dt;
+      if (b.y <= CHAO){ b.morto = true; explode(b.x, CHAO+200, b.z, 2.4); nuclear(b.x, b.z); }
+    }
+    b.no.position.set(b.x, b.y, b.z);
+    b.no.lookAt(b.x + b.vx, b.y + b.vy, b.z + b.vz);
+    b.no.rotateX(Math.PI/2);
+  }
+  bombas = bombas.filter(b => { if (b.morto){ cena.remove(b.no); return false; } return true; });
+  for (const t of tiros){
+    t.x += t.dx*t.v*dt; t.y += t.dy*t.v*dt; t.z += t.dz*t.v*dt; t.vida -= dt;
+    if (atingeAr(t.x,t.y,t.z,320)) t.vida = 0;
+    t.no.position.set(t.x, t.y, t.z);
+    t.no.lookAt(t.x + t.dx, t.y + t.dy, t.z + t.dz);
+    t.no.rotateX(Math.PI/2);
+  }
+  tiros = tiros.filter(t => { if (t.vida <= 0){ cena.remove(t.no); return false; } return true; });
+}
+
+/* --- A QUEDA E O PASSO DO JOGO ------------------------------------------- */
+function derruba(motivo){
+  if (caindo) return;
+  caindo = true; motivoQueda = motivo; vq = 0;
+  explode(aviaoX, aviaoY, aviaoZ, motivo === 'combustivel' ? 0.6 : 1.4);
+  mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL' : 'BATEU!', '#ff8080', 1400);
+}
+function atualizaQueda(dt){
+  giroQueda += dt*3.4;
+  let r = giraPar(eixoD, eixoC, dt*2.6);  eixoD = r[0]; eixoC = r[1];
+  r = giraPar(eixoF, eixoC, -dt*1.1);     eixoF = r[0]; eixoC = r[1];
+  endireitaEixos();
+  vq -= dt*1500;
+  aviaoY += (eixoF.y*voo + vq)*dt;
+  aviaoX += eixoF.x*voo*dt; aviaoZ += eixoF.z*voo*dt;
+  voo *= 0.985; distancia += voo*dt;
+  poeCamera(dt);
+  if (aviaoY <= CHAO + 120){
+    aviaoY = CHAO + 120;
+    if (motivoQueda !== 'acabou'){ explode(aviaoX, aviaoY, aviaoZ, 2.0); motivoQueda = 'acabou'; Motor.desliga(); setTimeout(fim, 900); }
+  }
+}
+
+function atualiza(dt){
+  Motor.ajusta();
+  if (clarao > 0) clarao = Math.max(0, clarao - dt*1.4);
+
+  // faíscas
+  for (const f of faiscas){
+    f.no.position.x += f.vx*dt; f.no.position.y += f.vy*dt; f.no.position.z += f.vz*dt;
+    f.vy -= dt*220; f.vida -= dt*1.2;
+    f.no.material.opacity = Math.max(0, f.vida);
+    f.no.scale.multiplyScalar(1 + dt*0.6);
+  }
+  faiscas = faiscas.filter(f => { if (f.vida <= 0){ cena.remove(f.no); return false; } return true; });
+
+  // cogumelos
+  for (const c of cogumelos){
+    c.t += dt;
+    const sobe = Math.min(1, c.t/2.6);
+    c.col.scale.set(1, sobe, 1); c.col.position.y = CHAO + 2600*sobe;
+    c.chapeu.position.y = CHAO + 900 + sobe*4900;
+    c.chapeu.scale.set(900 + sobe*1500, 500 + sobe*700, 900 + sobe*1500);
+    c.nucleo.visible = c.t < 2.4;
+    if (c.nucleo.visible) c.nucleo.material.opacity = 0.9*(1 - c.t/2.4);
+    const ra = RAIO_NUKE * Math.min(1, c.t/2.0);
+    c.anel.scale.setScalar(ra);
+    c.anel.material.opacity = Math.max(0, 0.9*(1 - c.t/2.4));
+    c.anel.visible = c.t < 2.4;
+    const some = Math.max(0, 1 - Math.max(0, c.t - 7)/4);
+    c.col.material.opacity = some; c.marca.material.opacity = 0.55*some;
+    c.col.material.transparent = c.marca.material.transparent = true;
+    c.no.visible = some > 0;
+  }
+  cogumelos = cogumelos.filter(c => { if (c.t > 12){ cena.remove(c.no); return false; } return true; });
+
+  if (caindo){ atualizaQueda(dt); return; }
+
+  const e = eixos();
+  let rol;
+  if (e.absoluto){
+    const erro = voltaCurta(e.lat*180 - inclinacao) * Math.PI/180;
+    rol = Math.max(-TAXA_ROL, Math.min(TAXA_ROL, erro*3.2));
+  } else rol = e.lat * TAXA_ROL;
+  let r = giraPar(eixoD, eixoC, -rol*dt); eixoD = r[0]; eixoC = r[1];
+
+  let cab = e.ver * TAXA_ARF;
+  if (Math.abs(e.ver) < 0.05 && Math.abs(arfagem) < 0.45 && Math.abs(inclinacao) < 30) cab = -arfagem*0.8;
+  r = giraPar(eixoF, eixoC, cab*dt); eixoF = r[0]; eixoC = r[1];
+
+  leme += ((e.leme || 0) - leme) * Math.min(1, dt*9);
+  if (Math.abs(leme) > 0.002){ r = giraPar(eixoF, eixoD, leme*TAXA_LEME*dt); eixoF = r[0]; eixoD = r[1]; }
+  endireitaEixos();
+
+  aviaoX += eixoF.x*voo*dt; aviaoY += eixoF.y*voo*dt; aviaoZ += eixoF.z*voo*dt;
+
+  const fora = Math.max(Math.abs(aviaoX), Math.abs(aviaoZ));
+  if (fora > MAPA){
+    aviaoX = Math.max(-MAPA, Math.min(MAPA, aviaoX));
+    aviaoZ = Math.max(-MAPA, Math.min(MAPA, aviaoZ));
+    mostraAviso('FIM DO MAPA — DÊ MEIA-VOLTA', '#ffb86b', 900);
+  }
+  if (aviaoY > TETO){ aviaoY = TETO; mostraAviso('AR RAREFEITO', '#9fd8ff', 900); }
+  if (aviaoY < CHAO + 240){
+    if (eixoF.y < -0.30){ derruba('chao'); return; }
+    aviaoY = CHAO + 240; mostraAviso('SUBA!', '#ff8080');
+  }
+
+  if (turbo > 0){ turbo -= dt; if (turbo <= 0){ turbo = 0; mostraAviso('fim do turbo', '#9fd8ff', 900); } }
+  voo += ((turbo > 0 ? VOO_TURBO : VOO_BASE) - voo) * Math.min(1, dt*2.5);
+  if (!infinito) combustivel -= dt * (turbo > 0 ? GASTO_TURBO : GASTO);
+  if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
+
+  distancia += voo*dt;
+  poeCamera(dt);
+  atualizaTiros(dt);
+
+  for (const n of nuvens) if (Math.hypot(n.x-aviaoX, n.z-aviaoZ) > 44000) recolocaNuvem(n, false);
+
+  const RP2 = (RAIO_PEGA*1.25)*(RAIO_PEGA*1.25);
+  for (const t of tambores){
+    if (t.pego) continue;
+    const dx = aviaoX-t.x, dy = aviaoY-t.y, dz = aviaoZ-t.z;
+    if (dx*dx + dy*dy + dz*dz > RP2) continue;
+    t.pego = true; someTambor(t);
+    combustivel = Math.min(100, combustivel + (t.azul ? DA_AZUL : DA_NORMAL));
+    if (t.azul){
+      turbo = TURBO_SEG; clarao = 0.55;
+      mostraAviso('TURBO AZUL!', '#7fd8ff', 1600);
+      solta(t.x, t.y, t.z, 30, 0x7fd8ff, 70, 700);
+      bip(520,0.09,'sine',0.07); setTimeout(()=>bip(1180,0.16,'sine',0.07),140);
+    } else {
+      mostraAviso('+' + DA_NORMAL + '%', '#ffd257', 800);
+      solta(t.x, t.y, t.z, 12, 0xffd257, 55, 420);
+      bip(700,0.07,'sine',0.06);
+    }
+  }
+
+  for (const o of obstaculos){
+    if (!o.vivo) continue;
+    o.fase += dt*2;
+    o.x = o.x0 + Math.sin(o.fase*0.7)*o.deriva;
+    if (o.tipo === 'pombo') o.y = o.y0 + Math.cos(o.fase*1.1)*220;
+    const raio = (o.tipo === 'aviao' ? RAIO_AVIAO : RAIO_POMBO) + 150;
+    const dx = aviaoX-o.x, dy = aviaoY-o.y, dz = aviaoZ-o.z;
+    if (dx*dx + dy*dy + dz*dz < raio*raio){ derruba(o.tipo); return; }
+  }
+  for (const p of predios){
+    if (!p.vivo) continue;
+    if (aviaoY > CHAO + p.h + 120) continue;
+    if (Math.abs(p.z - aviaoZ) < p.d/2 + 260 && Math.abs(p.x - aviaoX) < p.w/2 + 260){ derruba('predio'); return; }
+  }
+}
+
+/* --- põe cada coisa no lugar antes de desenhar --------------------------- */
+function arruma(){
+  let D = eixoD, C = eixoC;
+  if (giroQueda){
+    const c = Math.cos(giroQueda), s = Math.sin(giroQueda);
+    D = { x: eixoD.x*c + eixoC.x*s, y: eixoD.y*c + eixoC.y*s, z: eixoD.z*c + eixoC.z*s };
+    C = { x: eixoC.x*c - eixoD.x*s, y: eixoC.y*c - eixoD.y*s, z: eixoC.z*c - eixoD.z*s };
+  }
+  poeMalha(aviao, aviaoX, aviaoY, aviaoZ, D, C, eixoF);
+  aviao.visible = !cockpit;
+  for (const j of jatos){
+    j.scale.set(1, turbo > 0 ? 2.4 : 0.9, 1);
+    j.position.z = -250 - (turbo > 0 ? 90 : 0);
+    j.material.opacity = turbo > 0 ? 0.6 : 0.22;
+  }
+  for (const o of obstaculos){
+    if (!o.no) continue;
+    o.no.visible = o.vivo;
+    if (!o.vivo) continue;
+    if (o.tipo === 'aviao'){
+      const rr = o.rumo, bal = Math.sin(Date.now()/900 + o.fase)*0.25;
+      const Fr = vnorm({ x: Math.sin(rr), y: Math.sin(bal)*0.1, z: Math.cos(rr) });
+      const Dd = vnorm({ x: Math.cos(rr), y: Math.sin(bal)*0.5, z: -Math.sin(rr) });
+      poeMalha(o.no, o.x, o.y, o.z, Dd, vcruz(Fr, Dd), Fr);
+    } else {
+      o.no.position.set(o.x, o.y, o.z);
+      o.no.rotation.y = o.rumo;
+      if (o.asas){
+        const bate = Math.sin(Date.now()/90 + o.fase)*0.7;
+        o.asas[0].rotation.z = -bate; o.asas[1].rotation.z = bate;
+      }
+    }
+  }
+  for (const a of alvos) if (a.no && a.vivo) a.no.children[3].rotation.z = Date.now()/900;
+  for (const n of nuvens) n.no.position.set(n.x, n.y, n.z);
+}
+
+/* =============================================================================
+   O HUD — desenhado num canvas 2D POR CIMA do 3D
+
+   Texto e linhas finas são o que o 2D faz melhor e mais barato. Então a cena
+   é do three.js e a instrumentação continua sendo canvas, uma camada acima.
+   ========================================================================== */
+const hud = document.getElementById('hud'), h2 = hud.getContext('2d');
+let W=0, H=0, dpr=1;
+function redimensiona(){
+  dpr = Math.min(window.devicePixelRatio || 1, qualidade >= 2 ? 2 : 1);
+  W = Math.floor(window.innerWidth); H = Math.floor(window.innerHeight);
+  rend.setPixelRatio(dpr); rend.setSize(W, H, false);
+  cam.aspect = W/H; cam.updateProjectionMatrix();
+  hud.width = Math.floor(W*dpr); hud.height = Math.floor(H*dpr);
+  h2.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', redimensiona);
+window.addEventListener('orientationchange', () => setTimeout(redimensiona, 250));
+
+function anguloCurto(a){ while (a > Math.PI) a -= 6.283185; while (a < -Math.PI) a += 6.283185; return a; }
+function longe(x,z){ return Math.hypot(x-aviaoX, z-aviaoZ); }
+function maisPerto(lista, filtro){
+  let m = null, d = 1e12;
+  for (const o of lista){
+    if (filtro && !filtro(o)) continue;
+    const q = (o.x-aviaoX)*(o.x-aviaoX) + (o.z-aviaoZ)*(o.z-aviaoZ);
+    if (q < d){ d = q; m = o; }
+  }
+  return m;
+}
+const NOMES_RUMO = ['N','NE','L','SE','S','SO','O','NO'];
+const ABERTURA = 1.05;
+function marcaBussola(cx, meia, y, o, cor, abaixo){
+  if (!o) return;
+  const dl = anguloCurto(Math.atan2(o.x-aviaoX, o.z-aviaoZ) - rumo);
+  const preso = Math.abs(dl) > ABERTURA;
+  const x = cx + Math.max(-1, Math.min(1, dl/ABERTURA))*meia;
+  const t = Math.max(5, meia*0.030);
+  h2.fillStyle = cor; h2.beginPath();
+  if (preso){ const s = dl > 0 ? 1 : -1;
+    h2.moveTo(x + s*t*1.5, y); h2.lineTo(x - s*t*0.3, y - t); h2.lineTo(x - s*t*0.3, y + t);
+  } else { h2.moveTo(x, y + t*1.3); h2.lineTo(x - t, y - t*0.5); h2.lineTo(x + t, y - t*0.5); }
+  h2.closePath(); h2.fill();
+  h2.font = '700 ' + Math.max(9, H*0.019).toFixed(0) + 'px ui-monospace, monospace';
+  h2.textAlign = 'center';
+  h2.fillText(Math.round(longe(o.x,o.z)/METRO) + 'm', x, abaixo ? y + t*3 : y - t*1.4);
+}
+function bussola(y){
+  const meia = Math.min(W*0.27, H*0.55), cx = W/2;
+  h2.save(); h2.textAlign = 'center';
+  h2.fillStyle = 'rgba(9,15,25,.5)';
+  h2.beginPath();
+  if (h2.roundRect) h2.roundRect(cx-meia, y-H*0.028, meia*2, H*0.050, 4);
+  else h2.rect(cx-meia, y-H*0.028, meia*2, H*0.050);
+  h2.fill();
+  h2.strokeStyle = 'rgba(120,255,170,.3)'; h2.lineWidth = 1; h2.stroke();
+  const g = rumo*180/Math.PI, base = Math.round(g/15)*15;
+  for (let k = -6; k <= 6; k++){
+    const abs = base + k*15, dl = anguloCurto((abs - g)*Math.PI/180);
+    if (Math.abs(dl) > ABERTURA) continue;
+    const x = cx + (dl/ABERTURA)*meia, card = ((abs%360)+360)%360, eC = card % 45 === 0;
+    h2.strokeStyle = 'rgba(140,255,190,' + (eC ? '.9' : '.45') + ')';
+    h2.lineWidth = eC ? 2 : 1.2;
+    h2.beginPath(); h2.moveTo(x, y-H*0.026); h2.lineTo(x, y-H*0.026 + (eC?H*0.016:H*0.010)); h2.stroke();
+    if (eC){
+      h2.fillStyle = card % 90 === 0 ? 'rgba(190,255,215,1)' : 'rgba(140,255,190,.75)';
+      h2.font = '800 ' + Math.max(9, H*(card%90===0?0.022:0.018)).toFixed(0) + 'px system-ui, sans-serif';
+      h2.fillText(NOMES_RUMO[card/45], x, y + H*0.006);
+    }
+  }
+  marcaBussola(cx, meia, y + H*0.052, maisPerto(tambores, t => !t.pego), '#ffd257', false);
+  marcaBussola(cx, meia, y + H*0.056, maisPerto(alvos, a => a.vivo), '#ff6a5a', true);
+  h2.fillStyle = 'rgba(230,245,255,.95)';
+  h2.beginPath(); h2.moveTo(cx, y-H*0.030); h2.lineTo(cx-6, y-H*0.044); h2.lineTo(cx+6, y-H*0.044);
+  h2.closePath(); h2.fill();
+  h2.font = '800 ' + Math.max(10, H*0.021).toFixed(0) + 'px ui-monospace, monospace';
+  h2.fillText(((Math.round(g)+360)%360).toString().padStart(3,'0') + '°', cx, y - H*0.050);
+  h2.restore(); h2.textAlign = 'left';
+}
+
+function desenhaHUD(){
+  h2.clearRect(0,0,W,H);
+  if (clarao > 0){
+    h2.fillStyle = 'rgba(255,250,235,' + Math.min(0.92, clarao).toFixed(3) + ')';
+    h2.fillRect(0,0,W,H);
+  }
+  bussola(cockpit ? H*0.16 : H*0.175);
+
+  if (cockpit){
+    // mira do canhão e escada de arfagem, projetadas pelo mesmo three.js
+    const cx = W/2, cy = H/2;
+    h2.strokeStyle = 'rgba(120,255,170,.8)'; h2.lineWidth = 2.2;
+    h2.beginPath();
+    h2.moveTo(cx - W*0.030, cy); h2.lineTo(cx - W*0.010, cy);
+    h2.moveTo(cx + W*0.010, cy); h2.lineTo(cx + W*0.030, cy);
+    h2.moveTo(cx, cy - H*0.026); h2.lineTo(cx, cy - H*0.009);
+    h2.stroke();
+    h2.beginPath(); h2.arc(cx, cy, Math.max(4, H*0.010), 0, 7); h2.stroke();
+    const v = new THREE.Vector3();
+    h2.font = '700 ' + Math.max(8, H*0.019).toFixed(0) + 'px ui-monospace, monospace';
+    h2.fillStyle = 'rgba(120,255,170,.9)';
+    for (let a = -60; a <= 60; a += 10){
+      const ra = a*Math.PI/180, ca = Math.cos(ra), sa = Math.sin(ra);
+      v.set(Math.sin(rumo)*ca, sa, Math.cos(rumo)*ca).add(cam.position).project(cam);
+      if (v.z > 1) continue;
+      const x = (v.x*0.5+0.5)*W, y = (-v.y*0.5+0.5)*H;
+      if (y < H*0.06 || y > H*0.78) continue;
+      const meio = W*0.05, fora = a === 0 ? W*0.17 : W*0.11;
+      h2.setLineDash(a < 0 ? [6,5] : []);
+      h2.lineWidth = a === 0 ? 2.4 : 1.6;
+      h2.beginPath(); h2.moveTo(x-fora, y); h2.lineTo(x-meio, y);
+      h2.moveTo(x+meio, y); h2.lineTo(x+fora, y); h2.stroke();
+      h2.setLineDash([]);
+      if (a !== 0){
+        h2.textAlign='right'; h2.fillText(String(Math.abs(a)), x-fora-5, y+4);
+        h2.textAlign='left';  h2.fillText(String(Math.abs(a)), x+fora+5, y+4);
+      }
+    }
+    h2.textAlign = 'left';
+  }
+
+  if (infinito && jogando){
+    h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
+    h2.textAlign = 'center'; h2.fillStyle = 'rgba(127,216,255,.75)';
+    h2.fillText('TESTE · COMBUSTÍVEL INFINITO  (tecla I desliga)', W/2, H - 8);
+    h2.textAlign = 'left';
+  }
+}
+
+/* --- painel em HTML --- */
+const $ = id => document.getElementById(id);
+function pinta(){
+  $('vDist').textContent = Math.round(distancia/METRO);
+  const pct = Math.max(0, Math.min(100, combustivel));
+  $('barraComb').style.width = pct.toFixed(1) + '%';
+  $('barraComb').style.background = pct < 20 ? '#ff5a5a' : pct < 45 ? '#ffc24d' : '#5eff9a';
+  $('vComb').textContent = Math.round(pct);
+  $('vRec').textContent = Math.round(recorde);
+  $('vArma').textContent = ARMAS[arma].nome;
+  $('vMun').textContent = municao[arma];
+  $('vPontos').textContent = pontos;
+  $('vAlvos').textContent = alvosDestruidos + '/' + alvosTotal;
+}
+
+/* --- o laço --- */
+let ultimoT = 0, sobrando = 0, quadros = 0, tQuadro = 0, fps = 60, ruins = 0;
+const PASSO = 1/60;
+function quadro(t){
+  if (!jogando) return;
+  const dt = Math.min(0.1, (t-ultimoT)/1000 || PASSO);
+  ultimoT = t; sobrando += dt;
+  while (sobrando > PASSO){ atualiza(PASSO); sobrando -= PASSO; }
+  arruma();
+  rend.render(cena, cam);
+  desenhaHUD(); pinta();
+  // se a máquina não estiver dando conta, desliga a sombra sozinha
+  /* Rebaixar o desenho sozinho só depois de uns segundos ruins seguidos: nos
+     primeiros quadros a página ainda está montando textura e geometria, e
+     medir ali dava sempre "lento" mesmo em máquina boa. E nunca desce abaixo
+     do médio sozinho — quem faz isso é o botão. */
+  quadros++;
+  if (t - tQuadro > 2000){
+    fps = quadros/((t - tQuadro)/1000); quadros = 0; tQuadro = t;
+    if (fps < 34 && qualidade === 2){ ruins++; if (ruins >= 2) poeQualidade(1); }
+    else ruins = 0;
+  }
+  requestAnimationFrame(quadro);
+}
+function poeQualidade(q){
+  qualidade = q;
+  rend.shadowMap.enabled = q >= 2;
+  cena.traverse(o => { if (o.isMesh){ o.castShadow = q >= 2 && o.userData.sombra !== false; } });
+  $('btQual').textContent = ['baixo','médio','alto'][q];
+  redimensiona();
+  mostraAviso('desenho: ' + ['baixo','médio','alto'][q], '#9fd8ff', 900);
+}
+
+/* =============================================================================
+   ENTRADA E COMEÇO
+   ========================================================================== */
+document.addEventListener('keydown', e => {
+  if (e.key==='ArrowLeft')  tecla.esq=true;
+  if (e.key==='ArrowRight') tecla.dir=true;
+  if (e.key==='ArrowUp')   { tecla.cima=true;  e.preventDefault(); }
+  if (e.key==='ArrowDown') { tecla.baixo=true; e.preventDefault(); }
+  if (e.key==='a'||e.key==='A') tecla.lemeE=true;
+  if (e.key==='d'||e.key==='D') tecla.lemeD=true;
+  if (e.key==='1') trocaArma('bomba');
+  if (e.key==='2') trocaArma('missil');
+  if (e.key==='3') trocaArma('metralha');
+  if (e.key==='v'||e.key==='V') cockpit = !cockpit;
+  if (e.key==='i'||e.key==='I'){ infinito = !infinito;
+    mostraAviso(infinito ? 'COMBUSTÍVEL INFINITO' : 'combustível normal', '#7fd8ff', 1200); }
+  if (e.key===' '){ atirando = true; e.preventDefault(); }
+  if (e.key==='Enter' && !jogando) comeca();
+});
+document.addEventListener('keyup', e => {
+  if (e.key==='ArrowLeft')  tecla.esq=false;
+  if (e.key==='ArrowRight') tecla.dir=false;
+  if (e.key==='ArrowUp')    tecla.cima=false;
+  if (e.key==='ArrowDown')  tecla.baixo=false;
+  if (e.key==='a'||e.key==='A') tecla.lemeE=false;
+  if (e.key==='d'||e.key==='D') tecla.lemeD=false;
+  if (e.key===' ') atirando = false;
+});
+
+/* dedo na tela: arrastar vira/levanta, tocar atira */
+let toqueIni = null;
+addEventListener('touchstart', e => {
+  if (!jogando) return;
+  usandoToque = Controle.modo !== 'sensor';
+  toqueIni = { x:e.touches[0].clientX, y:e.touches[0].clientY, t:Date.now() };
+}, {passive:true});
+addEventListener('touchmove', e => {
+  if (!toqueIni || !usandoToque) return;
+  toqueX = Math.max(-1, Math.min(1, (e.touches[0].clientX - toqueIni.x)/90));
+  toqueY = Math.max(-1, Math.min(1, (toqueIni.y - e.touches[0].clientY)/90));
+}, {passive:true});
+addEventListener('touchend', () => {
+  if (toqueIni && Date.now() - toqueIni.t < 220){ atirando = true; setTimeout(()=>atirando=false, 130); }
+  toqueIni = null; toqueX = 0; toqueY = 0;
+}, {passive:true});
+
+$('btVisao').onclick = () => { cockpit = !cockpit; };
+$('btQual').onclick = () => poeQualidade((qualidade + 2) % 3);
+
+function reinicia(){
+  aviaoX = 0; aviaoZ = 0; aviaoY = 1500;
+  eixoF = {x:0,y:0,z:1}; eixoC = {x:0,y:1,z:0}; eixoD = {x:1,y:0,z:0};
+  endireitaEixos();
+  camF = {x:0,y:0,z:1}; camC = {x:0,y:1,z:0}; camD = {x:1,y:0,z:0};
+  camPos.set(0, 1710, -CAMD);
+  voo = VOO_BASE; turbo = 0; combustivel = 100; distancia = 0;
+  pontos = 0; alvosDestruidos = 0; venceu = false;
+  arma = 'bomba'; recarga = 0; atirando = false; leme = 0;
+  municao = {}; for (const k in ARMAS) municao[k] = ARMAS[k].municao;
+  caindo = false; giroQueda = 0; vq = 0; clarao = 0; motivoQueda = '';
+  for (const b of bombas) cena.remove(b.no); bombas = [];
+  for (const t of tiros) cena.remove(t.no); tiros = [];
+  for (const f of faiscas) cena.remove(f.no); faiscas = [];
+  for (const c of cogumelos) cena.remove(c.no); cogumelos = [];
+  montaMapa(); montaChao(); montaCidade(); montaTambores(); montaAlvos();
+  montaInimigos(); montaPombos(); montaNuvens();
+  poeCamera(1);
+  Motor.liga();
+}
+function comeca(){
+  reinicia(); jogando = true;
+  $('capa').style.display = 'none';
+  redimensiona();
+  ultimoT = performance.now(); sobrando = 0; tQuadro = ultimoT; quadros = 0;
+  requestAnimationFrame(quadro);
+}
+function fim(){
+  jogando = false;
+  const m = Math.round(distancia/METRO);
+  if (m > recorde){ recorde = m; try{ localStorage.setItem('aviao.recorde', String(m)); }catch(e){} }
+  const t = venceu ? 'Missão cumprida! Todos os alvos no chão.'
+          : motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível'
+          : motivoQueda === 'predio' ? 'Bateu num prédio'
+          : motivoQueda === 'chao' ? 'Mergulhou no chão'
+          : motivoQueda === 'nuclear' ? 'Largou a nuclear voando baixo demais' : 'O avião caiu';
+  document.querySelector('#capa h1').textContent = t;
+  const p = $('placar');
+  p.style.display = 'block';
+  p.innerHTML = 'Distância voada: <span>' + m + ' m</span><br>' +
+                'Alvos destruídos: <span>' + alvosDestruidos + ' de ' + alvosTotal + '</span><br>' +
+                'Pontos: <span>' + pontos + '</span><br>Recorde: <span>' + recorde + ' m</span>';
+  $('btSensor').textContent = 'Voar de novo';
+  $('btSensor').onclick = () => { p.style.display='none'; if (Controle.modo === 'sensor') Controle.calibrar(); comeca(); };
+  $('capa').style.display = 'flex';
+}
+
+function erro(msg){ const e = $('erro'); e.textContent = msg; e.style.display = 'block'; }
+function ligaAudio(){
+  try { audio = new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch(e){}
+}
+function telaCheia(){
+  try{
+    const el = document.documentElement;
+    const p = (el.requestFullscreen || el.webkitRequestFullscreen || (()=>{})).call(el);
+    if (p && p.then) p.then(() => {
+      try { const t = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape');
+            if (t && t.catch) t.catch(()=>{}); } catch(e){}
+    }).catch(()=>{});
+  }catch(e){}
+}
+$('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque = true; telaCheia(); comeca(); };
+$('btSensor').onclick = async () => {
+  ligaAudio();
+  try { await Controle.ligarSensor(); telaCheia(); comeca(); }
+  catch(e){ erro(e.message + ' Dá para jogar com o dedo ou com o teclado.'); }
+};
+Controle.escutar();
+
+/* desenha uma primeira imagem parada atrás da capa, para não abrir preto */
+montaMapa(); montaChao(); montaCidade(); montaTambores(); montaAlvos();
+montaInimigos(); montaPombos(); montaNuvens();
+aviaoY = 2200; poeCamera(1); arruma(); redimensiona();
+rend.render(cena, cam);
+</script>
+</body>
+</html>
