@@ -1650,3 +1650,100 @@ Corrida nenhuma se ganha andando mais depressa: o que resolve é **tirar o
 segundo corredor**. Os dois lados já se anunciam sozinhos, então o relógio foi
 para 15 s — tempo de sobra para o primeiro pacote de qualquer um. Quem chega
 depois disso é mesmo alguém que abriu a ligação e não falou.
+
+---
+
+## Duas portas no mesmo QR
+
+> *"Quando alguém ler o QR code, a pessoa tem que poder escolher entre ser
+> copiloto ou enfrentar a batalha aérea também."*
+
+Até aqui o QR só tinha um destino: `controle.html`, e quem lia virava
+**tripulante da mesma cabine** — copiloto, artilheiro, torre. Era o desenho
+antigo, de quando o jogo era uma TV com celulares em volta. Com a batalha
+aérea existindo, a mesma etiqueta passou a servir duas vontades diferentes:
+
+- o irmão que quer **sentar do lado** e dividir este avião;
+- o outro que quer **o avião dele** no céu, para brigar.
+
+### Por que a escolha mora no controle, e não no QR
+
+A tentação era fazer dois QR. Mas duas etiquetas na tela é uma decisão a mais
+para quem está *olhando de longe*, e nessa hora ninguém lê legenda — aponta a
+câmera e pronto.
+
+Então o QR continua um só, e a escolha acontece **depois de ler**, no celular,
+onde a pessoa já está com o aparelho na mão e o código já veio preenchido:
+
+```
+Código da tela de quem chamou
+          ┌──────┐
+          │ 73YB │
+          └──────┘
+   [ Ser copiloto desta tela ]     ← comanda o avião que já está na tela
+   [ Levar o meu avião · batalha ] ← abre o jogo aqui, avião só seu
+```
+
+O mesmo código serve aos dois caminhos sem mudar nada: para o copiloto é a
+**sala** onde ele entra; para o avião é o **código da batalha**.
+
+O segundo botão não conecta nada — `controle.html` é o controle, ele não voa.
+Ele **troca de página**: vai para `aviao3d.html?batalha=73YB`, que abre a sala
+própria do celular e entra sozinho no céu de quem chamou, sem ninguém digitar
+código de novo.
+
+### E a sala própria continua aberta
+
+Quem chegou com avião próprio também tem um código e um QR — então um terceiro
+celular pode sentar de copiloto **no avião dele**. Uma coisa não atrapalha a
+outra: tripulação e batalha são duas listas separadas, e a mesma ligação de
+rede serve às duas.
+
+### Dois monitores, um celular em cada
+
+A pergunta que veio junto: *o outro jogador também tem monitor — como ele
+controla pelo celular dele?* Não tem truque: **cada tela tem a sua sala**. O B
+liga o celular dele na sala dele e digita o código do A na caixa da batalha.
+Medido com quatro páginas de navegador ao mesmo tempo:
+
+```
+tela A = sala 5NAU | tela B = sala 6J2F
+cada tela com o seu piloto de celular ................. ✔
+na batalha: A anfitriã vê 2 | B convidado vê 2 ........ ✔
+nenhum celular foi derrubado pela batalha ............. ✔
+girei o CELULAR de B a 45°: a asa de B girou .......... ✔
+o avião de A não se mexeu junto ....................... ✔
+```
+
+E o caminho novo, ponta a ponta:
+
+```
+o QR aponta para .................. controle.html?sala=73YB
+o celular abriu com o código já digitado e duas portas . ✔
+escolheu COPILOTO: senta na mesma cabine ............... ✔
+escolheu MEU AVIÃO: foi para aviao3d.html?batalha=73YB . ✔
+   abriu sala própria 3CVK e entrou sem digitar nada ... ✔
+o copiloto continuou, e o segundo virou adversário ..... ✔
+a tela vê o avião dele no céu, na posição certa ........ ✔
+```
+
+### Um bug velho que a segunda porta destampou
+
+Com mais um botão, o título da tela de entrada **sumiu** num celular de 375 de
+altura — e não dava para rolar até ele.
+
+É uma armadilha antiga do flexbox: `justify-content:center` junto com
+`overflow:auto` faz o conteúdo que não cabe sobrar para os **dois** lados, e o
+que sobra para cima fica *acima do zero da rolagem* — cortado e inalcançável.
+A palavra `safe` desliga a centralização exatamente nesse caso e encosta o
+conteúdo no topo, que é de onde a rolagem começa. Uma palavra:
+
+```css
+justify-content: center;        /* para quem não conhece `safe` */
+justify-content: safe center;   /* para quem conhece */
+```
+
+**O que eu não consigo garantir daqui:** se ler o QR num iPhone abre o
+`controle.html` no Safari ou dentro do app da câmera — se abrir numa janelinha
+embutida, o pulo para o `aviao3d.html` pode perder a tela cheia. Isso só um
+iPhone de verdade responde.

@@ -262,7 +262,7 @@
 <div id="aviso"></div>
 <div id="convite" title="outro celular pode entrar a qualquer momento">
   <canvas id="qrJogo" width="180" height="180"></canvas>
-  <div class="txt2">entre também<b id="codigo2">····</b></div>
+  <div class="txt2">copiloto ou batalha<b id="codigo2">····</b></div>
 </div>
 <button class="bt" id="btVisao" title="cabine / de fora (V)">&#128065;</button>
 <button class="bt" id="btQual" title="qualidade do desenho">alto</button>
@@ -286,6 +286,9 @@
           <div class="cod" id="codigo">····</div>
           <p class="txt" style="text-align:left;font-size:13px">Aponte a câmera do celular no QR,
              ou abra <b id="url">…</b> e digite o código.</p>
+          <p class="txt" style="text-align:left;font-size:12.5px;color:#7d8cab;margin-top:6px">
+             Quem entrar escolhe: <b>copiloto desta tela</b> (comanda este avião)
+             ou <b>o avião dele</b> no mesmo céu, para a batalha.</p>
         </div>
       </div>
     </div>
@@ -10373,6 +10376,10 @@ function opcoesPeer(){
   const [host, porta] = sv.split(':');
   return { host, port: parseInt(porta || '9000', 10), path: '/sinal', secure: location.protocol === 'https:', debug: 0 };
 }
+/* ?batalha=ABCD — quem leu o QR de outra tela e pediu avião próprio */
+const batalhaPedida = (new URLSearchParams(location.search).get('batalha') || '')
+                        .toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4) || null;
+
 function urlDoControle(){
   const u = new URL(location.href);
   u.pathname = u.pathname.replace(/[^/]*$/, 'controle.html');
@@ -10844,6 +10851,14 @@ function abrirSala(){
       return;
     }
     estadoSala('meio', 'esperando o celular…');
+    /* CHEGOU PELO QR DE ALGUÉM, escolhendo "levar o meu avião": o código vem
+       no endereço e a entrada na batalha é automática. A sala PRÓPRIA desta
+       tela continua aberta do mesmo jeito — é por ela que um segundo celular
+       senta de copiloto neste avião aqui. Uma coisa não atrapalha a outra. */
+    if (batalhaPedida && batalhaPedida !== codigo){
+      const cx = $('codBatalha'); if (cx) cx.value = batalhaPedida;
+      Batalha.entra(batalhaPedida);
+    }
   });
   /* Uma conexão que chega pode ser um CELULAR (controle) ou outro JOGADOR
      (batalha). Não dá para saber pelo `connection` — dá para saber pela

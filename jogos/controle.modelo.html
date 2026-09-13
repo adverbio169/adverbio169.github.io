@@ -9,9 +9,17 @@
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;overflow:hidden;background:#0b1020;color:#e6edf9;
             font-family:system-ui,"Segoe UI",Arial,sans-serif;overscroll-behavior:none;touch-action:none}
-  .tela{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  /* `justify-content:center` com `overflow:auto` tem uma armadilha velha: quando
+     o conteúdo passa da altura, ele sobra para os DOIS lados e o começo fica
+     acima do zero da rolagem — cortado e inalcançável. O `safe` desliga a
+     centralização justamente nesse caso e encosta o conteúdo no topo, que é
+     onde dá para chegar rolando. Apareceu quando a tela de entrada ganhou a
+     segunda porta e o título sumiu num celular de 375 de altura. */
+  .tela{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+        justify-content:center;justify-content:safe center;
         padding:calc(12px + env(safe-area-inset-top)) 22px calc(12px + env(safe-area-inset-bottom));gap:12px;overflow:auto}
-  @media (max-height:480px){ .tela{gap:8px} #dica{display:none} .placar .val{font-size:18px} }
+  @media (max-height:480px){ .tela{gap:8px} #dica{display:none} .placar .val{font-size:18px}
+                             #telaCodigo h1{font-size:19px} #telaCodigo .porta{font-size:11.5px;margin:-4px 0 4px} }
   .selo{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;color:#5cc8ff;font-weight:800}
   h1{font-size:24px;font-weight:800;line-height:1.15;text-align:center}
   p.txt{font-size:14px;color:#aebbd4;line-height:1.5;text-align:center;max-width:36ch}
@@ -268,12 +276,17 @@ body.paisagem #controle.ver,
 <!-- ============ TELA 1: entrar na sala ============ -->
 <div class="tela" id="telaCodigo">
   <div class="selo">Controle &middot; avião</div>
-  <h1>Digite o código que está na TV</h1>
+  <h1>Código da tela de quem chamou</h1>
   <input id="codigo" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD" inputmode="text">
   <div id="erro"></div>
   <div class="estado" id="estadoSensor"><span class="luz"></span><span id="estadoSensorTxt">verificando o sensor&hellip;</span></div>
-  <button class="bt pri" id="btConectar">Conectar</button>
-  <p class="txt">Abra <b>tv.html</b> no monitor ou na TV: o código aparece lá, grande.</p>
+  <!-- AS DUAS PORTAS. Quem lê o QR não quer sempre a mesma coisa: às vezes é
+       o irmão sentando de copiloto na mesma cabine, às vezes é o outro que
+       quer o avião DELE no céu para brigar. Antes só havia a primeira. -->
+  <button class="bt pri" id="btConectar">Ser copiloto desta tela</button>
+  <p class="txt porta">este celular comanda o avião que já está na tela</p>
+  <button class="bt sec" id="btMeuAviao">Levar o meu avião &middot; batalha</button>
+  <p class="txt porta">abre o jogo aqui, com um avião só seu, no mesmo céu</p>
 </div>
 
 <!-- ============ TELA 2: o controle ============ -->
@@ -829,6 +842,26 @@ $('btComecar').onclick  = () => { if (conn && conn.open) conn.send({ t: 'botao',
 // código vindo pelo endereço (?sala=ABCD), por exemplo lendo o QR da TV
 const salaUrl = new URLSearchParams(location.search).get('sala');
 if (salaUrl){ elCodigo.value = salaUrl.toUpperCase().slice(0, 4); }
+
+/* --- A SEGUNDA PORTA: levar o próprio avião ---------------------------------
+   Este arquivo é o CONTROLE: ele não voa nada, ele manda comandos para uma
+   tela que voa. Então "quero o meu avião" não é coisa que se resolva aqui —
+   é uma página diferente. O botão leva para o jogo 3D com `?batalha=ABCD`,
+   que abre a sala própria do celular e já entra no céu de quem chamou.
+
+   O código do QR serve para os dois caminhos sem mudar nada: para o copiloto
+   é a sala onde ele entra, para o avião é o código da batalha. */
+$('btMeuAviao').onclick = () => {
+  const cod = elCodigo.value.trim().toUpperCase();
+  if (cod.length !== 4){ erro('O código tem 4 letras — está escrito na tela de quem chamou.'); return; }
+  const u = new URL(location.href);
+  u.pathname = u.pathname.replace(/[^/]*$/, 'aviao3d.html');
+  const sv = new URLSearchParams(location.search).get('servidor');
+  u.search = ''; u.hash = '';
+  if (sv) u.searchParams.set('servidor', sv);
+  u.searchParams.set('batalha', cod);
+  location.href = u.href;
+};
 
 /* --- referência do controle ------------------------------------------------
    Com o cálculo novo não é mais preciso adivinhar se o aparelho está em pé ou
