@@ -775,7 +775,8 @@ const Tripulacao = {
     this.membros.push(m);
     c.on('open', () => { this.avisaPapel(m); this.mostra(); mandaEstado(); });
     c.on('close', () => this.sai(c));
-    c.on('error', () => this.sai(c));
+    // erro solto não é despedida: quem sai, sai pelo 'close' ou pelo silêncio
+    c.on('error', () => {});
     c.on('data', d => this.recebe(m, d));
     if (c.open){ this.avisaPapel(m); this.mostra(); mandaEstado(); }
     // o Canal continua existindo para o Chromecast e para o jogador sozinho
@@ -822,7 +823,10 @@ const Tripulacao = {
     trataMensagem(d);
   },
 
-  envia(o){ for (const m of this.membros){ try { m.c.send(o); } catch(e){} } },
+  /* Só manda para quem JÁ abriu. Mandar antes disso faz o PeerJS soltar um
+     erro "not-open-yet" — e como o erro derrubava o membro, o celular que
+     acabava de chegar era expulso pelo aviso de estado que sai a cada 250 ms. */
+  envia(o){ for (const m of this.membros){ if (!m.c || !m.c.open) continue; try { m.c.send(o); } catch(e){} } },
 
   /* Fechar a aba do celular NÃO avisa a tela: o PeerJS não manda nada. Então
      quem sumiu é descoberto pelo silêncio — sem isto o artilheiro nunca

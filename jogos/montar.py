@@ -66,7 +66,9 @@ tres_cam = os.path.join(AQUI, 'three.min.js')
 if os.path.exists(tres_cam):
     tres = open(tres_cam, encoding='utf-8').read()
     t3 = open('aviao3d.modelo.html', encoding='utf-8').read()
-    t3 = t3.replace('<script>/* THREE */</script>', '<script>' + seguro(tres) + '</script>')
+    t3 = (t3.replace('<script>/* THREE */</script>', '<script>' + seguro(tres) + '</script>')
+            .replace('__PEERJS__', seguro(peer))
+            .replace('__QRCODE__', seguro(qr)))
     open('aviao3d.html', 'w', encoding='utf-8').write(t3)
     print('aviao3d.html: %d KB   (three.js embutido: %d KB)' % (len(t3)//1024, len(tres)//1024))
 else:

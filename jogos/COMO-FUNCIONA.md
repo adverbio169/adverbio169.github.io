@@ -617,3 +617,24 @@ Três erros que custaram tempo, anotados para não repetir:
 O que **ainda não está** na versão 3D: o controle pelo celular em rede (sala,
 QR, copiloto). Isso continua só em `aviao.html` / `aviao-tv.html` até a versão
 3D provar que roda bem na TV.
+
+### O celular controlando a versão 3D
+
+Não foi preciso escrever controle nenhum: o `controle.html` que já existia
+**conecta na página 3D sem uma linha de mudança**, porque as duas falam o mesmo
+protocolo e usam o mesmo prefixo de sala. O que a versão 3D ganhou foi só o
+lado que escuta — abrir a sala, desenhar o QR e repartir os postos.
+
+Um defeito que só apareceu com dois celulares, e que estava **também** nas
+versões 2D sem ninguém ter notado:
+
+> O aviso de estado sai a cada 250 ms para todo mundo. Quando um celular novo
+> entrava, esse aviso o alcançava **antes de a conexão terminar de abrir** — o
+> PeerJS soltava um erro `not-open-yet`, e como o meu tratador de erro
+> expulsava o membro, o recém-chegado era posto para fora no mesmo segundo em
+> que entrava.
+
+O sintoma enganava: o celular mostrava "ARTILHEIRO" e a torre até respondia
+(porque o tratador de dados continuava preso na conexão), mas a tela dizia que
+só havia um jogador. A correção são duas linhas: só mandar para quem já abriu,
+e **erro solto não é despedida** — quem sai, sai pelo `close` ou pelo silêncio.
