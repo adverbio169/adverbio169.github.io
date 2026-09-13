@@ -1,0 +1,26 @@
+CÓDIGO DE FORA, GUARDADO AQUI DE PROPÓSITO
+==========================================
+
+pico.js        5,6 KB   detector de rostos em JavaScript puro
+facefinder     234 KB   a cascata treinada que ele lê
+
+Autor: Nenad Markuš — https://github.com/nenadmarkus/picojs
+Licença: MIT (o aviso está na primeira linha do pico.js e vale para os dois
+         arquivos; a cascata vem de github.com/nenadmarkus/pico).
+
+POR QUE ESTÁ AQUI DENTRO E NÃO NUMA CDN
+---------------------------------------
+Os jogos abrem offline e não dependem de nenhum servidor além do GitHub Pages
+que serve esta pasta. Buscar o detector numa CDN quebraria isso e ainda
+contaria para alguém de fora quem está jogando. Trezentos e poucos KB no
+repositório é um preço menor.
+
+POR QUE ESTE DETECTOR E NÃO O FaceMesh / MediaPipe
+--------------------------------------------------
+O FaceMesh do MediaPipe pede 9 MB de WebAssembly mais 3,7 MB de modelo, e
+devolve 478 pontos do rosto. Para virar a câmera do avião não é preciso saber
+onde está o canto do lábio: basta saber ONDE a cabeça está e QUANTO ela ocupa
+da imagem. Isso é o que este detector de 240 KB faz, em 8 milissegundos, sem
+rede neural nenhuma.
+
+Quem usa: jogos/rosto.html

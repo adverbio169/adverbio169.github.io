@@ -3175,3 +3175,98 @@ a asa larga: bancos de 30°, 30°, -30°, -30°, -30°, -30°   ✔ tomba
    sempre para o mesmo lado durante um mesmo tombo         ✔
    com o manche: 12° contra 30° de mão solta               ✔ dá para corrigir
 ```
+
+---
+
+## Olhar com a cabeça — a prova antes do avião
+
+> *"Vi um vídeo sobre FaceMesh, dá para colocar no nosso jogo?"* — e depois,
+> quando perguntei quem estaria com a cara na frente da câmera: *"eu tava
+> pensando em usar isso só no notebook, que tem a câmera nativa."*
+
+Essa segunda frase é que fez a coisa existir. **No celular não dá**: o telefone
+é o *manche*, está na mão sendo torcido, e a câmera dele aponta para o teto. Só
+faz sentido na montagem em que o monitor é a tela e o celular é o controle — ali
+as mãos estão ocupadas e a cabeça está livre, olhando para a webcam.
+
+### O FaceMesh não entrou, e o motivo é o preço
+
+Medido, baixando as peças:
+
+```
+MediaPipe tasks-vision (wasm)   9,0 MB
+modelo face_landmarker          3,7 MB      478 pontos do rosto
+                               ~13 MB
+```
+
+Treze megabytes não cabem no jeito que o jogo é montado — o `montar.py` costura
+tudo num arquivo só, que abre offline. E, principalmente: **não precisa**. Os 478
+pontos servem para ler expressão. Para virar a câmera de um avião basta saber
+*onde* a cabeça está e *quanto* ela ocupa da imagem.
+
+Isso é achar um retângulo, e um detector de 1998 faz isso com o custo de nada:
+
+```
+pico.js       5,6 KB    (MIT, Nenad Markuš)
+facefinder     234 KB   a cascata treinada
+              ~240 KB   — cinquenta vezes menor
+```
+
+### Posição, não rotação
+
+Ler para que lado o rosto está *virado* é o caro. Ler para onde a cabeça *andou*
+é o barato — e, para pilotar, dá no mesmo: quando você olha para a esquerda, você
+também leva a cabeça para a esquerda. O corpo faz isso sozinho. Basta amplificar
+(aqui, 150° de olhar por unidade de cabeça andada).
+
+### O centro não é o centro da imagem
+
+Ninguém senta exatamente na frente da webcam. Então o repouso é **aprendido**: uma
+média muito lenta de onde a sua cabeça costuma estar. Fique dois minutos olhando
+para a esquerda e ela vira o seu novo "reto" — é o que fazem os rastreadores de
+cabeça de verdade, e é por isso que existe o botão de recalibrar.
+
+### Quinze vezes por segundo, não sessenta
+
+Uma busca custa de 8 a 12 ms. Um quadro de jogo a 60 por segundo tem 16,7 ms
+*no total*. Procurar rosto a cada quadro comeria metade do orçamento do jogo.
+
+E não precisa: cabeça humana não muda de lugar 60 vezes por segundo. A busca
+acontece **15 vezes por segundo** e o alisamento roda todo quadro — mesmo
+princípio da posição dos outros aviões na batalha, que chega 20 vezes por segundo
+e é desenhada 60.
+
+### A câmera é assunto sério neste site
+
+Este é o site oficial da Comissão. Então: botão explícito, desligado por padrão,
+dito na tela que **a imagem não sai do aparelho** (e não sai — a conta inteira
+acontece dentro da página), e o botão de desligar solta a câmera na hora.
+
+### O que foi medido
+
+Com seis fotos de rosto de verdade, passando pelo mesmo caminho da página:
+
+```
+sample1: rosto achado, confiança 139 ·  8,0 ms por leitura   ✔
+sample2: rosto achado, confiança 129 ·  8,0 ms               ✔
+sample3: rosto achado, confiança 171 · 12,5 ms               ✔
+sample4: rosto achado, confiança  32 ·  9,3 ms               ✔
+sample5: rosto achado, confiança  73 ·  9,9 ms               ✔
+sample6: rosto achado, confiança 462 · 13,7 ms               ✔
+```
+
+E com a câmera de mentira do navegador, que não tem rosto nenhum:
+
+```
+a câmera abriu (640 px)                        ✔
+não inventou rosto onde não tem                ✔
+o olhar ficou parado no zero                   ✔
+ao desligar, a câmera é solta                  ✔
+```
+
+*(A primeira rodada não achou nenhum dos seis rostos. O detector estava certo e
+eu estava errado: eu só procurava rostos maiores que 28% da altura da imagem —
+tamanho de quem está sentado na frente do notebook — e as fotos de teste eram
+cenas largas, com rostos pequenos. O piso caiu para 16% e todos apareceram.)*
+
+Isto é `jogos/rosto.html`, uma página solta: ainda **não** encosta no avião.

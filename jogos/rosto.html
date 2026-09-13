@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>Olhar com a cabeça &middot; teste</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#0b1020;color:#e6edf9;font-family:system-ui,"Segoe UI",Arial,sans-serif;
+            min-height:100%}
+  body{padding:22px 18px 40px;display:flex;flex-direction:column;align-items:center;gap:14px}
+  .selo{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;color:#5cc8ff;font-weight:800}
+  h1{font-size:23px;font-weight:800;text-align:center;line-height:1.2}
+  p.txt{font-size:14px;color:#aebbd4;line-height:1.55;text-align:center;max-width:52ch}
+  p.txt b{color:#e6edf9}
+  .aviso{max-width:52ch;background:rgba(94,255,154,.07);border:1px solid rgba(94,255,154,.28);
+         border-radius:12px;padding:11px 14px;font-size:13px;color:#bfe9cf;line-height:1.55;text-align:center}
+  button.bt{border:0;border-radius:12px;padding:14px 20px;font-size:15px;font-weight:800;
+            font-family:inherit;cursor:pointer}
+  .bt.pri{background:#2d7dff;color:#fff}
+  .bt.sec{background:rgba(255,255,255,.09);color:#dce5f5;border:1px solid rgba(255,255,255,.16);font-weight:700}
+  .bt:disabled{opacity:.45;cursor:default}
+  .linha{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+
+  #palco{position:relative;width:100%;max-width:480px;aspect-ratio:4/3;border-radius:14px;
+         overflow:hidden;background:#05070f;border:1px solid rgba(255,255,255,.14);display:none}
+  #palco.ver{display:block}
+  #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+  #marca{position:absolute;inset:0;width:100%;height:100%}
+
+  /* --- a régua: o que a cabeça está mandando --- */
+  #painel{width:100%;max-width:480px;display:none;flex-direction:column;gap:9px}
+  #painel.ver{display:flex}
+  .medida{display:flex;align-items:center;gap:10px;font-size:12.5px;color:#9fb1cf}
+  .medida .nome{width:88px;flex:0 0 88px;font-weight:700;letter-spacing:.4px}
+  .medida .trilho{flex:1;height:12px;border-radius:7px;background:rgba(255,255,255,.07);
+                  position:relative;overflow:hidden}
+  .medida .meio{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.22)}
+  .medida .bola{position:absolute;top:1px;width:10px;height:10px;border-radius:50%;background:#5cc8ff;
+                left:50%;margin-left:-5px;transition:left .05s linear}
+  .medida .val{width:62px;flex:0 0 62px;text-align:right;font:700 12px/1 ui-monospace,Menlo,monospace;color:#dce5f5}
+  .estado{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#9fb1cf;
+          border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px 12px;width:100%;max-width:480px}
+  .estado .luz{width:9px;height:9px;border-radius:50%;background:#6b7a95;flex:0 0 9px}
+  .estado.ok{color:#a9ecc4;border-color:rgba(94,255,154,.3)} .estado.ok .luz{background:#5eff9a;box-shadow:0 0 9px #5eff9a}
+  .estado.nao{color:#ffc9c9;border-color:rgba(255,90,90,.3)} .estado.nao .luz{background:#ff6a6a}
+  .estado.meio{color:#ffe1a8;border-color:rgba(255,194,77,.35)} .estado.meio .luz{background:#ffc24d}
+
+  /* --- a prova: uma janela de cabine que anda com a cabeça --- */
+  #cabine{width:100%;max-width:480px;height:150px;border-radius:14px;overflow:hidden;
+          border:1px solid rgba(255,255,255,.14);display:none;position:relative;background:#0e2136}
+  #cabine.ver{display:block}
+  #ceu{width:100%;height:100%}
+  .nota{font-size:11.5px;color:#7b8cab;max-width:52ch;text-align:center;line-height:1.5}
+  a{color:#5cc8ff}
+</style>
+</head>
+<body>
+
+<div class="selo">Teste &middot; jogos da Comissão</div>
+<h1>Olhar com a cabeça</h1>
+<p class="txt">Isto é só uma <b>prova</b>, antes de encostar no avião. A câmera do notebook
+acha o seu rosto e transforma o movimento da sua cabeça em <b>para onde você está
+olhando</b> — como o TrackIR dos simuladores de voo. Mexa a cabeça devagar para os lados
+e veja a janela lá embaixo acompanhar.</p>
+
+<div class="aviso">A imagem <b>não sai deste aparelho</b>: nada é enviado, nada é gravado.
+A conta acontece dentro da própria página, e some quando você fecha a aba.
+Fechar a página ou apertar <b>desligar</b> apaga a câmera na hora.</div>
+
+<div class="linha">
+  <button class="bt pri" id="btLigar">Ligar a câmera</button>
+  <button class="bt sec" id="btCentro" disabled>Estou centrado (recalibrar)</button>
+  <button class="bt sec" id="btParar" disabled>Desligar</button>
+</div>
+
+<div class="estado" id="estado"><span class="luz"></span><span id="txtEstado">câmera desligada</span></div>
+
+<div id="palco"><video id="video" playsinline muted></video><canvas id="marca"></canvas></div>
+
+<div id="painel">
+  <div class="medida"><span class="nome">OLHAR ↔</span>
+    <span class="trilho"><i class="meio"></i><i class="bola" id="bX"></i></span>
+    <span class="val" id="vX">0°</span></div>
+  <div class="medida"><span class="nome">OLHAR ↕</span>
+    <span class="trilho"><i class="meio"></i><i class="bola" id="bY"></i></span>
+    <span class="val" id="vY">0°</span></div>
+  <div class="medida"><span class="nome">CHEGAR</span>
+    <span class="trilho"><i class="meio"></i><i class="bola" id="bZ"></i></span>
+    <span class="val" id="vZ">0%</span></div>
+  <div class="medida"><span class="nome">CUSTO</span>
+    <span class="trilho"><i class="meio"></i><i class="bola" id="bF"></i></span>
+    <span class="val" id="vF">— ms</span></div>
+</div>
+
+<div id="cabine"><canvas id="ceu"></canvas></div>
+
+<p class="nota">O detector é o <b>pico.js</b> (MIT, de Nenad Markuš): 5 KB de código e uma
+cascata de 234 KB — nada de rede neural de 9 MB. Ele acha <i>onde</i> está a cabeça e
+<i>quanto</i> ela ocupa da imagem; o resto é conta nossa.</p>
+
+<script src="vendor/pico.js"></script>
+<script>
+/* ============================================================================
+   OLHAR COM A CABEÇA — a prova
+
+   O QUE ISTO FAZ, EM UMA LINHA: acha o rosto na imagem da webcam, compara com
+   onde ele costuma ficar, e transforma a diferença em ângulo de olhar.
+
+   POR QUE POSIÇÃO E NÃO ROTAÇÃO DA CABEÇA. Ler para que lado o rosto está
+   VIRADO exige malha de rosto — 478 pontos, 13 MB de modelo, uma rede neural
+   rodando 30 vezes por segundo em cima de um jogo 3D. Ler para onde a cabeça
+   se MOVEU exige achar um retângulo, e isso um detector de 1998 faz com o
+   custo de nada. E, para pilotar, é a mesma coisa: quando você olha para a
+   esquerda, você TAMBÉM leva a cabeça para a esquerda. O corpo faz isso
+   sozinho. Basta amplificar.
+
+   O CENTRO NÃO É O CENTRO DA IMAGEM. Ninguém senta exatamente na frente da
+   webcam, e a altura da tela muda tudo. Então o repouso é aprendido: uma média
+   bem lenta de onde a sua cabeça anda. Se você ficar dois minutos olhando para
+   a esquerda, ela vira o seu novo "reto" — é o mesmo que fazem os rastreadores
+   de cabeça de verdade, e é por isso que existe o botão de recalibrar.
+   ========================================================================= */
+
+/* --- os números que dão a "sensação". Todos foram para cá em vez de ficarem
+   espalhados: é aqui que se mexe quando o controle parecer duro ou solto. --- */
+const AMPLIA_X = 150;    // graus de olhar por unidade de cabeça andada
+const AMPLIA_Y = 105;
+const ZONA     = 0.035;  // folga no meio: sem isso o olhar nunca fica parado
+const MACIO    = 0.22;   // quanto do alvo se anda por leitura (alisa o tranco)
+const CADENCIA = 66;     // milissegundos entre duas buscas (uns 15 por segundo)
+const APRENDE  = 0.004;  // velocidade com que o repouso aprende a sua posição
+const LARGURA  = 240;    // a imagem é reduzida para isto antes de procurar
+const ROSTO_MIN = 0.16;  // menor rosto procurado, em fração da altura da imagem
+const CONFIA   = 22;     // abaixo disto é mancha de parede, não cabeça
+
+const $ = id => document.getElementById(id);
+const video = $('video'), marca = $('marca'), ceu = $('ceu');
+let fluxo = null, classifica = null, rodando = false;
+let trabalho = null, ctxT = null;          // a telinha cinza onde a busca acontece
+let memoria = null;                        // as últimas 5 leituras, para não piscar
+let repouso = null;                        // onde a sua cabeça costuma ficar
+let olhar = { x:0, y:0, z:0 };             // o resultado, já alisado
+let cru = null, custo = 0, achou = false, desde = 0, leituras = 0;
+
+/* --- a cascata: 234 KB de árvores de decisão, lidas uma vez --------------- */
+async function carregaCascata(){
+  const r = await fetch('vendor/facefinder');
+  if (!r.ok) throw new Error('não achei vendor/facefinder');
+  classifica = pico.unpack_cascade(new Int8Array(await r.arrayBuffer()));
+  memoria = pico.instantiate_detection_memory(5);
+}
+
+function diz(txt, classe){
+  $('txtEstado').textContent = txt;
+  $('estado').className = 'estado' + (classe ? ' ' + classe : '');
+}
+
+/* --- ligar a câmera ------------------------------------------------------- */
+async function liga(){
+  $('btLigar').disabled = true;
+  try{
+    diz('carregando o detector…', 'meio');
+    if (!classifica) await carregaCascata();
+    diz('pedindo a câmera…', 'meio');
+    fluxo = await navigator.mediaDevices.getUserMedia({
+      video: { width:{ideal:640}, height:{ideal:480}, facingMode:'user' }, audio:false });
+    video.srcObject = fluxo;
+    await video.play();
+    prepara();
+    $('palco').classList.add('ver'); $('painel').classList.add('ver'); $('cabine').classList.add('ver');
+    $('btParar').disabled = false; $('btCentro').disabled = false;
+    rodando = true; desde = performance.now();
+    diz('procurando o seu rosto…', 'meio');
+    requestAnimationFrame(passo);
+  }catch(e){
+    $('btLigar').disabled = false;
+    diz(e && e.name === 'NotAllowedError'
+        ? 'você não deu permissão para a câmera — nada acontece sem isso'
+        : 'não deu para ligar a câmera: ' + (e && e.message || e), 'nao');
+  }
+}
+function para(){
+  rodando = false;
+  if (fluxo){ for (const t of fluxo.getTracks()) t.stop(); fluxo = null; }
+  video.srcObject = null;
+  $('palco').classList.remove('ver'); $('painel').classList.remove('ver');
+  $('cabine').classList.remove('ver');
+  $('btLigar').disabled = false; $('btParar').disabled = true; $('btCentro').disabled = true;
+  repouso = null; olhar = { x:0, y:0, z:0 };
+  diz('câmera desligada');
+}
+function prepara(proporcao){
+  const L = LARGURA, A = Math.round(L*(proporcao || 3/4));
+  trabalho = document.createElement('canvas'); trabalho.width = L; trabalho.height = A;
+  ctxT = trabalho.getContext('2d', { willReadFrequently:true });
+  marca.width = 480; marca.height = 360;
+  ceu.width = 960; ceu.height = 300;
+}
+
+/* --- uma leitura ----------------------------------------------------------
+   A busca é feita em CINZA e pequena. Cinza porque o pico só compara brilho
+   entre dois pontos — cor é peso morto. Pequena porque o custo cresce com a
+   área, e um rosto a 60 pixels de largura já é rosto de sobra para dizer para
+   que lado ele andou. */
+function procura(){
+  const L = trabalho.width, A = trabalho.height;
+  ctxT.drawImage(video, 0, 0, L, A);
+  const d = ctxT.getImageData(0, 0, L, A).data;
+  const cinza = new Uint8Array(L*A);
+  for (let i = 0, j = 0; i < d.length; i += 4, j++)
+    cinza[j] = (d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114) >> 0;
+
+  let dets = pico.run_cascade(
+    { pixels:cinza, nrows:A, ncols:L, ldim:L },
+    classifica,
+    { shiftfactor:0.12, minsize:Math.round(A*ROSTO_MIN), maxsize:Math.round(A*0.95), scalefactor:1.12 });
+  dets = pico.cluster_detections(memoria(dets), 0.2);
+
+  /* o mais forte, e só se for forte MESMO: um limiar baixo enxerga rosto em
+     mancha de parede, e uma cabeça fantasma mexendo a câmera é pior do que
+     câmera nenhuma */
+  let melhor = null;
+  for (const q of dets) if (q[3] > CONFIA && (!melhor || q[3] > melhor[3])) melhor = q;
+  return melhor ? { r:melhor[0], c:melhor[1], s:melhor[2], q:melhor[3], L, A } : null;
+}
+
+/* --- QUANTAS VEZES POR SEGUNDO ---------------------------------------------
+   Uma busca custa de 8 a 12 milissegundos, e um quadro de jogo a 60 por
+   segundo tem 16,7 no total. Procurar rosto a cada quadro comeria metade do
+   orçamento do jogo — pelo desenho da cabine, pela cidade, pelos tiros.
+
+   E não precisa: cabeça humana não muda de lugar 60 vezes por segundo. A
+   busca acontece 15 vezes por segundo e o ALISAMENTO roda todo quadro, então
+   o movimento na tela continua contínuo mesmo com a leitura entrecortada.
+   É o mesmo princípio da posição dos outros aviões na batalha, que chega 20
+   vezes por segundo e é desenhada 60. */
+let proximaBusca = 0;
+function passo(){
+  if (!rodando) return;
+  const agora = performance.now();
+  let f = null;
+  if (video.videoWidth && agora >= proximaBusca){
+    const t0 = performance.now();
+    f = procura();
+    custo += (performance.now() - t0 - custo) * 0.2;
+    proximaBusca = agora + CADENCIA;
+    leituras++;
+  } else if (cru) { desenha(); requestAnimationFrame(passo); return; }
+
+  if (f){
+    achou = true; cru = f;
+    /* posição normalizada: -1 é a borda esquerda, +1 a direita. O X entra
+       ESPELHADO porque a câmera do notebook devolve a imagem invertida — sem
+       isso, mover a cabeça para a direita mandava olhar para a esquerda. */
+    const px = -((f.c/f.L)*2 - 1);
+    const py = -((f.r/f.A)*2 - 1);
+    const pz = f.s/f.A;
+    if (!repouso) repouso = { x:px, y:py, z:pz };
+    else {
+      repouso.x += (px - repouso.x)*APRENDE;
+      repouso.y += (py - repouso.y)*APRENDE;
+      repouso.z += (pz - repouso.z)*APRENDE;
+    }
+    const alvo = {
+      x: comFolga(px - repouso.x)*AMPLIA_X,
+      y: comFolga(py - repouso.y)*AMPLIA_Y,
+      z: (pz - repouso.z)/Math.max(0.05, repouso.z)
+    };
+    olhar.x += (alvo.x - olhar.x)*MACIO;
+    olhar.y += (alvo.y - olhar.y)*MACIO;
+    olhar.z += (alvo.z - olhar.z)*MACIO;
+    diz('rosto encontrado — mexa a cabeça', 'ok');
+  } else {
+    achou = false; cru = null;
+    /* perdeu o rosto: o olhar VOLTA para o centro sozinho, devagar. Ficar
+       travado onde estava seria pior — você vira a cabeça demais, o detector
+       perde, e a vista fica presa olhando para o nada. */
+    olhar.x -= olhar.x*0.04; olhar.y -= olhar.y*0.04; olhar.z -= olhar.z*0.04;
+    if (performance.now() - desde > 2500) diz('não estou achando o seu rosto', 'meio');
+  }
+  desenha();
+  requestAnimationFrame(passo);
+}
+function comFolga(v){
+  const a = Math.abs(v);
+  return a < ZONA ? 0 : Math.sign(v)*(a - ZONA);
+}
+
+/* --- o que aparece na tela ------------------------------------------------ */
+function desenha(){
+  const g = marca.getContext('2d');
+  g.clearRect(0, 0, marca.width, marca.height);
+  if (cru){
+    // o círculo do rosto, espelhado junto com o vídeo
+    const k = marca.width/cru.L;
+    const x = marca.width - cru.c*k, y = cru.r*k, r = cru.s*k/2;
+    g.strokeStyle = 'rgba(94,255,154,.95)'; g.lineWidth = 3;
+    g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke();
+    if (repouso){
+      const rx = marca.width*(1 - (repouso.x*-1 + 1)/2), ry = marca.height*((repouso.y*-1 + 1)/2);
+      g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(rx-9, ry); g.lineTo(rx+9, ry);
+      g.moveTo(rx, ry-9); g.lineTo(rx, ry+9); g.stroke();
+      g.strokeStyle = 'rgba(92,200,255,.8)'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(rx, ry); g.lineTo(x, y); g.stroke();
+    }
+  }
+  bola('bX', olhar.x/90, 'vX', Math.round(olhar.x) + '°');
+  bola('bY', olhar.y/90, 'vY', Math.round(olhar.y) + '°');
+  bola('bZ', olhar.z*2,  'vZ', Math.round(olhar.z*100) + '%');
+  bola('bF', custo/40 - 1, 'vF', custo.toFixed(1) + ' ms');
+  pintaCeu();
+}
+function bola(id, v, idv, txt){
+  v = Math.max(-1, Math.min(1, v));
+  $(id).style.left = (50 + v*48) + '%';
+  $(idv).textContent = txt;
+}
+/* uma janelinha de cabine: horizonte, nuvens e uma pista, que giram com o
+   olhar. É só para SENTIR — é isto que vai virar a câmera do avião. */
+function pintaCeu(){
+  const g = ceu.getContext('2d'), W = ceu.width, H = ceu.height;
+  const px = -olhar.x*(W/120), py = olhar.y*(H/90);
+  g.fillStyle = '#0e2136'; g.fillRect(0, 0, W, H);
+  const hz = H*0.62 + py;
+  const cimaG = g.createLinearGradient(0, 0, 0, hz);
+  cimaG.addColorStop(0, '#123a63'); cimaG.addColorStop(1, '#4d86b8');
+  g.fillStyle = cimaG; g.fillRect(0, 0, W, hz);
+  g.fillStyle = '#2f5a3a'; g.fillRect(0, hz, W, H-hz);
+  g.fillStyle = 'rgba(255,255,255,.5)';
+  for (let i = 0; i < 9; i++){
+    const x = (((i*337 + px*0.7) % (W+240)) + W+240) % (W+240) - 120;
+    g.beginPath(); g.ellipse(x, hz - 60 - (i%3)*34, 52, 13, 0, 0, 7); g.fill();
+  }
+  // a pista, para ter uma referência fixa no chão
+  g.fillStyle = '#3a3f46';
+  g.beginPath();
+  g.moveTo(W/2 + px*1.4 - 18, hz); g.lineTo(W/2 + px*1.4 + 18, hz);
+  g.lineTo(W/2 + px*2.6 + 210, H); g.lineTo(W/2 + px*2.6 - 210, H);
+  g.closePath(); g.fill();
+  // a moldura da janela, que NÃO se mexe: é ela que dá a sensação de virar
+  g.strokeStyle = 'rgba(11,16,32,.95)'; g.lineWidth = 26;
+  g.strokeRect(-13, -13, W+26, H+26);
+  g.fillStyle = 'rgba(230,237,249,.75)';
+  g.font = '700 13px ui-monospace,monospace';
+  g.fillText((olhar.x > 12 ? 'olhando à direita' : olhar.x < -12 ? 'olhando à esquerda'
+              : 'olhando para a frente'), 18, 26);
+}
+
+$('btLigar').onclick = liga;
+$('btParar').onclick = para;
+$('btCentro').onclick = () => { repouso = null; olhar = { x:0, y:0, z:0 }; };
+window.addEventListener('pagehide', para);
+
+/* --- a porta de teste -----------------------------------------------------
+   Sem uma cara de verdade na frente da câmera não dá para provar nada, e o
+   navegador de teste não tem cara nenhuma. Com `?imagem=…` a página procura
+   numa FOTO em vez de na webcam: mesma busca, mesmo caminho, sem câmera. */
+(async function testeDeFoto(){
+  const p = new URLSearchParams(location.search).get('imagem');
+  if (!p) return;
+  await carregaCascata();
+  const img = new Image(); img.src = p;
+  await img.decode();
+  prepara(img.naturalHeight/img.naturalWidth);   // a foto tem a forma dela
+  // o `passo` desiste quando `videoWidth` é 0; aqui não há vídeo nenhum
+  Object.defineProperty(video, 'videoWidth', { value: img.naturalWidth });
+  const orig = ctxT.drawImage.bind(ctxT);
+  ctxT.drawImage = (o, ...r) => orig(o === video ? img : o, ...r);
+  $('palco').classList.add('ver'); $('painel').classList.add('ver'); $('cabine').classList.add('ver');
+  rodando = true; desde = performance.now();
+  requestAnimationFrame(passo);
+})();
+
+window.Rosto = { ver: () => ({ achou, cru, olhar:{...olhar}, repouso: repouso && {...repouso}, custo }) };
+</script>
+</body>
+</html>
