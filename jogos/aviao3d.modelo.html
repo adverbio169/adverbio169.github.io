@@ -26,6 +26,18 @@
   #cArma{bottom:14px;left:50%;transform:translateX(-50%);text-align:center}
   /* motor: potência e nitro, do lado oposto aos botões de baixo */
   #cMotor{bottom:14px;right:14px;text-align:right;min-width:152px}
+  /* trem, flape e velocidade: o painel do pouso */
+  #ondeComeca{display:flex;gap:8px;width:100%}
+  #ondeComeca .op{flex:1;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);
+        color:#9fb1cf;border-radius:10px;padding:10px 8px;font:700 13px/1 inherit;cursor:pointer}
+  #ondeComeca .op.ligado{background:rgba(92,200,255,.16);border-color:rgba(92,200,255,.55);color:#dff1ff}
+  #cPouso{bottom:14px;left:128px;min-width:186px}
+  #cPouso .lin{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;
+               font-weight:700;color:#8fa3c8;margin-top:3px}
+  #cPouso .lin b{font-weight:800;color:#dce5f5}
+  #cPouso .lin b.ok{color:#5eff9a} #cPouso .lin b.nao{color:#ffb86b}
+  #cPouso.estol{border-color:rgba(255,106,106,.7);box-shadow:0 0 18px rgba(255,106,106,.35)}
+  #cPouso.estol .rot{color:#ff8f8f}
   #cMotor .tira{height:7px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden;margin:5px 0}
   #cMotor .tira i{display:block;height:100%;width:67%;border-radius:99px;background:#5eff9a;transition:width .1s linear}
   #cMotor .tira.nit i{background:#7fd8ff}
@@ -92,6 +104,10 @@
   <div class="val"><span id="vComb">100</span><small>%</small></div></div>
 <div class="painel" id="cArma"><div class="rot">Arma (1 2 3 · espaço atira)</div>
   <div class="val" style="font-size:19px"><span id="vArma">NUCLEAR</span> <small>x<span id="vMun">6</span></small></div></div>
+<div class="painel" id="cPouso"><div class="rot">Velocidade</div>
+  <div class="val"><span id="vVel">0</span><small>· mín <span id="vVmin">640</span></small></div>
+  <div class="lin">Trem <b id="vTrem">EMBAIXO</b></div>
+  <div class="lin">Flapes <b id="vFlap">0</b></div></div>
 <div class="painel" id="cMotor"><div class="rot">Potência (W/S · Shift nitro)</div>
   <div class="val"><span id="vMotor">67</span><small>%</small></div>
   <div class="tira"><i id="barraMotor"></i></div>
@@ -129,10 +145,15 @@
     </div>
 
     <div id="erro"></div>
+    <div id="ondeComeca">
+      <button class="op ligado" id="btPista">Começar na pista</button>
+      <button class="op" id="btAr">Começar já no ar</button>
+    </div>
     <button class="grande azul" id="btSensor">Jogar com a inclinação do celular</button>
     <button class="grande cinza" id="btToque">Jogar com o dedo / teclado</button>
     <p class="txt" style="font-size:12.5px;color:#7d8cab">No computador: setas voam, <b>A</b> e <b>D</b> são o leme,
-       <b>espaço</b> atira, <b>V</b> troca a vista, <b>1 2 3</b> trocam de arma.</p>
+       <b>W</b> e <b>S</b> são o acelerador, <b>Shift</b> é o nitro, <b>G</b> o trem de pouso,
+       <b>F</b> os flapes, <b>espaço</b> atira, <b>V</b> troca a vista, <b>1 2 3</b> trocam de arma.</p>
   </div>
 </div>
 
@@ -398,13 +419,60 @@ const VOO_BASE = 1700, VOO_TURBO = 3000;
    marcha lenta e potência militar. 0,67 dá exatamente os 1700 de antes, que é
    onde o acelerador começa — quem não tiver celular voa igual ao de sempre.
    NITRO: passa por cima de tudo e vai ao VOO_TURBO enquanto houver carga. */
-const VOO_MIN = 700, VOO_MAX = 2200, MOTOR_PADRAO = 0.67;
+/* A MARCHA LENTA tem de ficar ABAIXO do estol limpo (640), senão nunca se
+   estola e os flapes não servem para nada: era o caso, com 700 de marcha
+   lenta contra 640 de estol o avião nunca ficava lento o bastante. Com 520,
+   fechar a manete sem flape faz o nariz cair — e com flape (450) não faz, que
+   é exatamente para o que os flapes existem.
+   A potência padrão subiu de 0,67 para 0,70 só para a velocidade de cruzeiro
+   continuar sendo os mesmos ~1700 de sempre. */
+const VOO_MIN = 520, VOO_MAX = 2200, MOTOR_PADRAO = 0.70;
 const NITRO_GASTO = 26, NITRO_ENCHE = 8.5;
 const MAPA = 60000, METRO = 20;
 const TAXA_ROL = 3.4, TAXA_ARF = 1.5, TAXA_LEME = 0.55;
+/* AILERON: quanto de celular vale rolagem cheia, e a folga do meio. Ver o
+   comentário grande em `eixos()` sobre por que virou VELOCIDADE. */
+const ROL_CHEIO = 40, ROL_MORTO = 6, NIVELA = 1.5, NIVELA_ATE = 32;
 const RAIO_PEGA = 340, GASTO = 3.0, GASTO_TURBO = 4.6;
 const DA_NORMAL = 20, DA_AZUL = 32, TURBO_SEG = 5;
 const RAIO_NUKE = 9000, RAIO_POMBO = 170, RAIO_AVIAO = 430;
+
+/* ===========================================================================
+   PISTA, TREM DE POUSO E FLAPES
+
+   A pista corre de sul para norte (rumo 000), começa colada na origem e é
+   plana. Tudo o que é do pouso mede a partir destas quatro contas.
+   ======================================================================== */
+const PISTA_Z0 = -9000, PISTA_Z1 = 13000;     // as duas cabeceiras
+const PISTA_MEIA = 620;                       // meia largura
+const PISTA_Y = CHAO + 8;                     // o asfalto, um palmo acima do campo
+const RODA = 150;                             // altura do eixo das rodas
+/* Velocidade mínima para o ar sustentar o avião. Os flapes a derrubam: é para
+   isso que eles existem, poder chegar devagar sem cair. */
+const ESTOL = [640, 540, 450];                // sem flape, flape 1, flape 2
+const FLAP_TETO = [2400, 1500, 1150];         // o quanto cada flape deixa correr
+const TREM_TETO = 1400;                       // com o trem fora, o avião não corre
+const DECOLA = 1.18;                          // margem sobre o estol para sair do chão
+/* O limite de velocidade no toque fica ABAIXO do teto do trem (1400): assim
+   chegar com a manete aberta e sem flape realmente estoura o pouso, e é
+   preciso reduzir ou baixar flape. Com 1500 a conta era impossível de
+   estourar — o arrasto do trem já segurava antes. */
+const POUSO_VEL = 1250, POUSO_BANCO = 22, POUSO_QUEDA = 620;   // limites do toque
+const TAXA_ESTERCA = 0.85;                    // o leme esterça no chão
+/* No chão a velocidade ganha e perde POR SEGUNDO, não "perseguindo o alvo"
+   como no ar. Com a fórmula do ar a corrida de decolagem durava meio segundo
+   — o avião saltava para a velocidade de rotação antes de a pista começar a
+   passar. Assim dá uns 6 s de corrida, que é o bastante para parecer uma
+   decolagem sem virar espera. */
+const ACEL_CHAO = 86, FREIO_CHAO = 330;
+/* uma tarja folgada em volta do asfalto, onde não nasce prédio nem alvo */
+function perto_da_pista(x, z){
+  return Math.abs(x) < PISTA_MEIA + 2600 && z > PISTA_Z0 - 3000 && z < PISTA_Z1 + 3000;
+}
+function sobreAPista(x, z){
+  return Math.abs(x) < PISTA_MEIA && z > PISTA_Z0 - 400 && z < PISTA_Z1 + 400;
+}
+function velMin(){ return ESTOL[flap] || ESTOL[0]; }
 const ARMAS = {
   bomba:    { nome:'NUCLEAR',      municao:6,   recarga:2.2,  cor:'#ffc24d' },
   missil:   { nome:'MÍSSIL',       municao:8,   recarga:0.85, cor:'#ff7a4d' },
@@ -427,6 +495,7 @@ let eixoF={x:0,y:0,z:1}, eixoC={x:0,y:1,z:0}, eixoD={x:1,y:0,z:0};
 let rumo=0, inclinacao=0, arfagem=0, leme=0;
 let voo=VOO_BASE, turbo=0, combustivel=100, distancia=0, recorde=0;
 let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
+let noChao=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
 let jogando=false, caindo=false, giroQueda=0, vq=0, motivoQueda='';
@@ -482,6 +551,7 @@ function montaMapa(){
       if (Math.abs(xx - rioX(zz)) < 1100) continue;
       if (Math.abs(zz - estradaZ(xx)) < 700) continue;
       if (Math.abs(xx - estradaXv(zz)) < 700) continue;
+      if (perto_da_pista(xx, zz)) continue;          // o aeroporto é plano
       if (Math.random() < 0.20) continue;
       predios.push({ x:xx + (Math.random()-0.5)*300, z:zz + (Math.random()-0.5)*300,
                      w: 420 + Math.random()*520, d: 420 + Math.random()*520,
@@ -494,6 +564,7 @@ function montaMapa(){
     const ax = (Math.random()-0.5)*MAPA*1.8, az = (Math.random()-0.5)*MAPA*1.8;
     if (!ehCidade(ax, az)) continue;
     if (Math.abs(ax - rioX(az)) < 1200) continue;
+    if (perto_da_pista(ax, az)) continue;
     if (alvos.some(a => Math.hypot(a.x-ax, a.z-az) < 9000)) continue;
     if (Math.hypot(ax, az) < 6000) continue;
     alvos.push({ x:ax, z:az, r:520, vivo:true });
@@ -605,6 +676,7 @@ function montaChao(){
     if (dRio < 620) rgb = [58, 118, 160];
     else if (dRio < 860) rgb = [190, 180, 150];            // a areia da margem
     if (Math.abs(z - estradaZ(x)) < 190 || Math.abs(x - estradaXv(z)) < 190) rgb = [104, 103, 97];
+    if (perto_da_pista(x, z)) rgb = [96, 118, 78];      // a grama aparada do aeroporto
     for (let k = 0; k < 3; k++){
       cores[(t+k)*3] = rgb[0]/255; cores[(t+k)*3+1] = rgb[1]/255; cores[(t+k)*3+2] = rgb[2]/255;
     }
@@ -615,6 +687,45 @@ function montaChao(){
   chao.position.y = CHAO;
   chao.receiveShadow = true;
   cena.add(chao);
+}
+
+/* --- A PISTA -------------------------------------------------------------
+   Uma laje de asfalto com as marcas pintadas por cima, todas planas e um fio
+   acima da outra para não brigarem pelo mesmo pixel (z-fighting). O número da
+   cabeceira é o rumo dividido por dez, como nas de verdade: a ponta do sul
+   aponta para o norte, e por isso se chama 36. */
+let pista = null;
+function montaPista(){
+  if (pista) cena.remove(pista);
+  pista = new THREE.Group();
+  const compr = PISTA_Z1 - PISTA_Z0, meioZ = (PISTA_Z0 + PISTA_Z1)/2;
+  const laje = (larg, comp, cor, x, z, y) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(larg, comp),
+      new THREE.MeshLambertMaterial({ color: cor }));
+    m.rotation.x = -Math.PI/2;
+    m.position.set(x, PISTA_Y + y, z);
+    m.receiveShadow = y < 1;
+    m.userData.sombra = false;
+    pista.add(m);
+    return m;
+  };
+  laje(PISTA_MEIA*2, compr, 0x3c4048, 0, meioZ, 0);                 // o asfalto
+  laje(PISTA_MEIA*2 + 260, compr + 260, 0x6f7a5e, 0, meioZ, -2);    // o acostamento
+  // as duas bordas brancas
+  for (const lado of [-1, 1]) laje(26, compr - 400, 0xe8eef5, lado*(PISTA_MEIA - 60), meioZ, 1);
+  // o tracejado do meio
+  for (let z = PISTA_Z0 + 700; z < PISTA_Z1 - 700; z += 1400) laje(26, 700, 0xe8eef5, 0, z, 1);
+  // as barras das duas cabeceiras
+  for (const [z0, sinal] of [[PISTA_Z0 + 220, 1], [PISTA_Z1 - 220, -1]])
+    for (let k = -3; k <= 3; k++){
+      if (k === 0) continue;
+      laje(58, 900, 0xe8eef5, k*118, z0 + sinal*450, 1);
+    }
+  // faixas de toque, o alvo de quem pousa
+  for (const [z0, sinal] of [[PISTA_Z0, 1], [PISTA_Z1, -1]])
+    for (const lado of [-1, 1])
+      laje(110, 1100, 0xe8eef5, lado*250, z0 + sinal*2400, 1);
+  cena.add(pista);
 }
 
 /* --- OS PRÉDIOS: uma caixa só, repetida ----------------------------------
@@ -837,6 +948,45 @@ function montaAviao(corpoCor, detalheCor, vidroCor){
 const aviao = montaAviao(0xdfe7f3, 0x8b97ab, 0x14243e);
 cena.add(aviao);
 
+/* --- TREM DE POUSO e FLAPES ----------------------------------------------
+   Os dois moram só no avião do jogador (os inimigos voam sempre limpos). O
+   trem é um grupo que aparece e some; os flapes são duas abas na saída das
+   asas que baixam girando em torno do seu próprio bordo. */
+const tremNo = new THREE.Group();
+{
+  const matPerna = new THREE.MeshPhongMaterial({ color: 0x8f9aad, shininess: 60 });
+  const matPneu  = new THREE.MeshPhongMaterial({ color: 0x23262c, shininess: 10 });
+  // [x, z, comprimento da perna, raio da roda]
+  const pernas = [[0, 96, 116, 34], [-96, -34, 132, 42], [96, -34, 132, 42]];
+  for (const [px, pz, comp, raio] of pernas){
+    const p2 = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, comp, 8), matPerna);
+    p2.position.set(px, -22 - comp/2, pz);
+    p2.castShadow = true; tremNo.add(p2);
+    const roda = new THREE.Mesh(new THREE.CylinderGeometry(raio, raio, 26, 14), matPneu);
+    roda.rotation.z = Math.PI/2;                 // o eixo da roda atravessa o avião
+    roda.position.set(px, -22 - comp, pz);
+    roda.castShadow = true; tremNo.add(roda);
+  }
+}
+aviao.add(tremNo);
+
+const flapNos = [];
+{
+  const matFlap = new THREE.MeshPhongMaterial({ color: 0xc9d3e2, shininess: 40 });
+  for (const lado of [-1, 1]){
+    // o eixo da dobradiça é o bordo de saída da asa: o grupo fica nele e a
+    // aba pendura para trás, senão baixar o flape faria a peça mergulhar na asa
+    const eixo = new THREE.Group();
+    eixo.position.set(lado*92, 0, -60);
+    const aba = new THREE.Mesh(new THREE.BoxGeometry(130, 7, 44), matFlap);
+    aba.position.set(0, 0, -22);
+    aba.castShadow = true;
+    eixo.add(aba);
+    aviao.add(eixo);
+    flapNos.push(eixo);
+  }
+}
+
 /* faixas azuis nas asas, para o olho pegar a direção de longe */
 {
   const matAzul = new THREE.MeshPhongMaterial({ color: 0x2d7dff, shininess: 70 });
@@ -899,6 +1049,7 @@ function montaPombos(){
 /* =============================================================================
    PARTE 4 — VOO, REGRAS E CÂMERA
    ========================================================================== */
+let tremAnim = 1, flapAnim = 0;
 let camPos = new THREE.Vector3(), camF={x:0,y:0,z:1}, camC={x:0,y:1,z:0}, camD={x:1,y:0,z:0};
 const CAMD = 620;
 
@@ -1218,7 +1369,7 @@ function atualizaTiros(dt){
 /* --- A QUEDA E O PASSO DO JOGO ------------------------------------------- */
 function derruba(motivo){
   if (caindo) return;
-  caindo = true; motivoQueda = motivo; vq = 0;
+  caindo = true; noChao = false; motivoQueda = motivo; vq = 0;
   explode(aviaoX, aviaoY, aviaoZ, motivo === 'combustivel' ? 0.6 : 1.4);
   mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL' : 'BATEU!', '#ff8080', 1400);
 }
@@ -1236,6 +1387,123 @@ function atualizaQueda(dt){
     aviaoY = CHAO + 120;
     if (motivoQueda !== 'acabou'){ explode(aviaoX, aviaoY, aviaoZ, 2.0); motivoQueda = 'acabou'; Motor.desliga(); setTimeout(fim, 900); }
   }
+}
+
+/* =============================================================================
+   NO CHÃO — táxi, corrida de decolagem e corrida de pouso
+
+   Com as rodas no asfalto o avião deixa de ser um avião e vira um carro
+   comprido: fica plano, anda para onde o nariz aponta, esterça pelo leme e
+   acelera pelo acelerador. O manche só serve para uma coisa — levantar o
+   nariz e sair do chão, e só depois da velocidade mínima.
+
+   A aceleração aqui é MUITO mais lenta do que no ar (dt*0.5 em vez de
+   dt*2,5). No ar o número existe só para a velocidade "assentar" depois de
+   uma mudança de manete; no chão ele é a corrida de decolagem inteira, e com
+   a constante do ar ela durava meio segundo — não dava tempo nem de ver a
+   pista passando.
+   ========================================================================== */
+function aterra(queda){
+  noChao = true;
+  aviaoY = PISTA_Y + RODA;
+  eixoF = vnorm({ x: eixoF.x, y: 0, z: eixoF.z });
+  eixoC = { x: 0, y: 1, z: 0 };
+  endireitaEixos();
+  parado = 0;
+  const macio = queda < 240;
+  pousos++;
+  pontos += macio ? 400 : 150;
+  mostraAviso(macio ? 'POUSO DE MANUAL! +400' : 'POUSOU! +150', macio ? '#7fffa8' : '#ffd257', 1800);
+  solta(aviaoX, PISTA_Y + 40, aviaoZ, 14, 0xd8d8d8, 40, 260);
+  bip(220, 0.10, 'square', 0.05);
+  setTimeout(() => bip(160, 0.16, 'square', 0.04), 90);
+}
+
+function rolaNoChao(dt, e){
+  // esterçar: o leme gira o avião em torno da vertical, e só com a roda andando
+  const manda = Math.min(1, voo/500);
+  const gira = (e.leme || 0) * TAXA_ESTERCA * manda * dt;
+  if (Math.abs(gira) > 1e-5){
+    const c = Math.cos(gira), sn = Math.sin(gira);
+    const fx = eixoF.x*c + eixoF.z*sn, fz = -eixoF.x*sn + eixoF.z*c;
+    eixoF = { x: fx, y: 0, z: fz };
+    eixoC = { x: 0, y: 1, z: 0 };
+    endireitaEixos();
+  }
+  leme += ((e.leme || 0) - leme) * Math.min(1, dt*9);
+
+  if (tecla.mais)  motor = Math.min(1, motor + dt*0.65);
+  if (tecla.menos) motor = Math.max(0, motor - dt*0.65);
+  const querNitro = nitroBotao && nitroCarga > 0;
+  if (querNitro) nitroCarga = Math.max(0, nitroCarga - NITRO_GASTO*dt);
+  else if (nitroCarga < 100) nitroCarga = Math.min(100, nitroCarga + NITRO_ENCHE*dt);
+  turbinando = querNitro;
+
+  // acelerador fechado é freio: no chão o avião realmente para
+  const empurra = turbinando ? VOO_TURBO : VOO_MIN + (VOO_MAX - VOO_MIN)*motor;
+  const alvo = motor < 0.08 && !turbinando ? 0 : empurra;
+  if (alvo > voo) voo = Math.min(alvo, voo + ACEL_CHAO*(0.30 + 0.95*motor + (turbinando?1.3:0))*dt);
+  else            voo = Math.max(alvo, voo - FREIO_CHAO*dt);
+  // só encosta em zero quem está FREANDO: com este corte valendo sempre, o
+  // avião parado zerava o primeiro empurrãozinho de cada quadro e nunca saía
+  if (alvo === 0 && voo < 8) voo = 0;
+
+  aviaoX += eixoF.x*voo*dt; aviaoZ += eixoF.z*voo*dt;
+  aviaoY = PISTA_Y + RODA;
+  distancia += voo*dt;
+  if (!infinito) combustivel -= dt * GASTO*(0.30 + 0.5*motor);
+  if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
+
+  // saiu do asfalto rolando: capota
+  if (!sobreAPista(aviaoX, aviaoZ)){
+    if (voo > 260){ mostraAviso('SAIU DA PISTA!', '#ff8080', 1500); derruba('chao'); return; }
+    voo = 0;
+  }
+
+  // DECOLAR: velocidade mínima com margem, e o manche puxado
+  const vDecola = velMin()*DECOLA;
+  if (voo >= vDecola && e.ver > 0.22){
+    noChao = false;
+    const r2 = giraPar(eixoF, eixoC, 0.26); eixoF = r2[0]; eixoC = r2[1];
+    endireitaEixos();
+    aviaoY = PISTA_Y + RODA + 30;
+    mostraAviso('NO AR! recolha o trem (G)', '#7fd8ff', 1700);
+  } else if (voo >= vDecola){
+    mostraAviso('PUXE PARA DECOLAR', '#ffd257', 500);
+  }
+
+  /* parado de vez. O aviso dizia "de novo" já no primeiro segundo de jogo,
+     antes de a pessoa ter voado uma vez sequer — agora ele sabe se já houve
+     um pouso, e no começo ensina o que fazer. */
+  if (voo === 0){
+    parado += dt;
+    if (parado > 0.8 && parado - dt <= 0.8)
+      mostraAviso(pousos > 0 ? 'acelere para decolar de novo'
+                             : 'ACELERE (W) E PUXE PARA DECOLAR', '#9fd8ff', 2200);
+  } else parado = 0;
+
+  poeCamera(dt);
+  atualizaTiros(dt);
+  Motor.ajusta();
+}
+
+/* --- os dois comandos novos, um lugar só para teclado, celular e botão --- */
+function mexeTrem(quer){
+  const novo = quer === undefined ? !trem : !!quer;
+  if (novo === trem) return;
+  if (!novo && noChao){ mostraAviso('no chão, não!', '#ffb86b', 900); return; }
+  trem = novo;
+  mostraAviso(trem ? 'TREM EMBAIXO' : 'TREM RECOLHIDO', '#9fd8ff', 1000);
+  bip(trem ? 300 : 460, 0.16, 'square', 0.04);
+  mandaEstado();
+}
+function mexeFlap(passo){
+  const novo = Math.max(0, Math.min(2, passo === undefined ? (flap + 1) % 3 : passo));
+  if (novo === flap) return;
+  flap = novo;
+  mostraAviso(flap === 0 ? 'FLAPES RECOLHIDOS' : 'FLAPES ' + flap, '#9fd8ff', 1000);
+  bip(360 + flap*70, 0.12, 'sine', 0.05);
+  mandaEstado();
 }
 
 function atualiza(dt){
@@ -1274,10 +1542,44 @@ function atualiza(dt){
   if (caindo){ atualizaQueda(dt); return; }
 
   const e = eixos();
+  if (noChao){ rolaNoChao(dt, e); return; }
+  /* ---------------------------------------------------------------------
+     AILERON: velocidade de rolagem, não ângulo de rolagem.
+
+     Antes o banco COPIAVA o celular: 30° de mão eram 30° de asa. Fica preciso
+     para voar reto, mas torna o tonô impossível — para dar 360° na asa a
+     pessoa teria de girar o pulso 360°. Foi o que o Brunno sentiu: "tô com
+     dificuldade de fazer 180 ou 360".
+
+     Agora a mão pede VELOCIDADE: inclinou e segurou, o avião roda sem parar,
+     e roda mais rápido quanto mais inclinado estiver o celular. Dá tonô,
+     parafuso, o que for. Isso também deixa os dois eixos com a MESMA
+     gramática — o profundor já era velocidade —, que era o outro pedido:
+     "tem que ter bem definido o que mexe no profundor e o que mexe no
+     aileron".
+
+     Com a mão no meio (dentro da folga), as asas voltam sozinhas ao
+     nivelado — mas SÓ ATÉ 32° de banco. Passando disso o avião SEGURA a
+     inclinação que tem.
+
+     Esse limite não é enfeite: sem ele o comando por velocidade tira a curva
+     do jogo. A pessoa inclina para entrar na curva, endireita a mão para
+     parar de rolar — e o niveladeor desfazia a curva inteira. Com o limite,
+     inclinar e soltar deixa o avião pousado numa curva firme, que é como se
+     voa; e perto do nivelado ele continua se endireitando sozinho, que é o
+     que salva o iniciante.
+     ------------------------------------------------------------------ */
   let rol;
   if (e.absoluto){
-    const erro = voltaCurta(e.lat*180 - inclinacao) * Math.PI/180;
-    rol = Math.max(-TAXA_ROL, Math.min(TAXA_ROL, erro*3.2));
+    /* a resposta é CURVA, não reta: perto do meio o avião rola devagar, e a
+       rolagem cheia só vem no fim do curso. Reto, um tranquinho de mão já
+       jogava o avião de lado e não dava para corrigir fino. */
+    const pedido = grausParaEixo(e.lat*180, ROL_CHEIO, ROL_MORTO);
+    if (pedido !== 0) rol = Math.sign(pedido) * Math.pow(Math.abs(pedido), 1.6) * TAXA_ROL;
+    else if (Math.abs(voltaCurta(inclinacao)) < NIVELA_ATE){
+      const erro = voltaCurta(0 - inclinacao) * Math.PI/180;
+      rol = Math.max(-NIVELA, Math.min(NIVELA, erro*1.7));
+    } else rol = 0;                       // curva firme: segura o banco
   } else rol = e.lat * TAXA_ROL;
   let r = giraPar(eixoD, eixoC, -rol*dt); eixoD = r[0]; eixoC = r[1];
 
@@ -1298,9 +1600,28 @@ function atualiza(dt){
     mostraAviso('FIM DO MAPA — DÊ MEIA-VOLTA', '#ffb86b', 900);
   }
   if (aviaoY > TETO){ aviaoY = TETO; mostraAviso('AR RAREFEITO', '#9fd8ff', 900); }
-  if (aviaoY < CHAO + 240){
+
+  /* ----------------------------------------------------------------------
+     O TOQUE. Em cima da pista o solo é o asfalto e dá para pousar; fora
+     dela é chão batido e continua sendo batida na certa.
+     -------------------------------------------------------------------- */
+  const naPista = sobreAPista(aviaoX, aviaoZ);
+  const piso = naPista ? PISTA_Y + RODA : CHAO + 240;
+  if (aviaoY < piso){
+    if (naPista){
+      const queda = -eixoF.y*voo;                 // quanto está descendo, por segundo
+      const banco = Math.abs(voltaCurta(inclinacao));
+      let ruim = '';
+      if (!trem)                    ruim = 'SEM TREM DE POUSO!';
+      else if (banco > POUSO_BANCO) ruim = 'ASA NO CHÃO!';
+      else if (voo > POUSO_VEL)     ruim = 'RÁPIDO DEMAIS!';
+      else if (queda > POUSO_QUEDA) ruim = 'DESCEU RÁPIDO DEMAIS!';
+      if (ruim){ mostraAviso(ruim, '#ff8080', 1500); derruba('chao'); return; }
+      aterra(queda);
+      return;
+    }
     if (eixoF.y < -0.30){ derruba('chao'); return; }
-    aviaoY = CHAO + 240; mostraAviso('SUBA!', '#ff8080');
+    aviaoY = piso; mostraAviso('SUBA!', '#ff8080');
   }
 
   if (turbo > 0){ turbo -= dt; if (turbo <= 0){ turbo = 0; mostraAviso('fim do turbo', '#9fd8ff', 900); } }
@@ -1316,8 +1637,24 @@ function atualiza(dt){
   if (tecla.mais)  motor = Math.min(1, motor + dt*0.65);
   if (tecla.menos) motor = Math.max(0, motor - dt*0.65);
   turbinando = turbo > 0 || querNitro;
-  const vooAlvo = turbinando ? VOO_TURBO : VOO_MIN + (VOO_MAX - VOO_MIN)*motor;
+  let vooAlvo = turbinando ? VOO_TURBO : VOO_MIN + (VOO_MAX - VOO_MIN)*motor;
+  // trem fora e flape baixado ARRASTAM: o avião simplesmente não corre mais
+  vooAlvo = Math.min(vooAlvo, FLAP_TETO[flap] || FLAP_TETO[0]);
+  if (trem) vooAlvo = Math.min(vooAlvo, TREM_TETO);
   voo += (vooAlvo - voo) * Math.min(1, dt*2.5);
+
+  /* ESTOL: abaixo da velocidade mínima a asa não segura mais o avião, e o
+     nariz cai sozinho. É o que dá sentido aos flapes — eles baixam essa
+     velocidade, e é por isso que se pousa com eles. */
+  // o nariz cai, mas não vira mergulho vertical: passando de uns 50° para
+  // baixo o avião já está descendo o bastante para ganhar o que precisa
+  if (voo < velMin() && arfagem > -0.9){
+    const falta = Math.min(1, (velMin() - voo)/240);
+    const r2 = giraPar(eixoF, eixoC, -falta*1.1*dt); eixoF = r2[0]; eixoC = r2[1];
+    endireitaEixos();
+    avisouEstol -= dt;
+    if (avisouEstol <= 0){ avisouEstol = 1.1; mostraAviso('ESTOL — MAIS POTÊNCIA', '#ffb86b', 800); bip(180,0.18,'square',0.05); }
+  }
   // acelerador aberto bebe mais: meia potência gasta bem menos que tudo
   if (!infinito) combustivel -= dt * (turbinando ? GASTO_TURBO : GASTO*(0.55 + 0.7*motor));
   if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
@@ -1377,9 +1714,20 @@ function arruma(){
     // a chama cresce com o acelerador, e estoura no nitro
     const q = turbinando ? 1 : motor;
     j.scale.set(1, turbinando ? 2.4 : 0.5 + q*0.7, 1);
+    // (o trem e os flapes são arrumados logo abaixo, em arruma())
     j.position.z = -250 - (turbinando ? 90 : 0);
     j.material.opacity = turbinando ? 0.6 : 0.10 + q*0.18;
   }
+  /* trem e flapes: os dois se mexem devagar, senão aparecem e somem de um
+     quadro para o outro e não se vê nada acontecer */
+  tremAnim += ((trem ? 1 : 0) - tremAnim) * 0.10;
+  tremNo.visible = tremAnim > 0.02;
+  if (tremNo.visible){
+    tremNo.scale.set(1, Math.max(0.03, tremAnim), 1);   // recolhe encolhendo para dentro da asa
+    tremNo.position.y = (1 - tremAnim)*18;
+  }
+  flapAnim += (flap - flapAnim) * 0.10;
+  for (const f of flapNos) f.rotation.x = flapAnim*0.30;   // a aba baixa girando na dobradiça
   for (const o of obstaculos){
     if (!o.no) continue;
     o.no.visible = o.vivo;
@@ -1486,6 +1834,8 @@ function bussola(y){
   }
   marcaBussola(cx, meia, y + H*0.052, maisPerto(tambores, t => !t.pego), '#ffd257', false);
   marcaBussola(cx, meia, y + H*0.056, maisPerto(alvos, a => a.vivo), '#ff6a5a', true);
+  // a cabeceira do sul: sem ela ninguém acha a pista para voltar
+  if (!noChao) marcaBussola(cx, meia, y + H*0.052, { x: 0, z: PISTA_Z0 + 2400 }, '#7fffa8', false);
   h2.fillStyle = 'rgba(230,245,255,.95)';
   h2.beginPath(); h2.moveTo(cx, y-H*0.030); h2.lineTo(cx-6, y-H*0.044); h2.lineTo(cx+6, y-H*0.044);
   h2.closePath(); h2.fill();
@@ -1500,7 +1850,9 @@ function desenhaHUD(){
     h2.fillStyle = 'rgba(255,250,235,' + Math.min(0.92, clarao).toFixed(3) + ')';
     h2.fillRect(0,0,W,H);
   }
-  bussola(cockpit ? H*0.16 : H*0.175);
+  // um degrau mais abaixo: com a fita mais alta, o número do rumo ficava
+  // escondido atrás da caixa do combustível
+  bussola(cockpit ? H*0.175 : H*0.205);
 
   if (cockpit){
     // mira do canhão e escada de arfagem, projetadas pelo mesmo three.js
@@ -1637,11 +1989,11 @@ function desenhaHUD(){
   }
 
   if (infinito && jogando){
+    // no canto de cima à esquerda, abaixo dos painéis: no rodapé ele
+    // atravessava a caixa da arma
     h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
-    h2.textAlign = 'center'; h2.fillStyle = 'rgba(127,216,255,.75)';
-    // acima da caixa da arma, senão as duas letras se atravessam
-    h2.fillText('TESTE · COMBUSTÍVEL INFINITO  (tecla I desliga)', W/2, H - 86);
-    h2.textAlign = 'left';
+    h2.textAlign = 'left'; h2.fillStyle = 'rgba(127,216,255,.7)';
+    h2.fillText('TESTE · combustível infinito (tecla I)', 16, Math.max(190, H*0.30));
   }
 }
 
@@ -1663,6 +2015,14 @@ function pinta(){
   $('barraNitro').style.width = nitroCarga.toFixed(0) + '%';
   $('barraNitro').style.background = nitroCarga < 15 ? '#ff6a6a' : '#7fd8ff';
   $('cMotor').classList.toggle('turbo', turbinando);
+  $('vVel').textContent = Math.round(voo);
+  $('vVmin').textContent = velMin();
+  const bT = $('vTrem');
+  bT.textContent = trem ? 'EMBAIXO' : 'RECOLHIDO';
+  bT.className = trem ? 'ok' : '';
+  $('vFlap').textContent = flap === 0 ? '—' : String(flap);
+  $('vFlap').className = flap ? 'ok' : '';
+  $('cPouso').classList.toggle('estol', !noChao && voo < velMin());
 }
 
 /* --- o laço --- */
@@ -1712,6 +2072,8 @@ document.addEventListener('keydown', e => {
   if (e.key==='2') trocaArma('missil');
   if (e.key==='3') trocaArma('metralha');
   if (e.key==='v'||e.key==='V') cockpit = !cockpit;
+  if (e.key==='g'||e.key==='G') mexeTrem();
+  if (e.key==='f'||e.key==='F') mexeFlap();
   if (e.key==='w'||e.key==='W') tecla.mais=true;
   if (e.key==='s'||e.key==='S') tecla.menos=true;
   if (e.key==='Shift') nitroBotao = true;
@@ -1755,14 +2117,28 @@ addEventListener('touchend', () => {
 $('btVisao').onclick = () => { cockpit = !cockpit; };
 $('btQual').onclick = () => poeQualidade((qualidade + 2) % 3);
 
+/* Começar NA PISTA ou JÁ NO AR. Quem quer só sair bombardeando não tem de
+   fazer a decolagem toda; quem quer decolar, decola. A escolha fica guardada
+   no aparelho. */
+let naPistaAoComecar = true;
+try { naPistaAoComecar = localStorage.getItem('aviao3d.pista') !== '0'; } catch(e){}
+
 function reinicia(){
-  aviaoX = 0; aviaoZ = 0; aviaoY = 1500;
+  if (naPistaAoComecar){
+    aviaoX = 0; aviaoZ = PISTA_Z0 + 1200; aviaoY = PISTA_Y + RODA;
+    noChao = true; trem = true; flap = 1; motor = 0; voo = 0; parado = 0;
+  } else {
+    aviaoX = 0; aviaoZ = 0; aviaoY = 1500;
+    noChao = false; trem = false; flap = 0; motor = MOTOR_PADRAO; voo = VOO_BASE;
+  }
+  tremAnim = trem ? 1 : 0; flapAnim = flap;
   eixoF = {x:0,y:0,z:1}; eixoC = {x:0,y:1,z:0}; eixoD = {x:1,y:0,z:0};
   endireitaEixos();
   camF = {x:0,y:0,z:1}; camC = {x:0,y:1,z:0}; camD = {x:1,y:0,z:0};
-  camPos.set(0, 1710, -CAMD);
-  voo = VOO_BASE; turbo = 0; combustivel = 100; distancia = 0;
+  camPos.set(aviaoX, aviaoY + 210, aviaoZ - CAMD);
+  turbo = 0; combustivel = 100; distancia = 0;
   nitroCarga = 100; nitroBotao = false; turbinando = false;
+  avisouEstol = 0; pousos = 0;
   pontos = 0; alvosDestruidos = 0; venceu = false;
   arma = 'bomba'; recarga = 0; atirando = false; leme = 0; miraX = 0; miraY = 0;
   municao = {}; for (const k in ARMAS) municao[k] = ARMAS[k].municao;
@@ -1771,7 +2147,7 @@ function reinicia(){
   for (const t of tiros) cena.remove(t.no); tiros = [];
   for (const f of faiscas) cena.remove(f.no); faiscas = [];
   for (const c of cogumelos) cena.remove(c.no); cogumelos = [];
-  montaMapa(); montaChao(); montaCidade(); montaTambores(); montaAlvos();
+  montaMapa(); montaChao(); montaPista(); montaCidade(); montaTambores(); montaAlvos();
   montaInimigos(); montaPombos(); montaNuvens();
   poeCamera(1);
   Motor.liga();
@@ -1818,6 +2194,16 @@ function telaCheia(){
   }catch(e){}
 }
 $('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque = true; telaCheia(); comeca(); };
+(function(){
+  const bp = $('btPista'), ba = $('btAr');
+  const pinta = () => { bp.classList.toggle('ligado', naPistaAoComecar);
+                        ba.classList.toggle('ligado', !naPistaAoComecar); };
+  const poe = v => { naPistaAoComecar = v; try{ localStorage.setItem('aviao3d.pista', v ? '1' : '0'); }catch(e){} pinta(); };
+  bp.onclick = () => poe(true);
+  ba.onclick = () => poe(false);
+  pinta();
+})();
+
 $('btSensor').onclick = async () => {
   ligaAudio();
   try { await Controle.ligarSensor(); telaCheia(); comeca(); }
@@ -1931,6 +2317,8 @@ const Tripulacao = {
       case 'arma':  trocaArma(d.a); break;
       case 'fogo':  atirando = !!d.v; break;
       case 'visao': cockpit = !cockpit; break;
+      case 'trem':  if (m.papel === 'piloto') mexeTrem(d.v); break;
+      case 'flap':  if (m.papel === 'piloto') mexeFlap(d.v); break;
     }
   },
   /* Só manda para quem JÁ abriu. Mandar antes disso faz o PeerJS soltar um
@@ -1951,6 +2339,7 @@ const Tripulacao = {
 function mandaEstado(){
   Tripulacao.envia({ t:'estado', jogando, acabou: !jogando, dist: Math.round(distancia/METRO),
     comb: Math.round(combustivel), turbo: turbinando, nit: Math.round(nitroCarga),
+    pousa: true, trem, flap, chao: noChao, vel: Math.round(voo), estol: voo < velMin(),
     arma, mun: municao[arma], pontos,
     alvos: alvosDestruidos + '/' + alvosTotal,
     prog: Math.round(alvosDestruidos/Math.max(1,alvosTotal)*100) });
@@ -2005,7 +2394,7 @@ function abrirSala(){
 abrirSala();
 
 /* desenha uma primeira imagem parada atrás da capa, para não abrir preto */
-montaMapa(); montaChao(); montaCidade(); montaTambores(); montaAlvos();
+montaMapa(); montaChao(); montaPista(); montaCidade(); montaTambores(); montaAlvos();
 montaInimigos(); montaPombos(); montaNuvens();
 aviaoY = 2200; poeCamera(1); arruma(); redimensiona();
 rend.render(cena, cam);

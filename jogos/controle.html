@@ -120,6 +120,16 @@
           font:900 19px/1 inherit;letter-spacing:3px;color:#fff;background:#d8422f;
           box-shadow:0 6px 0 #8f2a1d;user-select:none;-webkit-user-select:none}
   #btFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
+  /* trem de pouso e flapes: só aparecem quando o jogo do outro lado sabe
+     pousar (o jogo avisa no pacote de estado). Ficam em cima, longe do
+     polegar, porque se mexe neles duas vezes por voo. */
+  .bt.pouso{display:none}
+  body.pousa .bt.pouso{display:block}
+  .bt.pouso.ligado{background:rgba(94,255,154,.20);border-color:rgba(94,255,154,.5);color:#c7ffdb}
+  #estolAviso{display:none;position:fixed;z-index:55;left:50%;top:44%;transform:translate(-50%,-50%);
+      background:rgba(160,30,30,.85);border:1px solid rgba(255,140,140,.6);border-radius:10px;
+      padding:8px 16px;font:900 13px/1 inherit;letter-spacing:2px;color:#fff}
+  body.estol #estolAviso{display:block}
 
   /* ----------------------------------------------------------------------
      ACELERADOR e NITRO.
@@ -208,6 +218,7 @@ body.paisagem #controle.ver,
   /* o que se usa pouco fica em cima, longe do polegar */
   body.paisagem .linha{top:8px;left:calc(10px + env(safe-area-inset-left));width:auto;max-width:none;gap:6px}
   body.paisagem .linha .bt{flex:0 0 auto;width:auto;padding:7px 12px;font-size:12.5px}
+  body.paisagem .bt.pouso{padding:7px 9px;font-size:11.5px;letter-spacing:.5px}
   body.paisagem .linha .bt b{font-size:12.5px}
 
   /* deitado: cada um colado na sua borda; o resto dá passagem */
@@ -239,6 +250,7 @@ body.paisagem #controle.ver,
 </head>
 <body>
   <div id="giroAviso">🔒 preso deitado</div>
+  <div id="estolAviso">ESTOL &middot; ACELERE</div>
 
 
 <!-- ============ TELA 1: entrar na sala ============ -->
@@ -279,12 +291,15 @@ body.paisagem #controle.ver,
   <div class="linha">
     <button class="bt pri" id="btComecar">Começar</button>
     <button class="bt sec" id="btCalibrar">Zerar</button>
+    <button class="bt sec pouso" id="btTrem">TREM</button>
+    <button class="bt sec pouso" id="btFlap">FLAPE</button>
   </div>
   <div id="giroLinha">asas: <b id="giroTxt">&hellip;</b>
     <button id="btGiro">girar</button>
     <button id="btVisaoC">cabine</button></div>
-  <div id="dica">Segure o celular <b>deitado</b>. <b>Zerar</b> torna a posição atual da sua mão o voo reto.
-    Girar de lado inclina as asas; puxar a borda de cima levanta o nariz.</div>
+  <div id="dica"><b>Girar de lado</b> = aileron, roda as asas (segure inclinado e ele dá a volta inteira).
+    <b>Puxar a borda de cima</b> = profundor, levanta o nariz.
+    <b>Deslizar para o lado</b> = leme. <b>Zerar</b> torna a posição da sua mão o voo reto.</div>
 </div>
 
 <!-- PeerJS (WebRTC com sinalização), embutido para a página ser um arquivo só -->
@@ -502,6 +517,7 @@ function conectar(codigo){
         $('btComecar').textContent = d.jogando ? 'Voando…' : (d.acabou ? 'Voar de novo' : 'Começar');
         $('btComecar').disabled = !!d.jogando;
         if (d.nit !== undefined) Motor.pintaCarga(d.nit);
+        if (d.pousa) Pouso.mostra(d);
         if (d.comb > combAntes + 4) vibra(d.turbo ? 140 : 60);
         if (!d.jogando && jogandoAntes) vibra(320);
         combAntes = d.comb; jogandoAntes = !!d.jogando;
@@ -809,6 +825,40 @@ const Motor = (function(){
   M.repinta = () => poe(M.potencia, false);   // a tira troca de eixo ao virar a tela
   window.addEventListener('resize', () => setTimeout(M.repinta, 60));
   return M;
+})();
+
+/* --- TREM DE POUSO e FLAPES ------------------------------------------------
+   Os dois só aparecem se o jogo do outro lado souber pousar — o pacote de
+   estado traz `pousa:true`. Assim o mesmo controle.html continua servindo os
+   jogos em 2D, que não têm pista, sem dois botões mortos na tela.
+
+   O TREM é um interruptor e manda o valor que quer (`v`), não "troque": num
+   canal que perde pacote, "troque" perdido deixa os dois lados discordando
+   para sempre. O jogo confirma no estado seguinte e o botão se pinta por ele,
+   nunca por conta própria.
+   ------------------------------------------------------------------------ */
+const Pouso = (function(){
+  const bt = document.getElementById('btTrem'), bf = document.getElementById('btFlap');
+  const P = { trem: true, flap: 0, mostra: () => {} };
+  if (!bt || !bf) return P;
+  let ligado = false;
+  bt.onclick = e => { e.preventDefault(); enviaCtl({ t:'trem', v: !P.trem }); vibra(35); };
+  bf.onclick = e => { e.preventDefault(); enviaCtl({ t:'flap', v: (P.flap + 1) % 3 }); vibra([18,40,18]); };
+  P.mostra = d => {
+    if (!ligado){ document.body.classList.add('pousa'); ligado = true; }
+    P.trem = !!d.trem; P.flap = d.flap || 0;
+    bt.textContent = 'TREM ' + (P.trem ? '▼' : '▲');
+    bt.classList.toggle('ligado', P.trem);
+    bf.textContent = 'FLAPE ' + (P.flap || '0');
+    bf.classList.toggle('ligado', P.flap > 0);
+    // estol: o aviso tem de gritar no controle, não só na tela grande
+    const est = !!d.estol && !d.chao && !!d.jogando;
+    if (est !== document.body.classList.contains('estol')){
+      document.body.classList.toggle('estol', est);
+      if (est) vibra([60,50,60,50,60]);
+    }
+  };
+  return P;
 })();
 
 /* --- preso deitado ---------------------------------------------------------
