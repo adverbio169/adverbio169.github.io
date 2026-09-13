@@ -35,6 +35,15 @@
   .bt.pri{background:#2d7dff;color:#fff}
   .bt.sec{background:rgba(255,255,255,.09);color:#dce5f5;border:1px solid rgba(255,255,255,.16);font-weight:700}
   .bt:disabled{opacity:.5}
+  /* --- os dois passos da entrada --- */
+  .passo{display:none;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:340px}
+  .passo.ver{display:flex}
+  .bt.alto{display:flex;flex-direction:column;gap:3px;align-items:center;padding:13px 16px;text-align:center}
+  .bt.alto b{font-size:16px;letter-spacing:.6px}
+  .bt.alto small{font-size:12px;font-weight:600;opacity:.82;line-height:1.35;max-width:30ch}
+  .bt.lnk{background:none;border:0;color:#8fa3c4;font-size:13px;font-weight:700;
+          text-decoration:underline;padding:4px;width:auto}
+  @media (max-height:350px){ .passo{gap:7px} .bt.alto small{font-size:11px} }
   #erro{display:none;max-width:340px;background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.35);
         border-radius:10px;padding:10px 13px;font-size:13px;color:#ffc9c9;line-height:1.5;text-align:center}
 
@@ -273,20 +282,42 @@ body.paisagem #controle.ver,
   <div id="estolAviso">ESTOL &middot; ACELERE</div>
 
 
-<!-- ============ TELA 1: entrar na sala ============ -->
+<!-- ============ TELA 1: entrar, em DOIS PASSOS ==============================
+     Isto já foi uma tela só, com um campo de código e um botão "Conectar",
+     de quando existia uma resposta só: todo celular que chegava virava o
+     controle de uma TV. Hoje são duas perguntas de verdade — EM QUE SALA e
+     O QUE ESTE APARELHO É — e empilhar as duas numa tela só deixou tudo
+     confuso: a pessoa via dois botões e não sabia o que cada um ia fazer
+     com o código que ela tinha acabado de digitar.
+
+     Duas perguntas, dois passos. Uma de cada vez, e a segunda já com a
+     resposta da primeira escrita em cima, para ninguém se perder.
+     ====================================================================== -->
 <div class="tela" id="telaCodigo">
-  <div class="selo">Controle &middot; avião</div>
-  <h1>Código da tela de quem chamou</h1>
-  <input id="codigo" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD" inputmode="text">
-  <div id="erro"></div>
-  <div class="estado" id="estadoSensor"><span class="luz"></span><span id="estadoSensorTxt">verificando o sensor&hellip;</span></div>
-  <!-- AS DUAS PORTAS. Quem lê o QR não quer sempre a mesma coisa: às vezes é
-       o irmão sentando de copiloto na mesma cabine, às vezes é o outro que
-       quer o avião DELE no céu para brigar. Antes só havia a primeira. -->
-  <button class="bt pri" id="btConectar">Ser copiloto desta tela</button>
-  <p class="txt porta">este celular comanda o avião que já está na tela</p>
-  <button class="bt sec" id="btMeuAviao">Levar o meu avião &middot; batalha</button>
-  <p class="txt porta">abre o jogo aqui, com um avião só seu, no mesmo céu</p>
+
+  <!-- PASSO 1: qual sala -->
+  <div class="passo ver" id="passoSala">
+    <div class="selo">Avião &middot; entrar</div>
+    <h1>Em qual sala?</h1>
+    <input id="codigo" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD" inputmode="text">
+    <p class="txt">O código de 4 letras está na tela de quem abriu o jogo.</p>
+    <div id="erro"></div>
+    <button class="bt pri" id="btSala">Continuar</button>
+    <p class="txt" style="opacity:.6;font-size:12.5px">Não tem código? Abra o jogo numa tela
+       e ele cria a sala sozinho.</p>
+  </div>
+
+  <!-- PASSO 2: o que este aparelho vai ser -->
+  <div class="passo" id="passoPapel">
+    <div class="selo">Sala <b id="salaEscolhida">&middot;&middot;&middot;&middot;</b></div>
+    <h1>Este aparelho vai ser&hellip;</h1>
+    <button class="bt pri alto" id="btConectar">
+      <b>O CONTROLE</b><small>comanda o avião que já está naquela tela</small></button>
+    <button class="bt sec alto" id="btMeuAviao">
+      <b>A TELA DO JOGO</b><small>o avião aparece aqui, e o seu controle entra por um QR</small></button>
+    <div class="estado" id="estadoSensor"><span class="luz"></span><span id="estadoSensorTxt">verificando o sensor&hellip;</span></div>
+    <button class="bt lnk" id="btTrocaSala">trocar de sala</button>
+  </div>
 </div>
 
 <!-- ============ TELA 2: o controle ============ -->
@@ -831,10 +862,27 @@ const elCodigo = $('codigo');
 elCodigo.addEventListener('input', () => { elCodigo.value = elCodigo.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); });
 elCodigo.addEventListener('keydown', e => { if (e.key === 'Enter') $('btConectar').click(); });
 
-$('btConectar').onclick = async () => {
-  const codigo = elCodigo.value.trim().toUpperCase();
-  if (codigo.length !== 4){ erro('O código tem 4 letras — está escrito na TV.'); return; }
+/* --- OS DOIS PASSOS ---------------------------------------------------------
+   `mostraPasso` é a tela inteira: um passo aparece, o outro some. O código
+   vive no campo do passo 1 e é lido pelos dois botões do passo 2 — assim
+   "trocar de sala" é só voltar, sem guardar estado em lugar nenhum. */
+function mostraPasso(qual){
+  $('passoSala').classList.toggle('ver', qual === 'sala');
+  $('passoPapel').classList.toggle('ver', qual === 'papel');
+  if (qual === 'papel') $('salaEscolhida').textContent = elCodigo.value.trim().toUpperCase();
+}
+function salaValida(){
+  const c = elCodigo.value.trim().toUpperCase();
+  if (c.length !== 4){ erro('O código tem 4 letras — está na tela de quem abriu o jogo.'); return null; }
   $('erro').style.display = 'none';
+  return c;
+}
+$('btSala').onclick = () => { if (salaValida()) mostraPasso('papel'); };
+$('btTrocaSala').onclick = () => { mostraPasso('sala'); elCodigo.focus(); elCodigo.select(); };
+
+$('btConectar').onclick = async () => {
+  const codigo = salaValida();
+  if (!codigo) { mostraPasso('sala'); return; }
   try { if (!(await Controle.pedirPermissao())) erro('Permissão de movimento negada; dá para jogar arrastando o dedo no horizonte.'); } catch(e){}
   Controle.escutar();
   $('telaCodigo').style.display = 'none';
@@ -847,9 +895,15 @@ $('btCalibrar').onclick = () => { Controle.calibrar(); vibra(30); };
 $('btComecar').onclick  = () => { if (conn && conn.open) conn.send({ t: 'botao', b: 'comecar' });
                                   Controle.calibrar(); tentaTravarDeitado(); };
 
-// código vindo pelo endereço (?sala=ABCD), por exemplo lendo o QR da TV
+/* Código vindo pelo endereço (?sala=ABCD) — quem leu o QR já respondeu a
+   primeira pergunta sem saber, então o passo 1 seria uma tela a mais só para
+   confirmar o que já está escrito. Pula direto para a segunda, que continua
+   mostrando a sala em cima e tem "trocar de sala" para quem errou de QR. */
 const salaUrl = new URLSearchParams(location.search).get('sala');
-if (salaUrl){ elCodigo.value = salaUrl.toUpperCase().slice(0, 4); }
+if (salaUrl){
+  elCodigo.value = salaUrl.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0, 4);
+  if (elCodigo.value.length === 4) mostraPasso('papel');
+}
 
 /* --- A SEGUNDA PORTA: levar o próprio avião ---------------------------------
    Este arquivo é o CONTROLE: ele não voa nada, ele manda comandos para uma
@@ -860,8 +914,8 @@ if (salaUrl){ elCodigo.value = salaUrl.toUpperCase().slice(0, 4); }
    O código do QR serve para os dois caminhos sem mudar nada: para o copiloto
    é a sala onde ele entra, para o avião é o código da batalha. */
 $('btMeuAviao').onclick = () => {
-  const cod = elCodigo.value.trim().toUpperCase();
-  if (cod.length !== 4){ erro('O código tem 4 letras — está escrito na tela de quem chamou.'); return; }
+  const cod = salaValida();
+  if (!cod) { mostraPasso('sala'); return; }
   const u = new URL(location.href);
   u.pathname = u.pathname.replace(/[^/]*$/, 'aviao3d.html');
   const sv = new URLSearchParams(location.search).get('servidor');

@@ -14,6 +14,11 @@
      foi escrita para as duas telas do jogo e pegava eles também: o código do
      convite ia parar grudado no canto de cima, longe da sua legenda. */
   #qr, #qrJogo{position:static;inset:auto}
+  #euSou{margin:10px 0 2px;padding:9px 12px;border-radius:10px;font-size:13.5px;text-align:center;
+         background:rgba(92,200,255,.10);border:1px solid rgba(92,200,255,.28);color:#cfe6fb}
+  #euSou b{color:#fff}
+  .rotG{font-size:13px;letter-spacing:.6px;color:#9fd4ff;text-transform:none;font-weight:800}
+  #sala.chama{border-color:rgba(92,200,255,.6);box-shadow:0 0 0 2px rgba(92,200,255,.18)}
   #hud{pointer-events:none;z-index:2}
   .painel{position:fixed;z-index:3;pointer-events:none;background:rgba(8,12,26,.55);
           border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:9px 13px;
@@ -31,8 +36,13 @@
   /* motor: potência e nitro, do lado oposto aos botões de baixo */
   #cMotor{bottom:14px;right:14px;text-align:right;min-width:152px}
   /* trem, flape e velocidade: o painel do pouso */
-  #batalha{width:100%;display:flex;flex-direction:column;gap:6px;
-           border-top:1px solid rgba(255,255,255,.10);padding-top:12px}
+  /* As duas caixas da capa precisam parecer DUAS COISAS. Antes uma era um
+     bloco solto e a outra vinha depois de um risquinho, e as duas liam como
+     "campo de código" — a pessoa não sabia qual era qual. Agora são dois
+     cartões iguais entre si e separados do resto. */
+  #sala, #batalha{width:100%;display:flex;flex-direction:column;gap:6px;
+           background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.11);
+           border-radius:14px;padding:12px 13px}
   #codBatalha{flex:1;min-width:0;font:900 22px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.28em;
         text-align:center;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.06);
         border:2px solid rgba(255,255,255,.18);border-radius:10px;padding:10px 6px 10px 14px;outline:none}
@@ -163,6 +173,9 @@
       color:#dce5f5;border-radius:10px;padding:9px 12px;font:700 14px/1 inherit;cursor:pointer}
   #btVisao{left:14px;bottom:14px;font-size:22px;padding:7px 11px}
   #btQual{left:70px;bottom:14px}
+  #btSom{display:none;left:50%;transform:translateX(-50%);bottom:14px;
+         background:rgba(255,170,60,.18);border-color:rgba(255,190,90,.55);color:#ffe0ad;font-weight:800}
+  #btSom.ver{display:block}
   /* ---- capa ---- */
   /* ---- sala e convite ---- */
   .estado{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#9fb1cf;
@@ -171,7 +184,6 @@
   .estado.ok{color:#a9ecc4;border-color:rgba(94,255,154,.3)} .estado.ok .luz{background:#5eff9a;box-shadow:0 0 9px #5eff9a}
   .estado.nao{color:#ffc9c9;border-color:rgba(255,90,90,.3)} .estado.nao .luz{background:#ff6a6a}
   .estado.meio{color:#ffe1a8;border-color:rgba(255,194,77,.35)} .estado.meio .luz{background:#ffc24d}
-  #sala{width:100%;display:flex;flex-direction:column;gap:12px}
   .salaLinha{display:flex;gap:16px;align-items:center}
   @media (max-width:520px){ .salaLinha{flex-direction:column} }
   #qr{width:min(42vw,200px);height:min(42vw,200px);background:#fff;border-radius:12px;padding:8px;display:none}
@@ -266,6 +278,9 @@
 </div>
 <button class="bt" id="btVisao" title="cabine / de fora (V)">&#128065;</button>
 <button class="bt" id="btQual" title="qualidade do desenho">alto</button>
+<!-- Só aparece quando o som ESTÁ mudo. Ver botão de som numa tela que já
+     tem som é ruído; não ver nenhum numa tela muda é o que aconteceu. -->
+<button class="bt" id="btSom" title="o navegador só solta o som depois de um toque NESTA tela">&#128263; ligar o som</button>
 
 <div id="capa">
   <div class="cartao">
@@ -275,30 +290,37 @@
        sombra no chão e névoa. Incline o celular para virar, puxe para levantar o nariz.</p>
     <div id="placar"></div>
 
-    <!-- a sala: mesmo protocolo do jogo em 2D, então o controle.html que já
-         existe conecta aqui sem mudar nada -->
+    <!-- ESTA TELA É A TELA DO JOGO. Diga isso, em letra grande, antes de
+         qualquer outra coisa: metade da confusão era a pessoa não saber em
+         que ponta da corda ela estava. -->
+    <div id="euSou">Esta é a <b>tela do jogo</b> — o avião voa aqui.</div>
+
+    <!-- CAIXA 1: LIGAR UM CELULAR NESTA TELA.
+         Antes o título era "Código da sala", que não diz o que a sala faz. -->
     <div id="sala">
-      <div class="estado" id="estadoSala"><i class="luz"></i><span id="estadoTxt">abrindo a sala…</span></div>
+      <div class="rot rotG">1 &middot; Ligar um celular nesta tela</div>
+      <p class="txt" style="text-align:left;font-size:12.5px;margin:2px 0 8px">
+         Para <b>comandar este avião</b> pela inclinação — o seu controle, ou um
+         copiloto e um artilheiro junto com você.</p>
       <div class="salaLinha">
         <canvas id="qr" width="220" height="220"></canvas>
         <div class="salaTxt">
-          <div class="rot">Código da sala</div>
+          <div class="rot">Código desta tela</div>
           <div class="cod" id="codigo">····</div>
           <p class="txt" style="text-align:left;font-size:13px">Aponte a câmera do celular no QR,
              ou abra <b id="url">…</b> e digite o código.</p>
-          <p class="txt" style="text-align:left;font-size:12.5px;color:#7d8cab;margin-top:6px">
-             Quem entrar escolhe: <b>copiloto desta tela</b> (comanda este avião)
-             ou <b>o avião dele</b> no mesmo céu, para a batalha.</p>
         </div>
       </div>
+      <div class="estado" id="estadoSala"><i class="luz"></i><span id="estadoTxt">abrindo a sala…</span></div>
     </div>
 
-    <!-- BATALHA: entrar no céu de outra pessoa -->
+    <!-- CAIXA 2: IR PARA O CÉU DE OUTRA TELA. Coisa completamente diferente
+         da caixa 1, e antes as duas tinham a mesma cara. -->
     <div id="batalha">
-      <div class="rot">Batalha aérea</div>
-      <p class="txt" style="text-align:left;font-size:12.5px;margin:6px 0 8px">
-        Quem já está voando tem um <b>código</b> na tela. Digite o dele aqui para
-        cair no mesmo céu — e poder derrubar e ser derrubado.</p>
+      <div class="rot rotG">2 &middot; Voar no céu de outra tela</div>
+      <p class="txt" style="text-align:left;font-size:12.5px;margin:2px 0 8px">
+        Opcional. Digite o código <b>da tela dela</b> e vocês dois passam a se ver
+        — e a poder se derrubar. Cada um continua com o seu próprio controle.</p>
       <div class="salaLinha" style="gap:8px">
         <input id="codBatalha" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD">
         <button class="op" id="btBatalha">Entrar na batalha</button>
@@ -7250,7 +7272,7 @@ let vida=100;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
 let jogando=false, caindo=false, giroQueda=0, vq=0, motivoQueda='';
-let cockpit=false, infinito=true, qualidade=2;
+let cockpit=false, infinito=true, munInfinita=true, qualidade=2;
 /* a torre do copiloto: desvio da mira em relação ao nariz, dentro de um cone */
 let miraX=0, miraY=0, temArtilheiro=false;
 const MIRA_MAX = 0.42;
@@ -7265,6 +7287,11 @@ function direcaoDaMira(){
 let tecla={esq:false,dir:false,cima:false,baixo:false,lemeE:false,lemeD:false,mais:false,menos:false};
 let toqueX=0, toqueY=0, usandoToque=false;
 try { if (new URLSearchParams(location.search).get('infinito') === '0') infinito = false; } catch(e){}
+/* MUNIÇÃO INFINITA, no mesmo molde do combustível: ligada para testar, e
+   `?municao=0` no endereço devolve as balas contadas. Sem isso não dá para
+   ficar meia hora provando o míssil perseguidor — acabam as oito e o teste
+   acaba junto. */
+try { if (new URLSearchParams(location.search).get('municao') === '0') munInfinita = false; } catch(e){}
 try { recorde = parseInt(localStorage.getItem('aviao.recorde') || '0', 10) || 0; } catch(e){}
 
 function endireitaEixos(){
@@ -8625,17 +8652,80 @@ function explode(x, y, z, e){
   solta(x,y,z, Math.round(14*e), 0xff3b2f, 150*e, 500);
   bip(90, 0.4, 'sawtooth', 0.16);
 }
-/* o cogumelo do míssil: mesma peça, um quinto do tamanho, e nasce na altura
-   do estouro em vez de brotar do chão */
-function cogumelinho(x, y, z){
-  const antes = cogumelos.length;
-  fazCogumelo(x, z);
-  const c = cogumelos[antes];
-  if (!c) return;
-  c.no.scale.setScalar(NUKE_MISSIL);
-  c.no.position.y = y - CHAO - 600*NUKE_MISSIL;
-  c.t = 3.2;                 // já nasce meio aberto: é um estouro, não um cogumelo lento
-  c.pequeno = true;
+/* --- O ESTOURO DO MÍSSIL ----------------------------------------------------
+   Aqui já morou um COGUMELO em miniatura, de quando o pedido foi "os mísseis
+   têm que ter uma porção nuclear". A ideia estava certa e a peça estava
+   errada: cogumelo é uma coluna que SOBE do chão por dez segundos, e o que
+   acontece num tiro ar-ar é o contrário — estoura em meio segundo, no ar, e
+   some. Encaixar a peça grande encolhida deixava uma torrinha cinza pendurada
+   no céu depois de cada míssil, entulhando a vista bem na hora da briga.
+
+   O que faz um estouro no ar ser lido como estouro são três coisas, nessa
+   ordem de importância:
+
+   1. O ANEL DE CHOQUE. É o que diz "isto explodiu" — um aro fino que abre
+      depressa e some. Sem ele, fogo é só fogo.
+   2. A BOLA DE FOGO, que cresce rápido, escurece de amarelo para laranja e
+      apaga. Curta: meio segundo. Fogo que dura parece cenário.
+   3. A FUMAÇA, que fica um pouco depois de tudo apagar. É ela que deixa a
+      marca no céu — e agora é uma bolinha, não uma torre.
+
+   As faíscas continuam, mas com CACO ESCURO no meio: só pontinhos luminosos
+   ficam parecendo fogo de artifício.
+   ------------------------------------------------------------------------ */
+let bolasFogo = [];
+/* Aro FINO. A primeira versão usava 0,82–1 de espessura e abria até três
+   vezes o raio: na tela virava uma argola de fumaça do tamanho da cidade,
+   pendurada em volta do avião. Anel de choque é um risco de luz, não um pneu. */
+const geoAnel = new THREE.RingGeometry(0.94, 1, 34);
+function bolaDeFogo(x, y, z, raio){
+  /* QUEM SOMA LUZ E QUEM NÃO SOMA.
+
+     A primeira tentativa botou `AdditiveBlending` em tudo, porque somar luz é
+     o que faz fogo parecer fogo e não tinta. Só que somar em cima de um CÉU
+     CLARO satura: claro + laranja = branco. O estouro virou uma bola de leite
+     e o laranja, que é a cor do fogo, sumiu da tela.
+
+     A divisão que funciona é a mesma de uma chama de verdade:
+       · o CORPO da bola tem cor própria e mistura normal — é ele que garante
+         o laranja contra qualquer fundo;
+       · o MIOLO soma, e é só ele que estoura em branco, no meio, onde a
+         chama é mesmo quente demais para ter cor.
+     O anel fica com mistura normal também: aditivo, sobre o céu, ele some. */
+  const pintura = (cor, op) => new THREE.MeshBasicMaterial({ color: cor, transparent: true,
+    opacity: op, depthWrite: false });
+  const luz = (cor, op) => new THREE.MeshBasicMaterial({ color: cor, transparent: true,
+    opacity: op, depthWrite: false, blending: THREE.AdditiveBlending });
+
+  const anel = new THREE.Mesh(geoAnel, pintura(0xfff1c4, 0.9));
+  anel.material.side = THREE.DoubleSide;
+  anel.position.set(x, y, z); anel.scale.setScalar(raio*0.4);
+  cena.add(anel);
+  bolasFogo.push({ no:anel, t:0, dur:0.38, r0:raio*0.4, r1:raio*2.4, tipo:'anel', op:0.9 });
+
+  const corpo = new THREE.Mesh(geoBola, pintura(0xff6a12, 0.96));
+  corpo.position.set(x, y, z); corpo.scale.setScalar(raio*0.3);
+  cena.add(corpo);
+  bolasFogo.push({ no:corpo, t:0, dur:0.50, r0:raio*0.3, r1:raio, tipo:'bola', op:0.96 });
+
+  const miolo = new THREE.Mesh(geoBola, luz(0xffe9a8, 1));
+  miolo.position.set(x, y, z); miolo.scale.setScalar(raio*0.26);
+  cena.add(miolo);
+  bolasFogo.push({ no:miolo, t:0, dur:0.26, r0:raio*0.26, r1:raio*0.62, tipo:'bola', op:1 });
+}
+function passoFogo(dt){
+  for (const b of bolasFogo){
+    b.t += dt;
+    const u = Math.min(1, b.t/b.dur);
+    // abre depressa e desacelera: é assim que o olho espera ver uma onda
+    const f = 1 - Math.pow(1-u, 3);
+    b.no.scale.setScalar(b.r0 + (b.r1-b.r0)*f);
+    b.no.material.opacity = (1-u)*(1-u) * b.op;
+    if (b.tipo === 'anel') b.no.quaternion.copy(cam.quaternion);   // sempre de frente
+  }
+  bolasFogo = bolasFogo.filter(b => {
+    if (b.t >= b.dur){ cena.remove(b.no); b.no.material.dispose(); return false; }
+    return true; });
 }
 function fazCogumelo(x, z){
   const g = new THREE.Group();
@@ -8681,11 +8771,20 @@ function pegaNaNuclear(x, z){
    ------------------------------------------------------------------------ */
 const NUKE_MISSIL = 0.22;                  // fração da nuclear grande
 function estouraMissil(x, y, z){
-  explode(x, y, z, 1.5);
-  clarao = Math.max(clarao, 0.42);
-  solta(x, y, z, 26, 0xffd9a0, 90, 900);
-  solta(x, y, z, 14, 0xff8a3a, 130, 600);
-  cogumelinho(x, y, z);
+  clarao = Math.max(clarao, 0.5);
+  bolaDeFogo(x, y, z, 235);
+  /* Os raios aqui são pequenos de propósito. O estouro antigo soltava bolas de
+     90 a 150, que na escala deste avião (uns 500 de ponta a ponta) são
+     PEDREGULHOS — no primeiro quadro, antes de se espalharem, viravam um
+     borrão preto tapando o próprio fogo. Faísca tem de ser faísca. */
+  solta(x, y, z, 26, 0xffe6b0, 26, 1250);        // faíscas claras, rápidas
+  solta(x, y, z, 18, 0xff7a2f, 34, 820);         // brasas laranja
+  solta(x, y, z, 10, 0x2b2622, 40, 560);         // e caco escuro, que é o que dá peso
+  for (let i = 0; i < 7; i++){                   // a fumaça que fica depois do fogo
+    const r = 150;
+    fumacinha(x + (Math.random()-0.5)*r, y + (Math.random()-0.5)*r, z + (Math.random()-0.5)*r);
+  }
+  bip(70, 0.5, 'sawtooth', 0.2);
   somNuclear(NUKE_MISSIL);
   const d = Math.hypot(aviaoX-x, aviaoY-y, aviaoZ-z);
   const f = Math.max(0, 1 - d/(RAIO_NUKE*NUKE_MISSIL*2.2));
@@ -8878,7 +8977,8 @@ function dispara(){
     return;
   }
   if (municao[arma] <= 0){ bip(120,0.08,'square',0.05); mostraAviso('SEM MUNIÇÃO', '#ff8080', 700); return; }
-  municao[arma]--; recarga = ARMAS[arma].recarga;
+  if (!munInfinita) municao[arma]--;
+  recarga = ARMAS[arma].recarga;
   if (arma === 'bomba'){
     const m = new THREE.Mesh(geoBomba, matBomba); m.castShadow = true; cena.add(m);
     bombas.push({ no:m, tipo:'bomba', x:aviaoX, y:aviaoY-60, z:aviaoZ,
@@ -9217,6 +9317,7 @@ function atualiza(dt){
   }
   faiscas = faiscas.filter(f => { if (f.vida <= 0){ cena.remove(f.no); return false; } return true; });
 
+  passoFogo(dt);
   // cogumelos
   for (const c of cogumelos){
     c.t += dt;
@@ -9858,12 +9959,14 @@ function desenhaHUD(){
     h2.fillStyle = g4; h2.fillRect(W-esp,0,esp,H);
   }
 
-  if (infinito && jogando){
+  if ((infinito || munInfinita) && jogando){
     // no canto de cima à esquerda, abaixo dos painéis: no rodapé ele
     // atravessava a caixa da arma
+    const quais = [infinito && 'combustível', munInfinita && 'munição'].filter(Boolean).join(' e ');
+    const teclas = [infinito && 'I', munInfinita && 'M'].filter(Boolean).join('/');
     h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
     h2.textAlign = 'left'; h2.fillStyle = 'rgba(127,216,255,.7)';
-    h2.fillText('TESTE · combustível infinito (tecla I)', 16,
+    h2.fillText('TESTE · ' + quais + ' sem fim (tecla ' + teclas + ')', 16,
                 Math.max(Batalha.ligada && Batalha.quantos() > 1 ? 246 : 190, H*0.34));
   }
 }
@@ -9878,7 +9981,7 @@ function pinta(){
   $('vComb').textContent = Math.round(pct);
   $('vRec').textContent = Math.round(recorde);
   $('vArma').textContent = ARMAS[arma].nome;
-  $('vMun').textContent = municao[arma];
+  $('vMun').textContent = munInfinita ? '∞' : municao[arma];
   $('vPontos').textContent = pontos;
   $('vAlvos').textContent = alvosDestruidos + '/' + alvosTotal;
   $('vMotor').textContent = turbinando ? 'NITRO' : Math.round(motor*100);
@@ -9961,6 +10064,9 @@ document.addEventListener('keydown', e => {
   if (e.key==='Shift') nitroBotao = true;
   if (e.key==='i'||e.key==='I'){ infinito = !infinito;
     mostraAviso(infinito ? 'COMBUSTÍVEL INFINITO' : 'combustível normal', '#7fd8ff', 1200); }
+  if (e.key==='m'||e.key==='M'){ munInfinita = !munInfinita;
+    if (munInfinita) for (const k in ARMAS) municao[k] = ARMAS[k].municao;
+    mostraAviso(munInfinita ? 'MUNIÇÃO INFINITA' : 'munição normal', '#7fd8ff', 1200); }
   if (e.key===' '){ atirando = true; e.preventDefault(); }
   if (e.key==='Enter' && !jogando) comeca();
 });
@@ -10043,6 +10149,9 @@ function reinicia(){
   Motor.liga();
 }
 function comeca(){
+  /* Também aqui, e não só nos botões: quando o "Começar" vem do celular pela
+     rede, este é o único ponto do código da TELA que sabe que o jogo começou. */
+  ligaAudio();
   reinicia(); jogando = true;
   $('capa').style.display = 'none';
   redimensiona();
@@ -10085,6 +10194,34 @@ function ligaAudio(){
     if (audio.state === 'suspended') audio.resume();
   } catch(e){}
 }
+/* --- O MONITOR MUDO ---------------------------------------------------------
+   Relato do teste: iPhone de controle, monitor sem som nenhum.
+
+   A causa é uma regra do navegador que aqui pegou de lado. Som só sai depois
+   de um gesto DAQUELA página — e quando se joga pelo celular, a página da
+   tela pode não receber gesto nenhum: quem apertou "Começar" foi o telefone,
+   e o `comeca()` chegou pela rede. O navegador não tem como saber que tem
+   gente ali; para ele aquilo é uma aba que quer tocar som sozinha, e ele
+   segura. O jogo rodava perfeito e mudo.
+
+   Duas correções, porque uma só não cobre:
+
+   1. QUALQUER toque na tela serve de chave. Antes só os botões da capa
+      chamavam `ligaAudio()`; agora um clique em qualquer lugar, uma tecla,
+      um toque — tudo destrava. Quem esbarrar no monitor já resolve sem saber.
+
+   2. Se mesmo assim continuar mudo, DIZER. Um botão aparece no rodapé
+      enquanto o som está preso e some no instante em que ele sai. Sem isso a
+      pessoa fica achando que o jogo não tem som — foi o que aconteceu. */
+for (const ev of ['pointerdown', 'touchstart', 'keydown', 'click'])
+  addEventListener(ev, ligaAudio, { passive: true, capture: true });
+
+function somPreso(){ return !audio || audio.state !== 'running'; }
+setInterval(() => {
+  const b = $('btSom'); if (!b) return;
+  b.classList.toggle('ver', jogando && somPreso());
+}, 500);
+$('btSom').onclick = () => { ligaAudio(); Motor.liga(); };
 function telaCheia(){
   try{
     const el = document.documentElement;
@@ -10291,7 +10428,7 @@ const Dedos = (function(){
     num.textContent = Math.round(motor*100) + '%';
     nitCarga.style.height = nitroCarga.toFixed(0) + '%';
     el('dArmaNome').textContent = ARMAS[arma].nome;
-    el('dArmaMun').textContent = 'x' + municao[arma];
+    el('dArmaMun').textContent = munInfinita ? '∞' : 'x' + municao[arma];
     const t = el('dTrem'); t.textContent = 'TREM ' + (trem ? '▼' : '▲'); t.classList.toggle('ligado', trem);
     const f = el('dFlap'); f.textContent = 'FLAPE ' + flap; f.classList.toggle('ligado', flap > 0);
   };
@@ -10565,7 +10702,7 @@ function mandaEstado(){
   Tripulacao.envia({ t:'estado', jogando, acabou: !jogando, dist: Math.round(distancia/METRO),
     comb: Math.round(combustivel), turbo: turbinando, nit: Math.round(nitroCarga),
     pousa: true, trem, flap, chao: noChao, vel: Math.round(voo), estol: voo < velMin(),
-    arma, mun: municao[arma], pontos,
+    arma, mun: munInfinita ? '∞' : municao[arma], pontos,
     alvos: alvosDestruidos + '/' + alvosTotal,
     prog: Math.round(alvosDestruidos/Math.max(1,alvosTotal)*100) });
 }
@@ -10858,6 +10995,15 @@ function abrirSala(){
     if (batalhaPedida && batalhaPedida !== codigo){
       const cx = $('codBatalha'); if (cx) cx.value = batalhaPedida;
       Batalha.entra(batalhaPedida);
+      /* Quem chega por aqui já respondeu as duas perguntas no celular: a sala
+         é a do outro e este aparelho é a TELA. Então a única coisa que ainda
+         falta para ele é o CONTROLE dele — e é exatamente o que a caixa 1 dá.
+         Ela vem acesa e dizendo isso, senão a pessoa cai numa capa com duas
+         caixas de código e volta à estaca zero da confusão. */
+      $('euSou').innerHTML = 'Esta é a <b>tela do jogo</b> e você já está na batalha <b>' +
+        batalhaPedida + '</b>. Falta ligar o <b>seu controle</b>, aqui embaixo.';
+      $('sala').classList.add('chama');
+      $('sala').scrollIntoView({ block:'nearest' });
     }
   });
   /* Uma conexão que chega pode ser um CELULAR (controle) ou outro JOGADOR

@@ -1747,3 +1747,170 @@ justify-content: safe center;   /* para quem conhece */
 `controle.html` no Safari ou dentro do app da câmera — se abrir numa janelinha
 embutida, o pulo para o `aviao3d.html` pode perder a tela cheia. Isso só um
 iPhone de verdade responde.
+
+---
+
+## A entrada, refeita: duas perguntas, dois passos
+
+> *"Quando outra pessoa acessar a página, tem que dar a opção de entrar na sala
+> ou escolher outra sala. Ao fazer isso, tem que selecionar se é a tela do jogo
+> ou do controle. Ao escolher a tela do jogo, tem que dar a opção de usar o QR
+> code para conectar o controle do outro jogador. Tá muito confuso."*
+
+Estava mesmo, e o defeito era meu. Eu tinha resolvido o **mecanismo** — o
+celular já podia virar controle ou trazer o próprio avião — e deixado a porta
+de entrada do jeito que estava: um campo de código e dois botões lado a lado.
+A pessoa digitava quatro letras sem saber o que cada botão ia fazer com elas.
+
+### Duas perguntas não cabem numa tela só
+
+Existem duas perguntas de verdade, e elas são independentes:
+
+1. **Em qual sala?**
+2. **Este aparelho vai ser o quê?** — a tela do jogo, ou o controle
+
+Empilhar as duas numa tela só foi o erro. Agora é uma de cada vez, e o passo 2
+mostra a resposta do passo 1 escrita em cima, com um *trocar de sala* embaixo:
+
+```
+PASSO 1                        PASSO 2
+  Em qual sala?                  SALA PTC9
+    ┌──────┐                   Este aparelho vai ser…
+    │ ABCD │                     [ O CONTROLE            ]
+    └──────┘                     [ A TELA DO JOGO        ]
+    [ Continuar ]                       trocar de sala
+```
+
+Quem chegou pelo QR **já respondeu a primeira pergunta sem saber** — o código
+veio no endereço. Então o passo 1 seria uma tela a mais só para confirmar o que
+já está escrito: ele é pulado, e o *trocar de sala* fica ali para quem leu o QR
+errado.
+
+### E o QR do outro jogador
+
+Quem escolhe **A TELA DO JOGO** já entra na batalha de quem chamou — e cai numa
+capa que, até ontem, tinha duas caixas de código com a mesma cara. Voltava à
+estaca zero.
+
+Agora a capa **diz em que ponta da corda a pessoa está**, e as duas caixas
+deixaram de parecer a mesma coisa:
+
+```
+  Esta é a TELA DO JOGO — o avião voa aqui.
+
+  ┌ 1 · Ligar um celular nesta tela ────────┐   ← QR e código DESTA tela
+  │  para comandar ESTE avião               │
+  └─────────────────────────────────────────┘
+  ┌ 2 · Voar no céu de outra tela ──────────┐   ← o código DA OUTRA
+  │  opcional; vocês se veem e se derrubam  │
+  └─────────────────────────────────────────┘
+```
+
+E para quem chegou pela escolha, a caixa 1 vem **acesa**, dizendo exatamente o
+que falta: *"você já está na batalha PTC9. Falta ligar o seu controle, aqui
+embaixo."*
+
+Medido com quatro páginas, o caminho inteiro:
+
+```
+leu o QR -> caiu no passo "papel", sala PTC9 ...... ✔ não repetiu a pergunta
+"trocar de sala" -> volta ao passo 1 .............. ✔
+escolheu O CONTROLE -> a tela ganhou 1 piloto ..... ✔
+escolheu A TELA DO JOGO -> sala própria RUL8,
+   já na batalha, caixa do QR acesa ............... ✔
+o controle DELE entrou pelo QR DELE ............... ✔
+placar: duas telas, um controle em cada, mesma batalha ✔
+```
+
+---
+
+## O monitor mudo
+
+> *"No outro terminal, com o iPhone, o monitor ficou sem som."*
+
+A causa é uma regra do navegador que aqui pegou de lado. **Som só sai depois de
+um gesto naquela página** — e quando se joga pelo celular, a página da tela pode
+não receber gesto nenhum: quem apertou "Começar" foi o telefone, e o `comeca()`
+chegou pela rede. Para o navegador aquilo é uma aba querendo tocar som sozinha,
+e ele segura. O jogo rodava perfeito e mudo.
+
+Duas correções, porque uma só não cobre:
+
+1. **Qualquer toque na tela serve de chave.** Antes só os botões da capa
+   chamavam `ligaAudio()`. Agora um clique em qualquer lugar, uma tecla, um
+   toque — tudo destrava. Quem esbarrar no monitor resolve sem saber.
+2. **Se ainda assim continuar mudo, dizer.** Um botão 🔇 *ligar o som* aparece
+   no rodapé enquanto o som está preso e some no instante em que ele sai. Sem
+   isso a pessoa fica achando que o jogo não tem som — foi o que aconteceu.
+
+**O que eu não consigo garantir daqui:** o navegador deste contêiner solta o som
+sem gesto nenhum, então a trava de verdade (iPhone, Chrome de mesa) não dá para
+reproduzir. O que ficou provado é a lógica — com o áudio preso na mão, o aviso
+aparece, o botão destrava e o motor pega:
+
+```
+começou pelo celular, sem tocar no monitor:
+  áudio=suspended, botão "ligar o som" aparece ... ✔
+tocou no botão: áudio=running, motor ligado,
+  e o aviso sumiu ................................ ✔
+clique em lugar nenhum da tela: áudio -> running   ✔
+```
+
+---
+
+## Munição infinita para teste
+
+No mesmo molde do combustível infinito que já existia: ligada por padrão, tecla
+**M** liga e desliga, `?municao=0` no endereço devolve as balas contadas. O
+contador, na tela e no celular, mostra **∞**.
+
+Sem isso não dava para ficar meia hora provando o míssil perseguidor — acabavam
+as oito e o teste acabava junto.
+
+---
+
+## O estouro do míssil, sem cogumelo
+
+> *"Tira esse cogumelo do míssil. Tenta melhorar ela."*
+
+Ali morava um cogumelo em miniatura, de quando o pedido foi *"os mísseis têm que
+ter uma porção nuclear"*. A ideia estava certa e a **peça** estava errada:
+cogumelo é uma coluna que sobe do chão por dez segundos, e o que acontece num
+tiro ar-ar é o contrário — estoura em meio segundo, no ar, e some. Encaixar a
+peça grande encolhida deixava uma torrinha cinza pendurada no céu depois de cada
+míssil, entulhando a vista bem na hora da briga.
+
+O que faz um estouro no ar ser lido como estouro são três coisas, nessa ordem:
+
+1. **O anel de choque** — é ele que diz "isto explodiu". Um aro fino que abre
+   depressa e some. Sem ele, fogo é só fogo.
+2. **A bola de fogo**, que cresce rápido e apaga em meio segundo. Fogo que dura
+   parece cenário.
+3. **A fumaça**, que fica um pouco depois de tudo apagar. É ela que deixa a
+   marca no céu — e agora é uma bolinha, não uma torre.
+
+### Três erros no caminho
+
+**O anel virou um pneu.** Espessura 0,82–1 e abertura até 3× o raio: na tela era
+uma argola de fumaça do tamanho da cidade, em volta do avião. Anel de choque é
+um risco de luz — 0,94–1, e abre 2,4×.
+
+**Somar luz em tudo deixou o fogo branco.** `AdditiveBlending` é o que separa
+fogo de tinta, mas somar sobre um **céu claro** satura: claro + laranja =
+branco. O estouro virou uma bola de leite e o laranja sumiu. A divisão que
+funciona é a de uma chama de verdade:
+
+| peça | mistura | por quê |
+|---|---|---|
+| corpo da bola | normal, laranja | garante a cor contra qualquer fundo |
+| miolo | aditiva | só o centro é quente demais para ter cor |
+| anel | normal | aditivo, sobre o céu, ele sumia |
+
+**As faíscas eram pedregulhos.** Raios de 90 a 150 num avião de 500 de ponta a
+ponta: no primeiro quadro, antes de se espalharem, dez bolas escuras empilhadas
+tapavam o próprio fogo. Viraram 26 a 40.
+
+```
+estouro do míssil: cogumelos 0, peças de fogo 3, clarão 0,43, vibrou  ✔
+0,8 s depois: 0 peça(s) de fogo                                      ✔ não deixa entulho
+```
