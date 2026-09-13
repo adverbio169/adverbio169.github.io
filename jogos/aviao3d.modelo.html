@@ -24,6 +24,12 @@
   #barra{height:7px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden;margin-bottom:5px}
   #barra i{display:block;height:100%;width:100%;background:#5eff9a;border-radius:99px;transition:width .15s}
   #cArma{bottom:14px;left:50%;transform:translateX(-50%);text-align:center}
+  /* motor: potência e nitro, do lado oposto aos botões de baixo */
+  #cMotor{bottom:14px;right:14px;text-align:right;min-width:152px}
+  #cMotor .tira{height:7px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden;margin:5px 0}
+  #cMotor .tira i{display:block;height:100%;width:67%;border-radius:99px;background:#5eff9a;transition:width .1s linear}
+  #cMotor .tira.nit i{background:#7fd8ff}
+  #cMotor.turbo{border-color:rgba(127,216,255,.65);box-shadow:0 0 18px rgba(127,216,255,.35)}
   #aviso{position:fixed;z-index:4;top:38%;left:0;right:0;text-align:center;font-size:clamp(20px,4vw,40px);
          font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s;pointer-events:none}
   .bt{position:fixed;z-index:5;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.6);
@@ -86,6 +92,11 @@
   <div class="val"><span id="vComb">100</span><small>%</small></div></div>
 <div class="painel" id="cArma"><div class="rot">Arma (1 2 3 · espaço atira)</div>
   <div class="val" style="font-size:19px"><span id="vArma">NUCLEAR</span> <small>x<span id="vMun">6</span></small></div></div>
+<div class="painel" id="cMotor"><div class="rot">Potência (W/S · Shift nitro)</div>
+  <div class="val"><span id="vMotor">67</span><small>%</small></div>
+  <div class="tira"><i id="barraMotor"></i></div>
+  <div class="rot">Nitro</div>
+  <div class="tira nit"><i id="barraNitro"></i></div></div>
 <div id="aviso"></div>
 <div id="convite" title="outro celular pode entrar a qualquer momento">
   <canvas id="qrJogo" width="180" height="180"></canvas>
@@ -383,6 +394,12 @@ function endireitaEixos(){
    ========================================================================== */
 const CHAO = -700, TETO = 5200;
 const VOO_BASE = 1700, VOO_TURBO = 3000;
+/* ACELERADOR: a potência do controle escolhe a velocidade de cruzeiro entre
+   marcha lenta e potência militar. 0,67 dá exatamente os 1700 de antes, que é
+   onde o acelerador começa — quem não tiver celular voa igual ao de sempre.
+   NITRO: passa por cima de tudo e vai ao VOO_TURBO enquanto houver carga. */
+const VOO_MIN = 700, VOO_MAX = 2200, MOTOR_PADRAO = 0.67;
+const NITRO_GASTO = 26, NITRO_ENCHE = 8.5;
 const MAPA = 60000, METRO = 20;
 const TAXA_ROL = 3.4, TAXA_ARF = 1.5, TAXA_LEME = 0.55;
 const RAIO_PEGA = 340, GASTO = 3.0, GASTO_TURBO = 4.6;
@@ -409,6 +426,7 @@ let aviaoX=0, aviaoY=1500, aviaoZ=0;
 let eixoF={x:0,y:0,z:1}, eixoC={x:0,y:1,z:0}, eixoD={x:1,y:0,z:0};
 let rumo=0, inclinacao=0, arfagem=0, leme=0;
 let voo=VOO_BASE, turbo=0, combustivel=100, distancia=0, recorde=0;
+let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
 let jogando=false, caindo=false, giroQueda=0, vq=0, motivoQueda='';
@@ -424,7 +442,7 @@ function direcaoDaMira(){
   d = { x: d.x*c2 + eixoC.x*s2, y: d.y*c2 + eixoC.y*s2, z: d.z*c2 + eixoC.z*s2 };
   return vnorm(d);
 }
-let tecla={esq:false,dir:false,cima:false,baixo:false,lemeE:false,lemeD:false};
+let tecla={esq:false,dir:false,cima:false,baixo:false,lemeE:false,lemeD:false,mais:false,menos:false};
 let toqueX=0, toqueY=0, usandoToque=false;
 try { if (new URLSearchParams(location.search).get('infinito') === '0') infinito = false; } catch(e){}
 try { recorde = parseInt(localStorage.getItem('aviao.recorde') || '0', 10) || 0; } catch(e){}
@@ -1273,8 +1291,22 @@ function atualiza(dt){
   }
 
   if (turbo > 0){ turbo -= dt; if (turbo <= 0){ turbo = 0; mostraAviso('fim do turbo', '#9fd8ff', 900); } }
-  voo += ((turbo > 0 ? VOO_TURBO : VOO_BASE) - voo) * Math.min(1, dt*2.5);
-  if (!infinito) combustivel -= dt * (turbo > 0 ? GASTO_TURBO : GASTO);
+  /* o nitro só empurra enquanto tem carga; solto, a carga volta sozinha */
+  const querNitro = nitroBotao && nitroCarga > 0;
+  if (querNitro){
+    const antes = nitroCarga;
+    nitroCarga = Math.max(0, nitroCarga - NITRO_GASTO*dt);
+    if (nitroCarga === 0 && antes > 0) mostraAviso('nitro no fim', '#7fd8ff', 800);
+  } else if (nitroCarga < 100){
+    nitroCarga = Math.min(100, nitroCarga + NITRO_ENCHE*dt);
+  }
+  if (tecla.mais)  motor = Math.min(1, motor + dt*0.65);
+  if (tecla.menos) motor = Math.max(0, motor - dt*0.65);
+  turbinando = turbo > 0 || querNitro;
+  const vooAlvo = turbinando ? VOO_TURBO : VOO_MIN + (VOO_MAX - VOO_MIN)*motor;
+  voo += (vooAlvo - voo) * Math.min(1, dt*2.5);
+  // acelerador aberto bebe mais: meia potência gasta bem menos que tudo
+  if (!infinito) combustivel -= dt * (turbinando ? GASTO_TURBO : GASTO*(0.55 + 0.7*motor));
   if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
 
   distancia += voo*dt;
@@ -1291,7 +1323,7 @@ function atualiza(dt){
     t.pego = true; someTambor(t);
     combustivel = Math.min(100, combustivel + (t.azul ? DA_AZUL : DA_NORMAL));
     if (t.azul){
-      turbo = TURBO_SEG; clarao = 0.55;
+      turbo = TURBO_SEG; clarao = 0.55; nitroCarga = 100;
       mostraAviso('TURBO AZUL!', '#7fd8ff', 1600);
       solta(t.x, t.y, t.z, 30, 0x7fd8ff, 70, 700);
       bip(520,0.09,'sine',0.07); setTimeout(()=>bip(1180,0.16,'sine',0.07),140);
@@ -1329,9 +1361,11 @@ function arruma(){
   poeMalha(aviao, aviaoX, aviaoY, aviaoZ, D, C, eixoF);
   aviao.visible = !cockpit;
   for (const j of jatos){
-    j.scale.set(1, turbo > 0 ? 2.4 : 0.9, 1);
-    j.position.z = -250 - (turbo > 0 ? 90 : 0);
-    j.material.opacity = turbo > 0 ? 0.6 : 0.22;
+    // a chama cresce com o acelerador, e estoura no nitro
+    const q = turbinando ? 1 : motor;
+    j.scale.set(1, turbinando ? 2.4 : 0.5 + q*0.7, 1);
+    j.position.z = -250 - (turbinando ? 90 : 0);
+    j.material.opacity = turbinando ? 0.6 : 0.10 + q*0.18;
   }
   for (const o of obstaculos){
     if (!o.no) continue;
@@ -1475,6 +1509,29 @@ function desenhaHUD(){
       }
     }
     h2.textAlign = 'left';
+
+    /* as duas réguas do motor, na mesma tinta verde do resto do HUD: a de
+       cima é o acelerador, a de baixo é a carga do nitro. Ficam na canhoto
+       da tela, onde não atrapalham a mira. */
+    const bx = W*0.075, bw = Math.max(62, W*0.12), bh = Math.max(8, H*0.018);
+    const cor = Math.max(10, H*0.021);           // altura da letra
+    const passo = bh + cor + Math.max(9, H*0.016);
+    const topo = H*0.63;
+    // um vidro escuro atrás, senão o verde some em cima da cidade branca
+    h2.fillStyle = 'rgba(4,10,14,.42)';
+    h2.fillRect(bx - 9, topo - cor - 8, bw + 20, passo*2 + 6);
+    h2.font = '700 ' + cor.toFixed(0) + 'px ui-monospace, monospace';
+    h2.textBaseline = 'alphabetic';
+    const regua = (rot, frac, aceso, i) => {
+      const by = topo + i*passo;
+      h2.fillStyle = aceso ? 'rgba(190,255,240,.98)' : 'rgba(120,255,170,.92)';
+      h2.fillText(rot, bx, by - 4);
+      h2.strokeStyle = 'rgba(120,255,170,.6)'; h2.lineWidth = 1.4;
+      h2.strokeRect(bx + 0.5, by + 0.5, bw, bh);
+      h2.fillRect(bx + 2, by + 2, Math.max(0, (bw - 3)*Math.max(0, Math.min(1, frac))), bh - 3);
+    };
+    regua(turbinando ? 'PWR  MAX' : 'PWR  ' + Math.round(motor*100), turbinando ? 1 : motor, turbinando, 0);
+    regua('NIT  ' + Math.round(nitroCarga), nitroCarga/100, nitroBotao && nitroCarga > 0, 1);
   }
 
   /* o retículo do artilheiro: um ponto do mundo lá na frente, projetado pela
@@ -1516,7 +1573,8 @@ function desenhaHUD(){
   if (infinito && jogando){
     h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
     h2.textAlign = 'center'; h2.fillStyle = 'rgba(127,216,255,.75)';
-    h2.fillText('TESTE · COMBUSTÍVEL INFINITO  (tecla I desliga)', W/2, H - 8);
+    // acima da caixa da arma, senão as duas letras se atravessam
+    h2.fillText('TESTE · COMBUSTÍVEL INFINITO  (tecla I desliga)', W/2, H - 86);
     h2.textAlign = 'left';
   }
 }
@@ -1534,6 +1592,11 @@ function pinta(){
   $('vMun').textContent = municao[arma];
   $('vPontos').textContent = pontos;
   $('vAlvos').textContent = alvosDestruidos + '/' + alvosTotal;
+  $('vMotor').textContent = turbinando ? 'NITRO' : Math.round(motor*100);
+  $('barraMotor').style.width = (turbinando ? 100 : motor*100).toFixed(0) + '%';
+  $('barraNitro').style.width = nitroCarga.toFixed(0) + '%';
+  $('barraNitro').style.background = nitroCarga < 15 ? '#ff6a6a' : '#7fd8ff';
+  $('cMotor').classList.toggle('turbo', turbinando);
 }
 
 /* --- o laço --- */
@@ -1583,6 +1646,9 @@ document.addEventListener('keydown', e => {
   if (e.key==='2') trocaArma('missil');
   if (e.key==='3') trocaArma('metralha');
   if (e.key==='v'||e.key==='V') cockpit = !cockpit;
+  if (e.key==='w'||e.key==='W') tecla.mais=true;
+  if (e.key==='s'||e.key==='S') tecla.menos=true;
+  if (e.key==='Shift') nitroBotao = true;
   if (e.key==='i'||e.key==='I'){ infinito = !infinito;
     mostraAviso(infinito ? 'COMBUSTÍVEL INFINITO' : 'combustível normal', '#7fd8ff', 1200); }
   if (e.key===' '){ atirando = true; e.preventDefault(); }
@@ -1596,7 +1662,12 @@ document.addEventListener('keyup', e => {
   if (e.key==='a'||e.key==='A') tecla.lemeE=false;
   if (e.key==='d'||e.key==='D') tecla.lemeD=false;
   if (e.key===' ') atirando = false;
+  if (e.key==='w'||e.key==='W') tecla.mais=false;
+  if (e.key==='s'||e.key==='S') tecla.menos=false;
+  if (e.key==='Shift') nitroBotao = false;
 });
+// perder o foco da janela com a tecla presa deixava o nitro ligado para sempre
+addEventListener('blur', () => { nitroBotao = false; tecla.mais = tecla.menos = false; });
 
 /* dedo na tela: arrastar vira/levanta, tocar atira */
 let toqueIni = null;
@@ -1625,6 +1696,7 @@ function reinicia(){
   camF = {x:0,y:0,z:1}; camC = {x:0,y:1,z:0}; camD = {x:1,y:0,z:0};
   camPos.set(0, 1710, -CAMD);
   voo = VOO_BASE; turbo = 0; combustivel = 100; distancia = 0;
+  nitroCarga = 100; nitroBotao = false; turbinando = false;
   pontos = 0; alvosDestruidos = 0; venceu = false;
   arma = 'bomba'; recarga = 0; atirando = false; leme = 0; miraX = 0; miraY = 0;
   municao = {}; for (const k in ARMAS) municao[k] = ARMAS[k].municao;
@@ -1751,6 +1823,8 @@ const Tripulacao = {
     if (i < 0) return;
     const era = this.membros[i].papel;
     this.membros.splice(i, 1);
+    // o celular do piloto sumiu com o dedo no nitro: solta, senão fica ligado
+    if (era === 'piloto') nitroBotao = false;
     if (era === 'piloto'){
       const novo = this.membros[0];
       if (novo){ novo.papel = 'piloto'; this.avisaPapel(novo); }
@@ -1771,6 +1845,9 @@ const Tripulacao = {
     if (d.t === 'eixo'){
       if (m.papel === 'piloto'){
         Controle.volante = d.v; Controle.manche = d.m; Controle.leme = d.r || 0;
+        // acelerador e nitro viajam junto com os eixos, 30x por segundo
+        if (d.p !== undefined) motor = Math.max(0, Math.min(1, d.p));
+        nitroBotao = !!d.n;
         Controle.modo = 'sensor'; Controle.ultimo = Date.now();
         Controle.ultimoMov = Date.now();
         usandoToque = false;
@@ -1807,7 +1884,8 @@ const Tripulacao = {
 };
 function mandaEstado(){
   Tripulacao.envia({ t:'estado', jogando, acabou: !jogando, dist: Math.round(distancia/METRO),
-    comb: Math.round(combustivel), turbo: turbo > 0, arma, mun: municao[arma], pontos,
+    comb: Math.round(combustivel), turbo: turbinando, nit: Math.round(nitroCarga),
+    arma, mun: municao[arma], pontos,
     alvos: alvosDestruidos + '/' + alvosTotal,
     prog: Math.round(alvosDestruidos/Math.max(1,alvosTotal)*100) });
 }

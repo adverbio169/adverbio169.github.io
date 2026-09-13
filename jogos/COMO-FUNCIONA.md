@@ -638,3 +638,106 @@ O sintoma enganava: o celular mostrava "ARTILHEIRO" e a torre até respondia
 (porque o tratador de dados continuava preso na conexão), mas a tela dizia que
 só havia um jogador. A correção são duas linhas: só mandar para quem já abriu,
 e **erro solto não é despedida** — quem sai, sai pelo `close` ou pelo silêncio.
+
+---
+
+## Esquerda e direita trocadas na versão 3D
+
+O Brunno testou a versão 3D e disse: *"os controles estão invertidos, a
+esquerda e a direita"*. Inclinar para a direita virava para a esquerda.
+
+A causa não estava no controle nem no sensor, e sim na **mão do sistema de
+eixos**. O avião guarda três vetores: `eixoF` (o nariz), `eixoC` (o teto) e
+`eixoD` (a asa direita). O `eixoD` era calculado assim:
+
+```js
+eixoD = vcruz(eixoC, eixoF);      // teto × nariz
+```
+
+Num sistema **destro**, com o nariz apontando para `+z` e o teto para `+y`,
+`teto × nariz` dá `+x` — e, olhando na direção de `+z`, o `+x` fica à
+**esquerda** da tela. Ou seja: aquilo que o código chamava de "asa direita"
+era a asa esquerda o tempo todo.
+
+Por que ninguém tinha notado em 2D? Porque o desenhador do jogo em 2D é feito
+à mão e está **espelhado do mesmo jeito**. Dois erros que se cancelam. Quando
+a mesma conta foi entregue ao three.js — que usa a convenção certa — o
+espelho sumiu e o erro apareceu sozinho.
+
+A medida que provou isso: projetar um ponto colado na asa "direita" e ver de
+que lado da tela ele cai.
+
+```
+3D  · ponto na ASA DIREITA aparece em x=-5645 (centro é 640) -> ESQUERDA  ✘
+2D  · ponto na ASA DIREITA aparece em x= 6112 (centro é 640) -> DIREITA   ✔
+```
+
+A correção é uma linha, `eixoD = vcruz(eixoF, eixoC)`, mais o `rumo` e as duas
+funções que traduzem rumo em direção (`dirDoRumo`, `rumoDe`), que precisavam
+concordar com o eixo novo. Depois disso os dois medem igual. **A versão 2D
+ficou como estava de propósito**: está espelhada por dentro, mas é coerente
+consigo mesma e o jogo se comporta certo — mexer ali só criaria um segundo
+bug.
+
+## O acelerador e o nitro
+
+Pedido: *"um acelerador no controle no lado direito, e no lado esquerdo o
+botão do nitro"*.
+
+Até aqui o avião voava sempre à mesma velocidade (`VOO_BASE`, 1700) e só
+acelerava quando pegava um tambor azul. Agora a velocidade de cruzeiro é
+escolhida pelo dedo:
+
+```
+potência 0     -> VOO_MIN  700     (marcha lenta)
+potência 0,67  -> VOO_BASE 1700    (exatamente o de antes)
+potência 1     -> VOO_MAX  2200    (potência militar)
+nitro          -> VOO_TURBO 3000
+```
+
+O acelerador começa em **0,67** de propósito: quem joga no teclado e nunca
+encostar nele voa igual ao de sempre. E o combustível passou a acompanhar o
+acelerador (`GASTO * (0,55 + 0,7 × potência)`) — voar devagar rende mais
+quilômetro.
+
+O **nitro** é de segurar e tem carga própria: gasta 26 por segundo, enche 8,5
+por segundo sozinho, e o tambor azul enche até em cima. Sem carga, o botão
+apaga e o avião volta à potência do acelerador.
+
+### Três decisões que valem explicar
+
+**1. O acelerador é uma alavanca, não um par de botões.** O dedo pousa na
+altura que quer e a potência salta para lá. É a mesma ideia do seletor de
+armas: nada que obrigue a olhar para o celular. E, como reforço, ele **vibra a
+cada 10%** — um toque curto nos degraus, dois no cheio, um longo no vazio.
+Dá para ajustar a potência com os olhos na tela grande.
+
+**2. Os dois viajam dentro do pacote de eixos, não em mensagem própria.** O
+canal do controle é o **não confiável** (rápido, mas perde pacote). Uma
+mensagem `{t:'motor', v:0.8}` solta que se perdesse deixaria o avião na
+potência errada até o dedo se mexer de novo. Indo junto com os eixos, 30 vezes
+por segundo, um pacote perdido não custa nada: o próximo já corrige. Custa
+dois números a mais por pacote.
+
+**3. O nitro solta sozinho quando o celular some.** Se o piloto sai da sala
+com o dedo no botão, o `nitroBotao` fica ligado para sempre e o avião não
+desacelera nunca. Quem sai, solta — e o mesmo vale para a janela que perde o
+foco com o Shift apertado.
+
+### O erro do caminho: a tira ficava larga e baixa deitada
+
+O CSS do controle deitado estava escrito como `body.paisagem .motor { width: ... }`,
+e não pegava. O motivo é **especificidade**: `#acel { width:100%; max-width:340px }`
+é uma regra de **id**, e uma regra de id ganha de uma regra de classe por mais
+classes que ela tenha. A tira continuava com 340×74 no meio da tela, por cima
+do botão de fogo. A correção foi trocar por `body.paisagem #acel, body.paisagem #nitro`.
+
+Medido depois, em quatro telas (844×390, 667×375, 915×412 e 390×844 girada
+por CSS): nenhuma sobreposição com o gatilho, com o seletor de armas ou com o
+horizonte, nada fora da tela, e o dedo a 2%, 50% e 98% da tira dando 2%, 50% e
+98% de potência.
+
+### Teclado
+
+`W` e `S` mexem o acelerador, `Shift` é o nitro. Vale nas quatro versões,
+porque a conta mora no núcleo compartilhado.

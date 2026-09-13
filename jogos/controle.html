@@ -120,6 +120,48 @@
           font:900 19px/1 inherit;letter-spacing:3px;color:#fff;background:#d8422f;
           box-shadow:0 6px 0 #8f2a1d;user-select:none;-webkit-user-select:none}
   #btFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
+
+  /* ----------------------------------------------------------------------
+     ACELERADOR e NITRO.
+
+     Pedido do Brunno: "um acelerador no controle no lado direito, e no lado
+     esquerdo o botão do nitro". Deitado, cada um fica na BORDA de um lado,
+     debaixo do polegar, e o resto do controle escorrega para dentro para
+     abrir espaço.
+
+     O acelerador é uma alavanca de verdade: o dedo pousa na altura que quer
+     e a potência vai junto. A cada 10% ele dá um toque no vibrador, para
+     ajustar a potência de olho na tela grande, sem olhar o celular.
+     -------------------------------------------------------------------- */
+  .motor{position:relative;border-radius:14px;border:1px solid rgba(255,255,255,.16);
+         background:rgba(255,255,255,.06);user-select:none;-webkit-user-select:none;touch-action:none}
+  #acel{width:100%;max-width:340px;height:74px;overflow:hidden;cursor:ns-resize}
+  /* a mesma barra serve de pé (deitado, tira alta) e deitada (em pé, tira
+     baixa e larga): quem escolhe o eixo é o JS, olhando a forma da tira */
+  /* verde no acelerador, azul no nitro: de relance dá para saber qual é qual
+     sem ler nada */
+  #acelBarra{position:absolute;left:0;bottom:0;width:100%;height:67%;
+             background:linear-gradient(0deg,rgba(94,255,154,.26),rgba(94,255,154,.5));
+             pointer-events:none}
+  #acelNum{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;
+           font:900 20px/1 inherit;color:#e6fff0;text-shadow:0 2px 8px #000;pointer-events:none}
+  #acelRot{position:absolute;left:0;right:0;bottom:4px;text-align:center;font-size:9.5px;
+           letter-spacing:2px;color:#7e93b4;font-weight:700;pointer-events:none}
+  #acel.mexendo{border-color:#5eff9a}
+
+  #nitro{width:100%;max-width:340px;height:74px;overflow:hidden;cursor:pointer;
+         display:flex;align-items:center;justify-content:center}
+  #nitro b{position:relative;z-index:2;font:900 17px/1 inherit;letter-spacing:3px;color:#bfe6ff;
+           text-shadow:0 2px 8px #000}
+  #nitroCarga{position:absolute;left:0;bottom:0;top:0;width:var(--carga,100%);
+              background:linear-gradient(90deg,rgba(92,200,255,.45),rgba(140,230,255,.28));
+              pointer-events:none;transition:width .12s linear}
+  #nitro.ligado{border-color:#7fd8ff;box-shadow:0 0 0 2px rgba(127,216,255,.35),0 0 22px rgba(127,216,255,.45)}
+  #nitro.ligado b{color:#fff}
+  #nitro.vazio{opacity:.45}
+  #nitro.vazio b{color:#ff9a9a}
+  /* o artilheiro não pilota: some com os dois */
+  body.artilheiro #acel, body.artilheiro #nitro{display:none}
   @media (max-height:470px){ .armas{height:60px} .armaAtual{font-size:15px} #btFogo{padding:11px;font-size:16px} }
   /* ----------------------------------------------------------------------
      CELULAR DEITADO: ergonomia de polegar.
@@ -167,6 +209,23 @@ body.paisagem #controle.ver,
   body.paisagem .linha{top:8px;left:calc(10px + env(safe-area-inset-left));width:auto;max-width:none;gap:6px}
   body.paisagem .linha .bt{flex:0 0 auto;width:auto;padding:7px 12px;font-size:12.5px}
   body.paisagem .linha .bt b{font-size:12.5px}
+
+  /* deitado: cada um colado na sua borda; o resto dá passagem */
+  /* os seletores precisam do ID: a regra de tamanho de #acel/#nitro é mais
+     forte que uma de classe, e a tira continuava larga e baixa deitada */
+  body.paisagem #acel, body.paisagem #nitro{width:min(13vw,58px);max-width:none;
+           height:min(62vh,215px);top:48%;transform:translateY(-50%)}
+  body.paisagem #acel{right:calc(8px + env(safe-area-inset-right));left:auto}
+  body.paisagem #nitro{left:calc(8px + env(safe-area-inset-left));right:auto}
+  body.paisagem #acelNum{font-size:min(3.4vw,15px)}
+  body.paisagem #acelRot{font-size:8px;letter-spacing:1px}
+  /* NITRO de pé, para caber na tira estreita */
+  body.paisagem #nitro b{writing-mode:vertical-rl;transform:rotate(180deg);font-size:min(3.2vw,14px);letter-spacing:4px}
+  body.paisagem #nitroCarga{left:0;right:0;top:auto;bottom:0;width:100%;height:var(--carga,100%);
+           background:linear-gradient(0deg,rgba(92,200,255,.5),rgba(140,230,255,.22))}
+  /* o gatilho e o seletor recuam a largura da alavanca */
+  body.paisagem #btFogo{right:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-right))}
+  body.paisagem .armas{left:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-left))}
   body.paisagem #dica{display:none}
   body.paisagem .estado{padding:6px 10px;font-size:11.5px}
   
@@ -213,6 +272,9 @@ body.paisagem #controle.ver,
     <div class="armaLado" id="armaProx"></div>
     <div class="armaDica">‹ deslize ›</div>
   </div>
+  <div class="motor" id="nitro"><i id="nitroCarga"></i><b>NITRO</b></div>
+  <div class="motor" id="acel"><i id="acelBarra"></i>
+    <div id="acelNum">67%</div><div id="acelRot">POTÊNCIA</div></div>
   <button id="btFogo">FOGO</button>
   <div class="linha">
     <button class="bt pri" id="btComecar">Começar</button>
@@ -439,6 +501,7 @@ function conectar(codigo){
         $('pComb').style.color = d.jogando && d.comb < 20 ? '#ff6a6a' : '';
         $('btComecar').textContent = d.jogando ? 'Voando…' : (d.acabou ? 'Voar de novo' : 'Começar');
         $('btComecar').disabled = !!d.jogando;
+        if (d.nit !== undefined) Motor.pintaCarga(d.nit);
         if (d.comb > combAntes + 4) vibra(d.turbo ? 140 : 60);
         if (!d.jogando && jogandoAntes) vibra(320);
         combAntes = d.comb; jogandoAntes = !!d.jogando;
@@ -464,7 +527,8 @@ function vibra(ms){ try { navigator.vibrate && navigator.vibrate(ms); } catch(e)
 setInterval(() => {
   if (!conn || !conn.open) return;
   conn.send({ t: 'eixo', v: +Controle.volante.toFixed(1), m: +Controle.manche.toFixed(1),
-              r: +(Controle.leme || 0).toFixed(2), s: seq++ });
+              r: +(Controle.leme || 0).toFixed(2),
+              p: +Motor.potencia.toFixed(2), n: Motor.nitro ? 1 : 0, s: seq++ });
 }, 33);
 setInterval(() => {
   if (!conn || !conn.open) return;
@@ -648,6 +712,103 @@ function enviaCtl(o){ if (conn && conn.open) conn.send(o); }
   window.addEventListener('mouseup',  puxa(false));
   const vis = document.getElementById('btVisaoC');
   if (vis) vis.addEventListener('click', e => { e.preventDefault(); enviaCtl({ t:'visao' }); });
+})();
+
+/* --- ACELERADOR e NITRO -----------------------------------------------------
+   Pedido: "um acelerador no lado direito do controle, e no lado esquerdo o
+   botão do nitro".
+
+   O ACELERADOR é uma alavanca, não um botão: o dedo pousa na altura que quer
+   e a potência salta para lá — em cima é tudo, embaixo é marcha lenta. A cada
+   10% ele dá um toque no vibrador, então dá para ajustar a potência com os
+   olhos na tela grande, que é a mesma ideia do seletor de armas.
+
+   O NITRO é de SEGURAR: enquanto o dedo estiver em cima, o avião empurra no
+   máximo e gasta a carga; soltando, a carga volta sozinha.
+
+   Os dois viajam DENTRO do pacote de eixos, 30 vezes por segundo. O canal é
+   o não confiável (rápido, mas perde pacote); mandar a cada quadro faz um
+   pacote perdido não custar nada — a próxima leitura já corrige.
+   ------------------------------------------------------------------------ */
+const Motor = (function(){
+  const PADRAO = 0.67;                         // 67% = a velocidade de cruzeiro de antes
+  const elAcel = document.getElementById('acel');
+  const elBarra= document.getElementById('acelBarra');
+  const elNum  = document.getElementById('acelNum');
+  const elNitro= document.getElementById('nitro');
+  const elCarga= document.getElementById('nitroCarga');
+  const M = { potencia: PADRAO, nitro: false, pintaCarga: () => {} };
+  if (!elAcel || !elNitro) return M;
+
+  let ultimoDegrau = Math.round(PADRAO*10);
+  function poe(v, comToque){
+    v = Math.max(0, Math.min(1, v));
+    M.potencia = v;
+    const pct = (v*100).toFixed(1) + '%';
+    const r = elAcel.getBoundingClientRect();
+    if (r.height >= r.width){                 // tira de pé: a barra sobe
+      elBarra.style.width = '100%';  elBarra.style.height = pct;
+      elBarra.style.borderTop = '2px solid #5eff9a'; elBarra.style.borderRight = '0';
+    } else {                                  // tira deitada: a barra anda para a direita
+      elBarra.style.height = '100%'; elBarra.style.width = pct;
+      elBarra.style.borderRight = '2px solid #5eff9a'; elBarra.style.borderTop = '0';
+    }
+    elNum.textContent = Math.round(v*100) + '%';
+    // quanto mais potência, mais azul acesa a barra
+    elBarra.style.filter = 'saturate(' + (0.7 + v*0.9).toFixed(2) + ')';
+    const deg = Math.round(v*10);
+    if (comToque && deg !== ultimoDegrau){
+      ultimoDegrau = deg;
+      vibra(deg === 10 ? [18,40,18] : deg === 0 ? [40] : 12);
+    }
+  }
+
+  /* A alavanca: o valor sai da posição do dedo dentro da tira.
+     Com a página GIRADA por CSS (iPhone preso deitado), o eixo do dedo que
+     sobe a alavanca é o X da tela, não o Y. getBoundingClientRect já vem
+     girado junto, então basta escolher qual coordenada entra. */
+  function valorDoDedo(x, y){
+    const r = elAcel.getBoundingClientRect();
+    if (r.height >= r.width) return Math.max(0, Math.min(1, 1 - (y - r.top)/Math.max(1,r.height)));
+    return Math.max(0, Math.min(1, (x - r.left)/Math.max(1,r.width)));
+  }
+  let pegou = false;
+  const pega = (x,y) => { pegou = true; elAcel.classList.add('mexendo'); poe(valorDoDedo(x,y), true); };
+  const anda = (x,y) => { if (pegou) poe(valorDoDedo(x,y), true); };
+  const solta= () => { pegou = false; elAcel.classList.remove('mexendo'); };
+  elAcel.addEventListener('touchstart', e => { e.preventDefault(); pega(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
+  elAcel.addEventListener('touchmove',  e => { e.preventDefault(); anda(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
+  elAcel.addEventListener('touchend',   e => { e.preventDefault(); solta(); }, {passive:false});
+  elAcel.addEventListener('touchcancel', solta);
+  elAcel.addEventListener('mousedown', e => { e.preventDefault(); pega(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', e => anda(e.clientX, e.clientY));
+  window.addEventListener('mouseup', () => { if (pegou) solta(); });
+
+  /* o nitro: segurar. mouseup/touchend no MUNDO, não só no botão — tirando o
+     dedo para fora o botão nunca soltava e o nitro ficava preso ligado. */
+  function nitro(lig){
+    if (M.nitro === lig) return;
+    M.nitro = lig;
+    elNitro.classList.toggle('ligado', lig);
+    if (lig) vibra([22,40,22]);
+  }
+  elNitro.addEventListener('touchstart', e => { e.preventDefault(); nitro(true); }, {passive:false});
+  elNitro.addEventListener('touchend',   e => { e.preventDefault(); nitro(false); }, {passive:false});
+  elNitro.addEventListener('touchcancel', () => nitro(false));
+  elNitro.addEventListener('mousedown', e => { e.preventDefault(); nitro(true); });
+  window.addEventListener('mouseup', () => nitro(false));
+  window.addEventListener('blur', () => nitro(false));
+
+  M.pintaCarga = pct => {
+    const v = Math.max(0, Math.min(100, pct));
+    elCarga.style.setProperty('--carga', v.toFixed(0) + '%');
+    elNitro.classList.toggle('vazio', v < 6);
+  };
+  poe(PADRAO, false);
+  M.pintaCarga(100);
+  M.repinta = () => poe(M.potencia, false);   // a tira troca de eixo ao virar a tela
+  window.addEventListener('resize', () => setTimeout(M.repinta, 60));
+  return M;
 })();
 
 /* --- preso deitado ---------------------------------------------------------

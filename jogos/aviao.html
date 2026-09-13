@@ -445,6 +445,13 @@ const CHAO     = -700;     // altura do solo
 const TETO     = 5200;     // altura máxima de voo
 const VOO_BASE = 1700;     // velocidade normal, unidades por segundo
 const VOO_TURBO= 3000;     // velocidade com o combustível azul
+/* ACELERADOR e NITRO, os dois do controle no celular. A potência escolhe a
+   velocidade de cruzeiro entre marcha lenta e potência militar; 0,67 dá
+   exatamente os 1700 de sempre, então quem joga no teclado não sente
+   diferença nenhuma até mexer no acelerador. O nitro passa por cima e vai ao
+   VOO_TURBO enquanto houver carga. */
+const VOO_MIN = 700, VOO_MAX = 2200, MOTOR_PADRAO = 0.67;
+const NITRO_GASTO = 26, NITRO_ENCHE = 8.5;
 const ALCANCE  = 17000;    // até onde se enxerga à frente
 const MAPA     = 60000;    // meio lado do mapa: 120000 u = 6 km de ponta a ponta
 const TAXA_ROL = 3.4;      // rad/s com que o avião acompanha a inclinação da mão
@@ -515,10 +522,11 @@ let cockpit=false;
 let tambores=[], obstaculos=[], predios=[], alvos=[], nuvens=[], particulas=[];
 let bombas=[], tiros=[], cogumelos=[];
 let distancia=0, recorde=0, combustivel=100, turbo=0, voo=VOO_BASE;
+let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
 let jogando=false, caindo=false, giroQueda=0, tremor=0, clarao=0, motivoQueda='';
-let tecla={esq:false,dir:false,cima:false,baixo:false,lemeE:false,lemeD:false};
+let tecla={esq:false,dir:false,cima:false,baixo:false,lemeE:false,lemeD:false,mais:false,menos:false};
 let leme=0;                                  // posição do leme, -1 a 1
 let toqueX=0, toqueY=0, usandoToque=false;
 let vq=0;                                    // velocidade de queda, só na queda
@@ -927,6 +935,7 @@ function reiniciaMundo(){
   endireitaEixos(); poeCamera(); atualizaHorizonte();
   vq = 0;
   combustivel = 100; turbo = 0; voo = VOO_BASE;
+  nitroCarga = 100; nitroBotao = false; turbinando = false;
   pontos = 0; alvosDestruidos = 0; venceu = false;
   arma = 'bomba'; recarga = 0; atirando = false;
   miraX = 0; miraY = 0; leme = 0;
@@ -1825,7 +1834,7 @@ function desenhaAviao(){
   }
 
   // o rastro dos motores, antes da malha para ficar por baixo
-  if (turbo > 0){
+  if (turbinando){
     for (const lado of [-1, 1]){
       const ex = lado*65, ez = 260;
       const a = projetaM(aviaoX + eixoD.x*ex - eixoF.x*ez,
@@ -2317,7 +2326,7 @@ function desenhaCockpit(){
     ctx.fill();
     for (let i = 0; i < 4; i++){
       const acesa = lado < 0 ? (i < 2 ? voo > VOO_BASE*1.05 : combustivel > 25)
-                             : (i % 2 === 0 ? municao[arma] > 0 : turbo > 0);
+                             : (i % 2 === 0 ? municao[arma] > 0 : turbinando);
       ctx.fillStyle = acesa ? 'rgba(120,220,160,.85)' : 'rgba(120,140,170,.20)';
       ctx.fillRect(cxL - W*0.013, cyL - H*0.062 + i*H*0.037, W*0.026, H*0.020);
     }
@@ -2378,7 +2387,7 @@ function desenhaCockpit(){
             alvosDestruidos + '/' + alvosTotal);
 
   // luzes de aviso nas laterais do painel
-  const luzes = [['COMB', combustivel < 20, '#ff5a5a'], ['TURBO', turbo > 0, '#5cc8ff'],
+  const luzes = [['COMB', combustivel < 20, '#ff5a5a'], ['TURBO', turbinando, '#5cc8ff'],
                  ['ALVO', alvos.some(a => a.vivo && longe(a.x,a.z) < 9000), '#ffd257'],
                  [ARMAS[arma].nome.slice(0,5), municao[arma] > 0, ARMAS[arma].cor]];
   luzes.forEach((l, i) => {
@@ -2519,7 +2528,7 @@ function desenha(){
     ctx.fillStyle = 'rgba(150,220,255,' + (clarao*0.55).toFixed(3) + ')';
     ctx.fillRect(0,0,W,H);
   }
-  if (turbo > 0){
+  if (turbinando){
     ctx.save();
     if (cockpit){ caminhoBolha(); ctx.clip(); }   // senão riscam o painel todo
     ctx.strokeStyle = 'rgba(190,230,255,.5)'; ctx.lineWidth = 2;
@@ -2657,7 +2666,7 @@ function explode(x, y, z, escala){
 function derruba(motivo){
   if (caindo) return;
   caindo = true; motivoQueda = motivo;
-  turbo = 0; voo = VOO_BASE;
+  turbo = 0; voo = VOO_BASE; nitroCarga = 100; nitroBotao = false; turbinando = false;
   mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL!' : 'BATEU!', '#ff8080', 2200);
   if (motivo !== 'combustivel') explode(aviaoX, aviaoY, aviaoZ);
   else { bip(160, 0.5, 'sawtooth', 0.10); solta(aviaoX, aviaoY, aviaoZ, 16, 'rgba(60,60,70,.7)', 150, 260, true); }
@@ -2857,8 +2866,22 @@ function atualiza(dt){
     turbo -= dt;
     if (turbo <= 0){ turbo = 0; mostraAviso('fim do turbo', '#9fd8ff', 900); }
   }
-  voo += ((turbo > 0 ? VOO_TURBO : VOO_BASE) - voo) * Math.min(1, dt*2.5);
-  if (!infinito) combustivel -= dt * (turbo > 0 ? GASTO_TURBO : GASTO);
+  /* o nitro só empurra enquanto tem carga; solto, a carga volta sozinha */
+  const querNitro = nitroBotao && nitroCarga > 0;
+  if (querNitro){
+    const antes = nitroCarga;
+    nitroCarga = Math.max(0, nitroCarga - NITRO_GASTO*dt);
+    if (nitroCarga === 0 && antes > 0) mostraAviso('nitro no fim', '#7fd8ff', 800);
+  } else if (nitroCarga < 100){
+    nitroCarga = Math.min(100, nitroCarga + NITRO_ENCHE*dt);
+  }
+  if (tecla.mais)  motor = Math.min(1, motor + dt*0.65);
+  if (tecla.menos) motor = Math.max(0, motor - dt*0.65);
+  turbinando = turbo > 0 || querNitro;
+  const vooAlvo = turbinando ? VOO_TURBO : VOO_MIN + (VOO_MAX - VOO_MIN)*motor;
+  voo += (vooAlvo - voo) * Math.min(1, dt*2.5);
+  // acelerador aberto bebe mais: meia potência gasta bem menos que tudo
+  if (!infinito) combustivel -= dt * (turbinando ? GASTO_TURBO : GASTO*(0.55 + 0.7*motor));
   if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
   if (combustivel < 18 && Math.random() < dt*2.2) mostraAviso('COMBUSTÍVEL BAIXO', '#ffb86b', 700);
 
@@ -2879,7 +2902,7 @@ function atualiza(dt){
     t.pego = true; t.brilho = 1;
     combustivel = Math.min(100, combustivel + (t.azul ? DA_AZUL : DA_NORMAL));
     if (t.azul){
-      turbo = TURBO_SEG; clarao = 0.8; tremor = 8;
+      turbo = TURBO_SEG; clarao = 0.8; tremor = 8; nitroCarga = 100;
       mostraAviso('TURBO AZUL!', '#7fd8ff', 1600);
       solta(t.x, t.y, t.z, 40, '#7fd8ff', 70, 700);
       solta(t.x, t.y, t.z, 18, '#ffffff', 50, 500);
@@ -2956,7 +2979,7 @@ function pinta(){
     elAltMarca.style.bottom = (Math.max(0, Math.min(1, h))*100).toFixed(1) + '%';
   }
   if (elRec)   elRec.textContent = Math.round(recorde);
-  if (elTurbo) elTurbo.classList.toggle('ver', turbo > 0);
+  if (elTurbo) elTurbo.classList.toggle('ver', turbinando);
   if (elSomNivel) elSomNivel.style.width = (Motor.nivel()*100).toFixed(0) + '%';
   const cxArma = document.getElementById('cArma');
   if (cxArma) cxArma.style.display = cockpit ? 'none' : '';
@@ -2972,12 +2995,22 @@ document.addEventListener('keydown', e => {
   if (e.key === '1') trocaArma('bomba');
   if (e.key === '2') trocaArma('missil');
   if (e.key === '3') trocaArma('metralha');
+  if (e.key === 'w' || e.key === 'W') tecla.mais = true;
+  if (e.key === 's' || e.key === 'S') tecla.menos = true;
+  if (e.key === 'Shift') nitroBotao = true;
   if (e.key === 'v' || e.key === 'V') cockpit = !cockpit;
   if (e.key === 'i' || e.key === 'I'){ infinito = !infinito;
     mostraAviso(infinito ? 'COMBUSTÍVEL INFINITO' : 'combustível normal', '#7fd8ff', 1200); }
   if (e.key === ' '){ atirando = true; e.preventDefault(); }
 });
-document.addEventListener('keyup', e => { if (e.key === ' ') atirando = false; });
+document.addEventListener('keyup', e => {
+  if (e.key === ' ') atirando = false;
+  if (e.key === 'w' || e.key === 'W') tecla.mais = false;
+  if (e.key === 's' || e.key === 'S') tecla.menos = false;
+  if (e.key === 'Shift') nitroBotao = false;
+});
+// perder o foco com a tecla presa deixava o nitro ligado para sempre
+addEventListener('blur', () => { nitroBotao = false; tecla.mais = tecla.menos = false; });
 
 let ultimoT=0, sobrando=0;
 const PASSO = 1/60;

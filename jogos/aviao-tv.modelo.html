@@ -811,6 +811,10 @@ const Tripulacao = {
         Controle.volante = d.v; Controle.manche = d.m; Controle.leme = d.r || 0;
         Controle.modo = 'sensor'; Controle.ultimo = Date.now();
         Controle.ultimoMov = Date.now();      // o leme vem pronto: não centra sozinho
+        // acelerador e nitro viajam junto com os eixos, 30x por segundo: no
+        // canal não confiável, repetir sai mais barato que garantir entrega
+        if (d.p !== undefined) motor = Math.max(0, Math.min(1, d.p));
+        nitroBotao = !!d.n;
         if (pausado) retoma();
       } else {
         // o artilheiro move a TORRE, dentro do cone
@@ -866,6 +870,8 @@ function ligaCanalDaTela(){
     if (Tripulacao.membros.length) return;        // a sala já cuida disso
     if (d.t === 'eixo'){
       Controle.volante = d.v; Controle.manche = d.m; Controle.modo = 'sensor'; Controle.ultimo = Date.now();
+      if (d.p !== undefined) motor = Math.max(0, Math.min(1, d.p));
+      nitroBotao = !!d.n;
       if (pausado) retoma();
       return;
     }
@@ -874,7 +880,8 @@ function ligaCanalDaTela(){
   };
 }
 function mandaEstado(){ const pacote = { t: 'estado', jogando, acabou, dist: Math.round(distancia/METRO), comb: Math.round(combustivel),
-                turbo: turbo > 0, arma, mun: municao[arma], pontos, alvos: alvosDestruidos + '/' + alvosTotal,
+                turbo: turbinando, nit: Math.round(nitroCarga),
+                arma, mun: municao[arma], pontos, alvos: alvosDestruidos + '/' + alvosTotal,
                 prog: Math.round(alvosDestruidos/Math.max(1,alvosTotal)*100) };
   if (Tripulacao.membros.length) Tripulacao.envia(pacote); else Canal.envia(pacote); }
 
