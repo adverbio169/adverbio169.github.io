@@ -1843,10 +1843,19 @@ Duas correções, porque uma só não cobre:
    no rodapé enquanto o som está preso e some no instante em que ele sai. Sem
    isso a pessoa fica achando que o jogo não tem som — foi o que aconteceu.
 
-**O que eu não consigo garantir daqui:** o navegador deste contêiner solta o som
-sem gesto nenhum, então a trava de verdade (iPhone, Chrome de mesa) não dá para
-reproduzir. O que ficou provado é a lógica — com o áudio preso na mão, o aviso
-aparece, o botão destrava e o motor pega:
+**Confirmado num iPhone de verdade:** *"o som deu certo no iPhone"*. Aqui o
+navegador do contêiner solta o som sem gesto nenhum, então a trava de verdade
+não dava para reproduzir — só a lógica, com o áudio preso na mão. O aparelho
+respondeu a pergunta que o teste não conseguia responder.
+
+Isto vale anotar porque é o padrão que se repete neste projeto: **o teste prova
+que o código faz o que eu escrevi; só o aparelho prova que era isso que
+precisava ser escrito.** Foi assim com o sentido da rolagem, com o estol de
+cabeça para baixo, com o tremor no celular — e agora com o som. O laço é o
+mesmo: eu meço o que dá para medir daqui, digo em voz alta o que ficou de fora,
+e alguém liga o aparelho.
+
+O que o teste daqui provou:
 
 ```
 começou pelo celular, sem tocar no monitor:
