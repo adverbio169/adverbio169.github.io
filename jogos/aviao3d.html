@@ -13,12 +13,32 @@
   /* ...menos os QR, que são canvas pequenos DENTRO de caixas. A regra de cima
      foi escrita para as duas telas do jogo e pegava eles também: o código do
      convite ia parar grudado no canto de cima, longe da sua legenda. */
-  #qr, #qrJogo{position:static;inset:auto}
+  /* A tela do jogo é um `canvas` preso na janela inteira — e a regra que faz
+     isso pega QUALQUER canvas da página, inclusive as lonas pequenas dos QR.
+     Cada QR novo precisa ser desamarrado aqui, senão ele salta para o canto
+     da tela do tamanho de um cartaz. Já aconteceu duas vezes. */
+  #qr, #qrJogo, #qrPainel{position:static;inset:auto}
   #euSou{margin:10px 0 2px;padding:9px 12px;border-radius:10px;font-size:13.5px;text-align:center;
          background:rgba(92,200,255,.10);border:1px solid rgba(92,200,255,.28);color:#cfe6fb}
   #euSou b{color:#fff}
   .rotG{font-size:13px;letter-spacing:.6px;color:#9fd4ff;text-transform:none;font-weight:800}
   #sala.chama{border-color:rgba(92,200,255,.6);box-shadow:0 0 0 2px rgba(92,200,255,.18)}
+  #btAbreSala{display:none;left:50%;transform:translateX(-50%);top:14px;bottom:auto;
+              font:800 13px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.16em}
+  #btAbreSala.ver{display:block}
+  #painelSala{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;
+              background:rgba(4,7,16,.82);padding:14px;overflow:auto}
+  #painelSala.ver{display:flex}
+  .cartaoSala{position:relative;width:100%;max-width:430px;background:#101728;
+              border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:16px}
+  .fechaSala{position:absolute;right:8px;top:6px;background:none;border:0;color:#9fb0cc;
+             font-size:26px;line-height:1;cursor:pointer;padding:2px 8px}
+  #qrPainel{width:132px;height:132px;background:#fff;border-radius:8px;flex:0 0 auto}
+  #codBatalha2{flex:1;min-width:0;font:900 22px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.28em;
+        text-align:center;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.06);
+        border:2px solid rgba(255,255,255,.18);border-radius:12px;padding:10px 6px 10px 12px;outline:none}
+  #codBatalha2:focus{border-color:#5cc8ff}
+  #capaSala{display:none;width:100%}
   #provaTremor{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:2px}
   #tremorComo{font-size:12.5px;color:#8fa3c4}
   #hud{pointer-events:none;z-index:2}
@@ -49,11 +69,18 @@
         text-align:center;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.06);
         border:2px solid rgba(255,255,255,.18);border-radius:10px;padding:10px 6px 10px 14px;outline:none}
   #codBatalha:focus{border-color:#5cc8ff}
-  #btBatalha{flex:0 0 auto}
+  /* `.op` já foi um estilo de dentro do `#ondeComeca` só, e por isso o botão
+     "Entrar na batalha" — que também é `.op` — vinha sem estilo nenhum, um
+     botão branco de navegador no meio do painel escuro. O estilo é do botão,
+     não do lugar onde ele está: vale para todos, e o `#ondeComeca` só ajusta
+     o que é dele (dividir a linha em dois). */
+  .op{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);
+      color:#9fb1cf;border-radius:10px;padding:10px 12px;font:700 13px/1 inherit;cursor:pointer}
+  .op:active{background:rgba(255,255,255,.11)}
+  .op.ligado{background:rgba(92,200,255,.16);border-color:rgba(92,200,255,.55);color:#dff1ff}
+  #btBatalha, #btBatalha2{flex:0 0 auto}
   #ondeComeca{display:flex;gap:8px;width:100%}
-  #ondeComeca .op{flex:1;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);
-        color:#9fb1cf;border-radius:10px;padding:10px 8px;font:700 13px/1 inherit;cursor:pointer}
-  #ondeComeca .op.ligado{background:rgba(92,200,255,.16);border-color:rgba(92,200,255,.55);color:#dff1ff}
+  #ondeComeca .op{flex:1;padding:10px 8px}
   #cVida{top:96px;right:14px;text-align:right;min-width:150px}
   #barraV{height:7px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden;margin:5px 0}
   #barraV i{display:block;height:100%;width:100%;background:#5eff9a;border-radius:99px;transition:width .12s}
@@ -221,6 +248,25 @@
   #placar{display:none;font-size:15px;line-height:1.9;color:#aebbd4}
   #placar span{color:#5cc8ff;font-weight:800}
   @media (max-height:480px){ h1{font-size:23px} p.txt{font-size:13px} .cartao{gap:10px} }
+
+  /* --- A CAPA NUM CELULAR DEITADO -------------------------------------------
+     Medido: numa tela de 390 de altura, a caixa "entrar na batalha" começava
+     em 647. Fora da tela, e quem rola procurando o botão de jogar passa
+     direto — foi por isso que "os celulares não conseguem entrar na mesma
+     sala". As duas caixas somem e viram um botão que abre o painel da sala,
+     e a capa volta a caber: o que ela precisa mostrar é como COMEÇAR A VOAR.
+
+     Esta regra mora no fim da folha de propósito. Ela já esteve lá em cima e
+     não fazia nada: `#sala, #batalha{display:flex}` vem depois, tem a mesma
+     especificidade, e entre iguais ganha a última. */
+  @media (max-height:560px){
+    #sala, #batalha{display:none}
+    #capaSala{display:block}
+    #capa .cartao{gap:9px}
+    /* o parágrafo de apresentação são três linhas que ninguém lê duas vezes,
+       e são elas que empurram o segundo botão de jogar para fora da tela */
+    #capa > .cartao > p.txt:first-of-type{display:none}
+  }
 </style>
 </head>
 <body>
@@ -280,6 +326,44 @@
 </div>
 <button class="bt" id="btVisao" title="cabine / de fora (V)">&#128065;</button>
 <button class="bt" id="btQual" title="qualidade do desenho">alto</button>
+<!-- ============ O PAINEL DA SALA ==========================================
+     "O jogo nos celulares não consegue entrar na mesma sala. Ao entrar numa
+     sala, tem que ficar o código disponível na tela, ou então o QR."
+
+     Era verdade e tinha uma medida atrás: na capa, num celular deitado de 390
+     de altura, a caixa da batalha começava em 647. Fora da tela. Dava para
+     rolar até ela, mas quem rola procurando o botão de jogar passa direto —
+     e depois, voando, não havia lugar NENHUM onde reler o código.
+
+     Este painel é a resposta: um só, que abre da capa e de dentro do voo, com
+     tudo o que diz respeito a estar acompanhado — o código desta tela, o QR
+     dela, e o campo para entrar no céu de outra pessoa. E o botão que o abre
+     tem o CÓDIGO ESCRITO NELE, então a resposta para "qual é o código?" já
+     está na tela antes de alguém tocar em nada.
+     ==================================================================== -->
+<button class="bt" id="btAbreSala" title="código desta tela, QR e batalha">SALA ····</button>
+<div id="painelSala">
+  <div class="cartaoSala">
+    <button class="fechaSala" id="btFechaSala" title="fechar">&times;</button>
+    <div class="rot rotG" style="margin-bottom:8px">Quem entrar por aqui comanda ESTE avião</div>
+    <div class="salaLinha">
+      <canvas id="qrPainel" width="220" height="220"></canvas>
+      <div class="salaTxt">
+        <div class="rot">Código desta tela</div>
+        <div class="cod" id="codigo3">····</div>
+        <p class="txt" style="text-align:left;font-size:12.5px">Aponte a câmera do celular no QR.
+           Lá ele escolhe: <b>ser o controle</b> deste avião, ou <b>trazer o avião dele</b>
+           para a batalha.</p>
+      </div>
+    </div>
+    <div class="rot rotG" style="margin-top:12px">Ou vá você para o céu de outra tela</div>
+    <div class="salaLinha" style="gap:8px">
+      <input id="codBatalha2" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD">
+      <button class="op" id="btBatalha2">Entrar na batalha</button>
+    </div>
+    <div class="estado" id="estadoBatalha2"><i class="luz"></i><span id="estadoBatalhaTxt2">voando sozinho</span></div>
+  </div>
+</div>
 <!-- Só aparece quando o som ESTÁ mudo. Ver botão de som numa tela que já
      tem som é ruído; não ver nenhum numa tela muda é o que aconteceu. -->
 <button class="bt" id="btSom" title="o navegador só solta o som depois de um toque NESTA tela">&#128263; ligar o som</button>
@@ -330,6 +414,7 @@
       <div class="estado" id="estadoBatalha"><i class="luz"></i><span id="estadoBatalhaTxt">voando sozinho</span></div>
     </div>
 
+    <button class="op" id="capaSala">Sala, QR e batalha aérea</button>
     <div id="erro"></div>
     <div id="ondeComeca">
       <button class="op ligado" id="btPista">Começar na pista</button>
@@ -10517,14 +10602,48 @@ function pintaBatalha(){
     $('salaGente').textContent = Batalha.anfitriao ? 'sala ' + codigo : '';
   }
 }
-(function(){
-  const el = $('codBatalha'), bt = $('btBatalha');
-  if (!el || !bt) return;
-  el.addEventListener('input', () => { el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4); });
+/* Os dois campos de código — o da capa e o do painel — são a MESMA pergunta
+   em dois lugares. Um laço só cuida dos dois, senão eles desandam: a pessoa
+   digita num, abre o outro e vê vazio. */
+for (const [idc, idb] of [['codBatalha','btBatalha'], ['codBatalha2','btBatalha2']]){
+  const el = $(idc), bt = $(idb);
+  if (!el || !bt) continue;
+  el.addEventListener('input', () => {
+    el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
+    const outro = $(idc === 'codBatalha' ? 'codBatalha2' : 'codBatalha');
+    if (outro) outro.value = el.value;
+  });
   el.addEventListener('keydown', e => { if (e.key === 'Enter') bt.click(); });
-  bt.onclick = () => { ligaAudio(); Batalha.entra(el.value); };
-})();
+  /* entrar na batalha FECHA o painel: a pessoa veio aqui para isso, e deixar
+     a folha aberta em cima do céu depois de pronto é só estorvo */
+  bt.onclick = () => { ligaAudio(); Batalha.entra(el.value); mostraSala(false); };
+}
+
+/* --- ABRIR E FECHAR O PAINEL --------------------------------------------
+   O botão vive no alto da tela com o CÓDIGO escrito nele, durante o voo
+   inteiro. É de propósito: a pergunta "qual é o código?" passa a ter resposta
+   sem que ninguém precise tocar em nada, e um toque abre o resto. */
+function mostraSala(ver){
+  $('painelSala').classList.toggle('ver', ver);
+  if (ver){
+    const c = $('codBatalha'); const c2 = $('codBatalha2');
+    if (c && c2) c2.value = c.value;
+    $('estadoBatalhaTxt2').textContent = $('estadoBatalhaTxt').textContent;
+    $('estadoBatalha2').className = $('estadoBatalha').className;
+  }
+}
+$('btAbreSala').onclick = () => mostraSala(!$('painelSala').classList.contains('ver'));
+$('btFechaSala').onclick = () => mostraSala(false);
+$('capaSala').onclick = () => mostraSala(true);
+$('painelSala').addEventListener('click', e => { if (e.target === $('painelSala')) mostraSala(false); });
+addEventListener('keydown', e => { if (e.key === 'Escape') mostraSala(false); });
 setInterval(pintaBatalha, 1000);
+setInterval(() => {
+  const b = $('btAbreSala');
+  if (b) b.classList.toggle('ver', jogando && !!codigo && codigo !== '····');
+}, 500);
+/* o convite pequeno do canto passa a ser um atalho para o painel inteiro */
+$('convite').addEventListener('click', e => { e.stopPropagation(); mostraSala(true); });
 
 $('btSensor').onclick = async () => {
   ligaAudio();
@@ -11061,14 +11180,18 @@ function abrirSala(){
   peer.on('open', () => {
     $('codigo').textContent = codigo;
     const el2 = $('codigo2'); if (el2) el2.textContent = codigo;
+    const el3 = $('codigo3'); if (el3) el3.textContent = codigo;
+    $('btAbreSala').textContent = 'SALA ' + codigo;
+    $('capaSala').textContent = 'Sala ' + codigo + ' · QR e batalha aérea';
     const url = urlDoControle();
     $('url').textContent = url.replace(/^https?:\/\//, '');
     if (/^https?:/.test(location.protocol)){
       desenhaQR($('qr'), url); $('qr').classList.add('ver');
       desenhaQR($('qrJogo'), url);
+      desenhaQR($('qrPainel'), url);
       $('convite').classList.add('ver');
       setTimeout(() => $('convite').classList.add('discreto'), 25000);
-      $('convite').addEventListener('click', () => $('convite').classList.toggle('discreto'));
+
     } else {
       estadoSala('meio', 'aberto como arquivo solto: o celular só entra pelo endereço do site');
       return;

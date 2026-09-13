@@ -2067,3 +2067,77 @@ contêiner. O que ficou provado é que os quatro jogos declaram `playback`, e
 declaram antes do contexto tocar. Se a `navigator.audioSession` não existir no
 iOS desse aparelho, a linha sai de graça e sobra a dica — que aí passa a ser a
 correção inteira.
+
+---
+
+## "Os celulares não conseguem entrar na mesma sala"
+
+> *"Ao entrar numa sala, tem que ficar o código disponível na tela, ou então o
+> QR, para entrar no jogo como copiloto ou fazer a batalha aérea."*
+
+Primeiro medi, porque "não consegue entrar" pode ser rede ou pode ser tela.
+**Dois celulares de verdade**, os dois rodando o jogo, num teste novo:
+
+```
+celular A: sala MGKR | celular B: sala RQEW
+os dois abriram sala ....................................... ✔
+B entrou na sala de A: A vê 2, B vê 2 ...................... ✔
+a caixa "entrar na batalha": topo em y=647, tela de 390 ..... ✘ o dedo NÃO alcança
+```
+
+A rede estava boa. O que não dava era **chegar ao botão**. Todos os meus testes
+anteriores usaram janelas de computador, de 560 a 620 de altura; um celular
+deitado tem 390, e nessa altura a capa vira uma coluna comprida com a caixa da
+batalha **257 pixels abaixo da borda de baixo**. Dava para rolar até lá, mas
+quem rola procurando o botão de jogar passa direto — e depois, voando, não
+havia lugar nenhum onde reler o código.
+
+### Um painel, e o código sempre na tela
+
+A resposta é a que veio no pedido. Um painel só, que abre da capa **e de dentro
+do voo**, com tudo o que diz respeito a estar acompanhado:
+
+- o **código desta tela** e o **QR** dela — quem entrar por aí comanda este avião;
+- o **campo para entrar no céu de outra pessoa**.
+
+E o botão que abre esse painel tem **o código escrito nele** — `SALA CUNN`, no
+alto da tela, o voo inteiro. A pergunta *"qual é o código?"* passa a ter resposta
+sem ninguém tocar em nada.
+
+Na capa de um celular deitado, as duas caixas compridas somem e no lugar entra
+um botão que abre o mesmo painel. A capa volta ao que ela precisa mostrar: como
+**começar a voar**. Num monitor nada muda — lá o QR grande à vista é justamente
+como se traz um celular para dentro.
+
+```
+na capa do celular: botão "Sala EWYR · QR e batalha aérea" em y=207 de 390  ✔
+o painel: código, QR desenhado, campo e botão ao alcance do dedo ......... ✔
+B entrou na sala de A pelo painel: os dois veem 2 ........................ ✔
+voando: o botão do alto diz "SALA EWYR", dentro da tela .................. ✔
+e abre o painel de dentro do voo ......................................... ✔
+```
+
+### Três defeitos que apareceram no caminho
+
+**A regra que não fazia nada.** A media query que esconde as caixas compridas
+começou lá em cima da folha de estilo — e `#sala, #batalha{display:flex}` vem
+depois, com a mesma especificidade. Entre iguais ganha a última, então a regra
+nova era letra morta. Foi para o fim da folha.
+
+**O QR gigante no canto, de novo.** A tela do jogo é um `canvas` preso na janela
+inteira, e a regra que faz isso pega **qualquer** canvas da página. O QR novo
+saltou para o canto do tamanho de um cartaz. Já é a segunda vez: cada QR precisa
+ser desamarrado à mão, e agora a lista está comentada no lugar.
+
+**O `.op` que só existia dentro de uma caixa.** `Entrar na batalha` é `.op`, mas
+o estilo estava escrito como `#ondeComeca .op` — então aquele botão sempre foi
+um botão branco de navegador, na capa e no painel. Estilo é do botão, não do
+lugar onde ele está: `.op` virou geral, e o `#ondeComeca` só ajusta o que é dele.
+
+### Ainda em aberto
+
+Este teste roda os dois celulares **dentro da mesma máquina**. Dois aparelhos de
+verdade em redes diferentes — um no wi-fi, outro no 4G — precisam de um servidor
+TURN para atravessar o NAT, e o PeerJS público não dá isso. Se continuar sem
+entrar com os dois longe um do outro, é esse o próximo lugar para olhar, e não
+a tela.
