@@ -3074,3 +3074,104 @@ vira um pico absurdo). Sem isso o alarme só tocaria para alvo parado.
 *(De brinde, o `fim()` passou a soltar as duas miras: ganhar a missão com um alvo
 travado deixava o alarme tocando na tela de fim, para sempre — o laço morre ali,
 e com ele os `passo()` que desligariam o tom sozinhos.)*
+
+---
+
+## Quatro coisas que só aparecem jogando
+
+### 1. A mira era um risquinho parado no meio
+
+> *"O HUD da metralhadora ficou muito curto ainda, e a extensão dele não
+> acompanha o movimento do avião."*
+
+A linha ia de **28% a 100%** do alcance — e esse trecho inteiro mora perto do
+ponto de fuga, onde a perspectiva amontoa tudo. Dava trinta pixels parados no
+centro da tela, por mais que o avião manobrasse.
+
+Agora começa a **2,5%** do alcance — praticamente no cano — e vai até o fim. O
+pedaço perto do avião é o que se espalha na tela: a linha nasce no nariz e sobe
+até o horizonte, e como uma ponta está colada no avião e a outra está longe,
+**virar varre a linha inteira pela tela**. Os passos dobram (2,5 · 6 · 13 · 26 ·
+50 · 100%) porque na tela a distância anda com o inverso da profundidade — passos
+que dobram no mundo dão pedaços parecidos no vidro. Os traços viraram
+**perpendiculares à linha** em vez de horizontais: numa curva a linha deita, e
+traço horizontal em linha deitada vira escada torta.
+
+### 2. Na cabine só aparecia o ponto do meio
+
+> *"Na visão de simulação parece que está no zero. Só mesmo o central aparece,
+> não aparece o rastro."*
+
+Também certo — e não tem conserto, porque é **geometria**: na cabine a câmera
+fica dentro do avião, olhando ao longo do cano. Uma linha vista de ponta é um
+ponto; os 700 metros de trajetória caem todos no mesmo pixel. É o mesmo motivo
+pelo qual você não enxerga o comprimento de uma flecha que vem na sua direção.
+
+Então na cabine a mira **troca de forma**, como troca num caça de verdade: em vez
+do rastro, um **anel com o ponto no meio** — o *pipper*. O anel dá o tamanho
+angular do alvo, o ponto diz por onde a bala passa, o número embaixo diz até onde
+ela chega. Mesma informação, outro desenho, porque mudou o ponto de vista.
+
+A troca é **medida, não chutada**: se a linha inteira couber em menos de 5% da
+altura da tela, ela não é linha — é ponto, e vira anel. Isso pega a cabine e
+pega também qualquer outro caso em que a câmera fique alinhada com o cano.
+
+### 3. O teto ficava a 295 metros
+
+> *"Aumenta o teto do jogo."*
+
+`TETO` era 5.200 e o chão é -700: a coluna inteira de ar tinha **295 metros**, e
+dava para encostar no limite numa subida só — o aviso "AR RAREFEITO" aparecia no
+meio de manobra. Subiu para 11.000: **585 metros**, o dobro. As nuvens, que moram
+entre 4.200 e 9.400, passaram a ficar *dentro* do espaço de voo em vez de serem
+enfeite inalcançável.
+
+E o tráfego subiu junto, senão a metade de cima do céu seria um deserto: aviões,
+helicópteros e tambores sorteiam a altura com `random × random`, o que empurra o
+sorteio para baixo — a maioria continua onde sempre esteve (o jogo baixo não
+mudou) e uma minoria vive lá em cima, que é o que dá **motivo** para subir.
+
+### 4. O estol chegava cedo demais, e chegava educado
+
+> *"Quando o estol acontece o avião tem que descontrolar um pouco. O estol está
+> acontecendo muito rápido na subida."*
+
+**Cedo demais.** O custo de subir era 6.800, e a escada de ângulos com manete de
+cruzeiro terminava em 55° — que é uma subida que se faz sem pensar. A varredura:
+
+```
+custo    45°    55°    65°    75°    90°
+ 5200   1921   1688   1507   1383   1312   <- sobe reto de cruzeiro: apaga a gravidade
+ 5800   1752   1492   1289    ✘      ✘     <- este
+ 6800   1469    ✘      ✘      ✘      ✘     <- o de antes
+```
+
+5.200 deixava subir na **vertical** com manete de cruzeiro, e isso tira a
+gravidade do jogo — o pedido antigo era justamente pôr a gravidade dentro dele.
+**5.800**: 45° tranquilo, 55° passa já reclamando (é o aviso), 70° para cima
+mata. Manete cheia continua subindo reto, porque empuxo maior que peso sobe reto
+mesmo.
+
+**Educado demais.** O estol era simétrico: o nariz caía reto, e avião que cai
+reto é avião que continua obedecendo. Asa de verdade não larga junto — uma
+descola primeiro e o avião **rola para o lado dela**. É o *wing drop*, e é o que
+transforma um estol num susto.
+
+O lado é sorteado **uma vez, na entrada**, e vale enquanto durar aquele estol.
+Sorteando a cada quadro daria chacoalho de brinquedo; sorteando uma vez o avião
+cai sempre para o mesmo lado — e é isso que dá para corrigir com o manche. Junto
+vai uma guinada no mesmo sentido, porque asa estolada arrasta mais.
+
+**E o nivelador teve que calar a boca.** Na primeira medição o tombo empacava em
+27° — *sempre* 27°, nas seis provas. Número redondo assim é sinal de duas forças
+se anulando, nunca de física: era o nivelador automático puxando de volta com a
+mesma força. E ele é que estava errado ali, porque representa a estabilidade da
+asa, que é justamente o que se perde quando ela estola. Avião estolado não se
+endireita sozinho: é o piloto que endireita, ou ninguém.
+
+```
+a asa larga: bancos de 30°, 30°, -30°, -30°, -30°, -30°   ✔ tomba
+   para os dois lados, sorteado                            ✔
+   sempre para o mesmo lado durante um mesmo tombo         ✔
+   com o manche: 12° contra 30° de mão solta               ✔ dá para corrigir
+```

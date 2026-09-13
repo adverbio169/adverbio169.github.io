@@ -743,7 +743,12 @@ function endireitaEixos(){
 /* =============================================================================
    PARTE 2 — O MUNDO (os mesmos números do jogo em 2D, para o voo ficar igual)
    ========================================================================== */
-const CHAO = -700, TETO = 5200;
+/* O TETO era 5.200 — com o chão em -700, a faixa inteira de voo tinha 295
+   metros. Dava para encostar nele numa subida só, e o "AR RAREFEITO" aparecia
+   no meio de qualquer manobra vertical. Subiu para 11.000: 585 metros de
+   coluna de ar, o dobro, e as nuvens (que moram entre 4.200 e 9.400) passam a
+   ficar DENTRO do espaço de voo em vez de serem enfeite inalcançável. */
+const CHAO = -700, TETO = 11000;
 /* ===========================================================================
    O MULTIPLICADOR DE VELOCIDADE
 
@@ -886,6 +891,7 @@ let rumo=0, inclinacao=0, arfagem=0, leme=0;
 let voo=VOO_BASE, turbo=0, combustivel=100, distancia=0, recorde=0;
 let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
 let noChao=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0, estolando=false;
+let ladoEstol = 0;        // para que lado a asa largou neste estol
 let rolChao = 0;          // o banco que sobrou do toque, escorrendo para zero
 let arfChao=0, rumoChao=0;
 let estresse=0;
@@ -934,7 +940,11 @@ function montaMapa(){
     for (let z = -MAPA; z <= MAPA; z += PASSO_T){
       if (Math.random() < 0.42) continue;
       const tx = x + (Math.random()-0.5)*PASSO_T*0.8, tz = z + (Math.random()-0.5)*PASSO_T*0.8;
-      tambores.push({ x:tx, y: 1200 + Math.random()*1800, z:tz,
+      /* O tráfego subiu junto com o teto. `random*random` empurra o sorteio
+         para baixo: a maioria continua na altura de sempre — o jogo baixo não
+         mudou — e uma minoria vive lá em cima, que é o que dá motivo para
+         subir. */
+      tambores.push({ x:tx, y: 1100 + Math.random()*Math.random()*(TETO*0.78), z:tz,
                       azul: Math.random() < 0.18, pego:false, giro:Math.random()*6.28 });
       /* --- QUEM VOA E QUEM PAIRA ------------------------------------------
          "Não quero mais avião parado no mapa; se for parado que seja um
@@ -952,7 +962,7 @@ function montaMapa(){
       if (sorte < 0.5){
         const tipo = sorte < 0.17 ? 'aviao' : sorte < 0.26 ? 'helicoptero' : 'pombo';
         obstaculos.push({ tipo,
-          x: tx + (Math.random()-0.5)*3000, y: 900 + Math.random()*2200,
+          x: tx + (Math.random()-0.5)*3000, y: 900 + Math.random()*Math.random()*(TETO*0.72),
           z: tz + (Math.random()-0.5)*3000, fase: Math.random()*6.28,
           deriva:(Math.random()-0.5)*300, rumo: Math.random()*6.283,
           /* o avião de rota vai de 900 a 1700 — abaixo do jogador, para dar
@@ -3453,6 +3463,16 @@ function atualiza(dt){
        jogava o avião de lado e não dava para corrigir fino. */
     const pedido = grausParaEixo(e.lat*180, ROL_CHEIO, ROL_MORTO);
     if (pedido !== 0) rol = Math.sign(pedido) * Math.pow(Math.abs(pedido), 1.6) * TAXA_ROL;
+    /* --- E O NIVELADOR CALA A BOCA NO ESTOL -----------------------------------
+       Com a asa largando de um lado, o nivelador virou o inimigo do estol: ele
+       puxava de volta com a mesma força, e o tombo empacava num banco fixo de
+       27° — sempre 27°, em todas as seis provas. Um número redondo assim é
+       sinal de duas forças se anulando, nunca de física.
+
+       E é o nivelador que está errado ali. Ele representa a estabilidade da
+       asa, que é justamente o que se perde quando ela estola. Avião estolado
+       não se endireita sozinho: é o piloto que endireita, ou ninguém. */
+    else if (estolando) rol = 0;
     else if (Math.abs(voltaCurta(inclinacao)) < NIVELA_ATE){
       const erro = voltaCurta(0 - inclinacao) * Math.PI/180;
       rol = Math.max(-NIVELA, Math.min(NIVELA, erro*1.7));
@@ -3627,8 +3647,26 @@ function atualiza(dt){
      estolar — e de quebra matava a DECOLAGEM: com o trem fora o motor só
      entrega 2.800, e a subida de 35° que a rotação produz sozinha custava mais
      do que isso. O avião saía da pista, estolava e voltava a assentar nela.
-     Medido, quadro a quadro, antes de escolher o número. */
-  const SUBIDA_CUSTO = 6800;
+     Medido, quadro a quadro, antes de escolher o número.
+
+     Depois de jogar: "o estol está acontecendo muito rápido na subida". Estava
+     mesmo — com a manete de cruzeiro, 55° já matava, e 55° é uma subida que
+     qualquer avião de jogo faz sem drama. 6.800 foi para 5.200: a mesma
+     escada, com um degrau a mais de fôlego em cima. O que continua matando é
+     puxar SEM potência, que é o erro de verdade e tem de continuar doendo.
+
+     A escada nova, medida na varredura (velocidade mínima 1.280):
+
+         custo    45°    55°    65°    75°    90°
+          5200   1921   1688   1507   1383   1312   <- sobe reto de cruzeiro: demais
+          5800   1752   1492   1289    ✘      ✘     <- este
+          6800   1469    ✘      ✘      ✘      ✘     <- o de antes: 55° matava
+
+     5.200 apagava a gravidade do jogo — com a manete de cruzeiro dava para
+     subir na VERTICAL sem consequência. 5.800 mantém a subida vertical como
+     coisa de manete cheia, deixa 55° passar com aviso e mata dos 70° para
+     cima. */
+  const SUBIDA_CUSTO = 5800;
   voo -= SUBIDA_CUSTO * eixoF.y * dt;
   /* o mergulho ganha velocidade, mas não sem fim: acima do turbo o avião
      entraria em números que nenhuma outra parte do jogo espera */
@@ -3681,6 +3719,9 @@ function atualiza(dt){
   const estolado = voo < velMin()*(estolando ? SAI_ESTOL : 1);
   if (estolado && arfagem > -0.9){
     const falta = Math.min(1, (velMin()*SAI_ESTOL - voo)/(velMin()*0.22));
+    /* o lado da asa que larga é sorteado na ENTRADA, antes de qualquer giro
+       deste quadro: assim o primeiro solavanco já vai para o lado certo */
+    if (!estolando) ladoEstol = Math.random() < 0.5 ? -1 : 1;
     /* ----------------------------------------------------------------------
        O NARIZ CAI PARA A TERRA, não para a barriga do avião.
 
@@ -3707,12 +3748,37 @@ function atualiza(dt){
       eixoC = giraEmTorno(eixoC, h, ang);
       eixoD = giraEmTorno(eixoD, h, ang);
     }
+    /* --- A ASA QUE LARGA PRIMEIRO ----------------------------------------
+       "Quando o estol acontece o avião tem que descontrolar um pouco."
+
+       Está certo, e faltava. Até aqui o estol era simétrico: o nariz caía
+       reto, e um avião que cai reto é um avião que continua obedecendo. Asa
+       de verdade não larga junto — uma das duas descola primeiro, por uma
+       gota de combustível a mais de um lado, um fio de vento, o leme torto —
+       e o avião ROLA para o lado dela. É o "wing drop", e é o que transforma
+       um estol num susto: você está subindo bonito e de repente está de lado.
+
+       O lado é sorteado UMA vez, na entrada, e vale enquanto durar o estol.
+       Sorteando a cada quadro daria um chacoalho de brinquedo; sorteando uma
+       vez dá o que acontece de verdade — o avião cai sempre para o MESMO
+       lado, e é isso que dá para corrigir com o manche, se você reagir.
+
+       Junto vai uma guinada no mesmo sentido: asa estolada arrasta mais, e é
+       esse arrasto assimétrico que, se ninguém fizer nada, vira parafuso.
+       Aqui ele não fecha em parafuso de verdade — só ameaça. */
+    const largou = falta*falta;              // ao quadrado: no comecinho quase não puxa
+    if (Math.abs(ladoEstol) > 0){
+      let r2 = giraPar(eixoD, eixoC, ladoEstol*largou*1.5*dt);
+      eixoD = r2[0]; eixoC = r2[1];
+      r2 = giraPar(eixoF, eixoD, ladoEstol*largou*0.55*dt);
+      eixoF = r2[0]; eixoD = r2[1];
+    }
     endireitaEixos();
     if (!estolando){ estolando = true; somEstol(true); Controles.treme('estol', true); }
     avisouEstol -= dt;
     if (avisouEstol <= 0){ avisouEstol = 1.0; mostraAviso('ESTOL — MAIS POTÊNCIA', '#ff8f6b', 800); }
   } else if (estolando){
-    estolando = false; somEstol(false); Controles.treme('estol', false);
+    estolando = false; somEstol(false); Controles.treme('estol', false); ladoEstol = 0;
   }
   // acelerador aberto bebe mais: meia potência gasta bem menos que tudo
   if (!infinito) combustivel -= dt * (turbinando ? GASTO_TURBO : GASTO*(0.55 + 0.7*motor));
@@ -3998,10 +4064,11 @@ function reguasOnde(){
    redondos, mesmo verde, mesmos riscos curtos e compridos, mesmo ponteiro
    branco. Duas fitas com o mesmo desenho leem-se sem aprender a segunda.
 
-   O TETO do jogo é 5.200 e o chão -700: a faixa inteira em que se voa tem
-   menos de 300 metros. Então a janela é de 60 para cada lado, risco a cada 10
-   e número a cada 50 — mais fino que isso vira grade, mais grosso não mostra
-   nada mexendo. Abaixo de zero não existe altura, e o chão ganha um traço
+   A janela é de 60 metros para cada lado, risco a cada 10 e número a cada 50
+   — mais fino que isso vira grade, mais grosso não mostra nada mexendo. Ela
+   NÃO cobre a coluna inteira de voo (que agora tem 585 metros) e não deve:
+   fita de altura serve para ver a altura MUDANDO, e para isso o que importa é
+   a escala, não o alcance. Abaixo de zero não existe altura, e o chão ganha um traço
    grosso: é o único risco da fita que se deve evitar.
    ------------------------------------------------------------------------- */
 const ALT_JANELA = 60;                 // metros visíveis para cada lado
@@ -4633,9 +4700,27 @@ function desenhaHUD(){
     const naTela3 = k => {
       const d = alcance*k;
       v3.set(aviaoX + T.x*d, aviaoY + T.y*d, aviaoZ + T.z*d).project(cam);
-      return { x:(v3.x*0.5+0.5)*W, y:(-v3.y*0.5+0.5)*H, atras: v3.z > 1 };
+      return { x:(v3.x*0.5+0.5)*W, y:(-v3.y*0.5+0.5)*H, atras: v3.z > 1, k };
     };
-    const pontos4 = [0.28, 0.52, 0.76, 1].map(naTela3);
+    /* --- POR QUE A LINHA COMEÇA COLADA NO NARIZ --------------------------------
+       "O HUD da metralhadora ficou muito curto, e a extensão dele não acompanha
+       o movimento do avião."
+
+       A linha ia de 28% a 100% do alcance — e esse trecho inteiro vive perto do
+       ponto de fuga, onde tudo se amontoa: dava um risquinho de trinta pixels
+       parado no meio da tela. Perspectiva é assim: o que está longe se junta, o
+       que está perto se espalha.
+
+       Agora ela começa a 2,5% — praticamente no cano — e vai até o fim do
+       alcance. O pedaço perto do avião abre bastante na tela, então a linha
+       nasce no nariz e sobe até o horizonte; e como o começo dela está COLADO
+       no avião e o fim está longe, virar o avião varre a linha inteira pela
+       tela. É exatamente o "acompanhar o movimento" que faltava.
+
+       Os passos dobram (2,5 · 6 · 13 · 26 · 50 · 100%) porque na tela a
+       distância anda com o INVERSO da profundidade: passos que dobram no mundo
+       dão pedaços parecidos no vidro. */
+    const pontos4 = [0.025, 0.06, 0.13, 0.26, 0.5, 1].map(naTela3);
     const preso = MiraTiro.bom;
     /* onde está a solução na tela — calculada ANTES, porque é ela que decide
        se ainda cabe escrever o alcance embaixo do círculo */
@@ -4649,22 +4734,75 @@ function desenhaHUD(){
         sol.ax = (v3.x*0.5+0.5)*W; sol.ay = (-v3.y*0.5+0.5)*H;
       }
     }
-    if (!pontos4.some(q => q.atras)){
+    /* --- E QUANDO A LINHA NÃO CABE NA TELA -------------------------------------
+       "Na visão de simulação parece que está no zero: só aparece o central,
+       não aparece o rastro."
+
+       Também está certo, e não é defeito de desenho — é geometria. Na cabine a
+       câmera fica DENTRO do avião, olhando exatamente ao longo do cano. Uma
+       linha vista de ponta é um ponto: os 700 metros de trajetória caem todos
+       no mesmo pixel. Não há como esticar isso; é o mesmo motivo pelo qual você
+       não enxerga o comprimento de uma flecha que vem na sua direção.
+
+       Então na cabine a mira troca de forma, como troca num caça de verdade: em
+       vez do rastro, um ANEL com o ponto no meio — o "pipper". O anel dá o
+       tamanho angular do alvo (alvo que enche o anel está na distância de
+       tiro), o ponto diz onde a bala passa, e o número embaixo diz até onde ela
+       chega. A informação é a mesma; muda o desenho, porque mudou o ponto de
+       vista.
+
+       A escolha é medida, não chutada: se a linha inteira couber em menos de 5%
+       da altura da tela, ela não é linha — é ponto, e vira anel. */
+    const p0 = pontos4[0], pf = pontos4[pontos4.length-1];
+    const vaoLinha = Math.hypot(pf.x-p0.x, pf.y-p0.y);
+    if (!pontos4.some(q => q.atras) && vaoLinha < H*0.05){
+      const r = Math.max(14, H*0.055);
+      h2.strokeStyle = preso ? 'rgba(150,255,190,.95)' : 'rgba(120,255,170,.6)';
+      h2.lineWidth = preso ? 2.4 : 1.6;
+      for (let i = 0; i < 4; i++){          // quatro arcos com folga entre eles
+        h2.beginPath();
+        h2.arc(pf.x, pf.y, r, i*Math.PI/2 + 0.16, (i+1)*Math.PI/2 - 0.16);
+        h2.stroke();
+      }
+      h2.strokeStyle = 'rgba(120,255,170,.85)'; h2.lineWidth = 2;
+      for (const a of [0, Math.PI/2, Math.PI, -Math.PI/2]){   // os riscos do anel
+        const cx = Math.cos(a), sy = Math.sin(a);
+        h2.beginPath();
+        h2.moveTo(pf.x + cx*r*0.72, pf.y + sy*r*0.72);
+        h2.lineTo(pf.x + cx*r*0.94, pf.y + sy*r*0.94);
+        h2.stroke();
+      }
+      h2.fillStyle = 'rgba(150,255,190,.95)';
+      h2.beginPath(); h2.arc(pf.x, pf.y, Math.max(2, H*0.005), 0, 7); h2.fill();
+      h2.textAlign = 'center';
+      h2.font = '700 ' + Math.max(8, H*0.014).toFixed(0) + 'px ui-monospace, monospace';
+      h2.fillStyle = 'rgba(120,255,170,.75)';
+      if (!sol || Math.hypot(sol.x-pf.x, sol.y-pf.y) > r*1.6)
+        h2.fillText(Math.round(alcance/METRO) + 'm', pf.x, pf.y + r + Math.max(14, H*0.028));
+      h2.textAlign = 'left';
+    } else if (!pontos4.some(q => q.atras)){
       h2.strokeStyle = preso ? 'rgba(150,255,190,.95)' : 'rgba(120,255,170,.55)';
       h2.lineWidth = preso ? 2.4 : 1.4;
       h2.beginPath();
       h2.moveTo(pontos4[0].x, pontos4[0].y);
       for (const q of pontos4) h2.lineTo(q.x, q.y);
       h2.stroke();
-      // os traços dos quartos, cada vez menores: é isso que dá a profundidade
+      /* os traços, cada vez menores: é isso que dá a profundidade. São
+         perpendiculares à LINHA, não horizontais — numa curva a linha deita, e
+         traço horizontal em linha deitada vira escada torta. */
       h2.strokeStyle = 'rgba(120,255,170,.8)'; h2.lineWidth = 2;
       pontos4.forEach((q, i) => {
-        if (i === 3) return;
-        const t = Math.max(4, H*0.016*(1 - i*0.26));
-        h2.beginPath(); h2.moveTo(q.x - t, q.y); h2.lineTo(q.x + t, q.y); h2.stroke();
+        if (i === pontos4.length-1) return;
+        const p2 = pontos4[i+1];
+        let dx = p2.x - q.x, dy = p2.y - q.y;
+        const n = Math.hypot(dx, dy) || 1; dx /= n; dy /= n;
+        const t = Math.max(4, H*0.020*(1 - i*0.15));
+        h2.beginPath();
+        h2.moveTo(q.x + dy*t, q.y - dx*t); h2.lineTo(q.x - dy*t, q.y + dx*t);
+        h2.stroke();
       });
       // e o fim do alcance
-      const f = pontos4[3];
+      const f = pontos4[pontos4.length-1];
       h2.strokeStyle = 'rgba(150,255,190,.95)'; h2.lineWidth = 2;
       h2.beginPath(); h2.arc(f.x, f.y, Math.max(5, H*0.013), 0, 7); h2.stroke();
       h2.textAlign = 'center';
