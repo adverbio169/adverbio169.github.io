@@ -879,8 +879,13 @@ function recolocaNuvem(n, emVolta){
    reflexo que corre pela lataria quando o avião vira. Nada disso eu conseguia
    fazer à mão a 60 quadros.                                                */
 function perfilFuselagem(){
-  // raio da fuselagem ao longo do corpo (de z = -175 na cauda a z = +190 no bico)
-  const p = [[-178,13],[-160,20],[-120,26],[-60,31],[0,33],[60,31],[120,23],[168,12],[192,3],[196,0]];
+  /* Raio da fuselagem ao longo do corpo. O perfil antigo era um charuto: subia
+     e descia quase igual dos dois lados, e de longe o avião virava uma bala.
+     Caça tem a cintura mais cheia à frente da asa, afina depressa depois do
+     canopy e termina num bico FINO e comprido. Mais pontos na frente, que é
+     onde a silhueta se reconhece. */
+  const p = [[-182,15],[-172,19],[-150,24],[-120,28],[-86,31],[-50,33],[-14,34],
+             [22,33],[58,31],[92,27],[124,22],[152,16],[176,10],[196,5],[210,2],[214,0]];
   return p.map(q => new THREE.Vector2(q[1], q[0]));
 }
 function fazAsa(pontos, esp, cor, x, y, z, giroZ){
@@ -901,8 +906,8 @@ function montaAviao(corpoCor, detalheCor, vidroCor){
   const g = new THREE.Group();
   const matCorpo   = new THREE.MeshPhongMaterial({ color: corpoCor, shininess: 55, specular: 0x93a4bd });
   const matEscuro  = new THREE.MeshPhongMaterial({ color: detalheCor, shininess: 30, specular: 0x556070 });
-  const matVidro   = new THREE.MeshPhongMaterial({ color: vidroCor, shininess: 110, specular: 0xdfeaff,
-                                                   transparent: true, opacity: 0.92 });
+  const matVidro   = new THREE.MeshPhongMaterial({ color: vidroCor, shininess: 160, specular: 0xffffff,
+                                                   transparent: true, opacity: 0.62 });
   const matBocal   = new THREE.MeshPhongMaterial({ color: 0x2a3038, shininess: 90, specular: 0x8895a8 });
 
   // fuselagem: revolução com normais suaves
@@ -910,57 +915,82 @@ function montaAviao(corpoCor, detalheCor, vidroCor){
   fus.rotation.x = Math.PI/2;          // o eixo do torno passa a apontar para a frente
   fus.castShadow = true; g.add(fus);
 
-  // asa em flecha (o perfil é desenhado no plano x-z e depois deitado)
-  const asaDir = [[20,74],[96,-6],[186,-52],[186,-84],[96,-66],[20,-64]];
+  /* ASA em flecha. A de antes era um losango chato de seis pontos; esta tem
+     bordo de ataque mais em flecha, ponta cortada e uma raiz que avança para
+     a frente (o "LERX" dos caças modernos) — é o que dá a cara de F-18 em vez
+     de aviãozinho de papel. Desenhada no plano x-z e depois deitada. */
+  const asaDir = [[18,96],[54,58],[112,-2],[196,-54],[212,-70],[150,-72],[86,-70],[20,-66]];
   const asaEsq = asaDir.map(p => [-p[0], p[1]]);
-  const asa1 = fazAsa(asaDir, 13, matCorpo, 0, 0, 0); asa1.rotation.x = Math.PI/2; g.add(asa1);
-  const asa2 = fazAsa(asaEsq, 13, matCorpo, 0, 0, 0); asa2.rotation.x = Math.PI/2; g.add(asa2);
+  const asa1 = fazAsa(asaDir, 12, matCorpo, 0, -2, 0); asa1.rotation.x = Math.PI/2; g.add(asa1);
+  const asa2 = fazAsa(asaEsq, 12, matCorpo, 0, -2, 0); asa2.rotation.x = Math.PI/2; g.add(asa2);
 
-  // empenas
-  const empD = [[16,-118],[82,-150],[82,-174],[16,-160]];
+  // empenas horizontais da cauda, também em flecha
+  const empD = [[14,-116],[64,-146],[98,-168],[98,-180],[42,-172],[14,-158]];
   const empE = empD.map(p => [-p[0], p[1]]);
-  const e1 = fazAsa(empD, 12, matCorpo, 0, 0, 0); e1.rotation.x = Math.PI/2; g.add(e1);
-  const e2 = fazAsa(empE, 12, matCorpo, 0, 0, 0); e2.rotation.x = Math.PI/2; g.add(e2);
+  const e1 = fazAsa(empD, 10, matCorpo, 0, -4, 0); e1.rotation.x = Math.PI/2; g.add(e1);
+  const e2 = fazAsa(empE, 10, matCorpo, 0, -4, 0); e2.rotation.x = Math.PI/2; g.add(e2);
 
   /* Derivas duplas. O perfil é desenhado no plano (z, y) — comprimento por
      altura — e o mesmo `fazAsa` serve: basta virar a peça um quarto de volta
      em torno do eixo vertical. O caimento para fora fica num grupo por cima,
      senão a ordem das rotações embaralha tudo. */
-  const der = [[-100, 0], [-128, 74], [-158, 74], [-172, 0]];
+  const der = [[-86, 0], [-120, 86], [-156, 88], [-168, 0]];
   for (const lado of [-1, 1]){
-    const d = fazAsa(der, 10, matCorpo, 0, 0, 0);
+    const d = fazAsa(der, 9, matCorpo, 0, 0, 0);
     d.rotation.y = -Math.PI/2;
     const suporte = new THREE.Group();
     suporte.add(d);
-    suporte.position.set(lado*30, 12, 0);
-    suporte.rotation.z = -lado*0.26;
+    suporte.position.set(lado*32, 14, 0);
+    suporte.rotation.z = -lado*0.30;
     g.add(suporte);
   }
 
-  // motores, com bocal escuro
+  // motores, com bocal escuro e um anel quente na saída
   for (const lado of [-1, 1]){
-    const mot = new THREE.Mesh(new THREE.CylinderGeometry(17, 15, 190, 16), matCorpo);
-    mot.rotation.x = Math.PI/2; mot.position.set(lado*37, -9, -74); mot.castShadow = true; g.add(mot);
-    const boc = new THREE.Mesh(new THREE.CylinderGeometry(16, 18, 26, 16, 1, true), matBocal);
-    boc.rotation.x = Math.PI/2; boc.position.set(lado*37, -9, -176); g.add(boc);
+    const mot = new THREE.Mesh(new THREE.CylinderGeometry(18, 16, 200, 18), matCorpo);
+    mot.rotation.x = Math.PI/2; mot.position.set(lado*36, -9, -80); mot.castShadow = true; g.add(mot);
+    const boc = new THREE.Mesh(new THREE.CylinderGeometry(17, 19, 30, 18, 1, true), matBocal);
+    boc.rotation.x = Math.PI/2; boc.position.set(lado*36, -9, -186); g.add(boc);
+    const anel = new THREE.Mesh(new THREE.TorusGeometry(17, 2.4, 6, 18), matEscuro);
+    anel.position.set(lado*36, -9, -170); g.add(anel);
   }
 
-  // canopy: meia esfera achatada, com vidro brilhante
-  // meia esfera com a barriga para baixo e esticada para trás. Girar isto era
-  // o que fazia o canopy virar uma barbatana preta em pé.
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI*2, 0, Math.PI/2), matVidro);
-  cap.scale.set(23, 21, 64); cap.position.set(0, 18, 40);
+  /* CANOPY em duas peças: o vidro e a espinha atrás dele. Meia esfera com a
+     barriga para baixo e esticada para trás — girar isto era o que fazia o
+     canopy virar uma barbatana preta em pé, lá no começo. */
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(1, 22, 14, 0, Math.PI*2, 0, Math.PI/2), matVidro);
+  cap.scale.set(21, 22, 62); cap.position.set(0, 18, 52);
   g.add(cap);
+  /* A moldura era meio toro em pé na frente do canopy: de perto virava um
+     arco de rollbar boiando no ar. Virou um aro FINO rente à base do vidro,
+     que é o que uma moldura de canopy é. */
+  const aro = new THREE.Mesh(new THREE.TorusGeometry(1, 1, 5, 20), matEscuro);
+  aro.scale.set(21.5, 62.5, 1.6);
+  aro.rotation.x = Math.PI/2;
+  aro.position.set(0, 18.5, 52);
+  g.add(aro);
+  // a espinha, do canopy até a cauda: some o degrau entre a bolha e o corpo
+  const espinha = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10, 0, Math.PI*2, 0, Math.PI/2), matCorpo);
+  espinha.scale.set(15, 14, 88); espinha.position.set(0, 16, -52);
+  espinha.castShadow = true; g.add(espinha);
 
-  // tomadas de ar coladas na fuselagem
+  // tomadas de ar coladas na fuselagem, com a boca escura
   for (const lado of [-1, 1]){
-    const t = new THREE.Mesh(new THREE.BoxGeometry(13, 22, 110), matEscuro);
-    t.position.set(lado*33, -6, 28); t.castShadow = true; g.add(t);
+    const t = new THREE.Mesh(new THREE.BoxGeometry(15, 24, 120), matEscuro);
+    t.position.set(lado*33, -6, 34); t.castShadow = true; g.add(t);
+    const boca = new THREE.Mesh(new THREE.BoxGeometry(12, 20, 4), matBocal);
+    boca.position.set(lado*33, -6, 95); g.add(boca);
   }
+
+  // o tubo de pitot: dois palitos, e o bico ganha escala
+  const pitot = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 46, 6), matEscuro);
+  pitot.rotation.x = Math.PI/2; pitot.position.set(0, 2, 232); g.add(pitot);
   return g;
 }
 
-const aviao = montaAviao(0xdfe7f3, 0x8b97ab, 0x14243e);
+/* o vidro era 0x14243e — de perto, um buraco preto. Azul de vidro mesmo,
+   e mais transparente, para dar para ver que é uma bolha. */
+const aviao = montaAviao(0xdfe7f3, 0x8b97ab, 0x3f6c9e);
 cena.add(aviao);
 
 /* --- TREM DE POUSO e FLAPES ----------------------------------------------
@@ -1007,8 +1037,9 @@ const flapNos = [];
   const matAzul = new THREE.MeshPhongMaterial({ color: 0x2d7dff, shininess: 70 });
   for (const lado of [-1, 1]){
     // em cima da asa, não dentro dela
-    const f = new THREE.Mesh(new THREE.BoxGeometry(56, 5, 22), matAzul);
-    f.position.set(lado*150, 8, -62);
+    const f = new THREE.Mesh(new THREE.BoxGeometry(60, 5, 20), matAzul);
+    f.position.set(lado*158, 5, -46);
+    f.rotation.y = -lado*0.62;              // acompanha a flecha do bordo
     aviao.add(f);
   }
 }
@@ -1025,7 +1056,7 @@ for (const lado of [-1, 1]){
 }
 
 /* --- inimigos: o mesmo avião, vermelho --------------------------------- */
-const modeloInimigo = montaAviao(0xc45a48, 0x7d3830, 0x20303f);
+const modeloInimigo = montaAviao(0xc45a48, 0x7d3830, 0x53707f);
 const inimigos = [];
 for (const o of []) {}
 function montaInimigos(){
@@ -1456,26 +1487,31 @@ function montaMissil(){
   const ogiva = new THREE.Mesh(new THREE.ConeGeometry(11, 46, 12), matOgiva);
   ogiva.rotation.x = Math.PI/2; ogiva.position.z = 98; g.add(ogiva);
 
-  // quatro aletas atrás, em cruz
+  /* quatro aletas atrás, em cruz. As primeiras saíram grandes demais — de
+     perto pareciam duas placas cinzas atravessadas no foguete. Aletas de
+     míssil são pequenas: mal passam do diâmetro do corpo. */
   for (let k = 0; k < 4; k++){
-    const a2 = new THREE.Mesh(new THREE.BoxGeometry(3, 30, 40), matAleta);
-    a2.position.set(0, 18, -58);
+    const a2 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 16, 30), matAleta);
+    a2.position.set(0, 15, -56);
     const eixo = new THREE.Group();
     eixo.add(a2); eixo.rotation.z = k*Math.PI/2;
     g.add(eixo);
   }
   // duas canards na frente, que é o que dá cara de perseguidor
   for (const lado of [-1, 1]){
-    const c = new THREE.Mesh(new THREE.BoxGeometry(26, 3, 18), matAleta);
-    c.position.set(lado*16, 0, 52); g.add(c);
+    const c = new THREE.Mesh(new THREE.BoxGeometry(20, 2.4, 14), matAleta);
+    c.position.set(lado*14, 0, 52); g.add(c);
   }
-  // o fogo do foguete
-  const fogo = new THREE.Mesh(new THREE.ConeGeometry(10, 90, 10, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xffc46a, transparent: true, opacity: 0.85,
+  // o fogo do foguete: curto e claro. O primeiro tinha 90 de comprimento e
+  // opacidade 0,85 — virava uma bandeira amarela maior que o míssil
+  const fogo = new THREE.Mesh(new THREE.ConeGeometry(7, 56, 10, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffd08a, transparent: true, opacity: 0.55,
                                   fog: false, depthWrite: false, side: THREE.DoubleSide }));
-  fogo.rotation.x = -Math.PI/2; fogo.position.z = -120;
+  fogo.rotation.x = -Math.PI/2; fogo.position.z = -103;
   g.add(fogo);
   g.userData.fogo = fogo;
+  // o míssil inteiro é menor que a metade do avião, como na vida
+  g.scale.setScalar(0.72);
   return g;
 }
 function trocaArma(nova){
