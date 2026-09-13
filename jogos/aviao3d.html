@@ -6964,14 +6964,29 @@ let toqueX=0, toqueY=0, usandoToque=false;
 try { if (new URLSearchParams(location.search).get('infinito') === '0') infinito = false; } catch(e){}
 try { recorde = parseInt(localStorage.getItem('aviao.recorde') || '0', 10) || 0; } catch(e){}
 
+/* QUAL LADO É A DIREITA — a conta que estava errada
+
+   Num sistema destro, quem olha para +z tem o +x à ESQUERDA. O meu código
+   calculava a asa direita como (teto × nariz), que dá justamente o +x — ou
+   seja, era a asa ESQUERDA com nome de direita. Na versão em canvas isso
+   passou batido porque aquela projeção era espelhada e o erro se cancelava.
+   Com uma câmera 3D de verdade o espelho sumiu, e o avião passou a virar para
+   o lado contrário do comando.
+
+   A asa direita é (nariz × teto). E, para a bússola continuar concordando com
+   o que se vê, o rumo passa a contar o leste no sentido certo da tela. */
 function endireitaEixos(){
   eixoF = vnorm(eixoF);
   eixoC = vnorm(vsub(eixoC, vmul(eixoF, vponto(eixoC, eixoF))));
-  eixoD = vcruz(eixoC, eixoF);
-  rumo = Math.atan2(eixoF.x, eixoF.z);
+  eixoD = vcruz(eixoF, eixoC);
+  rumo = Math.atan2(-eixoF.x, eixoF.z);
   arfagem = Math.asin(Math.max(-1, Math.min(1, eixoF.y)));
   inclinacao = Math.atan2(-eixoD.y, eixoC.y) * 180/Math.PI;
 }
+/* direção no mundo a partir de um rumo de bússola */
+function dirDoRumo(b){ return { x: -Math.sin(b), z: Math.cos(b) }; }
+/* rumo de bússola de um ponto do mapa, visto do avião */
+function rumoDe(x, z){ return Math.atan2(-(x - aviaoX), z - aviaoZ); }
 
 /* --- o mapa, montado uma vez --- */
 let predios=[], tambores=[], alvos=[], obstaculos=[];
@@ -7049,7 +7064,7 @@ cena.add(cam);
 const luzCeu = new THREE.HemisphereLight(0xc3dcf2, 0x46603f, 1.9);
 cena.add(luzCeu);
 const sol = new THREE.DirectionalLight(COR_SOL, 3.0);
-const solDir = { x: Math.sin(SOL_RUMO)*Math.cos(SOL_ALT), y: Math.sin(SOL_ALT), z: Math.cos(SOL_RUMO)*Math.cos(SOL_ALT) };
+const solDir = { x: -Math.sin(SOL_RUMO)*Math.cos(SOL_ALT), y: Math.sin(SOL_ALT), z: Math.cos(SOL_RUMO)*Math.cos(SOL_ALT) };
 sol.castShadow = true;
 sol.shadow.mapSize.set(1024, 1024);
 sol.shadow.camera.near = 100; sol.shadow.camera.far = 30000;
@@ -7256,7 +7271,8 @@ function recolocaNuvem(n, emVolta){
   const a = rumo + (emVolta ? Math.random()*6.28 : (Math.random()-0.5)*2.4);
   const d = 9000 + Math.random()*(emVolta ? 30000 : 26000);
   const r = 3400 + Math.random()*5000;
-  n.x = aviaoX + Math.sin(a)*d; n.z = aviaoZ + Math.cos(a)*d;
+  const dd = dirDoRumo(a);
+  n.x = aviaoX + dd.x*d; n.z = aviaoZ + dd.z*d;
   n.y = 4200 + Math.random()*5200;
   n.no.position.set(n.x, n.y, n.z);
   n.no.scale.set(r, r*0.5, 1);
@@ -7908,7 +7924,7 @@ const NOMES_RUMO = ['N','NE','L','SE','S','SO','O','NO'];
 const ABERTURA = 1.05;
 function marcaBussola(cx, meia, y, o, cor, abaixo){
   if (!o) return;
-  const dl = anguloCurto(Math.atan2(o.x-aviaoX, o.z-aviaoZ) - rumo);
+  const dl = anguloCurto(rumoDe(o.x, o.z) - rumo);
   const preso = Math.abs(dl) > ABERTURA;
   const x = cx + Math.max(-1, Math.min(1, dl/ABERTURA))*meia;
   const t = Math.max(5, meia*0.030);
@@ -7977,7 +7993,8 @@ function desenhaHUD(){
     h2.fillStyle = 'rgba(120,255,170,.9)';
     for (let a = -60; a <= 60; a += 10){
       const ra = a*Math.PI/180, ca = Math.cos(ra), sa = Math.sin(ra);
-      v.set(Math.sin(rumo)*ca, sa, Math.cos(rumo)*ca).add(cam.position).project(cam);
+      const dd = dirDoRumo(rumo);
+      v.set(dd.x*ca, sa, dd.z*ca).add(cam.position).project(cam);
       if (v.z > 1) continue;
       const x = (v.x*0.5+0.5)*W, y = (-v.y*0.5+0.5)*H;
       if (y < H*0.06 || y > H*0.78) continue;
