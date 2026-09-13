@@ -7611,126 +7611,406 @@ function recolocaNuvem(n, emVolta){
   n.no.scale.set(r, r*0.5, 1);
 }
 
-/* --- O AVIÃO --------------------------------------------------------------
-   Aqui é onde o three.js paga sozinho o bilhete. Na versão em canvas eu tinha
-   um punhado de triângulos chapados, porque cada face custava conta minha.
-   Agora a fuselagem é um SÓLIDO DE REVOLUÇÃO de 24 lados com normais suaves,
-   as asas saem de um perfil extrudado, e o material tem brilho especular — o
-   reflexo que corre pela lataria quando o avião vira. Nada disso eu conseguia
-   fazer à mão a 60 quadros.                                                */
-function perfilFuselagem(){
-  /* Raio da fuselagem ao longo do corpo. O perfil antigo era um charuto: subia
-     e descia quase igual dos dois lados, e de longe o avião virava uma bala.
-     Caça tem a cintura mais cheia à frente da asa, afina depressa depois do
-     canopy e termina num bico FINO e comprido. Mais pontos na frente, que é
-     onde a silhueta se reconhece. */
-  const p = [[-182,15],[-172,19],[-150,24],[-120,28],[-86,31],[-50,33],[-14,34],
-             [22,33],[58,31],[92,27],[124,22],[152,16],[176,10],[196,5],[210,2],[214,0]];
-  return p.map(q => new THREE.Vector2(q[1], q[0]));
+
+/* =============================================================================
+   O AVIÃO-DRAGÃO
+
+   "O avião é o objeto que vemos praticamente no jogo todo, ele tem que ser o
+   mais bem trabalhado." É verdade, e o caça branco era um caça branco: certo
+   de forma, sem personalidade nenhuma.
+
+   Este é um BRINQUEDO: peças grandes, cantos redondos, poucos detalhes e
+   todos reconhecíveis de longe. Azul com amarelo, cara de dragão amigável no
+   bico, asas de morcego com festões, hélice que gira de verdade e duas
+   turbininhas atrás.
+
+   Três decisões que mandam no resultado:
+
+   1. TUDO É REDONDO. Nada de aresta viva: o corpo é um torno (lathe) de
+      barriga cheia, o focinho é uma esfera achatada, as pontas são cones com
+      poucos lados. Brinquedo bom não tem quina.
+
+   2. O AMARELO É ESTRUTURA, NÃO ENFEITE. A membrana da asa, os chifres, o
+      bico, os aros das turbinas e os cubos das rodas — o olho junta tudo isso
+      e lê "é a mesma peça", que é o que dá unidade.
+
+   3. O TAMANHO NÃO MUDOU. Mesmo comprimento e mesma envergadura do caça, para
+      a câmera, o trem de pouso, as colisões e a altura de pouso continuarem
+      valendo sem nenhum outro ajuste.
+
+   Montado apontando para +z, como tudo neste jogo.
+   ========================================================================== */
+/* --- FUNDIR O AVIÃO ---------------------------------------------------------
+   O dragão ficou bonito e ficou CARO. Peça a peça ele tem 83 malhas contra as
+   33 do caça — e malha, para a placa de vídeo, não custa pelo tamanho: custa
+   por ser mais uma ORDEM de desenho. Com o céu cheio de inimigos a conta da
+   cena saltou de 2.800 para 6.000 ordens, e num celular isso é o fim.
+
+   O detalhe só apareceu porque o teste da batalha começou a falhar: os dois
+   navegadores, cada um moendo a cena por software, não davam conta nem de
+   fechar o aperto de mão do WebRTC. Com o laço parado a conexão fechava na
+   hora. Ou seja: não era o rádio, era o desenho.
+
+   A saída não custa desenho nenhum. Depois de montado, o avião não mexe mais
+   nas suas peças — só o grupo inteiro gira. Então dá para COZINHAR tudo: cada
+   peça é passada para o lugar onde ela está, e todas as que dividem a mesma
+   cor viram UMA malha. Continua o mesmo triângulo por triângulo, mesma cara,
+   mesma sombra — mas o que sai daqui são seis ou sete ordens, não oitenta e
+   três. A hélice fica de fora, que essa gira sozinha.
+
+   (`BufferGeometryUtils` faria isto pronto, mas ele mora nos "examples" do
+   three.js e aqui só está o núcleo — e o serviço é curto: tirar o índice,
+   aplicar a matriz e emendar os vetores.)                                   */
+function fundePorCor(raiz){
+  raiz.updateMatrixWorld(true);
+  const porCor = new Map(), velhas = [];
+  raiz.traverse(o => {
+    if (!o.isMesh) return;
+    velhas.push(o);
+    if (!porCor.has(o.material)) porCor.set(o.material, []);
+    porCor.get(o.material).push(o);
+  });
+  for (const o of velhas) o.parent.remove(o);
+  for (const [mat, lista] of porCor){
+    let n = 0;
+    const partes = lista.map(o => {
+      const g2 = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+      g2.applyMatrix4(o.matrixWorld);      // normais inclusive: o three cuida disso
+      n += g2.attributes.position.count;
+      return g2;
+    });
+    const pos = new Float32Array(n*3), nor = new Float32Array(n*3);
+    let k = 0;
+    for (const g2 of partes){
+      pos.set(g2.attributes.position.array, k*3);
+      nor.set(g2.attributes.normal.array,   k*3);
+      k += g2.attributes.position.count;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal',   new THREE.BufferAttribute(nor, 3));
+    geo.computeBoundingSphere();
+    const malha = new THREE.Mesh(geo, mat);
+    malha.castShadow = true;
+    raiz.add(malha);
+  }
+  return raiz;
 }
-function fazAsa(pontos, esp, cor, x, y, z, giroZ){
-  const forma = new THREE.Shape();
-  forma.moveTo(pontos[0][0], pontos[0][1]);
-  for (let i = 1; i < pontos.length; i++) forma.lineTo(pontos[i][0], pontos[i][1]);
-  forma.closePath();
+
+function fazForma(forma, esp, mat){
   const g = new THREE.ExtrudeGeometry(forma, { depth: esp, bevelEnabled: true,
-              bevelThickness: esp*0.45, bevelSize: esp*0.6, bevelSegments: 2 });
+              bevelThickness: esp*0.35, bevelSize: esp*0.5, bevelSegments: 1, curveSegments: 5 });
   g.translate(0, 0, -esp/2);
-  const m = new THREE.Mesh(g, cor);
-  m.position.set(x, y, z);
-  if (giroZ) m.rotation.z = giroZ;
+  const m = new THREE.Mesh(g, mat);
   m.castShadow = true;
   return m;
 }
-function montaAviao(corpoCor, detalheCor, vidroCor){
-  const g = new THREE.Group();
-  const matCorpo   = new THREE.MeshPhongMaterial({ color: corpoCor, shininess: 55, specular: 0x93a4bd });
-  const matEscuro  = new THREE.MeshPhongMaterial({ color: detalheCor, shininess: 30, specular: 0x556070 });
-  const matVidro   = new THREE.MeshPhongMaterial({ color: vidroCor, shininess: 160, specular: 0xffffff,
-                                                   transparent: true, opacity: 0.62 });
-  const matBocal   = new THREE.MeshPhongMaterial({ color: 0x2a3038, shininess: 90, specular: 0x8895a8 });
+/* uma "vareta" da asa, do ponto a ao ponto b, desenhada no plano da asa */
+function osso(ax, az, bx, bz, gross, mat){
+  const c = Math.hypot(bx-ax, bz-az);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(c, gross, gross*1.2), mat);
+  m.position.set((ax+bx)/2, 0, (az+bz)/2);
+  m.rotation.y = -Math.atan2(bz-az, bx-ax);
+  m.castShadow = true;
+  return m;
+}
 
-  // fuselagem: revolução com normais suaves
-  const fus = new THREE.Mesh(new THREE.LatheGeometry(perfilFuselagem(), 24), matCorpo);
-  fus.rotation.x = Math.PI/2;          // o eixo do torno passa a apontar para a frente
-  fus.castShadow = true; g.add(fus);
+/* --- a FAIXA da lateral -----------------------------------------------------
+   A primeira tentativa foi um mosaico de plaquinhas seguindo o casco: de
+   longe virava uma sujeira de pedaços soltos, e brilhava branco onde as
+   quinas pegavam a luz.
 
-  /* ASA em flecha. A de antes era um losango chato de seis pontos; esta tem
-     bordo de ataque mais em flecha, ponta cortada e uma raiz que avança para
-     a frente (o "LERX" dos caças modernos) — é o que dá a cara de F-18 em vez
-     de aviãozinho de papel. Desenhada no plano x-z e depois deitada. */
-  const asaDir = [[18,96],[54,58],[112,-2],[196,-54],[212,-70],[150,-72],[86,-70],[20,-66]];
-  const asaEsq = asaDir.map(p => [-p[0], p[1]]);
-  const asa1 = fazAsa(asaDir, 12, matCorpo, 0, -2, 0); asa1.rotation.x = Math.PI/2; g.add(asa1);
-  const asa2 = fazAsa(asaEsq, 12, matCorpo, 0, -2, 0); asa2.rotation.x = Math.PI/2; g.add(asa2);
+   O jeito certo é não inventar geometria nenhuma: a faixa é uma FATIA DO
+   MESMO TORNO que faz o corpo, com o raio um fio maior. Ela acompanha a
+   barriga exatamente — é a mesma superfície — e não tem quina para brilhar.
+   Um `LatheGeometry` aceita um pedaço do giro em vez da volta inteira, e é
+   só isso que a faixa é.
+   ------------------------------------------------------------------------ */
+function faixaLateral(perfil, mat, lado){
+  const pts = perfil.map(q => new THREE.Vector2(q[1] + 2.2, q[0]));
+  /* ONDE FICA A LATERAL, depois de deitar o torno.
 
-  // empenas horizontais da cauda, também em flecha
-  const empD = [[14,-116],[64,-146],[98,-168],[98,-180],[42,-172],[14,-158]];
-  const empE = empD.map(p => [-p[0], p[1]]);
-  const e1 = fazAsa(empD, 10, matCorpo, 0, -4, 0); e1.rotation.x = Math.PI/2; g.add(e1);
-  const e2 = fazAsa(empE, 10, matCorpo, 0, -4, 0); e2.rotation.x = Math.PI/2; g.add(e2);
+     O torno gira em volta do Y, e `rotation.x = PI/2` deita a peça: um ponto
+     em ângulo phi vai parar em (r·sen phi, −r·cos phi, ...). Ou seja, phi=0 é
+     a BARRIGA e phi=PI é o LOMBO — as laterais são ±PI/2.
 
-  /* Derivas duplas. O perfil é desenhado no plano (z, y) — comprimento por
-     altura — e o mesmo `fazAsa` serve: basta virar a peça um quarto de volta
-     em torno do eixo vertical. O caimento para fora fica num grupo por cima,
-     senão a ordem das rotações embaralha tudo. */
-  const der = [[-86, 0], [-120, 86], [-156, 88], [-168, 0]];
-  for (const lado of [-1, 1]){
-    const d = fazAsa(der, 9, matCorpo, 0, 0, 0);
-    d.rotation.y = -Math.PI/2;
-    const suporte = new THREE.Group();
-    suporte.add(d);
-    suporte.position.set(lado*32, 14, 0);
-    suporte.rotation.z = -lado*0.30;
-    g.add(suporte);
-  }
-
-  // motores, com bocal escuro e um anel quente na saída
-  for (const lado of [-1, 1]){
-    const mot = new THREE.Mesh(new THREE.CylinderGeometry(18, 16, 200, 18), matCorpo);
-    mot.rotation.x = Math.PI/2; mot.position.set(lado*36, -9, -80); mot.castShadow = true; g.add(mot);
-    const boc = new THREE.Mesh(new THREE.CylinderGeometry(17, 19, 30, 18, 1, true), matBocal);
-    boc.rotation.x = Math.PI/2; boc.position.set(lado*36, -9, -186); g.add(boc);
-    const anel = new THREE.Mesh(new THREE.TorusGeometry(17, 2.4, 6, 18), matEscuro);
-    anel.position.set(lado*36, -9, -170); g.add(anel);
-  }
-
-  /* CANOPY em duas peças: o vidro e a espinha atrás dele. Meia esfera com a
-     barriga para baixo e esticada para trás — girar isto era o que fazia o
-     canopy virar uma barbatana preta em pé, lá no começo. */
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(1, 22, 14, 0, Math.PI*2, 0, Math.PI/2), matVidro);
-  cap.scale.set(21, 22, 62); cap.position.set(0, 18, 52);
-  g.add(cap);
-  /* A moldura era meio toro em pé na frente do canopy: de perto virava um
-     arco de rollbar boiando no ar. Virou um aro FINO rente à base do vidro,
-     que é o que uma moldura de canopy é. */
-  const aro = new THREE.Mesh(new THREE.TorusGeometry(1, 1, 5, 20), matEscuro);
-  aro.scale.set(21.5, 62.5, 1.6);
-  aro.rotation.x = Math.PI/2;
-  aro.position.set(0, 18.5, 52);
-  g.add(aro);
-  // a espinha, do canopy até a cauda: some o degrau entre a bolha e o corpo
-  const espinha = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10, 0, Math.PI*2, 0, Math.PI/2), matCorpo);
-  espinha.scale.set(15, 14, 88); espinha.position.set(0, 16, -52);
-  espinha.castShadow = true; g.add(espinha);
-
-  // tomadas de ar coladas na fuselagem, com a boca escura
-  for (const lado of [-1, 1]){
-    const t = new THREE.Mesh(new THREE.BoxGeometry(15, 24, 120), matEscuro);
-    t.position.set(lado*33, -6, 34); t.castShadow = true; g.add(t);
-    const boca = new THREE.Mesh(new THREE.BoxGeometry(12, 20, 4), matBocal);
-    boca.position.set(lado*33, -6, 95); g.add(boca);
-  }
-
-  // o tubo de pitot: dois palitos, e o bico ganha escala
-  const pitot = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 46, 6), matEscuro);
-  pitot.rotation.x = Math.PI/2; pitot.position.set(0, 2, 232); g.add(pitot);
+     Eu tinha posto 0 e PI achando que eram os lados, e as duas faixas foram
+     parar uma embaixo e outra em cima: de cima o bicho ficava com as costas
+     inteiras amarelas. Aqui o menos 0,22 desce a faixa um pouco abaixo da
+     linha d'água, que é onde ela está na folha de modelo. */
+  const meio = lado > 0 ? Math.PI/2 - 0.22 : -Math.PI/2 + 0.22;
+  const g = new THREE.Mesh(new THREE.LatheGeometry(pts, 12, meio - 0.26, 0.52), mat);
+  g.rotation.x = Math.PI/2;
   return g;
 }
 
-/* o vidro era 0x14243e — de perto, um buraco preto. Azul de vidro mesmo,
-   e mais transparente, para dar para ver que é uma bolha. */
-const aviao = montaAviao(0xdfe7f3, 0x8b97ab, 0x3f6c9e);
+function montaDragao(corCorpo, corDetalhe, corVidro){
+  const g = new THREE.Group();
+  /* Brinquedo de plástico brilha POUCO e escuro. Reflexo claro estourava uma
+     mancha branca no meio do azul e comia o desenho todo. */
+  const mCorpo  = new THREE.MeshPhongMaterial({ color: corCorpo,   shininess: 42, specular: 0x38506e });
+  const mAmarelo= new THREE.MeshPhongMaterial({ color: corDetalhe, shininess: 46, specular: 0x6b5a20 });
+  const mEscuro = new THREE.MeshPhongMaterial({ color: 0x16305a,   shininess: 30 });
+  const mVidro  = new THREE.MeshPhongMaterial({ color: corVidro, shininess: 150, specular: 0xbcd4f0,
+                                                transparent: true, opacity: 0.74 });
+  const mBranco = new THREE.MeshPhongMaterial({ color: 0xfdfdff, shininess: 60 });
+  const mPreto  = new THREE.MeshPhongMaterial({ color: 0x161b24, shininess: 50 });
+  const mIris   = new THREE.MeshPhongMaterial({ color: 0x5cb4ff, shininess: 110, specular: 0xdfefff });
+
+  /* --- CORPO ------------------------------------------------------------
+     A primeira versão tinha diâmetro quase constante de ponta a ponta, com
+     as duas pontas arredondadas: virava um BALÃO, não um avião. Avião tem
+     cintura larga na frente e uma cauda que AFINA — é o afinar que faz o olho
+     ler "isso voa". O perfil abaixo vai de raio 58 no meio a 9 na ponta da
+     cauda, e tem um pescoço em 150 para a cabeça ser uma peça separada. */
+  const perfil = [[-198,6],[-186,16],[-168,26],[-140,36],[-104,46],[-64,54],
+                  [-16,58],[34,57],[76,53],[112,47],[140,42],[158,38]];
+  const fus = new THREE.Mesh(
+    new THREE.LatheGeometry(perfil.map(q => new THREE.Vector2(q[1], q[0])), 20), mCorpo);
+  fus.rotation.x = Math.PI/2; fus.castShadow = true; g.add(fus);
+  for (const lado of [-1, 1]) g.add(faixaLateral(perfil, mAmarelo, lado));
+
+  /* --- A CABEÇA ------------------------------------------------------------
+     A primeira cabeça só funcionava DE FRENTE. De lado — que é como o avião
+     do adversário passa por você, e como o segundo jogador vê o seu — ela
+     sumia: uma bola azul colada no corpo, um borrão branco no lugar do olho e
+     nada de cara. Um dragão que só é dragão de um ângulo não é dragão.
+
+     O que resolve o perfil é sempre a mesma coisa: SILHUETA. Focinho que
+     ADIANTA e DESCE da testa (quebra a linha do casco), boca que corre para
+     trás pela mandíbula, presa que aparece por fora da boca, olho com pupila
+     virada para o lado e chifres deitados para trás. Tudo isso aparece
+     recortado contra o céu; cor nenhuma resolve o que a silhueta não resolve. */
+  const cabeca = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), mCorpo);
+  cabeca.scale.set(52, 50, 54); cabeca.position.set(0, 2, 184);
+  cabeca.castShadow = true; g.add(cabeca);
+
+  /* O FOCINHO é uma peça inteira que sai da testa para a frente e para baixo.
+     Antes era uma bolinha amarela grudada na ponta e, com o cone da hélice
+     logo à frente, os dois juntos viravam um BICO DE PASSARINHO. Agora é
+     comprido e baixo, com o dorso azul por cima: focinho, não bico. */
+  const focinho = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 11), mAmarelo);
+  focinho.scale.set(34, 26, 46); focinho.position.set(0, -12, 222);
+  focinho.castShadow = true; g.add(focinho);
+  const dorso = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 8, 0, Math.PI*2, 0, Math.PI/2), mCorpo);
+  dorso.scale.set(30, 20, 44); dorso.position.set(0, -10, 220); g.add(dorso);
+  for (const lado of [-1, 1]){                       // narinas, no alto do focinho
+    const n2 = new THREE.Mesh(new THREE.SphereGeometry(4.2, 7, 5), mEscuro);
+    n2.position.set(lado*10, 2, 256); g.add(n2);
+  }
+
+  /* A BOCA vai da ponta do focinho até debaixo do olho: é ela que, de lado,
+     diz onde acaba a mandíbula. Uma caixa fina e escura, torta para cima na
+     ponta — o sorriso do bicho. */
+  /* A boca já foi feita de CAIXAS, uma de cada lado. Nunca deu certo: caixa
+     é reta e focinho é curvo, então metade da peça enterrava no amarelo e a
+     outra metade aparecia como uma CUNHA PRETA na bochecha — parecia machucado,
+     não sorriso. E compridas demais viravam bigode de gato.
+
+     A boca é UMA peça só: um aro fino e achatado, deitado, que dá a volta na
+     frente do focinho. Sendo curvo como o focinho, ele encosta igual em toda a
+     volta e não tem ponta nenhuma para aparecer torta. */
+  /* Um detalhe de torno que custou uma rodada: `TorusGeometry(1, 1, ...)` tem
+     o TUBO tão grosso quanto o aro. Escalado para o tamanho do focinho, o que
+     saiu foi uma cinta preta de queixo, não uma linha. O tubo tem de ser uma
+     fração do aro — 0,085 — e aí a escala engorda o aro sem engordar o risco. */
+  const boca = new THREE.Mesh(new THREE.TorusGeometry(1, 0.085, 4, 18, Math.PI*1.08), mEscuro);
+  boca.scale.set(32, 44, 30);
+  boca.rotation.set(Math.PI/2, 0, Math.PI*1.04);
+  boca.position.set(0, -17, 224); g.add(boca);
+  // presas: por FORA da boca, apontando para baixo, visíveis de todo lado
+  for (const lado of [-1, 1]){
+    const pr = new THREE.Mesh(new THREE.ConeGeometry(7, 26, 6), mBranco);
+    pr.position.set(lado*22, -27, 246); pr.rotation.set(0.16, 0, Math.PI);
+    g.add(pr);
+  }
+
+  /* --- OLHOS: grandes, bem à frente e ACIMA da linha dos chifres, senão
+         ficam escondidos atrás deles (foi o que aconteceu na 1ª versão).
+         A íris saiu para fora (x=40): em x=33 ela ficava quase na frente do
+         branco, e de perfil o olho era um ovo branco sem pupila nenhuma. --- */
+  for (const lado of [-1, 1]){
+    /* ONDE PÔR A ÍRIS foi um cabo de guerra que eu perdi duas vezes. Íris como
+       bolinha grudada no globo: para a frente (x=33) ela sumia de perfil, o
+       olho virava um ovo branco; para fora (x=40) sumia de frente, o olho
+       virava um ovo branco olhando para o nada. O meio-termo perdeu dos dois
+       lados ao mesmo tempo.
+
+       O erro estava em pensar a íris como uma PEÇA. Olho de verdade não tem
+       bolinha pendurada: tem uma MANCHA PINTADA no globo. Então é isso que ela
+       passa a ser — um pedaço de casca esférica com o mesmo centro do globo e
+       um fio de raio a mais, cobrindo 60° de olhar. Como acompanha a curva,
+       aparece inteira de frente, inteira de lado e não descola em ângulo
+       nenhum. Barato também: continua sendo uma esfera, só que recortada.
+
+       Em três.js o phi de uma esfera começa em −X e cresce para +Z: phi=π/2 é
+       para a frente e phi=π é para a direita. O olhar de cada olho fica na
+       quina entre os dois, um pouco para fora, que é como bicho de desenho
+       olha. */
+    const olhar = Math.PI * (lado > 0 ? 0.72 : 0.28);
+    const oco = new THREE.Mesh(new THREE.SphereGeometry(21, 14, 10), mBranco);
+    oco.position.set(lado*32, 18, 203); oco.castShadow = true; g.add(oco);
+    const casca = (r, meia, mat) => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 8,
+                   olhar - meia, meia*2, Math.PI/2 - meia, meia*2), mat);
+      m.position.copy(oco.position); return m;
+    };
+    g.add(casca(21.3, 0.62, mIris));
+    /* A pupila como casca saía RETANGULAR — recorte de esfera é retângulo em
+       (phi, theta), e de frente o bicho ficava com dois olhos de televisão. A
+       pupila volta a ser bola, mas AFUNDADA só o suficiente: a 18,5 do centro
+       de um globo de 21, ela põe para fora uma calota larga, redonda de todo
+       ângulo. Antes ela estava a 16 com raio 8,5 e mal vazava — daí sumir. */
+    const dx = Math.cos(olhar) * -1, dz = Math.sin(olhar);
+    const pup = new THREE.Mesh(new THREE.SphereGeometry(9.5, 10, 8), mPreto);
+    pup.position.set(oco.position.x + dx*18.5, 18, oco.position.z + dz*18.5);
+    g.add(pup);
+    const bri = new THREE.Mesh(new THREE.SphereGeometry(4, 6, 5), mBranco);
+    bri.position.set(pup.position.x + dx*4, 26, pup.position.z + dz*4 + 2); g.add(bri);
+    const sob = new THREE.Mesh(new THREE.BoxGeometry(30, 7, 10), mAmarelo);
+    sob.position.set(lado*30, 47, 199); sob.rotation.z = -lado*0.26; g.add(sob);
+  }
+
+  /* --- chifres e orelhas, atrás dos olhos.
+         Os chifres ficaram MAIS COMPRIDOS e mais deitados para trás: em pé e
+         curtos eles desapareciam contra o corpo; deitados, recortam no céu e
+         são a primeira coisa que diz "dragão" antes mesmo de dar para ver a
+         cara. --- */
+  for (const lado of [-1, 1]){
+    const ch = new THREE.Mesh(new THREE.ConeGeometry(11, 58, 7), mAmarelo);
+    ch.position.set(lado*30, 50, 152);
+    ch.rotation.set(-0.92, 0, -lado*0.48);
+    ch.castShadow = true; g.add(ch);
+    const orelha = new THREE.Mesh(new THREE.ConeGeometry(19, 52, 4), mAmarelo);
+    orelha.position.set(lado*47, 14, 156);
+    orelha.rotation.set(Math.PI/2 + 0.42, 0, -lado*1.08);
+    orelha.scale.set(1, 1, 0.30);
+    g.add(orelha);
+  }
+
+  /* --- cabine --- */
+  const bolha = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10, 0, Math.PI*2, 0, Math.PI/2), mVidro);
+  bolha.scale.set(36, 32, 56); bolha.position.set(0, 42, 78); g.add(bolha);
+  const aro = new THREE.Mesh(new THREE.TorusGeometry(1, 1, 4, 16), mAmarelo);
+  aro.scale.set(37, 57, 3); aro.rotation.x = Math.PI/2; aro.position.set(0, 42, 78); g.add(aro);
+
+  /* --- crista nas costas --- */
+  for (let i = 0; i < 3; i++){
+    const t = i/2;
+    const esp = new THREE.Mesh(new THREE.ConeGeometry(7 - t*2.5, 22 - t*8, 6), mAmarelo);
+    esp.position.set(0, 54 - t*12, -6 - i*30);
+    esp.rotation.x = -0.35; g.add(esp);
+  }
+
+  /* --- ASAS DE DRAGÃO -----------------------------------------------------
+     Braço azul grosso no bordo de ataque, membrana amarela pendurada atrás
+     com três festões. Na meia-altura do corpo: na 1ª versão elas saíam da
+     barriga e de lado viravam uma prateleira. */
+  const pontas = [[214,-96],[150,-112],[84,-122]];
+  for (const lado of [-1, 1]){
+    const f = new THREE.Shape();
+    f.moveTo(26*lado, 26);
+    f.quadraticCurveTo(140*lado, 6, 236*lado, -36);
+    f.quadraticCurveTo(232*lado, -64, 214*lado, -96);
+    f.quadraticCurveTo(180*lado, -68, 150*lado, -112);
+    f.quadraticCurveTo(116*lado, -82, 84*lado, -122);
+    f.quadraticCurveTo(56*lado, -88, 28*lado, -100);
+    f.closePath();
+    const asa = fazForma(f, 8, mAmarelo);
+    asa.rotation.x = Math.PI/2; asa.position.y = 10; g.add(asa);
+    const varetas = new THREE.Group();
+    varetas.add(osso(26*lado, 22, 238*lado, -38, 13, mCorpo));
+    for (const [px, pz] of pontas) varetas.add(osso(30*lado, -10, px*lado, pz, 6, mCorpo));
+    varetas.position.y = 15; g.add(varetas);
+    const capa = new THREE.Mesh(new THREE.ConeGeometry(13, 40, 8), mAmarelo);
+    capa.position.set(lado*250, 15, -44);
+    capa.rotation.set(Math.PI/2, 0, -lado*1.25); g.add(capa);
+  }
+
+  /* --- turbinas --- */
+  for (const lado of [-1, 1]){
+    /* Estavam em x=62 com raio 23: nessa altura o casco ainda tem raio 50, e
+       metade da turbina ficava DENTRO do avião. De lado não se via turbina
+       nenhuma. Saíram para 82 e subiram um pouco, apoiadas num pilarzinho —
+       agora são duas peças soltas, que é o que a folha de modelo pede. */
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(23, 21, 82, 12), mCorpo);
+    t.rotation.x = Math.PI/2; t.position.set(lado*82, -6, -66);
+    t.castShadow = true; g.add(t);
+    const pil = new THREE.Mesh(new THREE.BoxGeometry(36, 13, 40), mCorpo);
+    pil.position.set(lado*62, -8, -66); pil.rotation.z = lado*0.10; g.add(pil);
+    const aroT = new THREE.Mesh(new THREE.TorusGeometry(22, 4.2, 5, 12), mAmarelo);
+    aroT.position.set(lado*82, -6, -106); g.add(aroT);
+    const bocal = new THREE.Mesh(new THREE.CylinderGeometry(19, 20, 16, 12, 1, true), mEscuro);
+    bocal.rotation.x = Math.PI/2; bocal.position.set(lado*82, -6, -104); g.add(bocal);
+    const tomada = new THREE.Mesh(new THREE.TorusGeometry(21, 3.4, 5, 12), mAmarelo);
+    tomada.position.set(lado*82, -6, -26); g.add(tomada);
+  }
+
+  /* --- cauda: deriva alta lá atrás, com o brasão --- */
+  const dv = new THREE.Shape();
+  dv.moveTo(-186, 10); dv.lineTo(-200, 124); dv.lineTo(-150, 126); dv.lineTo(-120, 14);
+  dv.closePath();
+  const deriva = fazForma(dv, 10, mCorpo);
+  deriva.rotation.y = -Math.PI/2; deriva.position.set(0, 6, 0); g.add(deriva);
+  const brasao = new THREE.Mesh(new THREE.ConeGeometry(17, 32, 3), mAmarelo);
+  brasao.position.set(0, 82, -172); brasao.rotation.set(Math.PI/2, 0, 0); g.add(brasao);
+  for (const lado of [-1, 1]){
+    const e2 = new THREE.Mesh(new THREE.BoxGeometry(72, 9, 44), mCorpo);
+    e2.position.set(lado*42, 0, -168); e2.rotation.y = -lado*0.28;
+    e2.castShadow = true; g.add(e2);
+    const pt = new THREE.Mesh(new THREE.BoxGeometry(16, 10, 40), mAmarelo);
+    pt.position.set(lado*76, 0, -174); pt.rotation.y = -lado*0.28; g.add(pt);
+  }
+
+  /* --- HÉLICE ---------------------------------------------------------------
+     Esta peça já estragou o avião uma vez. Eram quatro pás PRETAS de 150 de
+     ponta a ponta, plantadas a 258: de frente — que é como o inimigo aparece
+     e como a gente vê o avião na capa — o que se via era uma CRUZ PRETA em
+     cima da cara. O rosto é a razão de ser deste modelo e a hélice o cobria.
+
+     Três correções, todas pela mesma razão (não tapar a cara):
+
+     1. DUAS pás, não quatro. Hélice de brinquedo é de duas, e duas tapam
+        metade do que quatro tapavam.
+     2. AZUIS com a ponta amarela, e mais curtas (104 de ponta a ponta, contra
+        os 52 de raio da cabeça). Azul sobre azul some; preto sobre azul é um
+        risco no meio da testa.
+     3. Mais à frente, em 282, à frente do bico inteiro.
+
+     E o disco: hélice de verdade, girando, não é pá nenhuma — é um véu
+     redondo meio transparente. Acima de um certo giro as pás somem e entra o
+     disco, que é o que o olho espera ver e ainda deixa a cara aparecer
+     através dele. */
+  const helice = new THREE.Group();
+  const cubo = new THREE.Mesh(new THREE.ConeGeometry(13, 30, 8), mCorpo);
+  cubo.rotation.x = Math.PI/2; cubo.position.z = 13; helice.add(cubo);
+  const eixo = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 26, 8), mCorpo);
+  eixo.rotation.x = Math.PI/2; eixo.position.z = -16; helice.add(eixo);
+  const pas = new THREE.Group();
+  for (const giro of [0, Math.PI]){
+    const pa = new THREE.Mesh(new THREE.BoxGeometry(11, 104, 5), mCorpo);
+    pa.rotation.z = giro; pa.rotation.y = 0.26; pas.add(pa);
+    const ponta = new THREE.Mesh(new THREE.BoxGeometry(11, 16, 6), mAmarelo);
+    ponta.position.set(Math.sin(giro)*-44, Math.cos(giro)*44, 0);
+    ponta.rotation.z = giro; pas.add(ponta);
+  }
+  helice.add(pas);
+  const disco = new THREE.Mesh(new THREE.CircleGeometry(54, 20),
+    new THREE.MeshBasicMaterial({ color: 0x9fc4ee, transparent: true, opacity: 0,
+                                  side: THREE.DoubleSide, depthWrite: false }));
+  disco.position.z = 2; disco.visible = false; helice.add(disco);
+  /* a fusão acontece AQUI, antes da hélice entrar: ela é a única peça do
+     avião que se mexe por conta própria e por isso não pode ser cozinhada */
+  fundePorCor(g);
+  helice.position.set(0, -4, 274);
+  g.add(helice);
+  g.userData.helice = helice;
+  g.userData.pas = pas;
+  g.userData.disco = disco;
+  return g;
+}
+
+const aviao = montaDragao(0x1f5fd0, 0xffd42a, 0x16325c);
 cena.add(aviao);
 
 /* --- TREM DE POUSO e FLAPES ----------------------------------------------
@@ -7739,8 +8019,9 @@ cena.add(aviao);
    asas que baixam girando em torno do seu próprio bordo. */
 const tremNo = new THREE.Group();
 {
-  const matPerna = new THREE.MeshPhongMaterial({ color: 0x8f9aad, shininess: 60 });
-  const matPneu  = new THREE.MeshPhongMaterial({ color: 0x23262c, shininess: 10 });
+  const matPerna = new THREE.MeshPhongMaterial({ color: 0x2a62c8, shininess: 70 });
+  const matPneu  = new THREE.MeshPhongMaterial({ color: 0x1b1f26, shininess: 18 });
+  const matCubo  = new THREE.MeshPhongMaterial({ color: 0xffd42a, shininess: 90, specular: 0xfff0c0 });
   /* [x, z, comprimento da perna, raio da roda]. As três somam o MESMO
      22 + perna + raio = 158, que é o RODA lá de cima: assim o avião fica
      assentado e nivelado, sem roda enterrada nem bico empinado. E as rodas
@@ -7750,17 +8031,24 @@ const tremNo = new THREE.Group();
     const p2 = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, comp, 8), matPerna);
     p2.position.set(px, -22 - comp/2, pz);
     p2.castShadow = true; tremNo.add(p2);
-    const roda = new THREE.Mesh(new THREE.CylinderGeometry(raio, raio, 26, 14), matPneu);
+    const roda = new THREE.Mesh(new THREE.CylinderGeometry(raio, raio, 26, 16), matPneu);
     roda.rotation.z = Math.PI/2;                 // o eixo da roda atravessa o avião
     roda.position.set(px, -22 - comp, pz);
     roda.castShadow = true; tremNo.add(roda);
+    // cubo amarelo dos dois lados: é o detalhe de brinquedo da folha de modelo
+    for (const lado of [-1, 1]){
+      const cubo = new THREE.Mesh(new THREE.CylinderGeometry(raio*0.52, raio*0.52, 5, 14), matCubo);
+      cubo.rotation.z = Math.PI/2;
+      cubo.position.set(px + lado*14, -22 - comp, pz);
+      tremNo.add(cubo);
+    }
   }
 }
 aviao.add(tremNo);
 
 const flapNos = [];
 {
-  const matFlap = new THREE.MeshPhongMaterial({ color: 0xc9d3e2, shininess: 40 });
+  const matFlap = new THREE.MeshPhongMaterial({ color: 0xffd42a, shininess: 70 });
   for (const lado of [-1, 1]){
     // o eixo da dobradiça é o bordo de saída da asa: o grupo fica nele e a
     // aba pendura para trás, senão baixar o flape faria a peça mergulhar na asa
@@ -7799,7 +8087,8 @@ for (const lado of [-1, 1]){
 }
 
 /* --- inimigos: o mesmo avião, vermelho --------------------------------- */
-const modeloInimigo = montaAviao(0xc45a48, 0x7d3830, 0x53707f);
+// os inimigos são o mesmo dragão, em vermelho: um estilo só no céu inteiro
+const modeloInimigo = montaDragao(0xc9402f, 0xffb03a, 0x4a1f1a);
 const inimigos = [];
 for (const o of []) {}
 function montaInimigos(){
@@ -9168,6 +9457,22 @@ function arruma(){
   }
   /* trem e flapes: os dois se mexem devagar, senão aparecem e somem de um
      quadro para o outro e não se vê nada acontecer */
+  /* A HÉLICE gira com o motor. Ela não mede nada e não muda nada no voo —
+     mas é o que faz o avião parecer LIGADO parado na pista, e é a primeira
+     coisa que o olho procura num avião de hélice. */
+  if (aviao.userData.helice){
+    const rpm = noChao && voo < 30 ? (motor > 0.05 ? 9 : 0)
+              : 16 + (voo/VOO_TURBO)*26 + (turbinando ? 10 : 0);
+    aviao.userData.helice.rotation.z -= rpm*0.02;
+    /* Acima de umas voltas a pá deixa de ser pá: a 60 quadros ela pisca em
+       posições quase aleatórias e vira um serrote na frente da cara. Aí ela
+       some e entra o DISCO — o véu redondo que é o que se enxerga de uma
+       hélice girando de verdade, e que ainda deixa o rosto aparecer. */
+    const gira = Math.max(0, Math.min(1, (rpm - 11) / 12));
+    aviao.userData.pas.visible = gira < 0.98;
+    aviao.userData.disco.visible = gira > 0.02;
+    aviao.userData.disco.material.opacity = gira * 0.30;
+  }
   tremAnim += ((trem ? 1 : 0) - tremAnim) * 0.10;
   tremNo.visible = tremAnim > 0.02;
   if (tremNo.visible){
@@ -10517,7 +10822,7 @@ function meuNome(){
   try{ localStorage.setItem('aviao3d.nome', n); }catch(e){}
   return n;
 }
-const modeloOutro = montaAviao(0xe6e9f0, 0x7b8699, 0x3f6c9e);
+const modeloOutro = montaDragao(0x4a9f6a, 0xffd42a, 0x16325c);
 
 function abrirSala(){
   if (typeof Peer !== 'function'){ estadoSala('nao', 'a biblioteca de conexão não carregou'); return; }
@@ -10555,8 +10860,23 @@ function abrirSala(){
       else { Tripulacao.entra(c); Tripulacao.recebe(Tripulacao.membros[Tripulacao.membros.length-1], d); }
     };
     c.on('data', decide);
-    // se em 4 s ninguém falou nada, trata como celular (é o caso comum)
-    setTimeout(() => { if (!decidido){ decidido = true; Tripulacao.entra(c); } }, 4000);
+    /* O CHUTE DOS 4 SEGUNDOS, e por que ele tinha de sair.
+
+       Ninguém precisa ser adivinhado aqui: o avião que entra na batalha manda
+       `{t:'entra'}` e o celular manda `{t:'oi'}`, os dois na hora em que a
+       ligação abre. O relógio só existia para o caso de o primeiro pacote não
+       vir — e virou uma CORRIDA: se o `entra` demorasse mais de 4 s (rede
+       ruim, celular fraco, a tela do anfitrião engasgada), o relógio ganhava e
+       o JOGADOR entrava como artilheiro. Ele via a batalha, a batalha não via
+       ele. Foi assim que o teste de dois navegadores começou a falhar quando o
+       avião novo deixou a cena mais pesada: 5,7 quadros por segundo em vez de
+       6,6 foi o bastante para o chute passar na frente do aperto de mão.
+
+       Corrida nenhuma se ganha andando mais depressa: o que resolve é tirar o
+       segundo corredor. Quinze segundos é tempo de sobra para o primeiro
+       pacote de qualquer um dos dois, e quem chega aqui depois disso é mesmo
+       alguém que abriu a ligação e não falou — aí sim, celular. */
+    setTimeout(() => { if (!decidido){ decidido = true; Tripulacao.entra(c); } }, 15000);
   });
   peer.on('error', e => {
     if (e.type === 'unavailable-id'){ try{ peer.destroy(); }catch(x){} abrirSala(); return; }

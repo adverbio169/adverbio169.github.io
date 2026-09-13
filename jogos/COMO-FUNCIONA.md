@@ -1540,3 +1540,113 @@ computador em janela alta .............. sem aviso de girar    ✔
 interruptor esteja dentro de um gesto do dedo para soltar o háptico. Se
 exigir, o tremor vai sair nos toques e não nos eventos do jogo. Isso só um
 iPhone de verdade responde.
+
+---
+
+## O avião-dragão
+
+> *"O avião é o objeto que vemos praticamente no jogo todo. Ele tem que ser o
+> objeto mais bem trabalhado."*
+
+Era verdade e era uma crítica justa. O que estava lá era um caça branco: certo
+de forma — fuselagem de revolução, asa em flecha, derivas duplas — e sem
+personalidade nenhuma. Dava para trocar por qualquer outro avião branco e
+ninguém notava.
+
+O que entrou no lugar é um **brinquedo**: azul com amarelo, redondo, com cara
+de dragão amigável no bico, asas de morcego, hélice na frente e duas
+turbininhas atrás. Peças grandes, poucas, todas reconhecíveis de longe.
+
+Três regras mandaram no desenho:
+
+1. **Tudo é redondo.** O corpo é um torno, o focinho é uma esfera achatada, as
+   pontas são cones de poucos lados. Brinquedo bom não tem quina.
+2. **O amarelo é estrutura, não enfeite.** Membrana da asa, chifres, focinho,
+   aros das turbinas e cubos das rodas — o olho junta tudo isso e lê "é a mesma
+   peça". É o que dá unidade.
+3. **O tamanho não mudou.** Mesmo comprimento e mesma envergadura do caça, para
+   a câmera, o trem de pouso, as colisões e a altura de pouso continuarem
+   valendo sem nenhum outro ajuste.
+
+### As quatro vezes em que ele ficou errado
+
+Modelar sem ver é impossível, então cada rodada foi: montar, **fotografar de
+seis ângulos** com o navegador de teste, olhar e consertar.
+
+| o que saiu | por quê | o conserto |
+|---|---|---|
+| um **balão** | o perfil tinha diâmetro quase igual de ponta a ponta | cauda que afina de verdade: raio 58 no meio, 6 na ponta |
+| as faixas laterais foram parar **na barriga e no lombo** | depois de deitar o torno, `phi=0` é a barriga e `phi=π` é o lombo — as laterais são ±π/2 | fatia do mesmo torno em ±π/2 |
+| uma **cruz preta em cima da cara** | quatro pás pretas de 150, plantadas na frente do rosto | duas pás azuis de 104, mais à frente, e um disco quando gira |
+| o rosto **só existia de frente** | de lado, uma bola azul e um borrão branco | focinho que adianta e desce, boca que corre pela mandíbula, presa por fora, chifres deitados |
+
+### O olho, que deu três voltas
+
+Onde pôr a íris foi um cabo de guerra perdido duas vezes. Bolinha grudada para
+a frente: some de perfil. Bolinha para fora: some de frente. O meio-termo
+perdeu dos dois lados ao mesmo tempo.
+
+O erro estava em pensar a íris como uma **peça**. Olho de verdade não tem
+bolinha pendurada — tem uma **mancha pintada no globo**. Então a íris virou um
+pedaço de casca esférica de mesmo centro e um fio de raio a mais, cobrindo 60°
+de olhar: como acompanha a curva, aparece inteira de frente e inteira de lado.
+
+A pupila tentou ser casca também e saiu **retangular** — recorte de esfera é
+retângulo em (phi, theta), e o bicho ficou com dois olhos de televisão. Ela
+voltou a ser bola, mas **afundada na medida**: a 18,5 do centro de um globo de
+21, põe para fora uma calota larga, redonda de todo ângulo. (Antes estava a 16
+com raio 8,5 e mal vazava — daí ter sumido.)
+
+### O preço, e como ele foi pago
+
+O dragão ficou bonito e ficou caro:
+
+```
+                     peças   triângulos     cena inteira
+caça branco             33        3.244    2.796 ordens / 226k
+dragão, peça a peça     83       10.852    6.047 ordens / 770k
+```
+
+Para a placa de vídeo, malha não custa pelo tamanho: custa por ser mais uma
+**ordem de desenho**. Com o céu cheio de inimigos, 6.000 ordens num celular é
+o fim.
+
+A saída não custou desenho nenhum. Depois de montado, o avião não mexe mais nas
+suas peças — só o grupo inteiro gira. Então dá para **cozinhar tudo**: cada peça
+é passada para o lugar onde está e todas as que dividem a mesma cor viram uma
+malha só. Mesmo triângulo por triângulo, mesma cara, mesma sombra — mas saem
+sete ordens em vez de oitenta e três. (A hélice fica de fora: essa gira
+sozinha.) Junto com uma poda de segmentos onde ninguém vê — o olho gastava
+sozinho 3.000 triângulos —, o resultado:
+
+```
+dragão, cozinhado        32        6.052    2.288 ordens / 343k
+```
+
+Menos ordens que o caça branco tinha, com o dobro de desenho.
+
+`BufferGeometryUtils` faria a fusão pronta, mas ele mora nos *examples* do
+three.js e aqui só está o núcleo. O serviço é curto: tirar o índice, aplicar a
+matriz, emendar os vetores.
+
+### O bug que o avião novo revelou
+
+Enquanto isso o teste de **dois navegadores** começou a falhar: o avião de B
+entrava na sala de A e A não via ninguém. Nada a ver com rádio — com o laço de
+desenho parado a conexão fechava na hora.
+
+A causa estava num **chute de 4 segundos**. Quem abre uma ligação com a tela do
+jogo pode ser um avião entrando na batalha (`{t:'entra'}`) ou um celular
+virando artilheiro (`{t:'oi'}`) — e havia um relógio que, se ninguém falasse em
+4 s, decidia "é celular". Isso é uma corrida: se o `entra` demorasse mais que
+isso — rede ruim, celular fraco, a tela do anfitrião engasgada —, o **jogador
+entrava como artilheiro**. Ele via a batalha; a batalha não via ele.
+
+O avião mais pesado derrubou o teste de 6,6 para 5,7 quadros por segundo, e
+isso bastou para o chute passar na frente do aperto de mão. Mas o bug já estava
+lá, esperando um celular ruim.
+
+Corrida nenhuma se ganha andando mais depressa: o que resolve é **tirar o
+segundo corredor**. Os dois lados já se anunciam sozinhos, então o relógio foi
+para 15 s — tempo de sobra para o primeiro pacote de qualquer um. Quem chega
+depois disso é mesmo alguém que abriu a ligação e não falou.
