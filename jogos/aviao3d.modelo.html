@@ -343,7 +343,8 @@
 <button class="bt" id="btQual" title="qualidade do desenho">alto</button>
 <!-- só aparece em computador com câmera: no celular o aparelho É o manche, e a
      câmera dele aponta para o teto -->
-<button class="bt" id="btCabeca" title="olhar com a cabeça (C)">&#129504; cabeça</button>
+<button class="bt" id="btCabeca"
+        title="olhar com a cabeça — C liga e recentra, X inverte o lado">&#129504; cabeça</button>
 <!-- ============ O PAINEL DA SALA ==========================================
      "O jogo nos celulares não consegue entrar na mesma sala. Ao entrar numa
      sala, tem que ficar o código disponível na tela, ou então o QR."
@@ -2313,6 +2314,16 @@ const CAB_MIN = 0.16;       // menor rosto procurado, em fração da altura
 const CAB_CONFIA = 22;      // abaixo disto é mancha de parede, não cabeça
 const Cabeca = {
   ligada:false, achou:false, x:0, y:0, custo:0, aviso:'',
+  /* +1 ou -1: para que lado a cabeça manda a vista. Ver o comentário no
+     `passo`; sai da tecla X e mora no aparelho de quem joga. */
+  espelho: (() => { try { return localStorage.getItem('aviao3d.olharEspelho') === '-1' ? -1 : 1; }
+                    catch(e){ return 1; } })(),
+  inverte(){
+    this.espelho = -this.espelho;
+    try { localStorage.setItem('aviao3d.olharEspelho', String(this.espelho)); } catch(e){}
+    this.centraliza();
+    mostraAviso(this.espelho === 1 ? 'OLHAR NORMAL' : 'OLHAR INVERTIDO', '#7fd8ff', 1200);
+  },
   _fluxo:null, _video:null, _cv:null, _ctx:null, _classifica:null, _memoria:null,
   _repouso:null, _alvoX:0, _alvoY:0, _proxima:0, _perdido:0,
 
@@ -2403,18 +2414,26 @@ const Cabeca = {
       if (f){
         if (!this.achou) pintaBotaoCabeca();
         this.achou = true; this._perdido = 0;
-        /* --- O SINAL DO X, DECIDIDO NA MÃO E NÃO NO PAPEL --------------------
-           Eu tinha espelhado o X por raciocínio: a webcam vê você como outra
-           pessoa veria, então o seu lado direito cai na esquerda da imagem.
-           O raciocínio está certo para quem se DESLOCA de lado — e errado para
-           o que as pessoas realmente fazem, que é VIRAR o rosto.
+        /* --- O SINAL DO X TEM UM BOTÃO, E O MOTIVO É BOM ---------------------
+           Duas explicações honestas puxam para lados OPOSTOS, e as duas estão
+           certas — cada uma para um jeito de mexer a cabeça:
 
-           Girando a cabeça, ela não desliza: ela pivota num eixo que fica
-           ATRÁS do rosto, no pescoço. O nariz vai para a direita e o bloco do
-           rosto varre para o outro lado. Foi o que veio do teste, com todas as
-           letras: "ao olhar para a direita, a tela está indo para o outro
-           lado". Não há teoria que ganhe disso — o sinal é este. */
-        const px = (f.c/f.L)*2 - 1, py = -((f.r/f.A)*2 - 1);
+             DESLIZANDO de lado, vale o espelho: a webcam te vê como outra
+             pessoa veria, então o seu lado direito cai na esquerda da imagem.
+             ("Se você está dentro do computador olhando para mim, seria a sua
+             esquerda.")
+
+             VIRANDO o rosto, vale o contrário: a cabeça não desliza, ela pivota
+             num eixo que fica ATRÁS do rosto, no pescoço. O nariz vai para a
+             direita e o bloco do rosto varre para o outro lado.
+
+           Qual das duas manda depende de como CADA PESSOA mexe a cabeça, de
+           onde a webcam está e de quão longe se senta. Não é coisa que se
+           decida no papel, e eu já tentei duas vezes.
+
+           Então tem tecla: X inverte, e fica guardado. Dois segundos para
+           acertar, para sempre, em vez de mais uma rodada de adivinhação. */
+        const px = ((f.c/f.L)*2 - 1) * this.espelho, py = -((f.r/f.A)*2 - 1);
         if (!this._repouso) this._repouso = { x:px, y:py };
         const ux = px - this._repouso.x, uy = py - this._repouso.y;
         /* --- O REPOUSO SÓ APRENDE QUANDO A CABEÇA ESTÁ EM REPOUSO ------------
@@ -5448,6 +5467,7 @@ document.addEventListener('keydown', e => {
   /* C liga; com o olhar já ligado, C recalibra o "reto" — que é o que se quer
      apertar no meio do jogo, depois de se acomodar melhor na cadeira */
   if (e.key==='c'||e.key==='C'){ if (Cabeca.ligada) Cabeca.centraliza(); else Cabeca.liga(); }
+  if (e.key==='x'||e.key==='X') Cabeca.inverte();     // o lado do olhar
   if (e.key==='g'||e.key==='G') mexeTrem();
   if (e.key==='f'||e.key==='F') mexeFlap();
   if (e.key==='w'||e.key==='W') tecla.mais=true;

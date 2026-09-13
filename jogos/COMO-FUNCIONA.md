@@ -3577,6 +3577,26 @@ fica *atrás* do rosto, no pescoço. O nariz vai para a direita e o bloco do ros
 varre para o outro lado.
 
 Não há teoria que ganhe de *"ao olhar para a direita, a tela está indo para o
-outro lado"*. O sinal é o que o teste disse. A página de prova
-(`jogos/rosto.html`) mudou junto — duas páginas com convenções contrárias seria
-uma armadilha guardada para daqui a três meses.
+outro lado"*. A página de prova (`jogos/rosto.html`) mudou junto — duas páginas
+com convenções contrárias seria uma armadilha guardada para daqui a três meses.
+
+### E aí veio a teoria contrária, também certa
+
+> *"É que se você está dentro do computador olhando para mim, seria a sua
+> esquerda... kkkkk"*
+
+Perfeitamente certo — e é o argumento do espelho, o mesmo que eu tinha usado na
+primeira versão. Ou seja: **duas explicações honestas puxando para lados
+opostos**, cada uma valendo para um jeito de mexer a cabeça.
+
+- **Deslizando** de lado vale o espelho: a webcam te vê como outra pessoa veria.
+- **Virando** o rosto vale o contrário: a cabeça pivota num eixo atrás do rosto.
+
+Qual das duas manda depende de como cada pessoa mexe a cabeça, de onde está a
+webcam e de quão longe se senta. Isso não se decide no papel — eu já tentei duas
+vezes, e a segunda foi guiada por um teste real que ainda assim não fecha a
+questão para todo mundo.
+
+Então tem **tecla**: `X` inverte o lado e fica guardado no aparelho. Dois
+segundos para acertar, para sempre, em vez de mais uma rodada de adivinhação. É
+o tipo de coisa que devia ter nascido com botão.
