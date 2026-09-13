@@ -50,6 +50,13 @@
     font-size:14px; font-weight:600; opacity:.9; text-align:center; max-width:min(92vw,440px);
   }
   #aviso:empty{display:none}
+  #faixaFase{
+    position:fixed; left:50%; top:26%; transform:translate(-50%,-50%) scale(.82);
+    font-family:"Nothing You Could Do",cursive; font-size:clamp(30px,8vw,52px);
+    color:var(--papel); text-shadow:0 3px 0 var(--tinta), 0 0 22px rgba(24,24,28,.45);
+    opacity:0; pointer-events:none; transition:opacity .45s, transform .45s; white-space:nowrap;
+  }
+  #faixaFase.on{opacity:1; transform:translate(-50%,-50%) scale(1)}
 
   .tela{
     position:fixed; inset:0; display:none; padding:20px;
@@ -111,6 +118,7 @@
   </div>
   <p id="aviso"></p>
 </div>
+<div id="faixaFase"></div>
 
 <div class="tela on" id="telaInicio">
   <div class="folha">
@@ -175,6 +183,47 @@
   };
   var CORACOES = [0xE94C6A, 0xF79A3C, 0x5EB0D6, 0x7EC474, 0xC476D0];
 
+  // As fases: o mundo muda de clima a cada trecho percorrido.
+  var TEMAS = [
+    {
+      nome: "Campo", ceu: ["#BEDFF0", "#DDEEF6", "#FDF3E3"], neblina: 0xDDEEF6,
+      mats: { grama: 0x7CC275, gramaEsc: 0x5FA45C, terra: 0xD2A972, fundo: 0xC9E6C4,
+              nuvem: 0xFFFFFF, montanha: 0xC3DCDA, montanha2: 0xCFE4E0, mato: 0x4E8A52,
+              folha: 0x6FBE68, folhaEsc: 0x4E9450,
+              tronco: 0xA9703F, pedra: 0xCFC4AC },
+      luz: 0xFFF6E2, intLuz: 0.85, hemiCeu: 0xFFFFFF, hemiChao: 0xC6DED0, intHemi: 0.72,
+      astro: 0xFFF3C4, astroY: 22, noite: 0, borboletas: 1
+    },
+    {
+      nome: "Pôr do sol", ceu: ["#3E4E96", "#F0845E", "#FFD9A0"], neblina: 0xF0A882,
+      mats: { grama: 0x9EA85E, gramaEsc: 0x7A8248, terra: 0xA9763F, fundo: 0xD9B98C,
+              nuvem: 0xFFC2A0, montanha: 0x9A7EA8, montanha2: 0xB292BC, mato: 0x4A3A52,
+              folha: 0x9A8A4A, folhaEsc: 0x6E6238,
+              tronco: 0x6B4A32, pedra: 0xB8A28C },
+      luz: 0xFFA766, intLuz: 1.0, hemiCeu: 0xFFC090, hemiChao: 0x8A6A5A, intHemi: 0.62,
+      astro: 0xFF8A4A, astroY: 6, noite: 0, borboletas: 0.5
+    },
+    {
+      nome: "Praia", ceu: ["#7FD4F0", "#BCEAF6", "#FFF6DC"], neblina: 0xBCEAF6,
+      mats: { grama: 0xF2E1B0, gramaEsc: 0xE6D096, terra: 0xD9BE87, fundo: 0x58C2D8,
+              nuvem: 0xFFFFFF, montanha: 0x8FD8DE, montanha2: 0xA8E4E6, mato: 0x2E9E76,
+              folha: 0x45A86E, folhaEsc: 0x2F7C52,
+              tronco: 0xC49A62, pedra: 0xF0E6CC },
+      luz: 0xFFFBE8, intLuz: 0.95, hemiCeu: 0xFFFFFF, hemiChao: 0xE8DCB8, intHemi: 0.8,
+      astro: 0xFFFCE0, astroY: 24, noite: 0, borboletas: 1
+    },
+    {
+      nome: "Noite dos vaga-lumes", ceu: ["#0A1030", "#1C2455", "#38406E"], neblina: 0x2A3358,
+      mats: { grama: 0x2E5A4A, gramaEsc: 0x23473A, terra: 0x3A3348, fundo: 0x26304A,
+              nuvem: 0x4A5878, montanha: 0x2E3858, montanha2: 0x3A4468, mato: 0x16202E,
+              folha: 0x2E5A4A, folhaEsc: 0x23473A,
+              tronco: 0x2E2434, pedra: 0x4A4658 },
+      luz: 0x93A9E8, intLuz: 0.4, hemiCeu: 0x44548E, hemiChao: 0x141A2E, intHemi: 0.55,
+      astro: 0xF2F2E0, astroY: 20, noite: 1, borboletas: 0
+    }
+  ];
+  var TROCA_FASE = 140;                            // metros por fase
+
   var GRAV = 42, PULO = 15.2, MOLA = 24.5;
   var VELMAX = 13.5;                // velocidade máxima, para os dois lados
   var MEIO = 0.46;            // meia largura da personagem
@@ -187,6 +236,7 @@
   var heroi, sombra, corpoTodo, tronco, cabecaG, chapeuG, saia;
   var ombroE, ombroD, cotoveloE, cotoveloD, coxaE, coxaD, joelhoE, joelhoD;
   var solidos = [], blocos = [], coracoes = [], molas = [], decors = [];
+  var inimigos = [], estrelas3d = [], particulas = [], vagalumes = [], borboletas = [];
   var jogador = { x: 0, y: 0, vy: 0, vel: 0, noChao: true, giro: 0, girando: false, passo: 0 };
   var estado = "menu";
   var dist = 0, pontos = 0, vidas = 3, xMax = 0, limiteTras = -12;
@@ -197,6 +247,8 @@
   var toqueAtivo = false, toqueX = 0, toqueMoveu = false, alvoToque = null;
   var teclas = { esq: false, dir: false };
   var recorde = 0, DIST_CAM = 20, ADIANTE = 3;
+
+  var faseAtual = 0;
 
   var el = {
     hud: document.getElementById("hud"),
@@ -212,13 +264,21 @@
     tituloFim: document.getElementById("tituloFim"),
     recordeNovo: document.getElementById("recordeNovo"),
     recordeInicio: document.getElementById("recordeInicio"),
-    recordeFim: document.getElementById("recordeFim")
+    recordeFim: document.getElementById("recordeFim"),
+    faixaFase: document.getElementById("faixaFase")
   };
+
+  var tempoFaixa = 0, estavaNoChao = true, quedaForte = 0;
+  function mostrarFase(nome) {
+    el.faixaFase.textContent = nome;
+    el.faixaFase.classList.add("on");
+    tempoFaixa = 2.4;
+  }
 
   /* =============================== som =============================== */
   var Som = (function () {
     var ctx = null, master = null, mudo = false, tocando = false, proxNota = 0, passo = 0, timer = null;
-    var BPM = 132, SPB = 60 / BPM;
+    var BPM = 132, SPB = 60 / BPM, mult = 1;
     // mesma melodia da trilha do vídeo, em batidas: [batida, duração, semitom relativo a C5]
     var MEL = [
       [0,1,7],[1,1,4],[2,1,2],[3,1,0],[4,1,2],[5,1,4],[6,2,2],
@@ -273,7 +333,7 @@
           if (Math.abs(n[0] - b) < 1e-6) sino(nota(n[2]), t, n[1] * SPB * 1.7, 0.17);
         });
         if (b % 4 === 0) grave(nota(BAIXO[(b / 4) | 0], -2), t, SPB * 1.6);
-        passo++; proxNota += SPB;
+        passo++; proxNota += SPB * mult;
       }
     }
     return {
@@ -288,6 +348,10 @@
           tocando = false; clearInterval(timer);
         }
       },
+      clima: function (i) {                 // cada fase tem um andamento
+        mult = [1, 1.07, 0.95, 1.2][i % 4];
+        if (master && !mudo) master.gain.value = [0.85, 0.8, 0.85, 0.62][i % 4];
+      },
       mudo: function (v) { mudo = v; if (master) master.gain.value = v ? 0 : 0.85; },
       efeito: function (tipo) {
         if (!ctx || mudo) return;
@@ -296,6 +360,9 @@
         else if (tipo === "pulo") varre(t, 320, 760, 0.16, "square", 0.12);
         else if (tipo === "mola") varre(t, 260, 1300, 0.3, "square", 0.15);
         else if (tipo === "batida") varre(t, 380, 70, 0.35, "sawtooth", 0.2);
+        else if (tipo === "estrela") { sino(1318.5, t, .3, .24); sino(1760, t + .07, .34, .22); sino(2637, t + .15, .5, .18); }
+        else if (tipo === "pisar") { varre(t, 900, 240, 0.18, "square", 0.16); sino(880, t + .04, .2, .14); }
+        else if (tipo === "fase") { [0, 4, 7, 12].forEach(function (n, i) { sino(523.25 * Math.pow(2, n / 12), t + i * 0.09, 0.6, 0.2); }); }
         else if (tipo === "fim") { sino(523.25, t, .5, .2); sino(415.3, t + .18, .5, .2); sino(349.23, t + .36, 1.1, .22); }
       }
     };
@@ -311,7 +378,14 @@
   })();
 
   /* ========================= peças do cenário ========================= */
-  function matPapel(cor) { return new THREE.MeshLambertMaterial({ color: cor === undefined ? COR.papel : cor }); }
+  var MATS = {};
+  function matPapel(cor) {
+    if (typeof cor === "string") {                 // material do tema, compartilhado
+      if (!MATS[cor]) MATS[cor] = new THREE.MeshLambertMaterial({ color: TEMAS[0].mats[cor] });
+      return MATS[cor];
+    }
+    return new THREE.MeshLambertMaterial({ color: cor === undefined ? COR.papel : cor });
+  }
 
   function comTraco(malha, cor) {
     malha.add(new THREE.LineSegments(
@@ -559,8 +633,8 @@
   /* ===================== chão, plataformas e enfeites ================= */
   function novoSolido() {
     var g = new THREE.Group();
-    var base = peca(new THREE.BoxGeometry(1, 1, 4.2), COR.terra, 0, 0, 0);
-    var topo = peca(new THREE.BoxGeometry(1, 0.44, 4.8), COR.grama, 0, 0, 0);
+    var base = peca(new THREE.BoxGeometry(1, 1, 4.2), "terra", 0, 0, 0);
+    var topo = peca(new THREE.BoxGeometry(1, 0.44, 4.8), "grama", 0, 0, 0);
     base.castShadow = base.receiveShadow = true;
     topo.castShadow = topo.receiveShadow = true;
     g.add(base); g.add(topo);
@@ -568,11 +642,11 @@
     var enfeites = [];                          // tufos de grama e florzinhas no topo
     for (var i = 0; i < 4; i++) {
       var e = new THREE.Group();
-      var tufo = peca(new THREE.ConeGeometry(0.17, 0.46, 5), COR.gramaEsc, 0, 0.23, 0);
+      var tufo = peca(new THREE.ConeGeometry(0.17, 0.46, 5), "gramaEsc", 0, 0.23, 0);
       tufo.castShadow = true;
       e.add(tufo);
       if (i % 2) {
-        var caule = peca(new THREE.CylinderGeometry(0.025, 0.03, 0.4, 5), COR.gramaEsc, 0.18, 0.2, 0.1);
+        var caule = peca(new THREE.CylinderGeometry(0.025, 0.03, 0.4, 5), "gramaEsc", 0.18, 0.2, 0.1);
         var flor = peca(new THREE.SphereGeometry(0.1, 8, 6), CORACOES[i % CORACOES.length], 0.18, 0.44, 0.1);
         flor.castShadow = true;
         e.add(caule); e.add(flor);
@@ -580,7 +654,7 @@
       e.visible = false;
       g.add(e); enfeites.push(e);
     }
-    var pedra = peca(new THREE.SphereGeometry(0.3, 8, 6), 0xCFC4AC, 0, 0, 2.15);
+    var pedra = peca(new THREE.SphereGeometry(0.3, 8, 6), "pedra", 0, 0, 2.15);
     pedra.scale.set(1, 0.7, 0.6);
     pedra.castShadow = true;
     pedra.visible = false;
@@ -604,16 +678,16 @@
 
   function criarArvore() {
     var g = new THREE.Group();
-    g.add(peca(new THREE.CylinderGeometry(0.2, 0.26, 1.5, 8), COR.tronco, 0, 0.75, 0));
-    g.add(peca(new THREE.ConeGeometry(1.05, 2.1, 12), COR.gramaEsc, 0, 2.35, 0));
-    g.add(peca(new THREE.ConeGeometry(0.8, 1.6, 12), COR.grama, 0, 3.2, 0));
+    g.add(peca(new THREE.CylinderGeometry(0.2, 0.26, 1.5, 8), "tronco", 0, 0.75, 0));
+    g.add(peca(new THREE.ConeGeometry(1.05, 2.1, 12), "folhaEsc", 0, 2.35, 0));
+    g.add(peca(new THREE.ConeGeometry(0.8, 1.6, 12), "folha", 0, 3.2, 0));
     cena.add(g);
     return g;
   }
 
   function criarNuvem() {
     var g = new THREE.Group();
-    var mat = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+    var mat = matPapel("nuvem");
     [[0, 0, 0, 1.5], [1.5, -0.3, 0.2, 1.1], [-1.4, -0.25, -0.2, 1.2], [0.5, 0.55, 0.1, 1]].forEach(function (b) {
       var m = new THREE.Mesh(new THREE.SphereGeometry(b[3], 10, 8), mat);
       m.position.set(b[0], b[1], b[2]);
@@ -625,9 +699,8 @@
 
   function criarMato() {
     var g = new THREE.Group();
-    var cor = 0x4E8A52;
     [[0, 0, 0, 1.0], [0.85, -0.25, 0.3, 0.7], [-0.8, -0.2, -0.2, 0.75]].forEach(function (b) {
-      var m = peca(new THREE.SphereGeometry(b[3], 10, 8), cor, b[0], b[1], b[2]);
+      var m = peca(new THREE.SphereGeometry(b[3], 10, 8), "mato", b[0], b[1], b[2]);
       g.add(m);
     });
     cena.add(g);
@@ -636,19 +709,168 @@
 
   function criarMontanha() {
     var g = new THREE.Group();
-    g.add(peca(new THREE.ConeGeometry(7, 9, 7), 0xC3DCDA, 0, 4.5, 0));
-    g.add(peca(new THREE.ConeGeometry(4.6, 6, 7), 0xCFE4E0, 6.5, 3, -2));
+    g.add(peca(new THREE.ConeGeometry(7, 9, 7), "montanha", 0, 4.5, 0));
+    g.add(peca(new THREE.ConeGeometry(4.6, 6, 7), "montanha2", 6.5, 3, -2));
     cena.add(g);
     return g;
   }
 
   function criarMorro() {
     var g = new THREE.Group();
-    var m = peca(new THREE.SphereGeometry(6, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), COR.grama, 0, 0, 0);
+    var m = peca(new THREE.SphereGeometry(6, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), "grama", 0, 0, 0);
     m.scale.set(1, 0.42, 1);
     g.add(m);
     cena.add(g);
     return g;
+  }
+
+  /* ==================== bichinhos, estrelas e brilhos ================= */
+  var CORES_BICHO = [0x8E62C4, 0x5EA9D8, 0xE0803C, 0x62B87A];
+
+  function novoInimigo(i) {
+    var cor = CORES_BICHO[i % CORES_BICHO.length];
+    var g = new THREE.Group();
+    var corpo = parte(new THREE.SphereGeometry(0.42, 16, 12), cor, 0, 0.46, 0, 0.028);
+    corpo.scale.set(1.2, 0.92, 1);
+    g.add(corpo);
+    [-1, 1].forEach(function (l) {
+      g.add(parte(new THREE.SphereGeometry(0.11, 10, 8), 0xFFFFFF, l * 0.17, 0.6, 0.32, 0));
+      g.add(parte(new THREE.SphereGeometry(0.055, 8, 6), COR.tinta, l * 0.18, 0.6, 0.39, 0));
+      var antena = parte(new THREE.CylinderGeometry(0.02, 0.025, 0.3, 5), COR.tinta, l * 0.14, 0.92, 0, 0);
+      antena.rotation.z = l * 0.35;
+      g.add(antena);
+      g.add(parte(new THREE.SphereGeometry(0.06, 8, 6), cor, l * 0.2, 1.06, 0, 0.02));
+    });
+    var pes = [];
+    [-1, 1].forEach(function (l) {
+      var pe = parte(geoCaixa(0.22, 0.13, 0.3, 0.05), COR.tinta, l * 0.22, 0.07, 0.02, 0.02);
+      g.add(pe); pes.push(pe);
+    });
+    g.traverse(function (o) { if (o.isMesh && !o.userData.casca) o.castShadow = true; });
+    g.visible = false;
+    cena.add(g);
+    return { obj: g, pes: pes, ativo: false, x: 0, y: 0, x0: 0, x1: 0, dir: 1, fase: Math.random() * 6 };
+  }
+
+  function geoEstrela() {
+    var f = new THREE.Shape();
+    for (var i = 0; i < 10; i++) {
+      var r = i % 2 ? 0.24 : 0.56;
+      var a = -Math.PI / 2 + i * Math.PI / 5;
+      var x = Math.cos(a) * r, y = Math.sin(a) * r;
+      if (i === 0) f.moveTo(x, y); else f.lineTo(x, y);
+    }
+    f.closePath();
+    var g = new THREE.ExtrudeGeometry(f, { depth: 0.16, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, bevelSegments: 2 });
+    g.center();
+    return g;
+  }
+
+  function novaEstrela() {
+    var m = parte(geoEstrela(), 0xFFC83D, 0, 0, 0, 0.03);
+    m.castShadow = true;
+    m.visible = false;
+    cena.add(m);
+    return { obj: m, ativo: false, x: 0, y: 0 };
+  }
+
+  function novaParticula() {
+    var m = new THREE.Mesh(new THREE.OctahedronGeometry(0.13, 0),
+      new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 1 }));
+    m.visible = false;
+    cena.add(m);
+    return { obj: m, viva: 0, vx: 0, vy: 0, vz: 0 };
+  }
+
+  function explodir(x, y, cor, n, forca) {
+    var feitas = 0;
+    for (var i = 0; i < particulas.length && feitas < n; i++) {
+      var p = particulas[i];
+      if (p.viva > 0) continue;
+      p.viva = 0.55 + Math.random() * 0.35;
+      p.obj.visible = true;
+      p.obj.material.color.setHex(cor);
+      p.obj.material.opacity = 1;
+      p.obj.position.set(x, y, (Math.random() - 0.5) * 0.8);
+      p.obj.scale.setScalar(0.7 + Math.random() * 0.8);
+      var a = Math.random() * Math.PI * 2, b = Math.random() * Math.PI;
+      p.vx = Math.cos(a) * Math.sin(b) * forca;
+      p.vy = Math.abs(Math.cos(b)) * forca + 2;
+      p.vz = Math.sin(a) * Math.sin(b) * forca * 0.5;
+      feitas++;
+    }
+  }
+
+  function moverParticulas(dt) {
+    for (var i = 0; i < particulas.length; i++) {
+      var p = particulas[i];
+      if (p.viva <= 0) continue;
+      p.viva -= dt;
+      p.vy -= 22 * dt;
+      p.obj.position.x += p.vx * dt;
+      p.obj.position.y += p.vy * dt;
+      p.obj.position.z += p.vz * dt;
+      p.obj.rotation.x += dt * 6; p.obj.rotation.y += dt * 5;
+      p.obj.material.opacity = Math.max(0, Math.min(1, p.viva * 2.2));
+      if (p.viva <= 0) p.obj.visible = false;
+    }
+  }
+
+  function novoVagalume() {
+    var g = new THREE.Group();
+    var luz = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xFFF3A0, transparent: true, opacity: 0 }));
+    var halo = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xEEF08A, transparent: true, opacity: 0 }));
+    g.add(luz); g.add(halo);
+    cena.add(g);
+    return { obj: g, luz: luz, halo: halo, fase: Math.random() * 9, raio: 1 + Math.random() * 3, alt: 1 + Math.random() * 3.4, desloc: (Math.random() - 0.5) * 26 };
+  }
+
+  function novaBorboleta(i) {
+    var g = new THREE.Group();
+    var cor = CORACOES[i % CORACOES.length];
+    var asaG = new THREE.PlaneGeometry(0.34, 0.24);
+    asaG.translate(0.17, 0, 0);                  // dobra na borda de dentro
+    var mat = new THREE.MeshBasicMaterial({ color: cor, side: THREE.DoubleSide, transparent: true, opacity: 1 });
+    var e = new THREE.Mesh(asaG, mat), d = new THREE.Mesh(asaG, mat);
+    var corpo = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.22, 6),
+      new THREE.MeshBasicMaterial({ color: 0x3A2E28, transparent: true, opacity: 1 }));
+    corpo.rotation.x = Math.PI / 2;
+    g.add(e); g.add(d); g.add(corpo);
+    g.rotation.x = -0.55;
+    cena.add(g);
+    return { obj: g, asaE: e, asaD: d, mat: mat, corpo: corpo, fase: Math.random() * 9, raio: 2 + Math.random() * 4, alt: 1.1 + Math.random() * 2.2, desloc: (Math.random() - 0.5) * 30 };
+  }
+
+  function moverBichinhos(dt) {
+    var noite = pesoNoite();
+    var luzBorb = TEMAS[temaDe].borboletas * (1 - trans) + TEMAS[temaPara].borboletas * trans;
+
+    for (var i = 0; i < vagalumes.length; i++) {
+      var v = vagalumes[i];
+      v.fase += dt * 0.7;
+      var px = jogador.x + v.desloc + Math.sin(v.fase) * v.raio;
+      v.obj.position.set(px, v.alt + Math.sin(v.fase * 1.7 + i) * 0.7, 1.5 + Math.cos(v.fase * 0.8) * 3.5);
+      var brilho = noite * (0.45 + 0.55 * Math.max(0, Math.sin(v.fase * 2.3 + i)));
+      v.luz.material.opacity = brilho;
+      v.halo.material.opacity = brilho * 0.22;
+      v.obj.visible = noite > 0.02;
+    }
+    for (var b = 0; b < borboletas.length; b++) {
+      var bo = borboletas[b];
+      bo.fase += dt * 1.1;
+      bo.obj.position.set(jogador.x + bo.desloc + Math.sin(bo.fase * 0.6) * bo.raio,
+        bo.alt + Math.sin(bo.fase * 1.3 + b) * 0.8, 3.4 + Math.cos(bo.fase * 0.5 + b) * 1.6);
+      bo.obj.rotation.y = Math.cos(bo.fase * 0.6) > 0 ? 0.5 : -0.5;
+      bo.obj.rotation.z = Math.sin(bo.fase * 1.3 + b) * 0.25;
+      var asa = 0.35 + Math.abs(Math.sin(bo.fase * 11)) * 1.1;
+      bo.asaD.rotation.y = asa;
+      bo.asaE.rotation.y = Math.PI - asa;
+      bo.mat.opacity = luzBorb;
+      bo.corpo.material.opacity = luzBorb;
+      bo.obj.visible = luzBorb > 0.05;
+    }
   }
 
   /* ======================= geração do caminho ======================== */
@@ -683,9 +905,23 @@
     b.obj.position.set(x, topoY, 0);
   }
 
+  function porInimigo(x, topoY, x0, x1) {
+    var e = livre(inimigos); if (!e) return;
+    e.ativo = true; e.obj.visible = true;
+    e.x = x; e.y = topoY; e.x0 = x0; e.x1 = x1; e.dir = Math.random() < 0.5 ? -1 : 1;
+    e.obj.position.set(x, topoY, 0);
+  }
+
+  function porEstrela(x, y) {
+    var es = livre(estrelas3d); if (!es) return;
+    es.ativo = true; es.obj.visible = true;
+    es.x = x; es.y = y;
+    es.obj.position.set(x, y, 0);
+  }
+
   function porCoracao(x, y) {
     var c = livre(coracoes); if (!c) return;
-    c.ativo = true; c.obj.visible = true;
+    c.ativo = true; c.obj.visible = true; c.y0 = y;
     c.obj.position.set(x, y, 0);
     c.obj.rotation.set(0, Math.random() * 6.28, 0);
   }
@@ -718,6 +954,8 @@
       porBloco(x + 6, 0);
       if (Math.random() < 0.28 + dif * 0.42) porBloco(x + 11, 0);
       linhaCoracoes(x + 2, 1.4, 3, 1.4);
+      if (Math.random() < 0.4 + dif * 0.3) porInimigo(x + 13, 0, x + 8.5, x + 15);
+      if (Math.random() < 0.16) porEstrela(x + 8, 3.6);
       return 16;
     }
     if (r < 0.46) {                                  // buraco para pular
@@ -731,6 +969,8 @@
       porSolido(x + 12.5, 4.6, 2.4, 0.7);
       linhaCoracoes(x + 13.2, 3.6, 3, 1.3);
       porSolido(x + 21, 12, 0);
+      if (Math.random() < 0.45) porInimigo(x + 25, 0, x + 22, x + 31);
+      porEstrela(x + 17.5, 4.6);
       return 33;
     }
     if (r < 0.82) {                                  // degraus (sobe e desce)
@@ -740,16 +980,20 @@
       linhaCoracoes(x + 11, 3.7, 3, 1.3);
       porSolido(x + 15, 5, 1.2);
       porSolido(x + 20, 8, 0);
+      if (Math.random() < 0.5 + dif * 0.3) porInimigo(x + 23, 0, x + 20.5, x + 27);
+      if (Math.random() < 0.2) porEstrela(x + 12.7, 4.2);
       return 28;
     }
     porSolido(x, 14, 0);                             // mola
+    if (Math.random() < 0.35) porInimigo(x + 11, 0, x + 8, x + 13.5);
     porMola(x + 4.5, 0);
     for (var k = 0; k < 6; k++) porCoracao(x + 5.6 + k * 1.6, 2.4 + Math.sin(k / 5 * Math.PI) * 4.4);
     return 14;
   }
 
   function limparMundo() {
-    [solidos, blocos, coracoes, molas].forEach(function (lista) {
+    particulas.forEach(function (p) { p.viva = 0; p.obj.visible = false; });
+    [solidos, blocos, coracoes, molas, inimigos, estrelas3d].forEach(function (lista) {
       lista.forEach(function (it) { it.ativo = false; it.obj.visible = false; });
     });
   }
@@ -837,7 +1081,8 @@
   }
 
   /* ============================ montagem ============================= */
-  var fundo, sol;
+  var fundo, sol, hemi, astro, estrelas, faixaFase;
+  var temaDe = 0, temaPara = 0, trans = 1, corA, corB, corC;
 
   function iniciar() {
     var canvas = document.getElementById("cena");
@@ -854,7 +1099,9 @@
     camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 300);
     camera.position.set(0, 5, 20);
 
-    cena.add(new THREE.HemisphereLight(0xFFFFFF, 0xC6DED0, 0.72));
+    corA = new THREE.Color(); corB = new THREE.Color(); corC = new THREE.Color();
+    hemi = new THREE.HemisphereLight(0xFFFFFF, 0xC6DED0, 0.72);
+    cena.add(hemi);
     sol = new THREE.DirectionalLight(0xFFF6E2, 0.85);
     sol.position.set(-7, 18, 13);
     sol.castShadow = true;
@@ -866,9 +1113,25 @@
     sc.updateProjectionMatrix();
     cena.add(sol); cena.add(sol.target);
 
-    fundo = new THREE.Mesh(new THREE.PlaneGeometry(400, 80), matPapel(0xC9E6C4));
+    fundo = new THREE.Mesh(new THREE.PlaneGeometry(400, 80), matPapel("fundo"));
     fundo.position.set(0, -38.7, -34);
     cena.add(fundo);
+
+    astro = new THREE.Mesh(new THREE.CircleGeometry(5.2, 32),
+      new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0 }));
+    astro.position.set(0, 20, -70);
+    cena.add(astro);
+
+    var pos = [];
+    for (var e = 0; e < 260; e++) {
+      pos.push((Math.random() - 0.5) * 360, 6 + Math.random() * 48, -60 - Math.random() * 30);
+    }
+    var geoEst = new THREE.BufferGeometry();
+    geoEst.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    estrelas = new THREE.Points(geoEst, new THREE.PointsMaterial({
+      color: 0xFFFFFF, size: 0.7, transparent: true, opacity: 0, sizeAttenuation: true
+    }));
+    cena.add(estrelas);
 
     GEO_CORACAO = geoCoracao();
     relogio = new THREE.Clock();
@@ -892,6 +1155,11 @@
       mo.visible = false; cena.add(mo);
       molas.push({ obj: mo, ativo: false, x: 0, y: 0 });
     }
+    for (var iq = 0; iq < 10; iq++) inimigos.push(novoInimigo(iq));
+    for (var ie = 0; ie < 4; ie++) estrelas3d.push(novaEstrela());
+    for (var ip = 0; ip < 80; ip++) particulas.push(novaParticula());
+    for (var iv = 0; iv < 26; iv++) vagalumes.push(novoVagalume());
+    for (var ib = 0; ib < 6; ib++) borboletas.push(novaBorboleta(ib));
     for (var a = 0; a < 16; a++) decors.push({ obj: criarArvore(), tipo: "arvore" });
     for (var n = 0; n < 8; n++) decors.push({ obj: criarNuvem(), tipo: "nuvem" });
     for (var h = 0; h < 5; h++) decors.push({ obj: criarMorro(), tipo: "morro" });
@@ -903,6 +1171,7 @@
     el.recordeInicio.textContent = recorde + " m";
     el.recordeFim.textContent = recorde + " m";
 
+    aplicarTema(1);                              // pinta a primeira fase
     ligarControles();
     window.addEventListener("resize", aoRedimensionar);
     ajustarCamera();
@@ -910,16 +1179,56 @@
     requestAnimationFrame(quadro);
   }
 
+  var telaCeu, ctxCeu, texCeu;
   function ceuGradiente() {
-    var c = document.createElement("canvas");
-    c.width = 4; c.height = 256;
-    var g = c.getContext("2d");
-    var grd = g.createLinearGradient(0, 0, 0, 256);
-    grd.addColorStop(0, "#BEDFF0");
-    grd.addColorStop(0.55, "#DDEEF6");
-    grd.addColorStop(1, "#FDF3E3");
-    g.fillStyle = grd; g.fillRect(0, 0, 4, 256);
-    return new THREE.CanvasTexture(c);
+    telaCeu = document.createElement("canvas");
+    telaCeu.width = 4; telaCeu.height = 256;
+    ctxCeu = telaCeu.getContext("2d");
+    texCeu = new THREE.CanvasTexture(telaCeu);
+    return texCeu;
+  }
+
+  function misturaCor(alvo, a, b, t) {
+    alvo.set(a); corC.set(b); alvo.lerp(corC, t);
+    return alvo;
+  }
+
+  // Interpola tudo entre a fase que sai e a que entra.
+  function aplicarTema(t) {
+    var A = TEMAS[temaDe], B = TEMAS[temaPara];
+    var grd = ctxCeu.createLinearGradient(0, 0, 0, 256);
+    [0, 0.55, 1].forEach(function (parada, i) {
+      grd.addColorStop(parada, "#" + misturaCor(corA, A.ceu[i], B.ceu[i], t).getHexString());
+    });
+    ctxCeu.fillStyle = grd; ctxCeu.fillRect(0, 0, 4, 256);
+    texCeu.needsUpdate = true;
+
+    misturaCor(corA, A.neblina, B.neblina, t); cena.fog.color.copy(corA);
+    for (var nome in MATS) {
+      if (A.mats[nome] === undefined) continue;
+      misturaCor(corA, A.mats[nome], B.mats[nome], t);
+      MATS[nome].color.copy(corA);
+    }
+    misturaCor(corA, A.luz, B.luz, t); sol.color.copy(corA);
+    sol.intensity = A.intLuz + (B.intLuz - A.intLuz) * t;
+    misturaCor(corA, A.hemiCeu, B.hemiCeu, t); hemi.color.copy(corA);
+    misturaCor(corA, A.hemiChao, B.hemiChao, t); hemi.groundColor.copy(corA);
+    hemi.intensity = A.intHemi + (B.intHemi - A.intHemi) * t;
+    misturaCor(corA, A.astro, B.astro, t); astro.material.color.copy(corA);
+    astro.position.y = A.astroY + (B.astroY - A.astroY) * t;
+    astro.material.opacity = 0.28 + pesoNoite() * 0.62;
+    estrelas.material.opacity = pesoNoite();
+  }
+
+  function pesoNoite() {
+    return TEMAS[temaDe].noite * (1 - trans) + TEMAS[temaPara].noite * trans;
+  }
+
+  function trocarFase(i) {
+    temaDe = temaPara; temaPara = i % TEMAS.length; trans = 0;
+    mostrarFase(TEMAS[temaPara].nome);
+    Som.efeito("fase");
+    Som.clima(temaPara);
   }
 
   function ajustarCamera() {
@@ -1021,6 +1330,9 @@
     estado = "jogando";
     dist = 0; pontos = 0; vidas = 3; xMax = 0; limiteTras = -12;
     invencivel = 0; tremor = 0; tempo = 0; olhando = Math.PI / 2; adianteAtual = 3;
+    faseAtual = 0; temaDe = 0; temaPara = 0; trans = 1; aplicarTema(1);
+    el.faixaFase.classList.remove("on"); tempoFaixa = 0;
+    estavaNoChao = true; quedaForte = 0;
     jogador.x = 0; jogador.y = 0; jogador.vy = 0; jogador.vel = 0;
     jogador.giro = 0; jogador.girando = false; jogador.passo = 0; jogador.noChao = true;
     seguro.x = 0; seguro.y = 0;
@@ -1120,6 +1432,10 @@
     if (estado === "jogando") passo(dt);
     else ocioso(dt);
     fundo.position.x = camera.position.x;
+    astro.position.x = camera.position.x + 16;
+    estrelas.position.x = camera.position.x;
+    moverParticulas(dt);
+    moverBichinhos(dt);
     render3d.render(cena, camera);
   }
 
@@ -1185,7 +1501,12 @@
       }
       if (topo <= jogador.y + 0.35 && (chaoAbaixo === null || topo > chaoAbaixo)) chaoAbaixo = topo;
     }
-    if (jogador.noChao) { seguro.x = jogador.x; seguro.y = jogador.y; }
+    if (jogador.noChao) {
+      if (!estavaNoChao && quedaForte < -9) explodir(jogador.x, jogador.y + 0.1, 0xE6D9BC, 8, 3);
+      seguro.x = jogador.x; seguro.y = jogador.y;
+    }
+    estavaNoChao = jogador.noChao;
+    quedaForte = jogador.vy;
     if (invencivel > 0) invencivel -= dt;
     if (tremor > 0) tremor -= dt;
 
@@ -1216,16 +1537,21 @@
     }
 
     animarCorrida(dt, jogador.noChao ? Math.abs(jogador.vel) : 0, !jogador.noChao);
+
+    var fase = Math.floor(dist / TROCA_FASE) % TEMAS.length;
+    if (fase !== faseAtual) { faseAtual = fase; trocarFase(fase); }
+    if (trans < 1) { trans = Math.min(1, trans + dt / 2.2); aplicarTema(trans); }
+    if (tempoFaixa > 0) { tempoFaixa -= dt; if (tempoFaixa <= 0) el.faixaFase.classList.remove("on"); }
     sol.position.set(jogador.x - 7, 18, 13);
     sol.target.position.set(jogador.x, jogador.y, 0);
     sol.target.updateMatrixWorld();
-    moverMundo();
+    moverMundo(dt);
     checarColisoes();
     posicionarCamera(dt);
     atualizarHud();
   }
 
-  function moverMundo() {
+  function moverMundo(dt) {
     var x = jogador.x;
     while (proxX < xMax + VISTA) proxX += gerarTrecho(proxX);
 
@@ -1234,6 +1560,7 @@
     coracoes.forEach(function (c) {
       if (!c.ativo) return;
       c.obj.rotation.y += 0.045;
+      c.obj.position.y = c.y0 + Math.sin(tempo * 2.2 + c.obj.position.x * 0.7) * 0.13;
       if (c.obj.position.x < xMax - 44) { c.ativo = false; c.obj.visible = false; }
     });
     molas.forEach(function (m) {
@@ -1241,7 +1568,31 @@
       m.obj.scale.y = 1 + Math.sin(tempo * 6 + m.x) * 0.14;
       if (m.x < xMax - 44) { m.ativo = false; m.obj.visible = false; }
     });
+    inimigos.forEach(function (e) {
+      if (!e.ativo) return;
+      e.x += e.dir * 2.4 * dt;
+      if (e.x < e.x0) { e.x = e.x0; e.dir = 1; }
+      if (e.x > e.x1) { e.x = e.x1; e.dir = -1; }
+      e.obj.position.set(e.x, e.y + Math.abs(Math.sin(tempo * 7 + e.fase)) * 0.13, 0);
+      e.obj.rotation.y = e.dir > 0 ? 0.4 : -0.4;
+      e.pes[0].position.y = 0.07 + Math.max(0, Math.sin(tempo * 9 + e.fase)) * 0.11;
+      e.pes[1].position.y = 0.07 + Math.max(0, -Math.sin(tempo * 9 + e.fase)) * 0.11;
+      if (e.x1 < xMax - 44) { e.ativo = false; e.obj.visible = false; }
+    });
+    estrelas3d.forEach(function (es) {
+      if (!es.ativo) return;
+      es.obj.rotation.y += dt * 2.4;
+      es.obj.position.y = es.y + Math.sin(tempo * 2 + es.x) * 0.28;
+      if (es.x < xMax - 44) { es.ativo = false; es.obj.visible = false; }
+    });
+    solidos.forEach(function (s2) {                 // a grama balança no vento
+      if (!s2.ativo) return;
+      for (var i = 0; i < s2.enfeites.length; i++) {
+        if (s2.enfeites[i].visible) s2.enfeites[i].rotation.z = Math.sin(tempo * 1.7 + i + s2.x0) * 0.09;
+      }
+    });
     decors.forEach(function (d) {
+      if (d.tipo === "nuvem") d.obj.position.x += dt * 0.4;
       if (d.obj.position.x < x - 34) reposicionarDecor(d, x + VISTA + Math.random() * 26);
     });
   }
@@ -1255,6 +1606,7 @@
       if (Math.abs(p.x - px) < 1.0 && p.y > py - 0.5 && p.y < py + ALTURA + 0.3) {
         c.ativo = false; c.obj.visible = false;
         pontos++; Som.efeito("coracao");
+        explodir(p.x, p.y, c.obj.material.color.getHex(), 7, 3.6);
       }
     });
 
@@ -1266,6 +1618,34 @@
         Som.efeito("mola");
       }
     });
+
+    for (var q = 0; q < estrelas3d.length; q++) {
+      var es = estrelas3d[q];
+      if (!es.ativo) continue;
+      if (Math.abs(es.x - px) < 1.15 && es.obj.position.y > py - 0.7 && es.obj.position.y < py + ALTURA + 0.5) {
+        es.ativo = false; es.obj.visible = false;
+        pontos += 5;
+        explodir(es.x, es.obj.position.y, 0xFFC83D, 24, 7);
+        Som.efeito("estrela");
+      }
+    }
+
+    for (var w = 0; w < inimigos.length; w++) {
+      var bi = inimigos[w];
+      if (!bi.ativo) continue;
+      if (Math.abs(bi.x - px) < 0.98 && py < bi.y + 1.1 && py + ALTURA > bi.y + 0.15) {
+        if (jogador.vy < -1 && py > bi.y + 0.4) {           // pisou em cima
+          bi.ativo = false; bi.obj.visible = false;
+          explodir(bi.x, bi.y + 0.6, 0xFFD35A, 16, 6);
+          jogador.vy = 11.5; jogador.girando = true; jogador.giro = 0;
+          pontos += 2; Som.efeito("pisar");
+        } else if (invencivel <= 0) {
+          perderVida();
+          jogador.x = bi.x + (jogador.vel >= 0 ? -1 : 1) * 1.15;
+        }
+        break;
+      }
+    }
 
     if (invencivel > 0) return;
     for (var i = 0; i < blocos.length; i++) {

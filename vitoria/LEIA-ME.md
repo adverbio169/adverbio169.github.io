@@ -56,8 +56,16 @@ para parecer o desenho ganhando volume. Tem braços e pernas articulados
   **→** acelera, **←** segura e **espaço** pula.
 - Pule os buracos, suba nas plataformas, pegue corações, desvie dos blocos
   vermelhos e use as molas amarelas. Três vidas; se cair no buraco ela volta
-  para a próxima plataforma. A velocidade vai aumentando e o recorde fica
-  salvo no aparelho.
+  para a próxima plataforma. O recorde fica salvo no aparelho.
+- **Quatro fases** que se revezam a cada 140 metros, com céu, luz, cores e
+  andamento da música próprios: Campo, Pôr do sol, Praia e Noite dos
+  vaga-lumes. A troca é suave — as cores vão se transformando aos poucos.
+- **Bichinhos** andam de um lado para o outro nas plataformas: encostar de
+  lado tira uma vida, mas pular em cima derrota o bichinho e dá dois corações
+  (com um quique de volta, estilo Mario).
+- **Estrelas douradas** valem cinco corações e soltam brilho.
+- Faíscas ao pegar coração, poeira ao pousar, borboletas de dia, vaga-lumes à
+  noite, nuvens passando e grama balançando no vento.
 - A música e os efeitos são sintetizados na hora pelo próprio navegador
   (Web Audio), sem nenhum arquivo de áudio.
 - O cenário tem sombras projetadas de verdade (shadow map), chão com beirada
