@@ -708,7 +708,10 @@
     el.inicio.classList.remove("on");
     el.fim.classList.remove("on");
     el.hud.classList.add("ativo");
-    el.aviso.textContent = temSensor ? "" : "Incline o celular ou arraste o dedo para os lados";
+    var noComputador = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
+    el.aviso.textContent = temSensor ? ""
+      : (noComputador ? "Setas ← → para desviar, espaço para pular"
+                      : "Incline o celular ou arraste o dedo para os lados");
     setTimeout(function () { if (estado === "jogando") el.aviso.textContent = ""; }, 4200);
     Som.ligar(); Som.musica(true);
   }
@@ -780,12 +783,20 @@
 
   function ocioso(dt) {
     tempo = (tempo || 0) + dt;
+    corpoTodo.visible = true;            // pode ter parado piscando ao perder a ultima vida
+    corpoTodo.rotation.set(0, 0, 0);
+    corpoTodo.position.set(0, 0, 0);
     heroi.rotation.y = Math.sin(tempo * 0.8) * 0.5;
+    heroi.rotation.z = 0;
     heroi.position.y = Math.abs(Math.sin(tempo * 2.2)) * 0.12;
     sombra.position.y = 0.02 - heroi.position.y;
+    sombra.scale.setScalar(1);
     animarCorrida(dt, 6);
-    camera.position.set(Math.sin(tempo * 0.25) * 1.2, 4.2, -11);
-    camera.lookAt(0, -1.5, 1);
+    // a camera acompanha onde a Vitoria parou, nao a origem do mundo
+    var hx = heroi.position.x, hz = heroi.position.z;
+    camera.position.set(hx + Math.sin(tempo * 0.25) * 1.2, 4.2, hz - 11);
+    camera.lookAt(hx, -1.5, hz + 1);
+    if (camera.fov !== 62) { camera.fov = 62; camera.updateProjectionMatrix(); }
   }
 
   function passo(dt) {
