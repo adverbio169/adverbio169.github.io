@@ -4229,3 +4229,162 @@ vezes reprova sozinha ensina a ignorar reprovação.
 
 De quebra, o número dentro do botão DEFESA não recebe mais toque
 (`pointer-events:none`): quem responde é o botão inteiro.
+
+---
+
+## Asa que varre, vórtice na ponta e a cabine que grita
+
+> *"1. Quero que o avião tenha asas de flexão variável, que aumente e diminua o
+> ângulo de fuga dependendo da velocidade. 2. Quero efeito de vórtex nas pontas
+> das asas nas manobras. 3. E o alarme de 'terrain' igual aos aviões de verdade
+> quando estiver voando baixo — é mais um barulho de desespero na cabine."*
+> E logo depois: *"aquele alarme 'pull up', sempre vejo nos filmes"*, e
+> *"coloca todos os alarmes mais frequentes"*.
+
+### 1. A asa de geometria variável
+
+É o que fazem o F-14 e o Tornado, e a razão é física: asa aberta sustenta muito
+e arrasta muito (boa para decolar e manobrar devagar); asa enflechada atrasa a
+onda de choque e corta o arrasto na velocidade alta.
+
+Aqui ela é **visual**: o voo não muda. Mudar a física junto viraria dois aviões
+diferentes na mão do jogador, e o jogo inteiro — estol, pouso, mira, alcance de
+bala — está calibrado em cima de um só. O que ela dá é **leitura**: dá para
+saber a velocidade do avião olhando para ele, de qualquer ângulo, sem ler
+número nenhum. É a mesma ideia do trem e do flape.
+
+```
+devagar (1400)  →  −5,7°        rápido (4200)  →  +32,1°
+meio segundo de transição       →  14°/s  (uns 2,8 s de ponta a ponta)
+com flape 2, mesmo a 4200       →  −5,7°   (abre e fica aberta)
+a ponta da asa recuou de z=−22 para z=−153 no referencial do avião
+```
+
+Três detalhes que decidem o resultado:
+
+- **A dobradiça mora dentro do casco** (x=±30, onde o corpo tem raio 50). Assim
+  a costura da raiz fica enterrada na barriga e a asa varre sem abrir fresta.
+- **Flape fora ou trem embaixo abrem a asa**, custe o que custar — é assim no
+  avião de verdade e é o que dá a silhueta de pouso.
+- **O flape e a faixa azul mudaram de dono**: eram filhos da fuselagem e agora
+  pendem da asa. Uma aba parada enquanto a asa varre ficaria boiando atrás do
+  nada; pendurada na asa, a dobradiça vira a linha do bordo de saída, que é
+  onde ela é de verdade.
+
+O preço: a asa não pode entrar na fusão geral do avião (senão vira um bloco só
+com o resto), então ela é cozinhada à parte — duas malhas por asa. Quem paga são
+o avião do jogador e os de gente de verdade; **o inimigo, que é clone e não mexe
+asa nenhuma, continua fundido inteiro**. A cena inteira ficou em 374 ordens de
+desenho, contra 398 de antes.
+
+E o enflechamento **viaja na rede** (dois algarismos de radiano no mesmo pacote
+de posição), senão a asa do outro contaria uma velocidade que não é a dele.
+Aqui uma armadilha: `clone()` copia o `userData` passando por JSON, e referência
+de objeto não sobrevive a isso — `no.userData.asas` chegava como lixo
+serializado, sem `rotation` nenhum. O que sobrevive é o dado simples de cada
+filho, então as asas do clone são reencontradas pelo `lado` que cada pivô
+carrega.
+
+### 2. Os vórtices de ponta de asa
+
+O que se vê num avião de verdade é **condensação**: a ponta despeja ar girando,
+a pressão cai dentro do redemoinho, a temperatura cai junto e a umidade vira
+névoa. Por isso ele aparece na manobra pesada e some no voo reto — não é fumaça
+que o avião solta, é o ar dizendo que a asa está trabalhando.
+
+Então a força do efeito é a força da asa, e sai de duas coisas que o jogo já
+sabia: a **taxa de giro do nariz vezes a velocidade** (que é, a menos de uma
+constante, a G da curva) e o **estresse aerodinâmico** (ângulo de ataque alto —
+avião lento e puxado faz vórtice tanto quanto avião rápido em curva).
+
+Não são partículas: partícula boa custa muita malha, e o vórtice de verdade é um
+fio contínuo saindo da ponta. É uma **fita** — uma tira de triângulos ao longo
+das últimas posições da ponta, com alfa por vértice (o three aceita cor de 4
+componentes e usa o quarto como transparência). Duas fitas no céu inteiro, duas
+ordens de desenho, 24 pontos cada. E ela segue o **caminho** da ponta: quem faz
+um S deixa um S no ar, pela mesma razão que o rastro da bala serpenteia.
+
+```
+voando reto (depois de assentar)   0 pontos de fita, força 0,00
+puxando o manche a 3.000           24 pontos, força 0,75
+quase estolando, devagar           força 0,48  (estresse 0,59)
+```
+
+Duas correções vieram da medição: a primeira escala saturava com qualquer
+puxada (força 1,00 de média — vórtice que fica no máximo sempre não informa
+nada), e a fita nascia com 7 de largura, que na foto virou fio de teia colado na
+asa. Agora nasce com 16 e abre até 130.
+
+*(E um erro meu, que rendeu uma lição: a primeira prova acusou vórtice em voo
+reto. Não havia — o que havia era o solavanco de eu ter teleportado o avião para
+o ar um quadro antes, lido pela história do nariz como manobra. Teste que mede
+logo depois de mexer no mundo mede o próprio empurrão.)*
+
+### 3. Os alarmes da cabine
+
+O "pull up" dos filmes é o GPWS, e ele não é um barulho só: é uma **família**, e
+a ordem entre eles importa tanto quanto o som. Estão todos aqui:
+
+| alarme | o que quer dizer |
+|---|---|
+| **WHOOP WHOOP · PULL UP** | o chão em menos de 5 s, ou um telhado já em cima |
+| **TERRAIN** | telhado mais alto que eu na rota, ainda dá para desviar |
+| **SINK RATE** | descendo demais para a altura que tem |
+| **DON'T SINK** | acabou de decolar e está perdendo altura |
+| **TOO LOW · TREM** | devagar, baixo e sem trem embaixo |
+| **STALL** | a asa largou (a buzina já existia; entrou a voz) |
+| **OVERSPEED** | o matraqueado de quem passou do limite do trem ou do flape |
+| **BANK ANGLE** | inclinou mais de 52° perto do chão |
+| **TRAFFIC** | outro avião perto e se aproximando |
+| **FUEL LOW** | combustível no fim |
+
+E, no pouso, o rádio-altímetro cantando: *five hundred, one hundred, fifty,
+thirty, twenty, ten*.
+
+Três decisões fazem isso virar cabine em vez de bagunça:
+
+1. **Um de cada vez, por prioridade.** Num avião de verdade os alarmes têm fila.
+   Sem ela, voar baixo numa curva fechada com pouco combustível seria três vozes
+   por cima uma da outra e nenhuma entendida. Medido: com `puxe`, `descida`,
+   `afunda`, `semtrem` e `combust` valendo ao mesmo tempo, toca só o *pull up*.
+2. **Som sintetizado primeiro, voz depois.** Cada alarme tem assinatura própria
+   (a varredura do whoop, o matraco do overspeed, o bong do aviso) que toca
+   sempre; a voz entra por cima quando o navegador tem `speechSynthesis`. Onde
+   não houver voz, o alarme continua reconhecível — que é como era antes de os
+   aviões falarem.
+3. **Inibição.** Alarme que dispara quando não devia ensina a ignorar alarme.
+   O GPWS se cala no pouso bem feito (trem embaixo, na pista, descendo manso);
+   o *bank angle* só existe baixo, senão xingaria cada tonô; o *traffic* só
+   conta quem está chegando; e o *terrain* **cala quando você já está subindo**
+   — continuar gritando com quem já está obedecendo é o jeito mais rápido de
+   ensinar alguém a ignorar o alarme.
+
+O olho do alarme de terreno pega carona na volta que já testa colisão com
+prédio: duas janelas na rota (2 s e 4 s) e, de cada uma, o telhado mais alto que
+o avião. Telhado abaixo de mim não é terreno, é paisagem.
+
+*(E aqui um defeito de projeto que só a medição mostrou: na primeira versão o
+**SINK RATE nunca tocava**. Eu pedia descida forte E altura baixa — e toda
+descida forte a baixa altura já cai dentro do "pull up". Alarme escrito de um
+jeito que só dispara quando o outro já está disparando não existe. No avião de
+verdade eles são escada: o "sink rate" vem antes, com mais tempo; o "pull up"
+vem quando já não dá.)*
+
+```
+mergulho contra o chão            puxe     ✔      pousando certinho        — ✔
+prédio alto na rota               terreno  ✔      cruzeiro alto e limpo    — ✔
+descendo rápido, com altura       descida  ✔      subindo, prédio na rota  — ✔
+acabou de decolar e afunda        afunda   ✔      tonô lá em cima          — ✔
+chegando devagar e sem trem       semtrem  ✔
+outro avião chegando perto        trafego  ✔      tarja na tela: "▲ PULL UP"
+rápido demais com trem            rapido   ✔      rádio-altímetro: 500,100,50,30,20,10
+inclinado perto do chão           banco    ✔
+pouco combustível                 combust  ✔
+estolando                         estol    ✔
+```
+
+*(Das nove reprovações da primeira rodada, oito eram da prova, não do jogo:
+cenários montados em cima da pista — que muda o piso —, um `saiuDoChao` que
+sobrevivia de um cenário para o outro, e uma inclinação posta na mão que o
+`endireitaEixos()` recalcula para zero no quadro seguinte. A nona era o SINK
+RATE de verdade.)*

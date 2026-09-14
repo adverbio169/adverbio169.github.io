@@ -7508,6 +7508,33 @@ const CONTRA_TARDE = 3500;    // míssil mais perto que isto: tarde demais
 let contra = CONTRA_TOTAL, contraEspera = 0;
 let travadoPor = new Map();   // quem está me travando, e desde quando
 let rolChao = 0;          // o banco que sobrou do toque, escorrendo para zero
+/* --- ASA DE GEOMETRIA VARIÁVEL ----------------------------------------------
+   "Quero que aumente e diminua o ângulo de fuga dependendo da velocidade."
+
+   É o que faz um F-14 ou um Tornado: asa aberta para voar devagar, asa
+   recolhida para voar rápido. E a razão é física, não enfeite — asa aberta
+   tem muita sustentação e muito arrasto (bom para decolar e manobrar devagar),
+   asa enflechada atrasa a onda de choque e corta o arrasto na velocidade alta.
+
+   Aqui ela é VISUAL: o voo não muda, porque mudar a física junto viraria dois
+   aviões diferentes na mão do jogador, e o jogo inteiro (estol, pouso, mira)
+   está calibrado em cima de um só. O que ela dá é leitura — dá para saber a
+   velocidade do avião olhando para ele, de qualquer ângulo, sem ler número
+   nenhum. É a mesma ideia do trem de pouso e do flape: o desenho contando o
+   estado.
+
+   Três regras:
+     · a asa leva TEMPO para andar (uns 3 segundos de ponta a ponta). Asa que
+       abre e fecha num quadro parece um erro de desenho, não uma máquina;
+     · com FLAPE fora ou TREM embaixo ela fica aberta, custe o que custar — é
+       assim no avião de verdade, e é o que dá a silhueta de pouso;
+     · e ela nunca some do lugar: o pivô fica enterrado na barriga, então o
+       que se vê é a asa varrendo, não uma peça se descolando. */
+const ASA_ABERTA = -0.10;      // rad: um fio à frente da posição de desenho
+const ASA_FECHADA = 0.56;      // rad: 32° para trás, a silhueta de alta
+const ASA_V1 = 1500, ASA_V2 = 3600;   // entre estas velocidades ela varre
+const ASA_TAXA = 0.24;         // rad por segundo: uns 2,8 s de ponta a ponta
+let enflecha = ASA_ABERTA;     // onde a asa está agora
 /* --- A HISTÓRIA DO NARIZ ----------------------------------------------------
    "A linha entre a mira externa e a central não pode ser retilínea. Tem que
    ser o traçado onde a bala vai: se o avião faz várias curvas, o traço das
@@ -8146,7 +8173,48 @@ function faixaLateral(perfil, mat, lado){
   return g;
 }
 
-function montaDragao(corCorpo, corDetalhe, corVidro){
+/* A RAIZ DA ASA — onde fica a dobradiça do enflechamento. Dentro do casco de
+   propósito (o corpo tem raio 50 nessa altura), para a costura não aparecer. */
+const ASA_RAIZ_X = 30, ASA_RAIZ_Z = 6;
+function fazAsasDeDragao(mCorpo, mAmarelo, cozinhaAparte){
+  const pontas = [[214,-96],[150,-112],[84,-122]];
+  const nos = [];
+  for (const lado of [-1, 1]){
+    /* as peças são desenhadas em coordenadas do AVIÃO, como sempre foram;
+       quem muda de lugar depois é o grupo, não os números */
+    const dentro = new THREE.Group();
+    const f = new THREE.Shape();
+    f.moveTo(26*lado, 26);
+    f.quadraticCurveTo(140*lado, 6, 236*lado, -36);
+    f.quadraticCurveTo(232*lado, -64, 214*lado, -96);
+    f.quadraticCurveTo(180*lado, -68, 150*lado, -112);
+    f.quadraticCurveTo(116*lado, -82, 84*lado, -122);
+    f.quadraticCurveTo(56*lado, -88, 28*lado, -100);
+    f.closePath();
+    const asa = fazForma(f, 8, mAmarelo);
+    asa.rotation.x = Math.PI/2; asa.position.y = 10; dentro.add(asa);
+    const varetas = new THREE.Group();
+    varetas.add(osso(26*lado, 22, 238*lado, -38, 13, mCorpo));
+    for (const [px, pz] of pontas) varetas.add(osso(30*lado, -10, px*lado, pz, 6, mCorpo));
+    varetas.position.y = 15; dentro.add(varetas);
+    const capa = new THREE.Mesh(new THREE.ConeGeometry(13, 40, 8), mAmarelo);
+    capa.position.set(lado*250, 15, -44);
+    capa.rotation.set(Math.PI/2, 0, -lado*1.25); dentro.add(capa);
+    /* a fusão é feita com o grupo ainda na origem: `fundePorCor` assa cada
+       peça pela matriz do mundo e pendura o resultado na raiz, então mover o
+       grupo ANTES contaria o deslocamento duas vezes */
+    if (cozinhaAparte) fundePorCor(dentro);
+    const pivo = new THREE.Group();
+    pivo.position.set(lado*ASA_RAIZ_X, 0, ASA_RAIZ_Z);
+    dentro.position.set(-lado*ASA_RAIZ_X, 0, -ASA_RAIZ_Z);
+    pivo.add(dentro);
+    pivo.userData.lado = lado;
+    nos.push(pivo);
+  }
+  return nos;
+}
+
+function montaDragao(corCorpo, corDetalhe, corVidro, asasMoveis){
   const g = new THREE.Group();
   /* Brinquedo de plástico brilha POUCO e escuro. Reflexo claro estourava uma
      mancha branca no meio do azul e comia o desenho todo. */
@@ -8304,30 +8372,23 @@ function montaDragao(corCorpo, corDetalhe, corVidro){
     esp.rotation.x = -0.35; g.add(esp);
   }
 
-  /* --- ASAS DE DRAGÃO -----------------------------------------------------
+  /* --- ASAS DE DRAGÃO, COM DOBRADIÇA ----------------------------------------
      Braço azul grosso no bordo de ataque, membrana amarela pendurada atrás
      com três festões. Na meia-altura do corpo: na 1ª versão elas saíam da
-     barriga e de lado viravam uma prateleira. */
-  const pontas = [[214,-96],[150,-112],[84,-122]];
-  for (const lado of [-1, 1]){
-    const f = new THREE.Shape();
-    f.moveTo(26*lado, 26);
-    f.quadraticCurveTo(140*lado, 6, 236*lado, -36);
-    f.quadraticCurveTo(232*lado, -64, 214*lado, -96);
-    f.quadraticCurveTo(180*lado, -68, 150*lado, -112);
-    f.quadraticCurveTo(116*lado, -82, 84*lado, -122);
-    f.quadraticCurveTo(56*lado, -88, 28*lado, -100);
-    f.closePath();
-    const asa = fazForma(f, 8, mAmarelo);
-    asa.rotation.x = Math.PI/2; asa.position.y = 10; g.add(asa);
-    const varetas = new THREE.Group();
-    varetas.add(osso(26*lado, 22, 238*lado, -38, 13, mCorpo));
-    for (const [px, pz] of pontas) varetas.add(osso(30*lado, -10, px*lado, pz, 6, mCorpo));
-    varetas.position.y = 15; g.add(varetas);
-    const capa = new THREE.Mesh(new THREE.ConeGeometry(13, 40, 8), mAmarelo);
-    capa.position.set(lado*250, 15, -44);
-    capa.rotation.set(Math.PI/2, 0, -lado*1.25); g.add(capa);
-  }
+     barriga e de lado viravam uma prateleira.
+
+     Agora cada asa mora num PIVÔ na raiz, para poder enflechar (recolher para
+     trás) conforme a velocidade. O pivô fica DENTRO do casco (x=±30, e o corpo
+     ali tem raio 50): girando a asa, a costura da raiz continua enterrada na
+     barriga e não abre fresta nenhuma.
+
+     Quem tem asa que mexe paga por isso: a asa não pode entrar na fusão geral
+     do avião, senão vira um bloco só com o resto. Então ela é cozinhada à
+     parte — duas malhas por asa em vez de três peças — e o inimigo, que é
+     clone e não mexe asa nenhuma, continua sendo fundido inteiro como antes.
+     O preço fica só onde se vê: o avião do jogador e os de carne e osso. */
+  const asasNos = fazAsasDeDragao(mCorpo, mAmarelo, !!asasMoveis);
+  if (!asasMoveis) for (const no of asasNos) g.add(no);
 
   /* --- turbinas --- */
   for (const lado of [-1, 1]){
@@ -8404,6 +8465,8 @@ function montaDragao(corCorpo, corDetalhe, corVidro){
   /* a fusão acontece AQUI, antes da hélice entrar: ela é a única peça do
      avião que se mexe por conta própria e por isso não pode ser cozinhada */
   fundePorCor(g);
+  /* e as asas com dobradiça entram DEPOIS, pela mesma razão */
+  if (asasMoveis){ for (const no of asasNos) g.add(no); g.userData.asas = asasNos; }
   helice.position.set(0, -4, 274);
   g.add(helice);
   g.userData.helice = helice;
@@ -8412,8 +8475,12 @@ function montaDragao(corCorpo, corDetalhe, corVidro){
   return g;
 }
 
-const aviao = montaDragao(0x1f5fd0, 0xffd42a, 0x16325c);
+const aviao = montaDragao(0x1f5fd0, 0xffd42a, 0x16325c, true);   // asa que enflecha com a velocidade
 cena.add(aviao);
+
+/* a asa daquele lado (-1 esquerda no modelo, +1 direita), para pendurar nela
+   o que tem de enflechar junto */
+function asaDoLado(lado){ return aviao.userData.asas[lado < 0 ? 0 : 1]; }
 
 /* --- TREM DE POUSO e FLAPES ----------------------------------------------
    Os dois moram só no avião do jogador (os inimigos voam sempre limpos). O
@@ -8455,12 +8522,17 @@ const flapNos = [];
     // o eixo da dobradiça é o bordo de saída da asa: o grupo fica nele e a
     // aba pendura para trás, senão baixar o flape faria a peça mergulhar na asa
     const eixo = new THREE.Group();
-    eixo.position.set(lado*92, 0, -60);
+    /* o flape mora na ASA, não na fuselagem: com a asa enflechando, uma aba
+       parada no lugar antigo ficaria boiando no ar atrás do nada. Pendurada
+       na asa, ela vai junto — e a dobradiça passa a ser a linha do bordo de
+       saída, que é onde ela é de verdade. As coordenadas descontam a raiz
+       (±30, 6), que é onde o pivô da asa está. */
+    eixo.position.set(lado*62, 0, -66);
     const aba = new THREE.Mesh(new THREE.BoxGeometry(130, 7, 44), matFlap);
     aba.position.set(0, 0, -22);
     aba.castShadow = true;
     eixo.add(aba);
-    aviao.add(eixo);
+    asaDoLado(lado).add(eixo);
     flapNos.push(eixo);
   }
 }
@@ -8471,9 +8543,9 @@ const flapNos = [];
   for (const lado of [-1, 1]){
     // em cima da asa, não dentro dela
     const f = new THREE.Mesh(new THREE.BoxGeometry(60, 5, 20), matAzul);
-    f.position.set(lado*158, 5, -46);
+    f.position.set(lado*128, 5, -52);       // já descontada a raiz da asa
     f.rotation.y = -lado*0.62;              // acompanha a flecha do bordo
-    aviao.add(f);
+    asaDoLado(lado).add(f);                 // pintada NA asa: enflecha com ela
   }
 }
 
@@ -9441,6 +9513,275 @@ function somAlerta(liga){
       o.stop(audio.currentTime + 0.3); lfo.stop(audio.currentTime + 0.3);
     }
   }catch(e){ alerta = null; }
+}
+
+/* =============================================================================
+   OS ALARMES DA CABINE
+
+   "Quero o alarme de terrain igual aos aviões de verdade quando estiver
+   voando baixo — é mais um barulho de desespero na cabine." E depois: "aquele
+   alarme 'pull up', sempre vejo nos filmes." E por fim: "coloca todos os
+   alarmes mais frequentes."
+
+   O "pull up" dos filmes é o GPWS (Ground Proximity Warning System). Ele não é
+   um barulho só: é uma FAMÍLIA de avisos, cada um com sua frase, e a ordem
+   entre eles é tão importante quanto o som. Os mais ouvidos numa cabine, e o
+   que cada um quer dizer:
+
+     WHOOP WHOOP · PULL UP   o chão vem vindo e você tem segundos
+     TERRAIN, TERRAIN        tem terreno à frente, ainda dá para desviar
+     SINK RATE               está descendo rápido demais para a altura
+     DON'T SINK              acabou de decolar e está perdendo altura
+     TOO LOW GEAR            baixo e sem trem embaixo
+     STALL                   a asa parou de sustentar
+     BANK ANGLE              inclinou demais perto do chão
+     TRAFFIC                 outro avião perto demais (esse é do TCAS)
+     OVERSPEED               o matraqueado de quem passou do limite
+     FUEL LOW                combustível no fim
+
+   TRÊS DECISÕES que fazem isto virar cabine em vez de bagunça:
+
+   1. UM DE CADA VEZ, POR PRIORIDADE. Num avião de verdade os alarmes têm fila:
+      o "pull up" cala o "sink rate", que cala o "bank angle". Sem essa fila,
+      voar baixo numa curva fechada com pouco combustível viraria três vozes
+      falando por cima uma da outra e nenhuma entendida. Aqui é a ordem da
+      lista: o primeiro da lista que estiver valendo é o que toca.
+
+   2. SOM SINTETIZADO PRIMEIRO, VOZ DEPOIS. Cada alarme tem uma assinatura
+      sonora própria (a varredura do whoop, o matraqueado do overspeed, o
+      bong grave do aviso) que toca SEMPRE. A voz, quando o navegador tem
+      `speechSynthesis`, entra por cima. Onde não houver voz nenhuma, o alarme
+      continua reconhecível pelo som — que é como era antes de os aviões
+      falarem.
+
+   3. INIBIÇÃO. Alarme que dispara quando não devia ensina a ignorar alarme. O
+      GPWS de verdade se cala no pouso (trem embaixo, na pista, descendo
+      manso) e perto do chão no toque; o "bank angle" só existe baixo, senão
+      xingaria cada tonô; o "traffic" só conta quem está se aproximando.
+   ========================================================================== */
+const Voz = {
+  pronta: false, tentou: false, voz: null,
+  prepara(){
+    if (this.tentou) return; this.tentou = true;
+    try{
+      if (!('speechSynthesis' in window)) return;
+      const pega = () => {
+        const vs = speechSynthesis.getVoices() || [];
+        if (!vs.length) return;
+        /* voz de inglês, que é a língua dos alarmes de cabine no mundo
+           inteiro — "pull up" é "pull up" em qualquer avião */
+        this.voz = vs.find(v => /^en[-_]/i.test(v.lang)) || vs[0];
+        this.pronta = true;
+      };
+      pega();
+      speechSynthesis.onvoiceschanged = pega;
+    }catch(e){}
+  },
+  diz(txt){
+    if (!this.pronta || !txt) return;
+    try{
+      speechSynthesis.cancel();          // nunca empilha: alarme atrasado mente
+      const u = new SpeechSynthesisUtterance(txt);
+      if (this.voz) u.voice = this.voz;
+      u.lang = 'en-US'; u.rate = 1.25; u.pitch = 1.05; u.volume = 0.9;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  },
+  cala(){ try{ speechSynthesis.cancel(); }catch(e){} }
+};
+
+/* o WHOOP: uma varredura grave subindo depressa. Dois deles seguidos são a
+   assinatura mais conhecida de cabine que existe. */
+function somWhoop(atraso){
+  if (!audio) return;
+  try{
+    const t0 = audio.currentTime + (atraso || 0);
+    const o = audio.createOscillator(), g = audio.createGain(), f = audio.createBiquadFilter();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(150, t0);
+    o.frequency.exponentialRampToValueAtTime(430, t0 + 0.20);
+    f.type = 'lowpass'; f.frequency.setValueAtTime(900, t0);
+    f.frequency.exponentialRampToValueAtTime(2400, t0 + 0.20);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.20, t0 + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.26);
+    o.connect(f); f.connect(g); g.connect(audio.destination);
+    o.start(t0); o.stop(t0 + 0.3);
+  }catch(e){}
+}
+/* o BONG dos avisos: duas notas curtas, a segunda mais baixa */
+function somBong(){
+  if (!audio) return;
+  bip(620, 0.10, 'triangle', 0.10);
+  setTimeout(() => bip(430, 0.14, 'triangle', 0.10), 110);
+}
+/* o MATRACO do overspeed: um chocalho seco, que é exatamente o que o
+   "clacker" de um jato é — uma catraca batendo */
+function somMatraco(){
+  if (!audio) return;
+  try{
+    const t0 = audio.currentTime;
+    for (let i = 0; i < 5; i++){
+      const f = ruido(); if (!f) return;
+      const bp = audio.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = 2100; bp.Q.value = 1.6;
+      const g = audio.createGain();
+      const t = t0 + i*0.085;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.12, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+      f.connect(bp); bp.connect(g); g.connect(audio.destination);
+      f.start(t); f.stop(t + 0.06);
+    }
+  }catch(e){}
+}
+/* o GONGO do painel: um toque só, de atenção */
+function somGongo(){ bip(880, 0.12, 'sine', 0.09); setTimeout(() => bip(660, 0.22, 'sine', 0.08), 130); }
+
+/* --- A LISTA, em ordem de prioridade ------------------------------------- */
+const ALARMES = [
+  { id:'puxe',     voz:'pull up',    txt:'▲ PULL UP',        cor:'#ff5d5d', ciclo:1.40, tremor:'alertado',
+    som(){ somWhoop(0); somWhoop(0.30); setTimeout(() => Voz.diz('pull up'), 620); } },
+  { id:'estol',    voz:'stall',      txt:'STALL',            cor:'#ff8f6b', ciclo:1.60, tremor:null,
+    som(){ Voz.diz('stall'); } },            // a buzina do estol já toca sozinha
+  { id:'terreno',  voz:'terrain',    txt:'TERRAIN',          cor:'#ffb04d', ciclo:1.60, tremor:null,
+    som(){ somBong(); setTimeout(() => Voz.diz('terrain, terrain'), 120); } },
+  { id:'descida',  voz:'sink rate',  txt:'SINK RATE',        cor:'#ffb04d', ciclo:1.70, tremor:null,
+    som(){ somBong(); setTimeout(() => Voz.diz('sink rate'), 120); } },
+  { id:'afunda',   voz:"don't sink", txt:'DON’T SINK',  cor:'#ffb04d', ciclo:1.80, tremor:null,
+    som(){ somBong(); setTimeout(() => Voz.diz("don't sink"), 120); } },
+  { id:'semtrem',  voz:'too low gear', txt:'TOO LOW · TREM', cor:'#ffb04d', ciclo:1.80, tremor:null,
+    som(){ somBong(); setTimeout(() => Voz.diz('too low, gear'), 120); } },
+  { id:'rapido',   voz:'overspeed',  txt:'OVERSPEED',        cor:'#ff8f6b', ciclo:1.00, tremor:null,
+    som(){ somMatraco(); } },
+  { id:'banco',    voz:'bank angle', txt:'BANK ANGLE',       cor:'#ffd257', ciclo:2.20, tremor:null,
+    som(){ bip(520, 0.10, 'square', 0.07); setTimeout(() => Voz.diz('bank angle'), 120); } },
+  { id:'trafego',  voz:'traffic',    txt:'TRAFFIC',          cor:'#9fd8ff', ciclo:2.40, tremor:null,
+    som(){ bip(760, 0.09, 'sine', 0.07); setTimeout(() => bip(760, 0.09, 'sine', 0.07), 160);
+           setTimeout(() => Voz.diz('traffic, traffic'), 300); } },
+  { id:'combust',  voz:'fuel low',   txt:'FUEL LOW',         cor:'#ffd257', ciclo:6.00, tremor:null,
+    som(){ somGongo(); setTimeout(() => Voz.diz('fuel low'), 260); } }
+];
+const Alarmes = {
+  ativos: {},        // id -> true, recalculado a cada passo
+  atual: null, t: 0,
+  /* os avisos de altura no pouso (o "rádio-altímetro" cantando): uma vez cada,
+     de cima para baixo, e zerados a cada decolagem */
+  ALTURAS: [ [500,'five hundred'], [100,'one hundred'], [50,'fifty'],
+             [30,'thirty'], [20,'twenty'], [10,'ten'] ],
+  ditas: new Set(),
+  bota(id, vale){ if (vale) this.ativos[id] = true; },
+  passo(dt){
+    /* o de maior prioridade que estiver valendo */
+    let escolhido = null;
+    for (const a of ALARMES) if (this.ativos[a.id]){ escolhido = a; break; }
+    if (!escolhido){ this.atual = null; this.t = 0; return; }
+    if (escolhido !== this.atual){ this.atual = escolhido; this.t = 0; }   // troca: fala já
+    this.t -= dt;
+    if (this.t <= 0){
+      this.t = escolhido.ciclo;
+      escolhido.som();
+      if (escolhido.tremor) Controles.bate(escolhido.tremor);
+    }
+  },
+  /* uma altura cantada, sem repetir */
+  canta(m){
+    for (const [alt, txt] of this.ALTURAS){
+      if (m <= alt && !this.ditas.has(alt)){
+        this.ditas.add(alt);
+        bip(980, 0.06, 'sine', 0.05);
+        Voz.diz(txt);
+        return;
+      }
+    }
+  },
+  zera(){ this.ativos = {}; this.atual = null; this.t = 0; this.ditas.clear(); Voz.cala(); }
+};
+
+/* --- QUEM ESTÁ VALENDO, A CADA PASSO -------------------------------------
+   Uma função só, porque as condições compartilham as mesmas três contas: a
+   altura acima do chão, o quanto se está descendo e quanto tempo falta para
+   encontrar o chão nessa descida. */
+let terrenoAFrente = 0, terrenoJa = 0;   // telhados na rota (4 s e 2 s), vistos na colisão
+let alturaChao = 9999, tempoChao = 99, saiuDoChao = 99;
+function alarmeDeTerreno(dt){
+  const A = Alarmes;
+  A.ativos = {};
+  if (!jogando || caindo){ if (A.atual) A.zera(); return; }
+  saiuDoChao = noChao ? 0 : saiuDoChao + dt;
+  if (noChao){ A.ditas.clear(); A.passo(dt); return; }
+
+  const naPista = sobreAPista(aviaoX, aviaoZ);
+  const piso = naPista ? PISTA_Y + RODA : CHAO + 240;
+  alturaChao = aviaoY - piso;
+  const queda = -eixoF.y*voo;                       // + = descendo
+  tempoChao = queda > 1 ? alturaChao/queda : 99;
+  const metros = alturaChao/METRO;
+  /* POUSANDO: trem embaixo, sobre a pista, descendo manso. Aqui o GPWS de
+     verdade se cala — senão ele gritaria em todo pouso bem feito. */
+  const pousando = trem && naPista && queda < POUSO_QUEDA*0.9;
+
+  /* CADA UM MEDE UMA COISA, e é isso que faz a fila funcionar.
+
+     Na primeira versão o "sink rate" nunca tocava, e a razão era geométrica:
+     eu pedia descida forte E altura baixa, e toda descida forte a baixa altura
+     já cai dentro do "pull up" — ou seja, um alarme escrito de um jeito que só
+     dispara quando o outro já está disparando não existe. No avião de verdade
+     eles são ESCADA: o "sink rate" é o aviso que vem ANTES, com mais tempo, e
+     o "pull up" é o que vem quando já não dá.
+
+     E o "terrain" não é o chão plano chegando: isso é descida. Terrain é
+     TERRENO SUBINDO na rota — aqui, telhado mais alto do que eu no caminho. */
+  /* 1) PULL UP: o chão em menos de 5 s, um telhado já em cima, ou muito baixo
+        e descendo sem trem. É o único que sacode o aparelho junto. */
+  A.bota('puxe', !pousando && ((tempoChao < 5 && alturaChao < 6000) ||
+                               terrenoJa > 0 ||
+                               (metros < 40 && queda > 0 && !trem)));
+  /* 2) TERRAIN: telhado na rota, ainda com tempo de desviar. E CALA quando já
+        se está subindo de verdade: o alarme existe para pedir uma ação, e
+        continuar gritando com quem já está fazendo aquilo é o jeito mais
+        rápido de ensinar o jogador a ignorar alarme. */
+  const subindoBem = eixoF.y*voo > 400;
+  A.bota('terreno', !pousando && !A.ativos.puxe && terrenoAFrente > 0 && !subindoBem);
+  /* 3) SINK RATE: o aviso que vem antes — descendo demais para a altura */
+  A.bota('descida', !pousando && !A.ativos.puxe &&
+                    queda > POUSO_QUEDA*1.2 && tempoChao < 12 && metros < 600);
+  /* 4) DON'T SINK: perdeu altura logo depois de decolar */
+  A.bota('afunda', saiuDoChao < 25 && saiuDoChao > 1.5 && queda > 60 && metros < 120);
+  /* 5) TOO LOW GEAR: devagar, baixo e sem trem — a configuração de quem está
+        chegando. Rápido não conta: passagem baixa a 3.000 não é aproximação,
+        e o alarme de verdade também se cala com velocidade alta. */
+  A.bota('semtrem', !trem && metros < 90 && queda > 0 && voo < 2000);
+  /* 6) OVERSPEED: passou do limite do trem ou do flape */
+  const teto = Math.min(FLAP_TETO[flap] || FLAP_TETO[0], trem ? TREM_TETO : 1e9);
+  A.bota('rapido', voo > teto*1.04);
+  /* 7) BANK ANGLE: inclinou demais PERTO DO CHÃO. Alto é acrobacia. */
+  A.bota('banco', Math.abs(voltaCurta(inclinacao)) > 52 && metros < 150);
+  /* 8) TRAFFIC: alguém perto e se aproximando */
+  A.bota('trafego', trafegoPerto());
+  /* 9) FUEL LOW */
+  A.bota('combust', combustivel < 12);
+  /* e o estol, que já tem buzina própria: aqui entra só a voz */
+  A.bota('estol', estolando);
+
+  /* as alturas cantadas, só quando se está POUSANDO de verdade */
+  if (pousando && queda > 0) A.canta(metros); else if (metros > 600) A.ditas.clear();
+  A.passo(dt);
+}
+/* o TCAS pobre: o avião mais perto, e só conta se estiver chegando */
+function trafegoPerto(){
+  let perto = false;
+  const olha = (x, y, z) => {
+    const dx = x-aviaoX, dy = y-aviaoY, dz = z-aviaoZ;
+    const d2 = dx*dx + dy*dy + dz*dz;
+    if (d2 > 2600*2600) return;
+    // chegando? o produto do rumo com a separação diz
+    if (dx*eixoF.x + dy*eixoF.y + dz*eixoF.z > 0) perto = true;
+  };
+  for (const o of obstaculos)
+    if (o.vivo && (o.tipo === 'aviao' || o.tipo === 'helicoptero')) olha(o.x, o.y, o.z);
+  for (const o of Batalha.outros.values()) if (o.vivo !== false) olha(o.x, o.y, o.z);
+  return perto;
 }
 
 let tomTravado = null;
@@ -11033,7 +11374,21 @@ function atualiza(dt){
   historiaNariz.push({ t:tJogo, x:eixoF.x, y:eixoF.y, z:eixoF.z });
   while (historiaNariz.length > 2 && historiaNariz[0].t < tJogo - 1.5) historiaNariz.shift();
 
+  /* --- a asa varrendo ---
+     Com flape fora ou trem embaixo ela fica aberta; no resto, ela segue a
+     velocidade. E anda no máximo ASA_TAXA por segundo, para ser máquina. */
+  {
+    const querAberta = flap > 0 || trem || noChao;
+    const t = Math.max(0, Math.min(1, (voo - ASA_V1)/(ASA_V2 - ASA_V1)));
+    const alvoAsa = querAberta ? ASA_ABERTA : ASA_ABERTA + (ASA_FECHADA - ASA_ABERTA)*t;
+    const passo = ASA_TAXA*dt;
+    enflecha += Math.max(-passo, Math.min(passo, alvoAsa - enflecha));
+  }
   aviaoX += eixoF.x*voo*dt; aviaoY += eixoF.y*voo*dt; aviaoZ += eixoF.z*voo*dt;
+  /* os dois leem a posição JÁ ANDADA deste passo: o vórtice sai da ponta onde
+     a asa está agora, e o alarme mede a altura que o avião tem agora */
+  passoVortices(dt);
+  alarmeDeTerreno(dt);
   /* A RAZÃO DE SUBIDA, para o altímetro da cabine. Sai direto de `eixoF.y*voo`
      — o quanto do vetor de voo aponta para cima — e não de comparar alturas
      entre quadros, que num jogo com quadro irregular pula de 300 para -900 e
@@ -11342,10 +11697,156 @@ function atualiza(dt){
     const dx = aviaoX-o.x, dy = aviaoY-o.y, dz = aviaoZ-o.z;
     if (dx*dx + dy*dy + dz*dz < raio*raio){ derruba(o.tipo); return; }
   }
+  /* --- a colisão com prédio, e de carona o OLHO DO ALARME DE TERRENO -------
+     O GPWS de verdade tem um mapa do relevo e olha para a frente. Aqui o
+     relevo são os prédios, e a varredura sai de graça: esta volta já passa por
+     todos eles a cada passo. Duas janelas na rota — uma a 2 s e outra a 4 s —
+     e de cada uma o telhado MAIS ALTO QUE EU. Telhado abaixo do avião não é
+     terreno, é paisagem. */
+  terrenoAFrente = terrenoJa = 0;
+  const olhaX = aviaoX + eixoF.x*voo*4, olhaZ = aviaoZ + eixoF.z*voo*4;
+  const jaX   = aviaoX + eixoF.x*voo*2, jaZ   = aviaoZ + eixoF.z*voo*2;
   for (const p of predios){
     if (!p.vivo) continue;
-    if (aviaoY > CHAO + p.h + 120) continue;
+    const topo = CHAO + p.h;
+    if (topo > aviaoY - 60){
+      const meia = p.w/2 + 420, meiaZ = p.d/2 + 420;
+      if (Math.abs(p.x - jaX) < meia && Math.abs(p.z - jaZ) < meiaZ && p.h > terrenoJa)
+        terrenoJa = p.h;
+      if (Math.abs(p.x - olhaX) < meia && Math.abs(p.z - olhaZ) < meiaZ && p.h > terrenoAFrente)
+        terrenoAFrente = p.h;
+    }
+    if (aviaoY > topo + 120) continue;
     if (Math.abs(p.z - aviaoZ) < p.d/2 + 260 && Math.abs(p.x - aviaoX) < p.w/2 + 260){ derruba('predio'); return; }
+  }
+}
+
+/* =============================================================================
+   OS VÓRTICES DE PONTA DE ASA
+
+   "Quero efeito de vórtex nas pontas das asas nas manobras."
+
+   O que se vê num avião de verdade é CONDENSAÇÃO: a ponta da asa despeja ar
+   girando, a pressão cai dentro do redemoinho, a temperatura cai junto e a
+   umidade do ar vira névoa. Por isso ele aparece na manobra pesada e some no
+   voo reto — não é fumaça que o avião solta, é o ar dizendo que a asa está
+   trabalhando.
+
+   Então a força do efeito é a força da asa, e ela sai de duas coisas que o
+   jogo já sabe:
+     · a taxa de giro do nariz vezes a velocidade — que é, a menos de uma
+       constante, a força G da curva;
+     · o estresse aerodinâmico, que é o quanto a asa está perto de largar
+       (ângulo de ataque alto). Avião lento e puxado faz vórtice tanto quanto
+       avião rápido e em curva.
+
+   COMO É DESENHADO. Não são partículas: partícula boa custa muita malha, e o
+   vórtice de verdade é um FIO contínuo saindo da ponta. Então é uma fita —
+   uma tira de triângulos ao longo das últimas posições da ponta da asa, que
+   engorda e desbota com a idade. Duas fitas no céu inteiro, duas ordens de
+   desenho, reconstruídas a cada quadro a partir de 24 pontos.
+
+   A fita segue o CAMINHO da ponta, não uma linha reta atrás dela: quem faz um
+   S deixa um S no ar, pela mesma razão que o rastro da bala serpenteia.
+   ========================================================================== */
+const VOR_PONTOS = 24;          // pontos guardados por ponta de asa
+const VOR_VIDA = 0.8;           // segundos de fita
+const VOR_INTERVALO = 0.03;     // um ponto a cada 30 ms
+/* Medido na primeira versão, com 2000 aqui: puxar o manche em cruzeiro já
+   saturava o efeito (força 1,00 de média). Vórtice que fica no máximo com
+   qualquer puxada não informa nada — o que se quer é ver a asa trabalhando
+   MAIS numa curva pesada do que numa manobra mansa. Com 4200, a puxada cheia
+   a 3.000 dá 0,64 e só a curva rápida de verdade satura. */
+const VOR_REF = 4200;           // giro x velocidade que já dá vórtice cheio
+const vortices = [-1, 1].map(lado => {
+  const n = VOR_PONTOS*2;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n*3), 3));
+  /* alfa POR VÉRTICE: o three aceita a cor com 4 componentes e usa o quarto
+     como transparência. É o que deixa a fita nascer forte na ponta e sumir no
+     fim sem precisar de uma malha por pedaço. */
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n*4), 4));
+  const idx = [];
+  for (let i = 0; i < VOR_PONTOS-1; i++){
+    const a = i*2;
+    idx.push(a, a+1, a+2, a+1, a+3, a+2);
+  }
+  geo.setIndex(idx);
+  const mat = new THREE.MeshBasicMaterial({ vertexColors:true, transparent:true,
+                depthWrite:false, side:THREE.DoubleSide, fog:true });
+  const malha = new THREE.Mesh(geo, mat);
+  malha.frustumCulled = false;      // a fita muda de lugar todo quadro
+  malha.visible = false;
+  cena.add(malha);
+  return { lado, pontos:[], geo, malha, espera:0 };
+});
+/* onde está a ponta da asa AGORA, já contando o enflechamento */
+function pontaDaAsa(lado){
+  const px = lado*ASA_RAIZ_X, pz = ASA_RAIZ_Z;       // a dobradiça
+  const bx = lado*220, by = 15, bz = -50;            // da dobradiça até a ponta
+  const a = lado*enflecha, c = Math.cos(a), s = Math.sin(a);
+  const lx = px + bx*c + bz*s, ly = by, lz = pz - bx*s + bz*c;
+  return { x: aviaoX + eixoD.x*lx + eixoC.x*ly + eixoF.x*lz,
+           y: aviaoY + eixoD.y*lx + eixoC.y*ly + eixoF.y*lz,
+           z: aviaoZ + eixoD.z*lx + eixoC.z*ly + eixoF.z*lz };
+}
+function passoVortices(dt){
+  /* a força da asa: giro x velocidade (a G da curva) e o ângulo de ataque */
+  const antes = narizHa(0.12);
+  const cosang = Math.max(-1, Math.min(1, antes.x*eixoF.x + antes.y*eixoF.y + antes.z*eixoF.z));
+  const giro = Math.acos(cosang)/0.12;                  // rad por segundo
+  const forca = jogando && !noChao
+    ? Math.max(0, Math.min(1, (giro*voo)/VOR_REF*0.9 + estresse*0.8))
+    : 0;
+  for (const v of vortices){
+    v.espera -= dt;
+    if (v.espera <= 0 && forca > 0.12){      // abaixo disto é voo reto: nada no ar
+      v.espera = VOR_INTERVALO;
+      const p = pontaDaAsa(v.lado);
+      p.f = forca; p.idade = 0;
+      v.pontos.push(p);
+      while (v.pontos.length > VOR_PONTOS) v.pontos.shift();
+    }
+    for (const p of v.pontos) p.idade += dt;
+    while (v.pontos.length && v.pontos[0].idade > VOR_VIDA) v.pontos.shift();
+  }
+}
+/* o desenho é separado do passo porque ele depende da CÂMERA: a fita é plana
+   e tem de ficar de frente para quem olha, senão some quando vista de canto */
+const _vA = new THREE.Vector3(), _vB = new THREE.Vector3(), _vC2 = new THREE.Vector3();
+function desenhaVortices(){
+  for (const v of vortices){
+    const n = v.pontos.length;
+    v.malha.visible = n > 2;
+    if (n <= 2) continue;
+    const pos = v.geo.attributes.position.array, cor = v.geo.attributes.color.array;
+    for (let i = 0; i < VOR_PONTOS; i++){
+      const j = Math.min(i, n-1), p = v.pontos[j];
+      /* a tangente: para onde a fita corre neste ponto */
+      const a = v.pontos[Math.max(0, j-1)], b = v.pontos[Math.min(n-1, j+1)];
+      _vA.set(b.x-a.x, b.y-a.y, b.z-a.z);
+      if (_vA.lengthSq() < 1e-6) _vA.set(eixoF.x, eixoF.y, eixoF.z);
+      _vB.set(p.x - camPos.x, p.y - camPos.y, p.z - camPos.z);   // até o olho
+      _vC2.crossVectors(_vA, _vB);
+      if (_vC2.lengthSq() < 1e-6) _vC2.set(eixoC.x, eixoC.y, eixoC.z);
+      _vC2.normalize();
+      const idade = Math.max(0, Math.min(1, p.idade/VOR_VIDA));
+      /* Medido na primeira foto: nascendo com 7 de largura, o vórtice lia-se
+         como um fio de teia perto da asa — e é justamente ali, colado na
+         ponta, que ele tem de ser visto. Nasce com 16 e abre até 130, que na
+         escala deste avião (250 de meia-envergadura) é uma trança grossa
+         atrás da ponta, não um arame. */
+      const larg = 16 + idade*114;                // o redemoinho abre com o tempo
+      const alfa = p.f * Math.pow(1 - idade, 1.4) * 0.66 * (i >= n ? 0 : 1);
+      const k = i*6, q = i*4*2;
+      pos[k  ] = p.x + _vC2.x*larg; pos[k+1] = p.y + _vC2.y*larg; pos[k+2] = p.z + _vC2.z*larg;
+      pos[k+3] = p.x - _vC2.x*larg; pos[k+4] = p.y - _vC2.y*larg; pos[k+5] = p.z - _vC2.z*larg;
+      for (const d of [0, 4]){
+        cor[q+d  ] = 1; cor[q+d+1] = 1; cor[q+d+2] = 1; cor[q+d+3] = alfa;
+      }
+    }
+    v.geo.attributes.position.needsUpdate = true;
+    v.geo.attributes.color.needsUpdate = true;
   }
 }
 
@@ -11359,6 +11860,9 @@ function arruma(){
   }
   poeMalha(aviao, aviaoX, aviaoY, aviaoZ, D, C, eixoF);
   aviao.visible = !cockpit;
+  /* a asa varrendo: o pivô de cada lado gira para o seu lado */
+  for (const no of aviao.userData.asas || []) no.rotation.y = no.userData.lado * enflecha;
+  desenhaVortices();
   for (const j of jatos){
     // a chama cresce com o acelerador e estoura no nitro; o tremido a cada
     // quadro é o que a separa de um cone de plástico
@@ -12541,6 +13045,31 @@ function desenhaHUD(){
        dá. */
   }
 
+  /* --- O ALARME DA CABINE, ESCRITO ---------------------------------------
+     O som diz o que é; a tarja diz onde olhar. Ela fica EMBAIXO, longe do
+     "TRAVADO" lá em cima, e também fora do vidro do HUD: alarme que anda com
+     a cabeça é alarme que se perde justamente quando se vira para procurar o
+     chão. O vermelho (pull up, stall, overspeed) pisca; o âmbar não — aviso
+     que pisca vira urgência, e nem todo aviso é urgente. */
+  if (jogando && !caindo && Alarmes.atual){
+    const a = Alarmes.atual;
+    const urgente = a.id === 'puxe' || a.id === 'estol' || a.id === 'rapido';
+    const pisca = !urgente || Math.sin(Date.now()/95) > -0.2;
+    const y = H*0.80, alt = Math.max(20, H*0.052);
+    h2.textAlign = 'center';
+    h2.font = '900 ' + Math.max(13, H*0.032).toFixed(0) + 'px system-ui, sans-serif';
+    const larg = Math.max(h2.measureText(a.txt).width + alt, W*0.20);
+    h2.globalAlpha = pisca ? 1 : 0.33;
+    h2.fillStyle = 'rgba(10,14,24,.62)';
+    h2.fillRect(W/2 - larg/2, y - alt*0.72, larg, alt);
+    h2.strokeStyle = a.cor; h2.lineWidth = Math.max(2, H*0.004);
+    h2.strokeRect(W/2 - larg/2, y - alt*0.72, larg, alt);
+    h2.fillStyle = a.cor;
+    h2.fillText(a.txt, W/2, y + alt*0.10);
+    h2.globalAlpha = 1;
+    h2.textAlign = 'left';
+  }
+
   /* --- AS CHAMAS QUE SOBRAM ---------------------------------------------------
      "Não vi onde ficou ativado o sistema de contramedida."
 
@@ -12832,6 +13361,16 @@ function reinicia(){
      ATRÁS da câmera, o que apagava a mira inteira. Foi a prova `novo` que
      pegou, renderizando um quadro logo depois de recomeçar. */
   historiaNariz = []; tJogo = 0;
+  /* a asa começa na posição que o voo novo pede, sem varrer na frente do
+     jogador logo no primeiro segundo; e as fitas de vórtice do voo anterior
+     ficariam penduradas no céu novo */
+  enflecha = (flap > 0 || trem || noChao) ? ASA_ABERTA
+           : ASA_ABERTA + (ASA_FECHADA - ASA_ABERTA)
+             * Math.max(0, Math.min(1, (voo - ASA_V1)/(ASA_V2 - ASA_V1)));
+  for (const v2 of vortices){ v2.pontos.length = 0; v2.malha.visible = false; v2.espera = 0; }
+  saiuDoChao = noChao ? 0 : 99;
+  terrenoAFrente = terrenoJa = 0;
+  Alarmes.zera();
   travadoPor.clear(); somAlerta(false);
   Mira.solta(); MiraTiro.solta();
   montaMapa(); montaChao(); montaPista(); montaCidade(); montaTambores(); montaAlvos();
@@ -12861,6 +13400,7 @@ function fim(){
   estresse = 0; somBuffet(0); sacudidaFixa = 0; sacudida = 0; pulso = 0;
   Controles.treme('metralha', false); Controles.treme('estol', false);
   Controles.treme('buffet', false);
+  Alarmes.zera();                 // nenhum alarme continua gritando na tela de fim
   const m = Math.round(distancia/METRO);
   if (m > recorde){ recorde = m; try{ localStorage.setItem('aviao.recorde', String(m)); }catch(e){} }
   const t = venceu ? 'Missão cumprida! Todos os alvos no chão.'
@@ -12916,6 +13456,9 @@ function ligaAudio(){
     if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
     if (audio.state === 'suspended') audio.resume();
   } catch(e){}
+  /* a voz da cabine pede o mesmo gesto do usuário que o áudio: é aqui que ela
+     cabe. Onde não houver voz nenhuma, os alarmes continuam tocando o som. */
+  Voz.prepara();
 }
 /* --- O MONITOR MUDO ---------------------------------------------------------
    Relato do teste: iPhone de controle, monitor sem som nenhum.
@@ -13655,6 +14198,7 @@ function pausa(){
   estresse = 0; somBuffet(0); sacudidaFixa = 0;
   Controles.treme('metralha', false); Controles.treme('estol', false);
   Controles.treme('buffet', false);
+  Alarmes.zera();
   mostraAviso('SEM SINAL DO CELULAR', '#ffb86b', 4000);
 }
 function retoma(){
@@ -13858,6 +14402,14 @@ const Batalha = {
         const d2 = new THREE.Mesh(new THREE.BoxGeometry(6, 40, 26), matCor);
         d2.position.set(lado*38, 58, -122); no.add(d2);
       }
+      /* --- as asas do clone -------------------------------------------------
+         `clone()` copia o userData passando por JSON, e referência de objeto
+         não sobrevive a isso: `no.userData.asas` chega como lixo serializado,
+         sem `rotation` nenhum. O que SOBREVIVE é o dado simples de cada filho
+         — o `lado` que cada pivô carrega. Então as asas do clone são
+         reencontradas pelos filhos, e a lista é remontada com os objetos de
+         verdade. (Sem isto, mexer na asa de outro jogador estoura.) */
+      no.userData.asas = no.children.filter(c => c.userData && c.userData.lado !== undefined);
       cena.add(no);
       o = { id, no, nome: nome || 'visitante', cor: cor || CORES_JOGADOR[1] };
       this.outros.set(id, o);
@@ -13881,6 +14433,7 @@ const Batalha = {
     o.F = { x:d.fx, y:d.fy, z:d.fz };
     o.C = { x:d.cx, y:d.cy, z:d.cz };
     o.vida = d.v === undefined ? VIDA_CHEIA : d.v;
+    o.asa = d.a === undefined ? ASA_ABERTA : d.a;   // controle antigo: asa aberta
     o.vivo = !d.k;                              // k = caiu
     o.nome = nome || o.nome;
     o.t = Date.now();
@@ -13895,7 +14448,11 @@ const Batalha = {
                     x:Math.round(aviaoX), y:Math.round(aviaoY), z:Math.round(aviaoZ),
                     fx:+eixoF.x.toFixed(3), fy:+eixoF.y.toFixed(3), fz:+eixoF.z.toFixed(3),
                     cx:+eixoC.x.toFixed(3), cy:+eixoC.y.toFixed(3), cz:+eixoC.z.toFixed(3),
-                    v:Math.round(vida), k: caindo ? 1 : 0 };
+                    v:Math.round(vida), k: caindo ? 1 : 0,
+                    /* a asa do outro tem de varrer junto, senão o avião dele
+                       conta uma velocidade que não é a dele. Dois algarismos
+                       de radiano bastam: a asa anda devagar. */
+                    a:+enflecha.toFixed(2) };
       /* A CONTAGEM vem do anfitrião, não de quem está desenhado no céu: quem
          está na tela de capa, ou caindo, não manda posição, e a conta feita
          pelos aviões visíveis piscava para menos toda hora. O anfitrião sabe
@@ -13917,6 +14474,8 @@ const Batalha = {
       o.no.visible = o.vivo !== false;
       const D = vcruz(o.F, o.C);
       poeMalha(o.no, o.x, o.y, o.z, D, o.C, o.F);
+      for (const asa of o.no.userData.asas || [])
+        asa.rotation.y = asa.userData.lado * (o.asa === undefined ? ASA_ABERTA : o.asa);
     }
   },
   /* levei um tiro: quem atirou já decidiu que acertou */
@@ -13966,7 +14525,7 @@ function meuNome(){
   try{ localStorage.setItem('aviao3d.nome', n); }catch(e){}
   return n;
 }
-const modeloOutro = montaDragao(0x4a9f6a, 0xffd42a, 0x16325c);
+const modeloOutro = montaDragao(0x4a9f6a, 0xffd42a, 0x16325c, true);   // gente de verdade também enflecha
 
 function abrirSala(){
   if (typeof Peer !== 'function'){ estadoSala('nao', 'a biblioteca de conexão não carregou'); return; }
