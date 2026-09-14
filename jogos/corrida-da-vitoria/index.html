@@ -259,6 +259,7 @@
   var cena, camera, render3d, relogio;
   var heroi, sombra, corpoTodo, tronco, cabecaG, chapeuG, saia;
   var ombroE, ombroD, cotoveloE, cotoveloD, coxaE, coxaD, joelhoE, joelhoD;
+  var olhos = [], chiquinhas = [];
   var solidos = [], blocos = [], coracoes = [], molas = [], decors = [];
   var inimigos = [], estrelas3d = [], particulas = [], vagalumes = [], borboletas = [];
   var baloes = [], rastros = [], rastroRelogio = 0, corRastro = 0;
@@ -523,25 +524,39 @@
     corpoTodo = new THREE.Group();
     corpoTodo.scale.setScalar(0.95);
     g.add(corpoTodo);
+    olhos = []; chiquinhas = [];
 
-    /* ---- do quadril para cima (balança ao correr) ---- */
+    /* ================= do quadril para cima ================= */
     tronco = new THREE.Group();
     tronco.position.y = 1.15;
     corpoTodo.add(tronco);
 
     tronco.add(parte(geoCaixa(0.66, 1.05, 0.42, 0.17), COR.papel, 0, 0.525, 0, 0.032));
 
-    var gola = parte(new THREE.TorusGeometry(0.17, 0.045, 8, 20), COR.vermelho, 0, 1.0, 0, 0.02);
-    gola.rotation.x = Math.PI / 2;
-    gola.scale.set(1.12, 1, 0.66);
-    tronco.add(gola);
+    // coraçãozinho costurado no peito
+    var coracaoPeito = parte(GEO_CORACAO, COR.rosa, 0, 0.66, 0.215, 0);
+    coracaoPeito.scale.setScalar(0.24);
+    tronco.add(coracaoPeito);
 
-    var cinto = parte(new THREE.TorusGeometry(0.27, 0.048, 8, 24), COR.vermelho, 0, 0.05, 0, 0.02);
+    // gola com lacinho
+    var gola = parte(new THREE.TorusGeometry(0.2, 0.045, 8, 20), COR.vermelho, 0, 1.0, 0, 0.02);
+    gola.rotation.x = Math.PI / 2;
+    gola.scale.set(1.1, 1, 0.68);
+    tronco.add(gola);
+    [-1, 1].forEach(function (l) {
+      var aba = parte(new THREE.ConeGeometry(0.075, 0.16, 8), COR.vermelho, l * 0.1, 1.01, 0.17, 0.018);
+      aba.rotation.z = l * Math.PI / 2;
+      aba.rotation.y = l * 0.3;
+      tronco.add(aba);
+    });
+    tronco.add(parte(new THREE.SphereGeometry(0.05, 10, 8), COR.vermelho, 0, 1.01, 0.19, 0.018));
+
+    var cinto = parte(new THREE.TorusGeometry(0.27, 0.05, 8, 24), COR.vermelho, 0, 0.05, 0, 0.02);
     cinto.rotation.x = Math.PI / 2;
     cinto.scale.set(1.14, 1, 0.68);
     tronco.add(cinto);
 
-    // saia curta: o triângulo do desenho, deixando as pernas à mostra
+    // saia com caimento e barra
     saia = parte(geoTorno([
       [0, 0.08], [0.28, 0.05], [0.37, -0.06], [0.45, -0.2],
       [0.5, -0.31], [0.51, -0.35], [0.36, -0.36], [0, -0.36]
@@ -553,7 +568,7 @@
 
     tronco.add(parte(geoMembro(0.16, 0.18, 0.18), COR.papel, 0, 1.08, 0, 0.026));
 
-    /* ---- cabeça ---- */
+    /* ======================= cabeça ======================= */
     cabecaG = new THREE.Group();
     cabecaG.position.y = 1.63;
     tronco.add(cabecaG);
@@ -562,38 +577,57 @@
     cabeca.scale.set(1, 0.96, 0.93);
     cabecaG.add(cabeca);
 
-    // olhinhos quadrados, como ela desenhou, com um brilho dentro
-    var geoOlho = geoCaixa(0.16, 0.18, 0.07, 0.045);
+    // cabelo: calota de trás, franja na testa e chiquinhas
+    var atras = parte(new THREE.SphereGeometry(0.545, 22, 16, Math.PI, Math.PI, 0, Math.PI * 0.8),
+      COR.cabelo, 0, 0, -0.01, 0.024);
+    atras.scale.set(1, 0.96, 0.95);
+    cabecaG.add(atras);
+    cabecaG.add(parte(new THREE.SphereGeometry(0.53, 20, 12, 0, Math.PI * 2, 0, 1.0), COR.cabelo, 0, 0.01, 0, 0.024));
+    for (var f = 0; f < 5; f++) {                   // franja
+      var fx = (f - 2) * 0.14;
+      var mecha = parte(new THREE.SphereGeometry(0.11, 10, 8), COR.cabelo,
+        fx, 0.28 - Math.abs(fx) * 0.25, 0.39 - Math.abs(fx) * 0.45, 0.02);
+      mecha.scale.set(1, 1.25, 0.7);
+      mecha.rotation.z = fx * 1.2;
+      cabecaG.add(mecha);
+    }
+
+    // olhos quadrados (como ela desenhou), com brilho, cílios e sobrancelha
+    var geoOlho = geoCaixa(0.165, 0.19, 0.07, 0.045);
     [-1, 1].forEach(function (l) {
-      cabecaG.add(parte(geoOlho, COR.tinta, l * 0.18, 0.05, 0.42, 0));
-      cabecaG.add(parte(new THREE.SphereGeometry(0.034, 8, 6), 0xFFFFFF, l * 0.158, 0.1, 0.47, 0));
-      var bo = parte(new THREE.SphereGeometry(0.1, 10, 8), 0xF7A8B8, l * 0.31, -0.09, 0.33, 0);
-      bo.scale.set(1, 0.7, 0.42);
+      var olho = parte(geoOlho, COR.tinta, l * 0.18, 0.04, 0.42, 0);
+      cabecaG.add(olho); olhos.push(olho);
+      cabecaG.add(parte(new THREE.SphereGeometry(0.036, 8, 6), 0xFFFFFF, l * 0.158, 0.09, 0.47, 0));
+      var cilio = parte(geoCaixa(0.1, 0.028, 0.03, 0.012), COR.tinta, l * 0.26, 0.15, 0.4, 0);
+      cilio.rotation.z = -l * 0.5;
+      cabecaG.add(cilio);
+      var sobra = parte(geoCaixa(0.14, 0.035, 0.03, 0.015), COR.cabelo, l * 0.18, 0.23, 0.41, 0);
+      sobra.rotation.z = -l * 0.18;
+      cabecaG.add(sobra);
+      var bo = parte(new THREE.SphereGeometry(0.105, 10, 8), 0xF79BB0, l * 0.31, -0.09, 0.33, 0);
+      bo.scale.set(1, 0.66, 0.4);
       cabecaG.add(bo);
     });
 
-    // cabelo: tufo atrás e duas chiquinhas com laço
-    var tufo = parte(new THREE.SphereGeometry(0.38, 18, 14), COR.cabelo, 0, -0.04, -0.22, 0.026);
-    tufo.scale.set(1.04, 0.92, 0.74);
-    cabecaG.add(tufo);
+    // chiquinhas: laço, cabelo e ponta
     [-1, 1].forEach(function (l) {
       var ch = new THREE.Group();
-      ch.position.set(l * 0.45, -0.1, -0.06);
-      ch.rotation.z = l * 0.75;
-      cabecaG.add(ch);
-      ch.add(parte(new THREE.SphereGeometry(0.15, 14, 11), COR.cabelo, 0, -0.17, 0, 0.024));
-      var laco = parte(new THREE.TorusGeometry(0.095, 0.038, 8, 16), COR.vermelho, 0, 0.01, 0, 0.02);
+      ch.position.set(l * 0.44, -0.06, -0.1);
+      ch.rotation.z = l * 0.8;
+      cabecaG.add(ch); chiquinhas.push(ch);
+      var laco = parte(new THREE.TorusGeometry(0.09, 0.04, 8, 16), COR.vermelho, 0, 0.02, 0, 0.02);
       laco.rotation.y = Math.PI / 2;
       ch.add(laco);
+      ch.add(parte(new THREE.SphereGeometry(0.15, 14, 11), COR.cabelo, 0, -0.17, 0, 0.024));
+      ch.add(parte(new THREE.SphereGeometry(0.1, 12, 9), COR.cabelo, 0, -0.33, 0.02, 0.022));
     });
 
-    // sorrisinho
     var arco = Math.PI * 0.78;
-    var sorriso = parte(new THREE.TorusGeometry(0.13, 0.024, 8, 20, arco), COR.tinta, 0, -0.13, 0.4, 0);
+    var sorriso = parte(new THREE.TorusGeometry(0.13, 0.024, 8, 20, arco), COR.tinta, 0, -0.14, 0.4, 0);
     sorriso.rotation.z = -(Math.PI / 2 + arco / 2);
     cabecaG.add(sorriso);
 
-    /* ---- chapéu (aba redonda + o triângulo vermelho) ---- */
+    /* =============== chapéu: aba, faixa e o triângulo vermelho =============== */
     chapeuG = new THREE.Group();
     chapeuG.position.y = 0.5;
     cabecaG.add(chapeuG);
@@ -605,8 +639,14 @@
       [0, 0.36], [0.08, 0.32], [0.24, 0.16], [0.38, -0.03],
       [0.48, -0.21], [0.5, -0.26], [0, -0.26]
     ]), COR.vermelho, 0, 0.28, 0, 0.028));
+    var faixa = parte(new THREE.TorusGeometry(0.46, 0.045, 8, 24), COR.rosa, 0, 0.06, 0, 0.02);
+    faixa.rotation.x = Math.PI / 2;
+    chapeuG.add(faixa);
+    var pin = parte(GEO_CORACAO, 0xFFFFFF, 0, 0.08, 0.46, 0);
+    pin.scale.setScalar(0.13);
+    chapeuG.add(pin);
 
-    /* ---- braços com cotovelo ---- */
+    /* ===================== braços com cotovelo e mãozinha ===================== */
     [-1, 1].forEach(function (l) {
       var ombro = new THREE.Group();
       ombro.position.set(l * 0.4, 0.9, 0);
@@ -618,14 +658,17 @@
       cotovelo.position.y = -0.4;
       ombro.add(cotovelo);
       cotovelo.add(parte(geoMembro(0.105, 0.092, 0.34), COR.papel, 0, -0.17, 0, 0.024));
-      cotovelo.add(parte(new THREE.SphereGeometry(0.125, 12, 10), COR.papel, 0, -0.35, 0, 0.024));
+      var punho = parte(new THREE.TorusGeometry(0.095, 0.03, 8, 14), COR.rosa, 0, -0.3, 0, 0.018);
+      punho.rotation.x = Math.PI / 2;
+      cotovelo.add(punho);
+      cotovelo.add(parte(new THREE.SphereGeometry(0.12, 12, 10), COR.papel, 0, -0.38, 0, 0.024));
+      cotovelo.add(parte(new THREE.SphereGeometry(0.055, 8, 6), COR.papel, l * 0.09, -0.35, 0.05, 0.02));
 
       if (l < 0) { ombroE = ombro; cotoveloE = cotovelo; }
       else { ombroD = ombro; cotoveloD = cotovelo; }
     });
 
-    /* ---- pernas com joelho e sapatinho ---- */
-    var geoPe = geoCaixa(0.24, 0.16, 0.38, 0.06);
+    /* ================ pernas com joelho, meia e sapatinho ================ */
     [-1, 1].forEach(function (l) {
       var coxa = new THREE.Group();
       coxa.position.set(l * 0.18, 1.15, 0);
@@ -636,13 +679,19 @@
       joelho.position.y = -0.55;
       coxa.add(joelho);
       joelho.add(parte(geoMembro(0.13, 0.115, 0.5), COR.papel, 0, -0.25, 0, 0.024));
-      joelho.add(parte(geoPe, COR.vermelho, 0, -0.5, 0.08, 0.024));
+      joelho.add(parte(geoMembro(0.14, 0.135, 0.2), COR.papel, 0, -0.4, 0, 0.022));   // meia
+      var listrinha = parte(new THREE.TorusGeometry(0.135, 0.026, 8, 16), COR.rosa, 0, -0.33, 0, 0.016);
+      listrinha.rotation.x = Math.PI / 2;
+      joelho.add(listrinha);
+      joelho.add(parte(geoCaixa(0.24, 0.15, 0.38, 0.06), COR.vermelho, 0, -0.52, 0.07, 0.024));
+      joelho.add(parte(geoCaixa(0.26, 0.05, 0.4, 0.025), 0x8E1010, 0, -0.6, 0.07, 0.02));   // sola
+      joelho.add(parte(geoCaixa(0.26, 0.045, 0.1, 0.02), 0x8E1010, 0, -0.48, 0.05, 0.018)); // tira
 
       if (l < 0) { coxaE = coxa; joelhoE = joelho; }
       else { coxaD = coxa; joelhoD = joelho; }
     });
 
-    /* ---- sombrinha no chão ---- */
+    /* ---- sombrinha de apoio ---- */
     sombra = new THREE.Mesh(
       new THREE.CircleGeometry(0.62, 22),
       new THREE.MeshBasicMaterial({ color: 0x2a2a30, transparent: true, opacity: 0.12 })
@@ -1178,6 +1227,17 @@
       cabecaG.rotation.set(r * 0.03, 0, 0);
       saia.rotation.x = 0; saia.rotation.z = 0;
     }
+    // piscadinha de vez em quando
+    var piscou = (tempo % 3.6) < 0.13 || (tempo % 3.6) > 3.52;
+    for (var o = 0; o < olhos.length; o++) olhos[o].scale.y = piscou ? 0.14 : 1;
+
+    // as chiquinhas vão atrás do movimento
+    for (var c2 = 0; c2 < chiquinhas.length; c2++) {
+      var ch = chiquinhas[c2];
+      var alvoCh = clamp(-jogador.vy * 0.022, -0.5, 0.5) + (v > 0.6 ? Math.sin(jogador.passo) * 0.1 : 0);
+      ch.rotation.x += (alvoCh - ch.rotation.x) * Math.min(1, dt * 9);
+    }
+
     // o chapéu balança um pouquinho atrás do movimento
     chapeuG.rotation.z = Math.sin(jogador.passo * 0.5) * 0.035;
     chapeuG.rotation.x = -0.02 + Math.sin(jogador.passo) * 0.025;
@@ -1440,11 +1500,10 @@
     var ang = 0;
     if (window.screen && screen.orientation && typeof screen.orientation.angle === "number") ang = screen.orientation.angle;
     else if (typeof window.orientation === "number") ang = window.orientation;
-    var t;                                       // inclinação no eixo horizontal da tela
-    if (ang === 90) t = -e.beta;
-    else if (ang === 270 || ang === -90) t = e.beta;
-    else if (ang === 180) t = -e.gamma;
-    else t = e.gamma;
+    // Gira a inclinação do aparelho para o eixo horizontal da TELA. Assim vale
+    // para as quatro posições, inclusive deitado dos dois lados.
+    var rad = ang * Math.PI / 180;
+    var t = e.gamma * Math.cos(rad) + e.beta * Math.sin(rad);
     if (neutro === null) neutro = t;
     inclinacao = t - neutro;
     temSensor = true;
