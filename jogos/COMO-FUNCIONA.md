@@ -3849,3 +3849,69 @@ Num HUD, cor que muda é cor que quer dizer alguma coisa. Aquelas não queriam.
 *(De tabela: a palavra `ATIRE` ia logo acima do losango, e o losango vive dentro
 do anel quando o alvo está centrado — a palavra saía escrita por cima do aro.
 Agora ela sobe acima do que estiver mais alto dos dois.)*
+
+---
+
+## O míssil passou a cobrar caro
+
+> *"Acho que não pode ser tão fácil o disparo com o míssil, fica muito apelão no
+> combate aéreo — fica como quem cravar primeiro. Tem que cravar e continuar na
+> trava; se perder o HUD de trava, o míssil perde o rumo."*
+
+Este é um problema de **jogo**, não de física, e é o problema clássico da arma
+que não cobra nada de quem atira: se disparar é grátis, o combate degenera em
+quem aperta o botão primeiro. Todo jogo de caça que ficou bom resolveu isso
+cobrando alguma coisa depois do disparo.
+
+Agora a trava **não se gasta** no tiro. Ela continua, e o míssil só se guia
+enquanto ela existir:
+
+- o alvo saiu do cone do olhar → perdeu a trava → o míssil segue reto até morrer;
+- o piloto olhou para outro alvo → mesma coisa;
+- trocou de arma → mesma coisa.
+
+E **uma vez burro, burro para sempre**: recuperar a trava não traz o míssil de
+volta. Se trouxesse, a regra não custaria nada — bastaria piscar o olhar e
+retomar.
+
+O preço, na prática, é ficar **preso ao alvo** durante os segundos em que o
+míssil voa: sem manobrar à vontade, sem procurar o próximo. Que é exatamente o
+que o pedido descreve.
+
+No HUD a caixa do buscador passa a dizer **GUIANDO** em vez de `TRAVADO` quando
+há míssil no ar dependendo daquela trava — a diferença importa, porque soltar o
+alvo nesse momento custa um míssil. E quando a trava cai com míssil no ar, o
+aviso é explícito: `TRAVA PERDIDA — MÍSSIL SEM RUMO`, com um bipe grave.
+
+A nuclear continua sendo largada e esquecida: ela é ar-terra, o alvo não desvia,
+e a regra existe para equilibrar combate aéreo — não para punir bombardeio.
+
+### E o capacete estava certo
+
+> *"Ao selecionar o alvo com o capacete, eu olhei para a esquerda e a mira foi
+> para a direita. Não sei se já arrumou isso."*
+
+Já, e de graça: a tecla `X` inverte o lado da cabeça, e o buscador lê **o mesmo
+valor** que a câmera. Medido, com o espelho nos dois sentidos:
+
+```
+com espelho +1: o buscador aponta a 0,0° de onde a vista aponta   ✔
+com espelho -1: o buscador aponta a 0,0° de onde a vista aponta   ✔
+```
+
+Ou seja: se a vista vai para o lado certo depois do `X`, a trava vai junto,
+sempre. Não há como um ficar certo e o outro errado.
+
+```
+de frente trava o alvo em frente; virando a cabeça trava o de lado   ✔
+depois de disparar, a trava continua e o míssil segue                ✔
+segurando o alvo na mira o tempo todo: acertou                       ✔
+largando a trava no meio do voo: o míssil perde o rumo               ✔
+e o alvo escapa                                                      ✔
+travando de novo, o míssil perdido continua perdido                  ✔
+```
+
+*(A prova ainda encontrou um buraco de estado: `Cabeca.passo` estourava se
+alguém ligasse o olhar sem passar pela câmera. O jogo não faz isso, mas um
+`liga()` que falhasse no meio poderia — e estado que só é coerente por convenção
+é estado que um dia quebra. Ganhou uma guarda de uma linha.)*

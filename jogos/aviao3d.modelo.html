@@ -2405,7 +2405,11 @@ const Cabeca = {
   },
 
   passo(dt){
-    if (!this.ligada) return;
+    /* `_video` só é nulo se alguém ligar o olhar sem passar pela câmera — o
+       que o jogo não faz, mas um teste faz, e um `liga()` que falhasse no meio
+       também poderia. Estado que só é coerente "por convenção" é estado que
+       um dia quebra: a guarda custa uma linha. */
+    if (!this.ligada || !this._video) return;
     const agora = performance.now();
     if (this._video.videoWidth && agora >= this._proxima){
       this._proxima = agora + CAB_CADENCIA;
@@ -3540,9 +3544,18 @@ function dispara(){
     somMissil();
     sacode(0.16);
     Controles.bate('missil');
-    if (perseguido) mostraAviso('MÍSSIL A CAMINHO', '#ff9a6b', 900);
-    // trava gasta: um míssil, um alvo
-    Mira.solta();
+    if (perseguido) mostraAviso('MÍSSIL A CAMINHO — SEGURE A TRAVA', '#ff9a6b', 1100);
+    /* --- A TRAVA NÃO SE GASTA NO DISPARO ---------------------------------
+       Antes ela era solta aqui: um míssil, um alvo, e o resto era com o
+       míssil. "Fica muito apelão no combate aéreo: vira quem cravar
+       primeiro."
+
+       Está certo, e é o problema clássico do míssil que não cobra nada de
+       quem atira. Agora a trava CONTINUA depois do disparo, e o míssil só se
+       guia enquanto ela existir — quem atirou tem de segurar o alvo na mira
+       durante o voo dele, sem poder manobrar à vontade nem escolher outro. Se
+       a trava cair, o míssil perde o rumo e vira foguete burro. Está no
+       `atualizaTiros`. */
   } else {
     /* --- A HARMONIZAÇÃO ---------------------------------------------------
        "O tiro não vai onde se dispara, só se estiver muito perto."
@@ -3634,7 +3647,22 @@ function atualizaTiros(dt){
          grudava no alvo e nunca errava, o que tira a graça; com ele, alvo
          que manobra a tempo escapa. */
       if (b.segue){
+        /* --- GUIADO ENQUANTO A TRAVA DURAR --------------------------------
+           O míssil não tem cabeça própria: ele voa para onde a trava DO
+           AVIÃO está apontando. Perdeu a trava — porque o alvo saiu do cone,
+           porque o piloto olhou para outro lado, porque trocou de arma —, o
+           míssil perde o rumo na hora e segue reto até morrer. Uma vez burro,
+           burro para sempre: recuperar a trava não o traz de volta, senão a
+           regra não custaria nada.
+
+           É isso que tira o "cravou primeiro, ganhou": atirar passou a ter
+           preço, e o preço é ficar preso ao alvo enquanto o míssil voa. */
         if (b.segue.vivo === false){ b.segue = null; }
+        else if (!Mira.travado || Mira.alvo !== b.segue){
+          b.segue = null;
+          mostraAviso('TRAVA PERDIDA — MÍSSIL SEM RUMO', '#ff8f6b', 1200);
+          bip(240, 0.18, 'sawtooth', 0.06);
+        }
         else {
           const q = Mira.posicaoDe(b.segue);
           const ax = q.x, ay = q.y, az = q.z;
@@ -5250,7 +5278,11 @@ function desenhaHUD(){
       h2.font = '800 ' + Math.max(9, H*0.020).toFixed(0) + 'px ui-monospace, monospace';
       h2.textAlign = 'center';
       h2.fillStyle = h2.strokeStyle;
-      h2.fillText(Mira.travado ? 'TRAVADO' : Mira.chao ? 'MIRANDO' : 'PROCURANDO', 0, -r - 8);
+      /* GUIANDO é diferente de TRAVADO: quer dizer que há míssil no ar
+         dependendo desta trava, e que soltar o alvo agora o perde */
+      const guiando = Mira.travado && bombas.some(b => b.tipo === 'missil' && b.segue === Mira.alvo);
+      h2.fillText(guiando ? 'GUIANDO' : Mira.travado ? 'TRAVADO'
+                : Mira.chao ? 'MIRANDO' : 'PROCURANDO', 0, -r - 8);
       const dist = Math.round(Math.hypot(q.x-aviaoX, q.y-aviaoY, q.z-aviaoZ)/METRO);
       h2.font = '700 ' + Math.max(8, H*0.016).toFixed(0) + 'px ui-monospace, monospace';
       h2.fillText(dist + 'm', 0, r + 16);
