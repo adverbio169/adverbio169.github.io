@@ -150,7 +150,8 @@
           display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;
           font:900 min(2.9vw,12px)/1 inherit;letter-spacing:1.2px;color:#2a1f05;
           background:#ffc24d;box-shadow:0 5px 0 #a8761f;cursor:pointer}
-  #dChama b{font-size:min(4vw,16px);opacity:.9}
+  /* o número não recebe toque: quem responde é o botão inteiro, sempre */
+  #dChama b{font-size:min(4vw,16px);opacity:.9;pointer-events:none}
   #dChama:active{transform:translateY(3px);box-shadow:0 2px 0 #a8761f}
   #dChama.vazio{background:#6b6257;color:#cfc6b8;box-shadow:0 5px 0 #3f3931}
   #dChama.espera{opacity:.5}

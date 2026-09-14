@@ -4182,3 +4182,50 @@ toque logo em seguida (dentro da espera): recusa, não gasta carga     ✔
 lista de elementos conferidos era escrita à mão e o botão novo não estava nela
 — o mesmo defeito do radar, no próprio instrumento de medir. Um teste que só
 olha o que eu lembrei de listar aprova qualquer coisa que eu esquecer.)*
+
+---
+
+### Conferência das atualizações
+
+Rodada de provas depois da DEFESA de celular, com o `aviao3d.html` publicado
+conferido contra o modelo (montar de novo não mudou um byte):
+
+```
+voo        decolagem, pouso, cambalhota, travagem, tetos de velocidade   ✔
+fisica     a escada da subida: 45° tranquilo, aviso em 55°, morre em 75° ✔
+estol      tomba para os dois lados, sorteado, e dá para corrigir        ✔
+chao       leme e inclinação na corrida, a pista tem ±620               ✔
+missil     trava, persegue, alcança quem foge, e sem trava vai reto      ✔
+trem       9 peças na linha, vãos iguais, vagão +150 e locomotiva +300   ✔
+duasmiras  reto: 0 px entre as marcas; em curva: 153 px e a linha        ✔
+           serpenteia (dobra para os dois lados depois do S)
+chama      12 cargas, espera de 1,1 s, quebra a trava do inimigo,        ✔
+           e a 1200 do míssil já é tarde
+zerar      o botão do celular recentra o olhar, e sem câmera não estoura ✔
+dedos      três telas de celular, colisão nenhuma, manete e gatilho      ✔
+radar      o disco acha canto livre e o mundo gira em volta do avião     ✔
+vidro      o HUD continua no nariz e o olhar não realimenta a câmera     ✔
+pescoco    limite de 100°, teto macio, não escorrega, X inverte          ✔
+nuke       44 prédios de 60 derrubados                                   ✔
+batalha    dois aviões se veem, o dano bate, o abatido some do céu       ✔
+```
+
+Duas coisas para o registro:
+
+**A prova da DEFESA reprovava o celular EM PÉ, e a errada era a prova.** Ela
+forçava a classe `paisagem` só quando `innerWidth > innerHeight` — o contrário
+do que o `controle.html` faz (quem está em pé tem a página GIRADA por CSS, e
+aí a "largura" da mão é a altura da tela). Pior: media retângulos crus numa
+página girada 90°, onde "em cima na mão" não é "y menor na tela". Convertendo
+os cantos de volta para o referencial da mão (`x = topo`, `y = W − direita`), o
+botão está em cima do FOGO e na mesma coluna nas duas orientações. *O aparelho
+estava certo o tempo todo; o metro é que estava torto.*
+
+**O passo 6 da batalha (o celular entrando numa sala que já está em combate)
+falhou numa rodada e passou na seguinte**, sem nada mudar no meio: são 3
+segundos de espera para uma conexão que passa pelo servidor de sinal. É
+lentidão da prova, não do jogo — mas fica anotado, porque uma prova que às
+vezes reprova sozinha ensina a ignorar reprovação.
+
+De quebra, o número dentro do botão DEFESA não recebe mais toque
+(`pointer-events:none`): quem responde é o botão inteiro.
