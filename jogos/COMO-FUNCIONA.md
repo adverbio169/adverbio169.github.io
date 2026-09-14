@@ -4006,3 +4006,52 @@ fita, então no primeiro segundo do voo novo a mira lia direções do voo anteri
 que podiam estar até atrás da câmera, apagando a mira inteira. Ela agora é limpa
 no reinício, e a curva corta no primeiro ponto que estiver atrás em vez de
 sumir toda.)*
+
+---
+
+## O cogumelo, refeito com partículas
+
+> *"A explosão nuclear está muito ruim. Faz uma física melhor de partículas para
+> a explosão, está muito feio."*
+
+Estava, e o motivo era estrutural: um **cilindro** com uma esfera achatada em
+cima. Cilindro e esfera são superfícies lisas, e nuvem nenhuma é lisa — a
+leitura instantânea de "nuvem" vem da textura **fervendo**, não do contorno.
+Nenhum ajuste de cor salvaria aquilo.
+
+O que uma nuclear é, e que dá para reproduzir barato — quatro famílias de
+partículas, cada uma com a sua física:
+
+**A bola de fogo.** Nasce, cresce depressa e **esfria**: branco, amarelo,
+laranja, vermelho escuro, apaga. É a única parte quente, e dura dois segundos.
+
+**O anel de vórtice.** Isto é o coração do troço e é o que quase ninguém
+desenha. O "chapéu" não é uma bola: é um anel de fumaça — um toro — que sobe
+**girando em torno do próprio tubo**. É esse rolamento que faz a nuvem ferver.
+Cada partícula tem um ângulo em volta do eixo e uma fase dentro do tubo, e a
+fase avança sozinha. Sai de graça, e é o que dá vida.
+
+**A haste.** Não é um cano: é poeira sugada do chão subindo **em espiral**,
+alimentando o anel.
+
+**A saia de base.** O jato que bate no chão e escorre rasteiro para os lados. É
+a assinatura de um estouro no solo, e é ela que amarra o cogumelo ao chão em vez
+de deixá-lo pairando.
+
+Custa **três ordens de desenho**, as mesmas da versão feia: um `InstancedMesh`
+com trezentas bolinhas — a placa recebe uma esfera e uma lista de matrizes —,
+mais o anel de choque e a marca de queimado. A cor vai **por instância**, que é
+o que deixa a bola de fogo esfriar de branco a preto sem material nenhum a mais,
+e o que dá à nuvem um cinza diferente por bolinha (uma nuvem de uma cor só lê
+como massa de plástico) com a parte de baixo do anel mais escura que a de cima.
+
+### Duas medidas que a foto corrigiu
+
+**Estava pequeno.** O raio de morte da bomba é 9.000 e a nuvem tinha 3.000 de
+largura — a explosão parecia menor do que é. Subiu para 8.200 de altura e 4.400
+de raio de anel: uma nuclear tem de encher o céu.
+
+**E a haste sumia de longe.** Medida numericamente a 38 km: 1.026 de raio contra
+6.113 do chapéu. Isso é a proporção real, e é ilegível — o cogumelo virava uma
+nuvem flutuando. Engrossou para 1.220: menos realista, mais reconhecível, e o
+que faz reconhecer um cogumelo é o **T**.

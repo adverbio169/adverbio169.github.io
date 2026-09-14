@@ -9735,26 +9735,189 @@ function passoFogo(dt){
     if (b.t >= b.dur){ cena.remove(b.no); b.no.material.dispose(); return false; }
     return true; });
 }
+/* =============================================================================
+   O COGUMELO, REFEITO COM PARTÍCULAS
+
+   "A explosão nuclear está muito ruim. Faz uma física melhor de partículas
+   para a explosão, está muito feio."
+
+   Estava mesmo, e o motivo é estrutural: era um CILINDRO com uma esfera achatada
+   em cima. Cilindro e esfera são superfícies lisas, e nuvem nenhuma é lisa —
+   a leitura instantânea de "nuvem" vem da textura fervendo, não do contorno.
+   Nenhum ajuste de cor salvaria aquilo.
+
+   O que uma nuclear de verdade é, e que dá para reproduzir barato:
+
+     A BOLA DE FOGO. Nasce, cresce depressa e ESFRIA — branco, amarelo,
+     laranja, vermelho escuro, apaga. Ela é a única parte que emite luz, e dura
+     pouco: dois segundos.
+
+     O ANEL DE VÓRTICE. Isto é o coração do troço e é o que ninguém desenha. O
+     "chapéu" não é uma bola: é um anel de fumaça — um toro — que sobe girando
+     em torno do próprio tubo. É esse rolamento que faz a nuvem FERVER. Aqui
+     cada partícula do chapéu tem um ângulo em volta do eixo e uma fase dentro
+     do tubo, e a fase avança sozinha: sai de graça, e é o que dá vida.
+
+     A HASTE. Não é um cano: é poeira sugada do chão subindo em espiral, mais
+     fina em cima, alimentando o anel.
+
+     A SAIA DE BASE. O jato que bate no chão e escorre para os lados, rasteiro.
+     É a assinatura de um estouro no solo e quase ninguém põe — e é ela que
+     amarra o cogumelo ao chão em vez de deixá-lo pairando.
+
+   Custa TRÊS ordens de desenho, como a versão feia: um `InstancedMesh` com
+   trezentas bolinhas (a placa recebe uma esfera e uma lista de matrizes), mais
+   o anel de choque e a marca de queimado no chão. A cor de cada partícula vai
+   por instância, que é o que deixa a bola de fogo esfriar de branco a preto
+   sem material nenhum a mais.
+   ========================================================================== */
+const COG_N = 300;
+const geoCogBola = new THREE.SphereGeometry(1, 7, 5);
+const _cogDummy = new THREE.Object3D();
+const _cogCor = new THREE.Color();
+/* mistura dois cinzas pelo tom da partícula, e escurece o que está por baixo
+   do cogumelo — a sombra própria da nuvem, que é metade da leitura de volume */
+function cinzaCog(tom, alto){
+  const a = alto ? 0.55 + tom*0.45 : 0.32 + tom*0.40;
+  const r = Math.round(120*a + 40), g2 = Math.round(112*a + 38), b2 = Math.round(100*a + 34);
+  return (r<<16) | (g2<<8) | b2;
+}
 function fazCogumelo(x, z){
   const g = new THREE.Group();
-  const matN = new THREE.MeshLambertMaterial({ color: 0xb9b0a2 });
-  const col = new THREE.Mesh(new THREE.CylinderGeometry(420, 620, 5200, 14), matN);
-  col.position.y = CHAO + 2600; g.add(col);
-  const chapeu = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), matN);
-  chapeu.scale.set(2300, 1100, 2300); chapeu.position.y = CHAO + 5600; g.add(chapeu);
-  const nucleo = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10),
-    new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.9, fog: false }));
-  nucleo.scale.setScalar(1400); nucleo.position.y = CHAO + 1200; g.add(nucleo);
-  const marca = new THREE.Mesh(new THREE.CircleGeometry(RAIO_NUKE*0.55, 36),
-    new THREE.MeshBasicMaterial({ color: 0x1a1614, transparent: true, opacity: 0.55 }));
+  const mat = new THREE.MeshLambertMaterial({ transparent: true, opacity: 1, fog: true });
+  const malha = new THREE.InstancedMesh(geoCogBola, mat, COG_N);
+  malha.frustumCulled = false;                 // ela é enorme e fica meio fora
+  const ps = [];
+  for (let i = 0; i < COG_N; i++){
+    const u = i/COG_N;
+    let p;
+    if (u < 0.16){                             // --- a bola de fogo
+      const a = Math.random()*6.283, b = Math.acos(2*Math.random()-1);
+      p = { tipo:'fogo', dx:Math.sin(b)*Math.cos(a), dy:Math.cos(b)*0.8, dz:Math.sin(b)*Math.sin(a),
+            r:0.35 + Math.random()*0.65, giro:Math.random()*6.283 };
+    } else if (u < 0.44){                      // --- a haste
+      p = { tipo:'haste', h:Math.random(), ang:Math.random()*6.283,
+            vgiro:(0.5 + Math.random())*1.1, r:0.6 + Math.random()*0.7,
+            atraso:Math.random()*0.5 };
+    } else if (u < 0.87){                      // --- o anel de vórtice
+      p = { tipo:'chapeu', ang:Math.random()*6.283, fase:Math.random()*6.283,
+            vfase:(0.8 + Math.random()*0.9), r:0.55 + Math.random()*0.7,
+            tubo:0.55 + Math.random()*0.45, vang:(Math.random()-0.5)*0.25 };
+    } else {                                   // --- a saia de base
+      p = { tipo:'saia', ang:Math.random()*6.283, vel:0.55 + Math.random()*0.65,
+            r:0.5 + Math.random()*0.8, atraso:Math.random()*0.35 };
+    }
+    /* cada bolinha ganha o seu cinza. Uma nuvem de uma cor só lê como massa
+       de plástico; a variação é o que faz o olho ver volume. */
+    p.tom = Math.random();
+    ps.push(p);
+  }
+  g.add(malha);
+  /* a marca de queimado e o anel de choque continuam, que são planos e ficam
+     bem como planos */
+  const marca = new THREE.Mesh(new THREE.CircleGeometry(RAIO_NUKE*0.55, 40),
+    new THREE.MeshBasicMaterial({ color: 0x140f0c, transparent: true, opacity: 0.6 }));
   marca.rotation.x = -Math.PI/2; marca.position.y = CHAO + 12; g.add(marca);
-  const anel = new THREE.Mesh(new THREE.RingGeometry(0.94, 1, 48),
-    new THREE.MeshBasicMaterial({ color: 0xfff2cf, transparent: true, opacity: 0.9, side: THREE.DoubleSide, fog: false }));
+  const anel = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 56),
+    new THREE.MeshBasicMaterial({ color: 0xfff2cf, transparent: true, opacity: 0.9,
+                                  side: THREE.DoubleSide, fog: false }));
   anel.rotation.x = -Math.PI/2; anel.position.y = CHAO + 40; g.add(anel);
   g.position.set(x, 0, z);
   cena.add(g);
-  cogumelos.push({ no:g, t:0, col:col, chapeu:chapeu, nucleo:nucleo, anel:anel, marca:marca });
+  cogumelos.push({ no:g, t:0, malha, ps, anel, marca });
 }
+
+/* --- e o passo dele ---------------------------------------------------------
+   Tudo aqui é conta de partícula: cada uma sabe subir, girar e esfriar
+   sozinha, e o desenho é uma matriz por bolinha. Nenhuma delas conhece as
+   outras — o cogumelo aparece porque as quatro famílias juntas fazem a forma,
+   não porque alguém desenhou a forma. */
+function passoCogumelo(c, dt){
+  c.t += dt;
+  const t = c.t;
+  const subiu = Math.min(1, t/3.2);
+  /* Escala. A primeira medida ficou pequena para o estrago que a bomba faz —
+     o raio de morte é 9.000 e a nuvem tinha 3.000 de largura, o que fazia a
+     explosão parecer menor do que é. Uma nuclear tem de encher o céu. */
+  const topo = CHAO + 1200 + subiu*8200;             // a que altura o anel está
+  const raioAnel = 1300 + Math.min(1, t/3.0)*3100;   // e o quanto ele abriu
+  const somem = Math.max(0, 1 - Math.max(0, t - 8)/4);
+  let n = 0;
+  for (const p of c.ps){
+    let px = 0, py = CHAO, pz = 0, tam = 100, cor = 0x8a8378, alfa = 1;
+    if (p.tipo === 'fogo'){
+      /* a bola: cresce depressa, desacelera e SOBE, esfriando de branco a
+         vermelho escuro. É a única que emite cor quente. */
+      const k = Math.min(1, t/1.1);
+      const raio = 300 + (1 - Math.pow(1-k, 3))*2500*p.r;
+      px = p.dx*raio; pz = p.dz*raio;
+      py = CHAO + 900 + p.dy*raio*0.8 + t*t*190;
+      tam = 420 + k*620*p.r;
+      const q = Math.min(1, t/2.0);
+      cor = q < 0.25 ? 0xfff6d8 : q < 0.5 ? 0xffd166 : q < 0.75 ? 0xff8b2c : 0x8c2f14;
+      alfa = Math.max(0, 1 - Math.max(0, t - 1.4)/1.1);
+    } else if (p.tipo === 'haste'){
+      const tt = Math.max(0, t - p.atraso);
+      const sobe = Math.min(1, tt/2.8);
+      /* a haste vai do chão até DENTRO do chapéu: com ela parando antes,
+         ficava um vão no meio do cogumelo e a nuvem parecia pendurada */
+      const alt = p.h*(topo - CHAO)*sobe;
+      /* Mais gorda do que a proporção real. Medido a 38 km, com 1.000 de raio
+         contra 6.100 do chapéu, a haste virava um fio invisível — realista e
+         ilegível. Num jogo o cogumelo precisa ser reconhecido de longe, e o
+         que faz reconhecer é o T. */
+      const rr = (700 + 520*p.h)*(0.6 + sobe*0.6)*p.r*0.9;
+      const a = p.ang + tt*p.vgiro;                  // a espiral
+      px = Math.cos(a)*rr; pz = Math.sin(a)*rr;
+      py = CHAO + 120 + alt;
+      tam = (430 + 420*p.h)*p.r;
+      cor = cinzaCog(p.tom, false);
+      alfa = somem;
+    } else if (p.tipo === 'chapeu'){
+      /* O ANEL DE VÓRTICE: `ang` dá a volta em torno do eixo, `fase` roda
+         DENTRO do tubo. É a fase que ferve. */
+      const tt = Math.max(0, t - 0.5);
+      const abre = Math.min(1, tt/3.0);
+      const fase = p.fase + tt*p.vfase;
+      const rt = (520 + abre*1250)*p.tubo;
+      const a = p.ang + tt*p.vang;
+      const rr = raioAnel*(0.55 + abre*0.45) + rt*Math.cos(fase);
+      px = Math.cos(a)*rr; pz = Math.sin(a)*rr;
+      py = topo + rt*Math.sin(fase)*0.85 + Math.sin(fase*2 + p.ang)*90;
+      tam = (440 + abre*720)*p.r;
+      /* no começo a nuvem ainda tem brasa por dentro; e a parte de baixo do
+         anel é mais escura que a de cima, que é o que dá volume */
+      cor = t < 1.8 ? (Math.sin(fase) < 0 ? 0x7a4a2a : 0xc0955f)
+                    : cinzaCog(p.tom, Math.sin(fase) > 0);
+      alfa = Math.min(1, tt*1.6)*somem;
+    } else {
+      /* a saia: escorre rasteiro, desacelerando, e engorda ao se espalhar */
+      const tt = Math.max(0, t - p.atraso);
+      const dist = (1 - Math.exp(-tt*0.55))*RAIO_NUKE*0.5*p.vel;
+      px = Math.cos(p.ang)*dist; pz = Math.sin(p.ang)*dist;
+      py = CHAO + 120 + Math.min(700, dist*0.14);
+      tam = (520 + dist*0.11)*p.r;
+      cor = cinzaCog(0.75 + p.tom*0.25, true);
+      alfa = Math.max(0, 1 - tt/7)*somem;
+    }
+    if (alfa <= 0.01){ tam = 0.01; }
+    _cogDummy.position.set(px, py, pz);
+    _cogDummy.scale.setScalar(Math.max(0.01, tam*alfa));
+    _cogDummy.updateMatrix();
+    c.malha.setMatrixAt(n, _cogDummy.matrix);
+    c.malha.setColorAt(n, _cogCor.setHex(cor));
+    n++;
+  }
+  c.malha.instanceMatrix.needsUpdate = true;
+  if (c.malha.instanceColor) c.malha.instanceColor.needsUpdate = true;
+  const ra = RAIO_NUKE * Math.min(1, t/2.0);
+  c.anel.scale.setScalar(ra);
+  c.anel.material.opacity = Math.max(0, 0.9*(1 - t/2.4));
+  c.anel.visible = t < 2.4;
+  c.marca.material.opacity = 0.6*somem;
+  c.no.visible = somem > 0;
+}
+
 /* a nuclear nao escolhe: quem estiver no raio leva */
 function pegaNaNuclear(x, z){
   for (const o of Batalha.outros.values()){
@@ -10690,24 +10853,7 @@ function atualiza(dt){
   faiscas = faiscas.filter(f => { if (f.vida <= 0){ cena.remove(f.no); return false; } return true; });
 
   passoFogo(dt);
-  // cogumelos
-  for (const c of cogumelos){
-    c.t += dt;
-    const sobe = Math.min(1, c.t/2.6);
-    c.col.scale.set(1, sobe, 1); c.col.position.y = CHAO + 2600*sobe;
-    c.chapeu.position.y = CHAO + 900 + sobe*4900;
-    c.chapeu.scale.set(900 + sobe*1500, 500 + sobe*700, 900 + sobe*1500);
-    c.nucleo.visible = c.t < 2.4;
-    if (c.nucleo.visible) c.nucleo.material.opacity = 0.9*(1 - c.t/2.4);
-    const ra = RAIO_NUKE * Math.min(1, c.t/2.0);
-    c.anel.scale.setScalar(ra);
-    c.anel.material.opacity = Math.max(0, 0.9*(1 - c.t/2.4));
-    c.anel.visible = c.t < 2.4;
-    const some = Math.max(0, 1 - Math.max(0, c.t - 7)/4);
-    c.col.material.opacity = some; c.marca.material.opacity = 0.55*some;
-    c.col.material.transparent = c.marca.material.transparent = true;
-    c.no.visible = some > 0;
-  }
+  for (const c of cogumelos) passoCogumelo(c, dt);
   cogumelos = cogumelos.filter(c => { if (c.t > 12){ cena.remove(c.no); return false; } return true; });
 
   if (caindo){ atualizaQueda(dt); return; }
