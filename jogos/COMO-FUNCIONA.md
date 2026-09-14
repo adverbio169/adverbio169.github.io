@@ -4055,3 +4055,30 @@ de raio de anel: uma nuclear tem de encher o céu.
 6.113 do chapéu. Isso é a proporção real, e é ilegível — o cogumelo virava uma
 nuvem flutuando. Engrossou para 1.220: menos realista, mais reconhecível, e o
 que faz reconhecer um cogumelo é o **T**.
+
+---
+
+## O endereço mudou
+
+O site saiu de `comissaosubsidiorr.github.io` para **`adverbio169.github.io`**. Foi
+renomeada a **organização** do GitHub (e, junto, o repositório, que para um site
+de Pages é obrigado a se chamar `<dono>.github.io`).
+
+Nada no jogo precisou mudar, e isso não é sorte: o endereço **nunca foi escrito
+em lugar nenhum**. O QR do controle e o link da sala são montados a partir do
+`location.href` da própria página —
+
+```js
+function urlDoControle(){
+  const u = new URL(location.href);
+  u.pathname = u.pathname.replace(/[^/]*$/, 'controle.html');
+  ...
+}
+```
+
+— então no minuto seguinte à mudança o celular já lê o QR novo sozinho. É o
+argumento a favor de nunca escrever o próprio endereço no código: o dia em que
+ele muda, não há o que procurar.
+
+O endereço antigo deixou de existir, e o nome antigo ficou livre para outra
+pessoa. Quem tiver link salvo precisa trocar.
