@@ -135,7 +135,7 @@
 <div id="hud">
   <div class="linha">
     <div class="pilula"><span id="vidas"></span></div>
-    <div class="pilula"><small>corações</small><span id="corac">0</span></div>
+    <div class="pilula"><small>pontos</small><span id="corac">0</span></div>
   </div>
   <div class="linha">
     <button id="som" type="button" aria-label="Ligar ou desligar o som">🔊</button>
@@ -156,13 +156,13 @@
 <div class="tela on" id="telaInicio">
   <div class="folha">
     <h1>Corrida da Vitória</h1>
-    <p class="instr">O desenho da Vitória saiu do papel e foi correr.<br>Ela corre sozinha: pule os buracos, pegue os corações<br>e desvie dos blocos vermelhos.</p>
+    <p class="instr">A Vitória pegou o skate e foi para o parque.<br>Suba nas rampas, voe, emende manobras e deslize nos corrimãos.</p>
     <div class="chaves">
       <div class="chave"><span class="icone">🔄</span><span>Jogue com o <b>celular deitado</b></span></div>
       <div class="chave"><span class="icone">📱</span><span><b>Incline o celular</b>: para a direita ela vai para frente, para a esquerda ela volta</span></div>
-      <div class="chave"><span class="icone">👉</span><span><b>Toque na direita</b> para pular</span></div>
-      <div class="chave"><span class="icone">👈</span><span><b>Toque na esquerda</b>: mortal para trás</span></div>
-      <div class="chave"><span class="icone">⭐</span><span>No ar dá para pular <b>mais uma vez</b>. Pise nos bichinhos e pegue a estrela</span></div>
+      <div class="chave"><span class="icone">👉</span><span><b>Direita</b>: salta. E no ar, <b>giro 360</b></span></div>
+      <div class="chave"><span class="icone">👈</span><span><b>Esquerda</b>: mortal para trás — no chão e no ar</span></div>
+      <div class="chave"><span class="icone">🛹</span><span>Emende manobras no mesmo voo: cada uma <b>multiplica</b> os pontos. Deslize nos corrimãos!</span></div>
       <div class="chave"><span class="icone">⌨️</span><span>No computador: <b>→</b> acelera, <b>←</b> segura e <b>espaço</b> pula</span></div>
     </div>
     <button class="jogar" id="btnComecar" type="button">Começar</button>
@@ -251,7 +251,7 @@
   var TROCA_FASE = 140;                            // metros por fase
 
   var GRAV = 42, PULO = 15.2, MOLA = 24.5;
-  var VELMAX = 13.5;                // velocidade máxima, para os dois lados
+  var VELMAX = 18;                  // velocidade de skate: sempre rápida
   var MEIO = 0.46;            // meia largura da personagem
   var ALTURA = 3.1;           // altura da personagem
   var DEGRAU = 1.35;          // altura que ela sobe sozinha
@@ -261,12 +261,16 @@
   var cena, camera, render3d, relogio;
   var heroi, sombra, corpoTodo, tronco, cabecaG, chapeuG, saia;
   var ombroE, ombroD, cotoveloE, cotoveloD, coxaE, coxaD, joelhoE, joelhoD;
-  var olhos = [], chiquinhas = [];
+  var olhos = [], chiquinhas = [], skate, corpoEmPe;
   var solidos = [], blocos = [], coracoes = [], molas = [], decors = [];
   var inimigos = [], estrelas3d = [], particulas = [], vagalumes = [], borboletas = [];
   var baloes = [], rastros = [], rastroRelogio = 0, corRastro = 0, pontinhos = [];
+  var rampas = [], corrimaos = [];
+  var RAMPA_COMP = 5, RAMPA_ALT = 2.4;
   var jogador = { x: 0, y: 0, vy: 0, vel: 0, noChao: true, giro: 0, girando: false, passo: 0,
-                  empurrao: 0, giroDir: 1, pulosNoAr: 0 };
+                  empurrao: 0, giroDir: 1, spinAtivo: false, spinAng: 0, spinDir: 1,
+                  vyChao: 0, grind: false };
+  var manobras = [], pontosManobra = 0, tempoGrind = 0;
   var estado = "menu";
   var dist = 0, pontos = 0, vidas = 3, xMax = 0, limiteTras = -12;
   var olhando = Math.PI / 2, adianteAtual = 3;
@@ -388,6 +392,8 @@
         if (tipo === "coracao") { sino(1046.5, t, 0.22, 0.22); sino(1568, t + 0.055, 0.3, 0.18); }
         else if (tipo === "pulo") varre(t, 320, 760, 0.16, "square", 0.12);
         else if (tipo === "mortal") { varre(t, 260, 900, 0.22, "square", 0.13); sino(1046, t + .1, .26, .14); }
+        else if (tipo === "combo") { [0, 5, 9, 12, 17, 21].forEach(function (n, i) { sino(523 * Math.pow(2, n / 12), t + i * 0.06, 0.45, 0.2); }); }
+        else if (tipo === "grind") { varre(t, 180, 260, 0.25, "sawtooth", 0.07); }
         else if (tipo === "poder") { [0, 4, 7, 12, 16].forEach(function (n, i) { sino(659 * Math.pow(2, n / 12), t + i * 0.07, 0.5, 0.2); }); }
         else if (tipo === "mola") varre(t, 260, 1300, 0.3, "square", 0.15);
         else if (tipo === "batida") varre(t, 380, 70, 0.35, "sawtooth", 0.2);
@@ -531,10 +537,14 @@
     g.add(corpoTodo);
     olhos = []; chiquinhas = [];
 
+    corpoEmPe = new THREE.Group();                 // tudo que fica em cima do skate
+    corpoEmPe.position.y = 0.22;
+    corpoTodo.add(corpoEmPe);
+
     /* ================= do quadril para cima ================= */
     tronco = new THREE.Group();
     tronco.position.y = 1.15;
-    corpoTodo.add(tronco);
+    corpoEmPe.add(tronco);
 
     tronco.add(parte(geoCaixa(0.66, 1.05, 0.42, 0.17), COR.papel, 0, 0.525, 0, 0.032));
 
@@ -677,7 +687,7 @@
     [-1, 1].forEach(function (l) {
       var coxa = new THREE.Group();
       coxa.position.set(l * 0.18, 1.15, 0);
-      corpoTodo.add(coxa);
+      corpoEmPe.add(coxa);
       coxa.add(parte(geoMembro(0.15, 0.13, 0.55), COR.papel, 0, -0.275, 0, 0.024));
 
       var joelho = new THREE.Group();
@@ -694,6 +704,25 @@
 
       if (l < 0) { coxaE = coxa; joelhoE = joelho; }
       else { coxaD = coxa; joelhoD = joelho; }
+    });
+
+    /* ======================= o skate ======================= */
+    skate = new THREE.Group();
+    skate.position.y = 0.09;   // as rodinhas encostam no chão
+    corpoTodo.add(skate);
+    var shape = parte(geoCaixa(0.44, 0.075, 1.55, 0.12), COR.rosa, 0, 0.1, 0, 0.026);
+    skate.add(shape);
+    [-1, 1].forEach(function (l) {                 // bico e rabeta levantados
+      var ponta = parte(geoCaixa(0.42, 0.07, 0.34, 0.1), COR.rosa, 0, 0.15, l * 0.72, 0.024);
+      ponta.rotation.x = -l * 0.42;
+      skate.add(ponta);
+      var truck = parte(geoCaixa(0.3, 0.09, 0.12, 0.03), 0x6E6E7A, 0, 0.02, l * 0.45, 0.02);
+      skate.add(truck);
+      [-1, 1].forEach(function (w) {
+        var roda = parte(new THREE.CylinderGeometry(0.11, 0.11, 0.1, 12), 0xFFF2D8, w * 0.19, 0.02, l * 0.45, 0.02);
+        roda.rotation.z = Math.PI / 2;
+        skate.add(roda);
+      });
     });
 
     /* ---- sombrinha de apoio ---- */
@@ -966,13 +995,17 @@
     var chave = txt + cor;
     if (texPonto[chave]) return texPonto[chave];
     var c = document.createElement("canvas");
-    c.width = 256; c.height = 128;
+    c.width = 512; c.height = 160;
     var x = c.getContext("2d");
-    x.font = "bold 86px Outfit, system-ui, sans-serif";
+    var tam = 104;                                   // encolhe até o nome caber inteiro
+    do {
+      x.font = "bold " + tam + "px Outfit, system-ui, sans-serif";
+      tam -= 4;
+    } while (x.measureText(txt).width > c.width - 44 && tam > 28);
     x.textAlign = "center"; x.textBaseline = "middle";
-    x.lineWidth = 16; x.lineJoin = "round"; x.strokeStyle = "#18181C";
-    x.strokeText(txt, 128, 66);
-    x.fillStyle = cor; x.fillText(txt, 128, 66);
+    x.lineWidth = 18; x.lineJoin = "round"; x.strokeStyle = "#18181C";
+    x.strokeText(txt, 256, 84);
+    x.fillStyle = cor; x.fillText(txt, 256, 84);
     var t = new THREE.CanvasTexture(c);
     if (THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace;
     texPonto[chave] = t;
@@ -981,14 +1014,15 @@
 
   function novoPonto() {
     var sp = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false }));
-    sp.scale.set(1.5, 0.75, 1);
+    sp.scale.set(2.6, 0.8, 1);
     sp.visible = false;
     sp.renderOrder = 5;
     cena.add(sp);
-    return { obj: sp, viva: 0 };
+    return { obj: sp, viva: 0, dx: 0, segue: false, alt: 0 };
   }
 
-  function mostrarPonto(x, y, txt, cor) {
+  // segue = true faz o aviso viajar junto com ela (senão fica para trás na velocidade)
+  function mostrarPonto(x, y, txt, cor, segue) {
     for (var i = 0; i < pontinhos.length; i++) {
       var p = pontinhos[i];
       if (p.viva > 0) continue;
@@ -997,7 +1031,12 @@
       p.obj.material.map = texturaTexto(txt, cor);
       p.obj.material.needsUpdate = true;
       p.obj.material.opacity = 1;
-      p.obj.position.set(x, y + 0.4, 0.6);
+      p.segue = !!segue;
+      p.dx = x - jogador.x;
+      p.alt = y + 0.4;
+      p.obj.position.set(x, p.alt, 0.6);
+      p.base = 2.6;
+      p.obj.scale.set(p.base, p.base * 0.31, 1);
       return;
     }
   }
@@ -1007,10 +1046,13 @@
       var p = pontinhos[i];
       if (p.viva <= 0) continue;
       p.viva -= dt;
-      p.obj.position.y += dt * 1.7;
+      p.alt += dt * 1.7;
+      if (p.segue) p.obj.position.x = jogador.x + p.dx;
+      p.obj.position.y = p.alt;
       p.obj.material.opacity = Math.max(0, Math.min(1, p.viva * 1.8));
       var e = 1 + (0.9 - p.viva) * 0.35;
-      p.obj.scale.set(1.5 * e, 0.75 * e, 1);
+      var lg = p.base || 2.6;
+      p.obj.scale.set(lg * e, lg * 0.31 * e, 1);
       if (p.viva <= 0) p.obj.visible = false;
     }
   }
@@ -1079,6 +1121,82 @@
       bo.corpo.material.opacity = luzBorb;
       bo.obj.visible = luzBorb > 0.05;
     }
+  }
+
+  /* ===================== rampas e corrimãos ===================== */
+  function geoRampa() {
+    var f = new THREE.Shape();
+    f.moveTo(0, 0);
+    for (var i = 1; i <= 12; i++) {
+      var t = i / 12;
+      f.lineTo(t * RAMPA_COMP, RAMPA_ALT * t * t);
+    }
+    f.lineTo(RAMPA_COMP, -1.5);
+    f.lineTo(0, -1.5);
+    f.closePath();
+    var g = new THREE.ExtrudeGeometry(f, { depth: 4.2, bevelEnabled: false });
+    g.translate(0, 0, -2.1);
+    return g;
+  }
+  var GEO_RAMPA = null;
+
+  function novaRampa() {
+    var g = new THREE.Group();
+    var corpo = new THREE.Mesh(GEO_RAMPA, matPapel("terra"));
+    comTraco(corpo);
+    corpo.castShadow = corpo.receiveShadow = true;
+    g.add(corpo);
+    // piso da rampa, na cor da listra
+    var piso = new THREE.Mesh(GEO_RAMPA, matPapel("listra"));
+    piso.scale.set(1, 1, 0.9);
+    piso.position.y = 0.06;
+    g.add(piso);
+    g.visible = false;
+    cena.add(g);
+    return { obj: g, ativo: false, x0: 0, x1: 0, y: 0 };
+  }
+
+  function novoCorrimao() {
+    var g = new THREE.Group();
+    var barra = parte(new THREE.CylinderGeometry(0.09, 0.09, 1, 10), 0xC9CBD6, 0, 0, 0, 0.022);
+    barra.rotation.z = Math.PI / 2;
+    barra.castShadow = true;
+    g.add(barra);
+    var pes = [];
+    for (var i = 0; i < 2; i++) {
+      var pe = parte(new THREE.CylinderGeometry(0.07, 0.08, 1, 8), 0x8A8E9C, 0, 0, 0, 0.02);
+      pe.castShadow = true;
+      g.add(pe); pes.push(pe);
+    }
+    g.visible = false;
+    cena.add(g);
+    return { obj: g, barra: barra, pes: pes, ativo: false, x0: 0, x1: 0, y: 0 };
+  }
+
+  function porRampa(x0, topoY) {
+    var r = livre(rampas); if (!r) return 0;
+    r.ativo = true; r.obj.visible = true;
+    r.x0 = x0; r.x1 = x0 + RAMPA_COMP; r.y = topoY;
+    r.obj.position.set(x0, topoY, 0);
+    return RAMPA_ALT;
+  }
+
+  function porCorrimao(x0, comp, altura) {
+    var c = livre(corrimaos); if (!c) return;
+    c.ativo = true; c.obj.visible = true;
+    c.x0 = x0; c.x1 = x0 + comp; c.y = altura;
+    c.obj.position.set(x0 + comp / 2, 0, 0);
+    c.barra.scale.set(1, comp, 1);
+    c.barra.position.y = altura;
+    for (var i = 0; i < 2; i++) {
+      c.pes[i].scale.set(1, altura, 1);
+      c.pes[i].position.set((i ? 1 : -1) * (comp / 2 - 0.4), altura / 2, 0);
+    }
+  }
+
+  function topoRampa(r, x) {
+    var t = clamp((x - r.x0) / RAMPA_COMP, 0, 1);
+    return r.y + RAMPA_ALT * t * t;
   }
 
   /* ======================= geração do caminho ======================== */
@@ -1160,57 +1278,57 @@
     }
   }
 
+  // O parque: rampas para decolar, corrimãos para deslizar e vãos para saltar.
   function gerarTrecho(x) {
     var dif = Math.min(1, dist / 650);
     var r = Math.random();
 
-    if (r < 0.24) {                                  // chão reto com blocos
-      porSolido(x, 16, 0);
-      porBloco(x + 6, 0);
-      if (Math.random() < 0.28 + dif * 0.42) porBloco(x + 11, 0);
-      linhaCoracoes(x + 2, 1.4, 3, 1.4);
-      if (Math.random() < 0.4 + dif * 0.3) porInimigo(x + 13, 0, x + 8.5, x + 15);
-      if (Math.random() < 0.16) porEstrela(x + 8, 3.6);
-      return 16;
+    if (r < 0.24) {                                  // rampa e voo livre
+      porSolido(x, 24, 0);
+      porRampa(x + 7, 0);
+      for (var a = 0; a < 7; a++) {
+        porCoracao(x + 13 + a * 1.7, RAMPA_ALT + 1.4 + Math.sin(a / 6 * Math.PI) * 3);
+      }
+      if (Math.random() < 0.3) porInimigo(x + 20, 0, x + 17, x + 23);
+      return 24;
     }
-    if (r < 0.46) {                                  // buraco para pular
-      porSolido(x, 10, 0);
-      var vao = 3.4 + dif * 2.3;
-      arcoCoracoes(x + 10, vao);
-      return 10 + vao;
+    if (r < 0.44) {                                  // corrimão para deslizar
+      porSolido(x, 24, 0);
+      porRampa(x + 4, 0);
+      porCorrimao(x + 11.5, 8, 2.1);
+      linhaCoracoes(x + 12.5, 3.1, 5, 1.5);
+      if (Math.random() < 0.3) porEstrela(x + 20, 2.6);
+      return 24;
     }
-    if (r < 0.64) {                                  // plataformas sobre o vão
-      porSolido(x, 9, 0);
-      var elevador = Math.random() < 0.55 ? 1.5 : 0;  // às vezes a plataforma sobe e desce
-      porSolido(x + 12.5, 4.6, 2.8, 0.7, elevador);
-      linhaCoracoes(x + 13.2, 4.2, 3, 1.3);
-      porSolido(x + 21, 12, 0);
-      if (Math.random() < 0.45) porInimigo(x + 25, 0, x + 22, x + 31);
-      porEstrela(x + 17.5, 4.6);
-      return 33;
+    if (r < 0.62) {                                  // rampa, vão e plataforma
+      porSolido(x, 12, 0);
+      porRampa(x + 6, 0);
+      var vao = 5 + dif * 2.5;
+      arcoCoracoes(x + 12, vao, 2.6);
+      porSolido(x + 12 + vao, 14, 0);
+      if (Math.random() < 0.45) porInimigo(x + 18 + vao, 0, x + 14 + vao, x + 24 + vao);
+      return 26 + vao;
     }
-    if (r < 0.82) {                                  // degraus (sobe e desce)
-      porSolido(x, 6, 0);
-      porSolido(x + 6, 4.5, 1.2);
-      porSolido(x + 10.5, 4.5, 2.4);
-      linhaCoracoes(x + 11, 3.7, 3, 1.3);
-      porSolido(x + 15, 5, 1.2);
-      porSolido(x + 20, 8, 0);
-      if (Math.random() < 0.5 + dif * 0.3) porInimigo(x + 23, 0, x + 20.5, x + 27);
-      if (Math.random() < 0.2) porEstrela(x + 12.7, 4.2);
-      return 28;
+    if (r < 0.8) {                                   // caixote com corrimão em cima
+      porSolido(x, 26, 0);
+      porSolido(x + 8, 9, 1.5, 1.4);
+      porCorrimao(x + 9, 7, 2.6);
+      linhaCoracoes(x + 9.5, 3.6, 4, 1.6);
+      porBloco(x + 20, 0);
+      if (Math.random() < 0.35) porEstrela(x + 12.5, 4.6);
+      return 26;
     }
-    porSolido(x, 14, 0);                             // mola
-    if (Math.random() < 0.35) porInimigo(x + 11, 0, x + 8, x + 13.5);
-    porMola(x + 4.5, 0);
-    for (var k = 0; k < 6; k++) porCoracao(x + 5.6 + k * 1.6, 2.4 + Math.sin(k / 5 * Math.PI) * 4.4);
-    return 14;
+    porSolido(x, 18, 0);                             // mola e bichinho
+    porMola(x + 5, 0);
+    for (var k = 0; k < 6; k++) porCoracao(x + 6.2 + k * 1.7, 2.4 + Math.sin(k / 5 * Math.PI) * 4.6);
+    if (Math.random() < 0.5) porInimigo(x + 14, 0, x + 11, x + 17);
+    return 18;
   }
 
   function limparMundo() {
     particulas.forEach(function (p) { p.viva = 0; p.obj.visible = false; });
     rastros.forEach(function (r) { r.viva = 0; r.obj.visible = false; });
-    [solidos, blocos, coracoes, molas, inimigos, estrelas3d].forEach(function (lista) {
+    [solidos, blocos, coracoes, molas, inimigos, estrelas3d, rampas, corrimaos].forEach(function (lista) {
       lista.forEach(function (it) { it.ativo = false; it.obj.visible = false; });
     });
   }
@@ -1251,47 +1369,40 @@
   }
 
   function animarCorrida(dt, v, noAr) {
-    if (noAr) {                          // no ar
-      coxaE.rotation.x = -0.95; joelhoE.rotation.x = -1.15;
-      coxaD.rotation.x = -0.3; joelhoD.rotation.x = -1.75;
-      ombroE.rotation.x = -2.3; ombroD.rotation.x = -2.3;
-      cotoveloE.rotation.x = -0.45; cotoveloD.rotation.x = -0.45;
-      tronco.position.y = 1.15;
-      tronco.rotation.x = -0.12; tronco.rotation.z = 0;
-      cabecaG.rotation.set(0.08, 0, 0);
-      saia.rotation.x = 0.06; saia.rotation.z = 0;
-    } else if (v > 0.6) {                // correndo
-      jogador.passo += dt * (4.4 + v * 0.28);
-      var s = Math.sin(jogador.passo), c = Math.cos(jogador.passo);
+    if (noAr) {                          // no ar, encolhida na manobra
+      coxaE.rotation.x = -0.85; joelhoE.rotation.x = -1.25;
+      coxaD.rotation.x = -0.15; joelhoD.rotation.x = -1.5;
+      ombroE.rotation.x = -1.9; ombroD.rotation.x = -1.9;
+      ombroE.rotation.z = -0.9; ombroD.rotation.z = 0.9;
+      cotoveloE.rotation.x = -0.6; cotoveloD.rotation.x = -0.6;
+      tronco.position.y = 1.04;
+      tronco.rotation.x = -0.1; tronco.rotation.z = 0;
+      cabecaG.rotation.set(0.1, 0, 0);
+      saia.rotation.x = 0.08; saia.rotation.z = 0;
+    } else {                             // em cima do skate
+      var bal = Math.sin(tempo * 3.1) * 0.02 + Math.sin(tempo * 7.3) * 0.008;
+      var agacha = Math.min(1, Math.abs(v) / VELMAX);
+      var frente = jogador.vel >= 0 ? 1 : -1;
 
-      coxaE.rotation.x = s * 0.95;
-      coxaD.rotation.x = -s * 0.95;
-      joelhoE.rotation.x = -0.12 - Math.max(0, -s) * 1.5;
-      joelhoD.rotation.x = -0.12 - Math.max(0, s) * 1.5;
+      coxaE.rotation.x = -0.5 * frente; joelhoE.rotation.x = -0.42 - agacha * 0.2;
+      coxaD.rotation.x = 0.34 * frente; joelhoD.rotation.x = -0.5 - agacha * 0.2;
 
-      ombroE.rotation.x = -s * 0.8;
-      ombroD.rotation.x = s * 0.8;
-      cotoveloE.rotation.x = -0.5 - Math.max(0, s) * 0.55;
-      cotoveloD.rotation.x = -0.5 - Math.max(0, -s) * 0.55;
+      ombroE.rotation.x = -0.55 - agacha * 0.35; ombroD.rotation.x = -0.2 + agacha * 0.2;
+      ombroE.rotation.z = -0.85; ombroD.rotation.z = 0.95;
+      cotoveloE.rotation.x = -0.35; cotoveloD.rotation.x = -0.5;
 
-      tronco.position.y = 1.15 + Math.abs(c) * 0.07;
-      tronco.rotation.x = 0.1;
-      tronco.rotation.z = s * 0.045;
-      cabecaG.rotation.x = -0.1 - Math.abs(c) * 0.05;
-      cabecaG.rotation.z = -s * 0.05;
-      saia.rotation.x = -0.05 - Math.abs(c) * 0.04;
-      saia.rotation.z = s * 0.07;
-    } else {                             // paradinha, respirando
-      var r = Math.sin(tempo * 2.1);
-      coxaE.rotation.x = 0; coxaD.rotation.x = 0;
-      joelhoE.rotation.x = -0.05; joelhoD.rotation.x = -0.05;
-      ombroE.rotation.x = r * 0.08; ombroD.rotation.x = -r * 0.08;
-      cotoveloE.rotation.x = -0.12; cotoveloD.rotation.x = -0.12;
-      tronco.position.y = 1.15 + r * 0.02;
-      tronco.rotation.x = 0; tronco.rotation.z = 0;
-      cabecaG.rotation.set(r * 0.03, 0, 0);
-      saia.rotation.x = 0; saia.rotation.z = 0;
+      tronco.position.y = 1.12 - agacha * 0.1 + bal;
+      tronco.rotation.x = 0.12 + agacha * 0.16;
+      tronco.rotation.z = bal * 2;
+      cabecaG.rotation.set(-0.1 - agacha * 0.12, 0, -bal);
+      saia.rotation.x = -0.06 - agacha * 0.05;
+      saia.rotation.z = bal;
     }
+    if (skate) {
+      skate.rotation.z = noAr ? 0 : Math.sin(tempo * 3.1) * 0.03;
+      skate.rotation.x = noAr ? -0.12 : 0;
+    }
+
     // piscadinha de vez em quando
     var piscou = (tempo % 3.6) < 0.13 || (tempo % 3.6) > 3.52;
     for (var o = 0; o < olhos.length; o++) olhos[o].scale.y = piscou ? 0.14 : 1;
@@ -1400,6 +1511,9 @@
     for (var ba = 0; ba < 7; ba++) baloes.push(novoBalao(ba));
     for (var ra = 0; ra < 22; ra++) rastros.push(novoRastro());
     for (var pp = 0; pp < 10; pp++) pontinhos.push(novoPonto());
+    GEO_RAMPA = geoRampa();
+    for (var rp = 0; rp < 6; rp++) rampas.push(novaRampa());
+    for (var cr = 0; cr < 6; cr++) corrimaos.push(novoCorrimao());
     for (var a = 0; a < 16; a++) decors.push({ obj: criarArvore(), tipo: "arvore" });
     for (var n = 0; n < 8; n++) decors.push({ obj: criarNuvem(), tipo: "nuvem" });
     for (var h = 0; h < 5; h++) decors.push({ obj: criarMorro(), tipo: "morro" });
@@ -1604,6 +1718,8 @@
     invencivel = 0; tremor = 0; tempo = 0; olhando = Math.PI / 2; adianteAtual = 3;
     faseAtual = 0; temaDe = 0; temaPara = 0; trans = 1; aplicarTema(1);
     poder = 0; if (aura) { aura.visible = false; aura.material.opacity = 0; }
+    manobras = []; pontosManobra = 0; tempoGrind = 0;
+    jogador.grind = false; jogador.spinAtivo = false; jogador.spinAng = 0; jogador.vyChao = 0;
     jogador.empurrao = 0; jogador.giroDir = 1; jogador.pulosNoAr = 0;
     el.faixaFase.classList.remove("on"); tempoFaixa = 0;
     estavaNoChao = true; quedaForte = 0;
@@ -1645,29 +1761,57 @@
     el.fim.classList.add("on");
   }
 
-  // lado: 1 = salto normal (polegar direito), -1 = mortal para trás (esquerdo)
+  // No chão os dois lados saltam. No ar, cada lado é uma manobra.
   function pular(lado) {
     if (estado !== "jogando") return;
-    var podeChao = jogador.noChao;
-    var podeAr = !jogador.noChao && jogador.pulosNoAr < 1;
-    if (!podeChao && !podeAr) return;
-    if (podeAr) jogador.pulosNoAr++;
-    else jogador.pulosNoAr = 0;
 
-    if (lado < 0) {                               // mortal para trás
-      jogador.vy = PULO * 1.06;
-      jogador.empurrao = (jogador.vel >= 0 ? -1 : 1) * 9.5;
-      jogador.giroDir = -1;
-      Som.efeito("mortal");
-    } else {
-      jogador.vy = PULO;
-      jogador.empurrao = 0;
-      jogador.giroDir = 1;
-      Som.efeito("pulo");
+    if (jogador.noChao || jogador.grind) {
+      if (jogador.grind) fimDoGrind();
+      jogador.vy = PULO * (lado < 0 ? 1.06 : 1);
+      jogador.noChao = false;
+      if (lado < 0) {                             // saída com mortal
+        jogador.empurrao = (jogador.vel >= 0 ? -1 : 1) * 8;
+        manobra("MORTAL", 30, -1, 0);
+      } else {
+        jogador.empurrao = 0;
+        Som.efeito("pulo");
+      }
+      explodir(jogador.x, jogador.y + 0.15, 0xE6D9BC, 5, 2.4);
+      return;
     }
-    jogador.noChao = false;
-    jogador.girando = true; jogador.giro = 0;
-    explodir(jogador.x, jogador.y + 0.15, 0xE6D9BC, 5, 2.4);
+
+    // no ar: manobra
+    if (lado < 0) manobra("MORTAL", 30, -1, 0);
+    else manobra("GIRO 360", 25, 0, jogador.vel >= 0 ? 1 : -1);
+  }
+
+  function manobra(nome, valor, flip, spin) {
+    if (flip) { jogador.girando = true; jogador.giro = 0; jogador.giroDir = flip; }
+    if (spin) { jogador.spinAtivo = true; jogador.spinAng = 0; jogador.spinDir = spin; }
+    manobras.push(nome);
+    pontosManobra += valor;
+    mostrarPonto(jogador.x, jogador.y + 2.4, nome, "#FFFFFF", true);
+    Som.efeito("mortal");
+    explodir(jogador.x, jogador.y + 1.4, CORACOES[manobras.length % CORACOES.length], 8, 4);
+  }
+
+  // Ao pousar, a sequência vira ponto: quanto mais manobras, maior o multiplicador.
+  function fecharManobras() {
+    if (!manobras.length) return;
+    var mult = manobras.length;
+    var ganho = Math.round(pontosManobra * mult);
+    pontos += ganho;
+    mostrarPonto(jogador.x, jogador.y + 2.6,
+      (mult > 1 ? mult + "x  +" : "+") + ganho, "#FFD24A", true);
+    Som.efeito(mult > 1 ? "combo" : "estrela");
+    explodir(jogador.x, jogador.y + 1.2, 0xFFD24A, 10 + mult * 4, 5);
+    manobras = []; pontosManobra = 0;
+  }
+
+  function fimDoGrind() {
+    if (!jogador.grind) return;
+    jogador.grind = false;
+    tempoGrind = 0;
   }
 
   function perderVida() {
@@ -1758,8 +1902,8 @@
     if (alvoToque !== null) alvo = clamp(alvoToque, -1, 1) * VELMAX;
     if (teclas.dir) alvo = VELMAX;
     if (teclas.esq) alvo = -VELMAX;
-    if (poder > 0) alvo *= 1.3;                      // e mais rápida
-    jogador.vel += (alvo - jogador.vel) * Math.min(1, dt * 5);
+    if (poder > 0) alvo *= 1.15;                     // e um empurrãozinho a mais
+    jogador.vel += (alvo - jogador.vel) * Math.min(1, dt * 3.2);   // o skate embala e desembala
     if (Math.abs(jogador.vel) < 0.05) jogador.vel = 0;
     jogador.empurrao *= Math.pow(0.06, dt);        // o recuo do mortal vai sumindo
     if (Math.abs(jogador.empurrao) < 0.05) jogador.empurrao = 0;
@@ -1785,6 +1929,10 @@
       var bl = blocos[b];
       if (bl.ativo && Math.abs(jogador.x - bl.x) < MEIO + 0.75) apoios.push(bl.y + 1.6);
     }
+    for (var rr = 0; rr < rampas.length; rr++) {
+      var ra = rampas[rr];
+      if (ra.ativo && jogador.x > ra.x0 - MEIO && jogador.x < ra.x1) apoios.push(topoRampa(ra, jogador.x));
+    }
     for (var k = 0; k < apoios.length; k++) {
       var topo = apoios[k];
       if (jogador.vy <= 0 && yAnt >= topo - 0.02 && jogador.y <= topo) {
@@ -1794,8 +1942,40 @@
       }
       if (topo <= jogador.y + 0.35 && (chaoAbaixo === null || topo > chaoAbaixo)) chaoAbaixo = topo;
     }
+    // corrimão: deslizar dá ponto enquanto durar
+    var noCorrimao = false;
+    for (var g2 = 0; g2 < corrimaos.length; g2++) {
+      var cm = corrimaos[g2];
+      if (!cm.ativo || jogador.x < cm.x0 - 0.2 || jogador.x > cm.x1 + 0.2) continue;
+      if (jogador.vy <= 0.6 && yAnt >= cm.y - 0.5 && jogador.y <= cm.y + 0.3) {
+        jogador.y = cm.y; jogador.vy = 0; jogador.noChao = true; noCorrimao = true;
+        chaoAbaixo = cm.y;
+        if (!jogador.grind) {
+          jogador.grind = true; tempoGrind = 0;
+          manobras.push("GRIND"); pontosManobra += 20;
+          mostrarPonto(jogador.x, cm.y + 2.2, "GRIND!", "#9AE6FF", true);
+        }
+        tempoGrind += dt;
+        if (tempoGrind > 0.25) {
+          tempoGrind = 0; pontosManobra += 8;
+          Som.efeito("grind");
+          explodir(jogador.x, cm.y, 0xFFE9A0, 3, 2.2);
+        }
+      }
+    }
+    if (jogador.grind && !noCorrimao) fimDoGrind();
+
+    // decolagem: a velocidade que a rampa deu continua no ar
     if (jogador.noChao) {
-      jogador.pulosNoAr = 0;
+      jogador.vyChao = clamp((jogador.y - yAnt) / Math.max(dt, 0.001), -30, 30);
+    } else if (estavaNoChao && jogador.vyChao > 3) {
+      jogador.vy = Math.min(jogador.vyChao * 0.95, 27);
+      Som.efeito("pulo");
+      explodir(jogador.x, jogador.y, 0xFFE9A0, 6, 3);
+    }
+
+    if (jogador.noChao) {
+      if (!estavaNoChao) fecharManobras();
       if (!estavaNoChao && quedaForte < -9) {
         explodir(jogador.x, jogador.y + 0.1, 0xE6D9BC, 10, 3.4);
         tremor = Math.max(tremor, 0.16);
@@ -1831,6 +2011,13 @@
       if (jogador.giro >= Math.PI * 2 || jogador.noChao) {
         jogador.girando = false; jogador.giro = 0;
         corpoTodo.rotation.x = 0; corpoTodo.position.set(0, 0, 0);
+      }
+    }
+    if (jogador.spinAtivo) {
+      jogador.spinAng += dt * 10 * jogador.spinDir;
+      corpoTodo.rotation.y = jogador.spinAng;
+      if (Math.abs(jogador.spinAng) >= Math.PI * 2 || jogador.noChao) {
+        jogador.spinAtivo = false; jogador.spinAng = 0; corpoTodo.rotation.y = 0;
       }
     }
     corpoTodo.visible = !(invencivel > 0 && Math.floor(tempo * 14) % 2 === 0);
@@ -1886,6 +2073,12 @@
       e.pes[1].position.y = 0.07 + Math.max(0, -Math.sin(tempo * 9 + e.fase)) * 0.11;
       if (e.x1 < xMax - 44) { e.ativo = false; e.obj.visible = false; }
     });
+    rampas.forEach(function (ra) {
+      if (ra.ativo && ra.x1 < xMax - 44) { ra.ativo = false; ra.obj.visible = false; }
+    });
+    corrimaos.forEach(function (cm) {
+      if (cm.ativo && cm.x1 < xMax - 44) { cm.ativo = false; cm.obj.visible = false; }
+    });
     solidos.forEach(function (s3) {                  // elevadores
       if (!s3.ativo || !s3.movAmp) return;
       var novoY = s3.baseY + Math.sin(tempo * s3.movVel + s3.movFase) * s3.movAmp;
@@ -1918,9 +2111,9 @@
       var p = c.obj.position;
       if (Math.abs(p.x - px) < 1.0 && p.y > py - 0.5 && p.y < py + ALTURA + 0.3) {
         c.ativo = false; c.obj.visible = false;
-        pontos++; Som.efeito("coracao");
+        pontos += 10; Som.efeito("coracao");
         explodir(p.x, p.y, c.obj.material.color.getHex(), 7, 3.6);
-        mostrarPonto(p.x, p.y, "+1", "#FFFFFF");
+        mostrarPonto(p.x, p.y, "+10", "#FFFFFF");
       }
     });
 
@@ -1938,7 +2131,7 @@
       if (!es.ativo) continue;
       if (Math.abs(es.x - px) < 1.15 && es.obj.position.y > py - 0.7 && es.obj.position.y < py + ALTURA + 0.5) {
         es.ativo = false; es.obj.visible = false;
-        pontos += 5;
+        pontos += 100;
         poder = 7;                                   // sete segundos de invencível
         explodir(es.x, es.obj.position.y, 0xFFC83D, 26, 7.5);
         mostrarPonto(es.x, es.obj.position.y, "PODER!", "#FFD24A");
@@ -1954,8 +2147,8 @@
           bi.ativo = false; bi.obj.visible = false;
           explodir(bi.x, bi.y + 0.6, 0xFFD35A, 16, 6);
           jogador.vy = 11.5; jogador.girando = true; jogador.giro = 0;
-          pontos += 2; Som.efeito("pisar");
-          mostrarPonto(bi.x, bi.y + 1, "+2", "#FFE066");
+          pontos += 25; Som.efeito("pisar");
+          mostrarPonto(bi.x, bi.y + 1, "+25", "#FFE066");
           tremor = Math.max(tremor, 0.24);
         } else if (invencivel <= 0) {
           perderVida();
