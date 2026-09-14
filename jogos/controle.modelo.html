@@ -147,6 +147,20 @@
           font:900 19px/1 inherit;letter-spacing:3px;color:#fff;background:#d8422f;
           box-shadow:0 6px 0 #8f2a1d;user-select:none;-webkit-user-select:none}
   #btFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
+  /* --- DEFESA: as contramedidas ---------------------------------------------
+     Mora colada no FOGO de propósito. Foi o pedido, e é o certo: soltar chama
+     é decisão de meio segundo, no meio da manobra, com o dedo já em cima do
+     gatilho. Botão de defesa longe do polegar é botão que não se usa. */
+  #btChama{display:none;width:100%;max-width:340px;border:0;border-radius:12px;padding:10px;
+           cursor:pointer;font:900 14px/1 inherit;letter-spacing:2.5px;color:#2a1f05;
+           background:#ffc24d;box-shadow:0 5px 0 #a8761f;user-select:none;
+           -webkit-user-select:none;margin-bottom:10px}
+  #btChama b{font-weight:900;opacity:.75;margin-left:6px}
+  #btChama:active{transform:translateY(3px);box-shadow:0 2px 0 #a8761f}
+  #btChama.vazio{background:#6b6257;color:#cfc6b8;box-shadow:0 5px 0 #3f3931}
+  #btChama.espera{opacity:.55}
+  body.pousa #btChama{display:block}
+  body.artilheiro #btChama{display:none}
   /* trem de pouso e flapes: só aparecem quando o jogo do outro lado sabe
      pousar (o jogo avisa no pacote de estado). Ficam em cima, longe do
      polegar, porque se mexe neles duas vezes por voo. */
@@ -244,6 +258,15 @@ body.paisagem #controle.ver,
             width:min(27vw,132px);height:min(27vw,132px);max-width:none;border-radius:50%;
             font-size:17px;letter-spacing:2px;box-shadow:0 7px 0 #8f2a1d}
   body.paisagem #btFogo:active{transform:translateY(5px);box-shadow:0 2px 0 #8f2a1d}
+  /* deitado, ela vira um círculo menor empilhado em cima do FOGO */
+  body.paisagem #btChama{right:calc(10px + env(safe-area-inset-right));
+            bottom:calc(10px + min(27vw,132px) + 12px + env(safe-area-inset-bottom));
+            position:fixed;width:min(20vw,98px);height:min(20vw,98px);max-width:none;
+            border-radius:50%;font-size:12.5px;letter-spacing:1.5px;margin:0;
+            display:none;box-shadow:0 6px 0 #a8761f;z-index:6}
+  body.pousa.paisagem #btChama{display:flex;align-items:center;justify-content:center;
+            flex-direction:column;gap:2px}
+  body.paisagem #btChama b{margin:0;font-size:15px;opacity:.9}
   /* o que se usa pouco fica em cima, longe do polegar */
   body.paisagem .linha{top:8px;left:calc(10px + env(safe-area-inset-left));width:auto;max-width:none;gap:6px}
   body.paisagem .linha .bt{flex:0 0 auto;width:auto;padding:7px 12px;font-size:12.5px}
@@ -265,6 +288,7 @@ body.paisagem #controle.ver,
            background:linear-gradient(0deg,rgba(92,200,255,.5),rgba(140,230,255,.22))}
   /* o gatilho e o seletor recuam a largura da alavanca */
   body.paisagem #btFogo{right:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-right))}
+  body.paisagem #btChama{right:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-right))}
   body.paisagem .armas{left:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-left))}
   body.paisagem #dica{display:none}
   body.paisagem .estado{padding:6px 10px;font-size:11.5px}
@@ -352,15 +376,15 @@ body.paisagem #controle.ver,
   <div class="motor" id="nitro"><i id="nitroCarga"></i><b>NITRO</b></div>
   <div class="motor" id="acel"><i id="acelBarra"></i>
     <div id="acelNum">67%</div><div id="acelRot">POTÊNCIA</div></div>
+  <!-- DEFESA fica logo ACIMA do FOGO: o polegar já mora ali, e no meio de um
+       combate não dá para procurar botão no outro canto da tela. -->
+  <button id="btChama" class="pouso">DEFESA <b id="chamaN">12</b></button>
   <button id="btFogo">FOGO</button>
   <div class="linha">
     <button class="bt pri" id="btComecar">Começar</button>
     <button class="bt sec" id="btCalibrar">Zerar</button>
     <button class="bt sec pouso" id="btTrem">TREM</button>
     <button class="bt sec pouso" id="btFlap">FLAPE</button>
-    <!-- a contramedida fica na mesma fileira do trem e do flape, e aparece
-         junto com eles: é botão de piloto, não de artilheiro -->
-    <button class="bt sec pouso" id="btChama">CHAMA</button>
   </div>
   <div id="giroLinha">asas: <b id="giroTxt">&hellip;</b>
     <button id="btGiro">girar</button>
@@ -1029,9 +1053,20 @@ $('btConectar').onclick = async () => {
   conectar(codigo);
   setTimeout(() => Controle.calibrar(), 600);   // zera na mão, depois que a pessoa se ajeitou
 };
-$('btCalibrar').onclick = () => { Controle.calibrar(); vibra(30); };
+/* --- ZERAR ZERA AS DUAS COISAS ----------------------------------------------
+   "Ao apertar Zerar, além de calibrar o controle, tem que calibrar o controle
+   direcional do capacete."
+
+   Faz sentido e faltava: são duas medidas de "reto" que moram em aparelhos
+   diferentes. O reto da MÃO é medido aqui no celular — por isso `calibrar()`
+   sempre funcionou sozinho. O reto da CABEÇA é medido na webcam, do outro
+   lado, e o jogo nunca ficava sabendo que alguém tinha apertado Zerar.
+
+   Agora o botão faz as duas: zera aqui e manda o recado para lá. Quem não
+   estiver usando a câmera não perde nada — o jogo ignora. */
+$('btCalibrar').onclick = () => { Controle.calibrar(); enviaCtl({ t:'zerar' }); vibra(30); };
 $('btComecar').onclick  = () => { if (conn && conn.open) conn.send({ t: 'botao', b: 'comecar' });
-                                  Controle.calibrar(); tentaTravarDeitado(); };
+                                  Controle.calibrar(); enviaCtl({ t:'zerar' }); tentaTravarDeitado(); };
 
 /* Código vindo pelo endereço (?sala=ABCD) — quem leu o QR já respondeu a
    primeira pergunta sem saber, então o passo 1 seria uma tela a mais só para
@@ -1292,6 +1327,15 @@ const Pouso = (function(){
   P.mostra = d => {
     if (!ligado){ document.body.classList.add('pousa'); ligado = true; }
     P.trem = !!d.trem; P.flap = d.flap || 0;
+    /* quantas chamas sobraram, direto do jogo: botão de defesa sem contador é
+       botão que se aperta no vazio */
+    const bc2 = document.getElementById('btChama');
+    if (bc2 && d.chamas !== undefined){
+      const n = d.chamas|0;
+      document.getElementById('chamaN').textContent = n;
+      bc2.classList.toggle('vazio', n <= 0);
+      bc2.classList.toggle('espera', d.chamaPronta === false);
+    }
     bt.textContent = 'TREM ' + (P.trem ? '▼' : '▲');
     bt.classList.toggle('ligado', P.trem);
     bf.textContent = 'FLAPE ' + (P.flap || '0');

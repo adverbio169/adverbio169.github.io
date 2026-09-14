@@ -294,7 +294,7 @@
   <div class="rot" style="margin-top:4px">Alvos <b id="vAlvos">0/0</b></div></div>
 <div class="painel" id="cComb"><div class="rot">Combustível</div><div id="barra"><i id="barraComb"></i></div>
   <div class="val"><span id="vComb">100</span><small>%</small></div></div>
-<div class="painel" id="cArma"><div class="rot">Arma (1 2 3 · espaço atira)</div>
+<div class="painel" id="cArma"><div class="rot">Arma (1 2 3 · espaço atira · Z chama)</div>
   <div class="val" style="font-size:19px"><span id="vArma">NUCLEAR</span> <small>x<span id="vMun">6</span></small></div></div>
 <div class="painel" id="cVida"><div class="rot">Fuselagem</div>
   <div id="barraV"><i id="vidaBarra"></i></div>
@@ -5977,20 +5977,34 @@ function desenhaHUD(){
        dá. */
   }
 
-  /* --- AS CHAMAS QUE SOBRAM, no vidro, ao lado da arma ------------------------ */
+  /* --- AS CHAMAS QUE SOBRAM ---------------------------------------------------
+     "Não vi onde ficou ativado o sistema de contramedida."
+
+     Estava desenhado, mas ao LADO da caixa da arma, colado na borda de baixo —
+     medido: começava em x=645 numa tela de 1000, e a caixa da arma termina em
+     617. Vinte e oito pixels de folga, letra pequena, canto da tela. Existir e
+     ser visto são coisas diferentes.
+
+     Foi para CIMA da caixa da arma, centralizado: é ali que o olho já vai para
+     ler qual arma está na mão. E a tecla passou a ser anunciada no rótulo da
+     própria caixa, junto do "1 2 3" e do "espaço atira" — quem aprende as
+     outras teclas aprende essa no mesmo lugar. */
   if (jogando && !caindo){
     presoNoAviao();
-    const y = H - Math.max(16, H*0.030), x = W*0.5 + Math.max(120, W*0.145);
-    h2.textAlign = 'left';
-    h2.font = '800 ' + Math.max(9, H*0.015).toFixed(0) + 'px ui-monospace, monospace';
-    h2.fillStyle = contraEspera > 0 ? 'rgba(255,214,120,.45)'
-                 : contra > 0 ? 'rgba(255,214,120,.9)' : 'rgba(255,90,80,.8)';
-    h2.fillText('CHAMA ' + contra, x, y);
+    const cx = W*0.5, y = H - Math.max(74, H*0.135);
+    const w = Math.max(4, W*0.0062), g = w*1.5;
+    const largura = CONTRA_TOTAL*g - (g - w);
+    h2.textAlign = 'right';
+    h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px ui-monospace, monospace';
+    h2.fillStyle = contra === 0 ? 'rgba(255,90,80,.85)'
+                 : contraEspera > 0 ? 'rgba(255,214,120,.45)' : 'rgba(255,214,120,.92)';
+    h2.fillText('CHAMA', cx - largura/2 - 8, y + Math.max(7, H*0.012));
     for (let i = 0; i < CONTRA_TOTAL; i++){
-      const w = Math.max(3, W*0.005), g = Math.max(5, W*0.0072);
-      h2.fillStyle = i < contra ? 'rgba(255,214,120,.75)' : 'rgba(255,214,120,.16)';
-      h2.fillRect(x + i*g, y + 5, w, Math.max(4, H*0.008));
+      h2.fillStyle = i < contra ? (contraEspera > 0 ? 'rgba(255,214,120,.4)' : 'rgba(255,214,120,.85)')
+                                : 'rgba(255,214,120,.15)';
+      h2.fillRect(cx - largura/2 + i*g, y, w, Math.max(8, H*0.016));
     }
+    h2.textAlign = 'left';
     presoNaTela();
   }
 
@@ -6893,6 +6907,10 @@ const Tripulacao = {
       case 'fogo':  atirando = !!d.v; break;
       case 'visao': cockpit = !cockpit; esqueceRadar(); break;
       case 'chama': if (m.papel === 'piloto') largaContramedida(); break;
+      /* o Zerar do celular zera a mão LÁ e a cabeça AQUI: são dois "retos"
+         medidos em aparelhos diferentes, e o botão é um só */
+      case 'zerar': if (Cabeca.ligada){ Cabeca.centraliza();
+                      mostraAviso('OLHAR RECENTRADO', '#7fd8ff', 800); } break;
       case 'trem':  if (m.papel === 'piloto') mexeTrem(d.v); break;
       case 'flap':  if (m.papel === 'piloto') mexeFlap(d.v); break;
     }
@@ -7053,6 +7071,7 @@ function mandaEstado(){
   Tripulacao.envia({ t:'estado', jogando, acabou: !jogando, dist: Math.round(distancia/METRO),
     comb: Math.round(combustivel), turbo: turbinando, nit: Math.round(nitroCarga),
     pousa: true, trem, flap, chao: noChao, vel: Math.round(voo), estol: voo < velMin(),
+    chamas: contra, chamaPronta: contraEspera <= 0,   // o botão de defesa mostra quantas sobraram
     arma, mun: munInfinita ? '∞' : municao[arma], pontos,
     alvos: alvosDestruidos + '/' + alvosTotal,
     prog: Math.round(alvosDestruidos/Math.max(1,alvosTotal)*100) });

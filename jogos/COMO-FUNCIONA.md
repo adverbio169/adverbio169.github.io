@@ -4082,3 +4082,59 @@ ele muda, não há o que procurar.
 
 O endereço antigo deixou de existir, e o nome antigo ficou livre para outra
 pessoa. Quem tiver link salvo precisa trocar.
+
+---
+
+## A defesa ganhou botão, e o "Zerar" ganhou a cabeça
+
+> *"Não vi onde ficou ativado o sistema de contramedida."*
+
+Estava lá, e estava invisível — que é a mesma coisa. Medido: o contador era
+desenhado em `x=645` numa tela de 1000, e a caixa da arma termina em `617`.
+Vinte e oito pixels de folga, letra pequena, colado na borda de baixo. **Existir
+e ser visto são coisas diferentes**, e esse é o tipo de coisa que só aparece
+quando alguém joga.
+
+Três consertos:
+
+**No computador**, o contador subiu para **cima da caixa da arma**, centralizado
+— é ali que o olho já vai para ler qual arma está na mão. E a tecla passou a ser
+anunciada no rótulo da própria caixa: `ARMA (1 2 3 · ESPAÇO ATIRA · Z CHAMA)`.
+Quem aprende as outras teclas aprende essa no mesmo lugar.
+
+**No celular**, um botão **DEFESA** logo acima do FOGO — foi o pedido, e é o
+certo: soltar chama é decisão de meio segundo, no meio da manobra, com o dedo já
+em cima do gatilho. Botão de defesa longe do polegar é botão que não se usa.
+Deitado ele vira um círculo âmbar menor empilhado no círculo vermelho.
+
+**E ele mostra a conta.** O jogo já mandava o estado 4 vezes por segundo para o
+celular; agora manda também quantas chamas sobraram e se a espera acabou. Botão
+de defesa sem contador é botão que se aperta no vazio: fica cinza quando acaba e
+apaga enquanto recarrega.
+
+---
+
+> *"Ao apertar Zerar, além de calibrar o controle, tem que calibrar o controle
+> direcional do capacete."*
+
+Faz sentido e faltava, e o motivo de faltar é bonito: são **dois "retos" medidos
+em aparelhos diferentes**. O reto da MÃO é medido no celular — por isso o
+`calibrar()` sempre funcionou sozinho, sem falar com ninguém. O reto da CABEÇA é
+medido na webcam, do outro lado da sala, e o jogo nunca ficava sabendo que
+alguém tinha apertado Zerar.
+
+Agora o botão faz as duas: zera ali e manda o recado para cá. Quem não estiver
+usando a câmera não perde nada — o jogo ignora em silêncio.
+
+```
+no celular, "Zerar" manda {"t":"zerar"}                        ✔
+o jogo recebe: repouso {x:0.3,y:0.1} -> null, olhar 40° -> 0°   ✔
+com a câmera desligada, ignora sem estourar                     ✔
+DEFESA está acima do FOGO e alinhado com ele                    ✔
+e ao tocar manda {"t":"chama"}                                  ✔
+```
+
+*(A prova do "Zerar" falhou na primeira rodada por culpa dela mesma: a
+assinatura é `recebe(MEMBRO, DADO)`, nessa ordem, e eu inverti. O `d.t` veio
+indefinido e a função saiu na primeira linha sem fazer nada — parecendo que o
+jogo ignorava o botão.)*
