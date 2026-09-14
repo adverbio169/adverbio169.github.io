@@ -358,6 +358,9 @@ body.paisagem #controle.ver,
     <button class="bt sec" id="btCalibrar">Zerar</button>
     <button class="bt sec pouso" id="btTrem">TREM</button>
     <button class="bt sec pouso" id="btFlap">FLAPE</button>
+    <!-- a contramedida fica na mesma fileira do trem e do flape, e aparece
+         junto com eles: é botão de piloto, não de artilheiro -->
+    <button class="bt sec pouso" id="btChama">CHAMA</button>
   </div>
   <div id="giroLinha">asas: <b id="giroTxt">&hellip;</b>
     <button id="btGiro">girar</button>
@@ -1282,6 +1285,10 @@ const Pouso = (function(){
   let ligado = false;
   bt.onclick = e => { e.preventDefault(); enviaCtl({ t:'trem', v: !P.trem }); vibra(35); };
   bf.onclick = e => { e.preventDefault(); enviaCtl({ t:'flap', v: (P.flap + 1) % 3 }); vibra([18,40,18]); };
+  /* a contramedida vai pelo mesmo caminho do trem e do flape — `enviaCtl` é
+     quem sabe se esta tela fala com o anfitrião ou direto com o jogo */
+  const bc = document.getElementById('btChama');
+  if (bc) bc.onclick = e => { e.preventDefault(); enviaCtl({ t:'chama' }); vibra([30,40,30]); };
   P.mostra = d => {
     if (!ligado){ document.body.classList.add('pousa'); ligado = true; }
     P.trem = !!d.trem; P.flap = d.flap || 0;

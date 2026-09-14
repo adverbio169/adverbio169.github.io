@@ -3915,3 +3915,94 @@ travando de novo, o míssil perdido continua perdido                  ✔
 alguém ligasse o olhar sem passar pela câmera. O jogo não faz isso, mas um
 `liga()` que falhasse no meio poderia — e estado que só é coerente por convenção
 é estado que um dia quebra. Ganhou uma guarda de uma linha.)*
+
+---
+
+## Contramedidas, e o alerta que as torna uma escolha
+
+> *"Quero incluir um antimíssil, contramedida, uns fogos que o avião joga para o
+> míssil perder o rumo. Aí acho que ficará mais legal o combate aéreo."*
+
+Ficará, e vale dizer por quê: sem elas o combate é decidido por quem trava
+primeiro, e a única defesa é não ser visto. Com elas existe uma **resposta** — e
+resposta é o que transforma troca de tiros em duelo. Quem atira tem de segurar a
+trava; quem é travado tem de gastar chama na hora certa. Os dois têm o que fazer
+no mesmo instante, que é a definição de um bom combate.
+
+Três regras fazem isso funcionar como jogo:
+
+- são **contadas** (doze), senão a resposta certa é apertar sempre;
+- têm **espera** entre uma e outra, senão bastava esvaziar tudo de uma vez;
+- e são **tardias**: com o míssil a menos de 3.500 do alvo, não salvam mais
+  ninguém.
+
+A terceira é a que cria a decisão interessante. Quem foge tem de soltar cedo, sem
+saber se já foi disparado míssil nenhum, gastando carga à toa se errar a hora.
+Quem atira aprende a esperar a chama do outro acabar antes de puxar o gatilho.
+Nenhum dos dois tem resposta automática.
+
+### O alerta, que não era opcional
+
+Sem saber que está sendo travado, soltar chama é adivinhação. Então entrou junto
+o **receptor de alerta**: quem trava avisa o alvo pela rede, e o alvo vê
+`TRAVADO` piscando e ouve um som novo.
+
+Os dois sons são o oposto um do outro de propósito: o de travamento é firme e
+agudo e quer dizer *"consegui"*; o de alerta é rápido, repetido e desconfortável
+e quer dizer *"corre"*. Num jogo que se joga com o celular na mão e os olhos na
+tela, som é o único canal que sobra livre.
+
+*(Duas coisas que a foto do HUD corrigiu: o clarão vermelho de borda estava indo
+junto com o alerta, e estar travado DURA — a tela ficava vermelha o combate
+inteiro. Clarão de borda é para o instante em que se leva tiro. E o baque
+reaproveitado era o do `levou`, um soco de 0,52; virou um susto próprio de 0,16,
+uma vez só, na hora em que a trava fecha.)*
+
+```
+uma salva: 12 -> 11 cargas, 8 chamas no ar; a segunda logo em seguida não sai  ✔
+as chamas somem sozinhas · passada a espera, sai outra · sem carga não sai     ✔
+recado de trava: o alerta toca; quando ele solta, o alerta cala                ✔
+ele solta chama: a minha trava cai                                             ✔
+com o míssil a 1200 dele: a chama NÃO salva (tarde demais)                     ✔
+com o míssil a 9000 dele: salva                                                ✔
+```
+
+---
+
+## O rastro não é um arco
+
+> *"A linha entre a mira externa e a central não pode ser retilínea. Tem que ser
+> o traçado onde a bala vai: se o avião faz várias curvas, o traço das balas
+> também faz curva."*
+
+Certo, e a versão anterior não dava conta. Ela desenhava um arco a partir da taxa
+de giro **de agora** — o que só está certo se a curva for constante. Num S, o
+rastro de verdade serpenteia, e um arco de raio fixo mente.
+
+Um instante da rotação não tem essa informação. Quem tem é a **história**: cada
+bala no ar saiu num instante diferente, na direção em que o nariz estava naquele
+instante. Então o jogo guarda essa direção quadro a quadro, por um segundo e
+meio, e a curva do HUD é lida dessa fita.
+
+Ela sai reta quando se voou reto, em arco quando a curva foi constante, e
+serpenteando quando o avião serpenteou — **sem nenhum caso especial**, é a mesma
+leitura.
+
+```
+numa curva mansa os segmentos dobram sempre para o mesmo lado (-1,-1,-1,-1,-1,-1)  ✔
+logo depois de inverter o aileron, dobram para os dois (1,1,1,1,1,-1)              ✔
+voando reto as duas marcas continuam a 0,0 px uma da outra                         ✔
+acompanhando um alvo, o anel continua caindo a 0,0° dele                           ✔
+```
+
+O batente passou a ser aplicado **à fita**: ela é lida do presente para trás e
+cortada exatamente nos 16° (interpolando entre duas amostras — cortar na amostra
+seguinte deixava o batente parar onde calhasse, a 25° ou a 30°). Numa curva
+violenta isso quer dizer que só o quarto de segundo mais recente aparece: o sight
+está nos limites e não mostra o passado, que é o certo.
+
+*(E a prova `novo` pegou um defeito de tabela: recomeçar o jogo não limpava a
+fita, então no primeiro segundo do voo novo a mira lia direções do voo anterior —
+que podiam estar até atrás da câmera, apagando a mira inteira. Ela agora é limpa
+no reinício, e a curva corta no primeiro ponto que estiver atrás em vez de
+sumir toda.)*

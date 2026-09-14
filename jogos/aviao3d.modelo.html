@@ -926,9 +926,64 @@ let voo=VOO_BASE, turbo=0, combustivel=100, distancia=0, recorde=0;
 let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
 let noChao=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0, estolando=false;
 let ladoEstol = 0;        // para que lado a asa largou neste estol
+/* --- AS CONTRAMEDIDAS -------------------------------------------------------
+   "Quero incluir um antimíssil, contramedida, uns fogos que o avião joga para
+   o míssil perder o rumo. Aí acho que ficará mais legal o combate aéreo."
+
+   Ficará, e por um motivo que vale escrever: sem elas o combate é decidido por
+   quem trava primeiro, e a única defesa é não ser visto. Com elas existe uma
+   RESPOSTA — e resposta é o que transforma troca de tiros em duelo. Quem
+   atira tem de segurar a trava; quem é travado tem de gastar chama na hora
+   certa. Os dois passam a ter o que fazer no mesmo momento, que é a definição
+   de um bom combate.
+
+   As três regras que fazem isso funcionar como jogo:
+     · são CONTADAS (doze), senão a resposta certa é apertar sempre;
+     · têm espera entre uma e outra, senão bastava esvaziar tudo de uma vez;
+     · e são TARDIAS: com o míssil já colado, não salvam mais ninguém. É o que
+       obriga a decidir cedo, com a informação incompleta — que é a decisão
+       interessante. */
+const CONTRA_TOTAL = 12;      // quantas cargas cabem no avião
+const CONTRA_ESPERA = 1.1;    // segundos entre uma salva e outra
+const CONTRA_TARDE = 3500;    // míssil mais perto que isto: tarde demais
+let contra = CONTRA_TOTAL, contraEspera = 0;
+let travadoPor = new Map();   // quem está me travando, e desde quando
 let rolChao = 0;          // o banco que sobrou do toque, escorrendo para zero
-let giroNariz = {x:0,y:0,z:0};   // quanto o nariz varre por segundo (rad/s)
-let nariz0 = {x:0,y:0,z:1};      // o nariz do quadro passado
+/* --- A HISTÓRIA DO NARIZ ----------------------------------------------------
+   "A linha entre a mira externa e a central não pode ser retilínea. Tem que
+   ser o traçado onde a bala vai: se o avião faz várias curvas, o traço das
+   balas também faz curva."
+
+   Certíssimo, e a versão anterior não dava conta. Ela desenhava um arco a
+   partir da taxa de giro DE AGORA — o que só está certo se a curva for
+   constante. Numa curva que muda, ou num S, o rastro de verdade serpenteia, e
+   um arco de raio fixo mente.
+
+   Um instante da rotação não tem essa informação. Quem tem é a HISTÓRIA: as
+   balas no ar saíram cada uma num instante diferente, cada uma na direção em
+   que o nariz estava naquele instante. Então guardo essa direção quadro a
+   quadro, por um segundo e meio — o tempo de vida da bala com folga —, e a
+   curva do HUD passa a ser lida dessa fita. Ela sai reta quando se voou reto,
+   em arco quando a curva foi constante, e serpenteando quando o avião
+   serpenteou. Sem nenhum caso especial: é a mesma leitura. */
+let tJogo = 0;
+let historiaNariz = [];          // {t,x,y,z}, um por quadro, 1,5 s de fita
+function narizHa(idade){
+  const h = historiaNariz;
+  if (!h.length) return eixoF;
+  const quando = tJogo - idade;
+  if (quando <= h[0].t) return h[0];
+  for (let i = h.length - 1; i > 0; i--){
+    if (h[i-1].t <= quando){
+      const dt2 = h[i].t - h[i-1].t;
+      const f = dt2 > 1e-6 ? (quando - h[i-1].t)/dt2 : 0;
+      return vnorm({ x: h[i-1].x + (h[i].x - h[i-1].x)*f,
+                     y: h[i-1].y + (h[i].y - h[i-1].y)*f,
+                     z: h[i-1].z + (h[i].z - h[i-1].z)*f });
+    }
+  }
+  return h[h.length-1];
+}
 let arfChao=0, rumoChao=0;
 let estresse=0;
 let vida=100;
@@ -2174,6 +2229,11 @@ const BAQUES = {
   missil:  [0.17, '255,170,90'],
   bomba:   [0.34, '255,205,130'],
   travou:  [0.07, '120,255,170'],
+  /* Estar sob mira não é levar tiro. Eu tinha reaproveitado o baque do
+     'levou' aqui, e a foto entregou: a tela ficava vermelha inteira, porque
+     `levou` é o soco de 0,52 de quem tomou bala. Este é um susto pequeno, uma
+     vez só, na hora em que a trava fecha. */
+  alertado:[0.16, '255,110,90'],
   levou:   [0.52, '255,80,70'],
   explode: [0.26, '255,170,90'],
   bateu:   [0.85, '255,60,50'],
@@ -2794,6 +2854,36 @@ function somProcura(){
     o.connect(g); g.connect(audio.destination); o.start(t0); o.stop(t0 + 0.06);
   }catch(e){}
 }
+/* --- O ALERTA DE ESTAR NA MIRA DE ALGUÉM -----------------------------------
+   O oposto exato do tom de travamento: aquele é firme e agudo e quer dizer
+   "consegui"; este é rápido, repetido e desconfortável, e quer dizer "corre".
+   Um piscando contra o outro é a linguagem inteira de um combate aéreo em dois
+   sons — e num jogo que se joga com o celular na mão e os olhos na tela, som é
+   o único canal que sobra livre. */
+let alerta = null;
+function somAlerta(liga){
+  if (!audio) return;
+  try{
+    if (liga && !alerta){
+      const o = audio.createOscillator(), g = audio.createGain(), lfo = audio.createOscillator(),
+            lg = audio.createGain();
+      o.type = 'square'; o.frequency.value = 880;
+      lfo.type = 'square'; lfo.frequency.value = 7.5;      // o pisca-pisca
+      lg.gain.value = 0.045;
+      g.gain.value = 0.045;
+      lfo.connect(lg); lg.connect(g.gain);
+      o.connect(g); g.connect(audio.destination);
+      o.start(); lfo.start();
+      alerta = { o, g, lfo };
+    } else if (!liga && alerta){
+      const { o, g, lfo } = alerta; alerta = null;
+      g.gain.cancelScheduledValues(audio.currentTime);
+      g.gain.setTargetAtTime(0.0001, audio.currentTime, 0.05);
+      o.stop(audio.currentTime + 0.3); lfo.stop(audio.currentTime + 0.3);
+    }
+  }catch(e){ alerta = null; }
+}
+
 let tomTravado = null;
 function somTravado(liga){
   if (!audio) return;
@@ -2949,6 +3039,64 @@ function solta(x, y, z, n, cor, raio, forca){
                    vz:(Math.random()-0.3)*forca, vida:1 });
   }
 }
+/* --- AS CHAMAS ------------------------------------------------------------
+   Oito bolas quentes cuspidas para trás e para baixo, com arrasto e gravidade.
+   Uma malha por chama e um material por salva — some tudo em dois segundos, e
+   o que importa é a leitura instantânea: fogo saindo do avião. */
+let chamas = [];
+function soltaChamas(x, y, z, tras, baixo){
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffd77a, transparent: true,
+                                            fog: false, depthWrite: false });
+  for (let i = 0; i < 8; i++){
+    const m = new THREE.Mesh(geoBola, mat);
+    m.position.set(x, y, z);
+    m.scale.setScalar(34 + Math.random()*26);
+    cena.add(m);
+    chamas.push({ no:m, mat,
+      vx: tras.x*(700+Math.random()*500) + (Math.random()-0.5)*900,
+      vy: baixo.y*(300+Math.random()*260) + (Math.random()-0.5)*500 - 200,
+      vz: tras.z*(700+Math.random()*500) + (Math.random()-0.5)*900,
+      vida: 1.6 + Math.random()*0.9 });
+  }
+}
+function passoChamas(dt){
+  for (const c of chamas){
+    c.vida -= dt;
+    c.vx -= c.vx*dt*1.6; c.vz -= c.vz*dt*1.6;   // arrasto: elas param no ar
+    c.vy -= 900*dt;                              // e caem
+    c.no.position.x += c.vx*dt; c.no.position.y += c.vy*dt; c.no.position.z += c.vz*dt;
+    c.mat.opacity = Math.max(0, Math.min(1, c.vida*0.8));
+    c.no.scale.setScalar(Math.max(6, 34 + (2.5 - c.vida)*40));
+  }
+  chamas = chamas.filter(c => { if (c.vida <= 0){ cena.remove(c.no); return false; } return true; });
+}
+/* o som: um chiado curto e sujo, nada de explosão — é pirotecnia, não bomba */
+function somChama(){
+  if (!audio) return;
+  try{
+    const t0 = audio.currentTime, f = ruido(); if (!f) return;
+    const bp = audio.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.setValueAtTime(2400, t0);
+    bp.frequency.exponentialRampToValueAtTime(700, t0 + 0.5); bp.Q.value = 0.7;
+    const g = audio.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.16, t0 + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6);
+    f.connect(bp); bp.connect(g); g.connect(audio.destination);
+    f.start(t0); f.stop(t0 + 0.65);
+  }catch(e){}
+}
+/* --- soltar uma salva ------------------------------------------------------ */
+function largaContramedida(){
+  if (!jogando || caindo || contra <= 0 || contraEspera > 0) return;
+  contra--; contraEspera = CONTRA_ESPERA;
+  soltaChamas(aviaoX - eixoF.x*90, aviaoY - eixoF.y*90 - 40, aviaoZ - eixoF.z*90,
+              { x:-eixoF.x, z:-eixoF.z }, { y:-1 });
+  somChama(); sacode(0.10); Controles.bate('pegou');
+  Batalha.avisaChamas();
+  mostraAviso('CONTRAMEDIDA · ' + contra, '#ffd77a', 700);
+}
+
 /* rastro do míssil: bolinhas que crescem e somem. Materiais separados por
    partícula seriam caros — uma só, e a opacidade vai na escala e na vida. */
 let fumos = [];
@@ -3271,7 +3419,11 @@ const NUKE_TRAVA_SEG = 0.5;       // visor de bombardeio trava mais depressa
 const Mira = {
   alvo: null, carga: 0, travado: false, chao: false, impacto: null, _pulso: 0, _perdeu: 0,
   solta(){
-    if (this.travado) somTravado(false);
+    if (this.travado){
+      somTravado(false);
+      // se era gente, ela precisa saber que saiu da mira
+      if (this.alvo && this.alvo.id) Batalha.avisaTrava(this.alvo.id, false);
+    }
     this.alvo = null; this.carga = 0; this.travado = false; this._perdeu = 0;
   },
   /* o melhor candidato: vivo, na frente, dentro do cone e do alcance.
@@ -3352,7 +3504,10 @@ const Mira = {
          para ele. Sem isso a primeira trava grudava e a mira de capacete não
          servia para nada. */
       if (!this.travado || !this.alvo || !r.atualNoCone){
-        if (this.travado){ this.travado = false; somTravado(false); }
+        if (this.travado){
+          this.travado = false; somTravado(false);
+          if (this.alvo && this.alvo.id) Batalha.avisaTrava(this.alvo.id, false);
+        }
         this.alvo = r.alvo; this.carga = 0;
       }
     }
@@ -3364,6 +3519,7 @@ const Mira = {
       if (!this.travado && this.carga >= precisa){
         this.travado = true; somTravado(true);
         Controles.bate('travou');
+        if (this.alvo && this.alvo.id) Batalha.avisaTrava(this.alvo.id, true);
         mostraAviso('TRAVADO', '#7fffa8', 700);
       }
       if (!this.travado){
@@ -3477,6 +3633,26 @@ const MiraTiro = {
     }
   }
 };
+/* --- O QUE A CHAMA DO OUTRO FAZ COM A MINHA TRAVA ---------------------------
+   Ela derruba — MENOS quando já é tarde. Se o meu míssil está a menos de
+   `CONTRA_TARDE` do sujeito, a chama não salva mais ninguém: quem esperou
+   demais para se defender, morreu.
+
+   E é isso que dá a decisão interessante dos dois lados. Quem foge tem de
+   soltar cedo, sem saber se já foi disparado míssil nenhum, gastando carga à
+   toa se errar a hora. Quem atira aprende a esperar a chama do outro acabar
+   antes de puxar o gatilho. Nenhum dos dois tem resposta automática. */
+function chamaDoOutro(id){
+  if (!Mira.alvo || Mira.alvo.id !== id) return;
+  const q = Mira.posicaoDe(Mira.alvo);
+  for (const b of bombas){
+    if (b.tipo !== 'missil' || b.segue !== Mira.alvo) continue;
+    if (Math.hypot(b.x-q.x, b.y-q.y, b.z-q.z) < CONTRA_TARDE) return;   // tarde demais
+  }
+  Mira.solta();
+  mostraAviso('CHAMA! TRAVA PERDIDA', '#ffd77a', 1100);
+}
+
 /* preenchido pela parte de rede; sem sala, não há inimigo de rede nenhum */
 function inimigosRede(){ return []; }
 function dispara(){
@@ -3752,6 +3928,8 @@ function atualizaTiros(dt){
   tiros = tiros.filter(t => { if (t.vida <= 0){ cena.remove(t.no); return false; } return true; });
   passoRiscas(dt);
   passoFumo(dt);
+  passoChamas(dt);
+  if (contraEspera > 0) contraEspera -= dt;
 }
 
 /* --- A QUEDA E O PASSO DO JOGO ------------------------------------------- */
@@ -4145,26 +4323,10 @@ function atualiza(dt){
   endireitaEixos();
 
 
-  /* --- QUANTO O NARIZ ESTÁ VARRENDO ------------------------------------------
-     Sai do produto vetorial entre o nariz de antes e o de agora: para ângulos
-     pequenos ele dá o eixo de rotação multiplicado pelo ângulo, e dividido
-     pelo tempo vira a velocidade angular. A rolagem em torno do próprio nariz
-     não entra — e não deve, porque girar em torno do eixo do cano não desloca
-     bala nenhuma.
-
-     Alisado, senão a mira treme junto com o dedo. Isto já existiu e foi
-     removido quando a mira giroscópica caiu; voltou porque a mira giroscópica
-     voltou, agora no papel certo dela. */
-  {
-    const cx2 = nariz0.y*eixoF.z - nariz0.z*eixoF.y;
-    const cy2 = nariz0.z*eixoF.x - nariz0.x*eixoF.z;
-    const cz2 = nariz0.x*eixoF.y - nariz0.y*eixoF.x;
-    const k = Math.min(1, dt*9);
-    giroNariz.x += (cx2/dt - giroNariz.x)*k;
-    giroNariz.y += (cy2/dt - giroNariz.y)*k;
-    giroNariz.z += (cz2/dt - giroNariz.z)*k;
-    nariz0 = { x:eixoF.x, y:eixoF.y, z:eixoF.z };
-  }
+  /* a fita da história do nariz, um quadro por vez */
+  tJogo += dt;
+  historiaNariz.push({ t:tJogo, x:eixoF.x, y:eixoF.y, z:eixoF.z });
+  while (historiaNariz.length > 2 && historiaNariz[0].t < tJogo - 1.5) historiaNariz.shift();
 
   aviaoX += eixoF.x*voo*dt; aviaoY += eixoF.y*voo*dt; aviaoZ += eixoF.z*voo*dt;
   /* A RAZÃO DE SUBIDA, para o altímetro da cabine. Sai direto de `eixoF.y*voo`
@@ -5457,13 +5619,8 @@ function desenhaHUD(){
               ? Math.max(alcance*0.25, Math.min(alcance, MiraTiro.solucao.dist)) : alcance;
     const v3 = new THREE.Vector3();
 
-    /* o rastro é o nariz girado PARA TRÁS do que ele já varreu no tempo de voo
-       — Rodrigues em torno do eixo de rotação do próprio avião */
-    const wm = Math.hypot(giroNariz.x, giroNariz.y, giroNariz.z);
-    const ex = wm > 1e-5 ? giroNariz.x/wm : 0;
-    const ey = wm > 1e-5 ? giroNariz.y/wm : 0;
-    const ez = wm > 1e-5 ? giroNariz.z/wm : 1;
-    const pe = ex*T.x + ey*T.y + ez*T.z;
+    /* o rastro sai da FITA: cada ponto é a direção em que o nariz estava no
+       instante em que aquela bala saiu */
     /* --- OS PONTOS DA CURVA, TODOS À MESMA DISTÂNCIA ---------------------------
        A primeira tentativa desenhou a TRAJETÓRIA: cada ponto a uma distância
        diferente, como a bala realmente voa. A medição reprovou por um motivo
@@ -5480,30 +5637,56 @@ function desenhaHUD(){
        O rastro de verdade continua existindo na tela: são as balas, em 3D,
        que o jogo já desenha. O HUD não precisa imitá-las; precisa dizer onde
        elas VÃO PARAR. */
-    /* --- O BATENTE -------------------------------------------------------------
-       Numa curva violenta — 58°/s de nariz, que este avião faz — a dianteira
-       dá 64°, e o anel sai voando para fora da tela com a linha atravessando
-       tudo. Mira giroscópica de verdade tem batente pelo mesmo motivo: o
-       retículo é uma imagem projetada num vidro que tem tamanho, e passando do
-       curso ele para nos limites mecânicos.
+    /* --- OS PONTOS, TODOS À MESMA DISTÂNCIA ------------------------------------
+       Só a DIREÇÃO muda de ponto para ponto; a distância é sempre `ate`. Isso
+       não é preguiça: a câmera de perseguição fica 210 acima da linha do cano,
+       então pontos a distâncias diferentes caem em lugares diferentes da tela
+       mesmo voando reto — e as duas marcas nasciam separadas por 63 px sem
+       curva nenhuma. Com a distância fixa, voar reto junta as duas num ponto
+       só, que é o comportamento pedido.
 
-       Aqui o limite é 16°, e quando ele é atingido o anel muda de cara — fica
-       vazado, sem os riscos — para dizer o que um batente diz: "a dianteira
-       que você precisa é maior do que eu consigo mostrar; alivie a curva". */
+       --- E O BATENTE ------------------------------------------------------------
+       Numa curva violenta — 58°/s de nariz, que este avião faz — a dianteira
+       passa de 60°, e o anel sai voando para fora da tela com a linha
+       atravessando tudo. Mira giroscópica de verdade tem batente pelo mesmo
+       motivo: o retículo é uma imagem num vidro que tem tamanho.
+
+       Aqui o batente é aplicado à FITA: ela é lida do presente para trás e
+       cortada no ponto em que o desvio passa de 16°. A curva simplesmente
+       acaba ali, e o anel fica vazado — que é o que um batente diz: "a
+       dianteira que você precisa é maior do que eu mostro; alivie a curva". */
     const LEAD_MAX = 16*Math.PI/180;
-    const leadCheio = wm*(ate/vBala);
-    const noBatente = leadCheio > LEAD_MAX;
-    const lead = Math.min(leadCheio, LEAD_MAX);
+    const tVoo0 = ate/vBala;
     const naTela = k => {
-      const a = -lead*k;
-      const ca = Math.cos(a), sa = Math.sin(a);
-      const dx = T.x*ca + (ey*T.z - ez*T.y)*sa + ex*pe*(1-ca);
-      const dy = T.y*ca + (ez*T.x - ex*T.z)*sa + ey*pe*(1-ca);
-      const dz = T.z*ca + (ex*T.y - ey*T.x)*sa + ez*pe*(1-ca);
-      v3.set(aviaoX + dx*ate, aviaoY + dy*ate, aviaoZ + dz*ate).project(cam);
-      return { x:(v3.x*0.5+0.5)*W, y:(-v3.y*0.5+0.5)*H, atras: v3.z > 1 };
+      const d = narizHa(tVoo0*k);
+      v3.set(aviaoX + d.x*ate, aviaoY + d.y*ate, aviaoZ + d.z*ate).project(cam);
+      return { x:(v3.x*0.5+0.5)*W, y:(-v3.y*0.5+0.5)*H, atras: v3.z > 1,
+               fora: Math.acos(Math.max(-1, Math.min(1, d.x*T.x + d.y*T.y + d.z*T.z))) };
     };
-    const curva = [0, 0.17, 0.34, 0.5, 0.67, 0.84, 1].map(naTela);
+    let curva = [0, 0.11, 0.22, 0.33, 0.44, 0.56, 0.67, 0.78, 0.89, 1].map(naTela);
+    /* ponto atrás da câmera não se projeta: corta ali. Antes eu descartava a
+       mira INTEIRA se um só ponto estivesse atrás — e como o primeiro ponto é
+       o cano, que quase nunca está atrás, dava para perder a mira por causa da
+       cauda da fita. */
+    const iAtras = curva.findIndex(q => q.atras);
+    if (iAtras === 0) curva = [];
+    else if (iAtras > 0) curva = curva.slice(0, iAtras);
+    let noBatente = false;
+    for (let i = 1; i < curva.length; i++){
+      if (curva[i].fora > LEAD_MAX){
+        /* corta EXATAMENTE nos 16°, interpolando entre as duas amostras. Cortar
+           na amostra seguinte deixava o anel parar onde calhasse — a 25° ou a
+           30°, dependendo de onde a amostragem caísse —, e o batente ficava
+           bambo justamente por ser um limite. */
+        const a = curva[i-1].fora, b2 = curva[i].fora;
+        const f = b2 > a ? (LEAD_MAX - a)/(b2 - a) : 0;
+        const kA = (i-1)/(curva.length-1), kB = i/(curva.length-1);
+        curva = curva.slice(0, i);
+        curva.push(naTela(kA + (kB - kA)*f));
+        noBatente = true;
+        break;
+      }
+    }
     const preso = MiraTiro.bom;
 
     /* a solução de tiro (o losango do ATIRE), calculada antes: ela decide se
@@ -5520,7 +5703,7 @@ function desenhaHUD(){
     }
 
     let anel = null;                     // onde o anel ficou, para o ATIRE não bater nele
-    if (!curva.some(q => q.atras)){
+    if (curva.length >= 2){
       const dentro = curva[0], fora = curva[curva.length-1];
       const afastou = Math.hypot(fora.x-dentro.x, fora.y-dentro.y);
 
@@ -5624,6 +5807,45 @@ function desenhaHUD(){
     h2.fillStyle = 'rgba(120,255,170,.8)';
     h2.fillText('NARIZ ' + Math.abs(g) + '°', dir ? x - t - 6 : x + t + 6, H*0.5 + 4);
     h2.textAlign = 'left';
+  }
+
+  /* --- ESTÃO ME TRAVANDO ------------------------------------------------------
+     Isto NÃO vai no vidro do HUD: é o aviso mais urgente que existe no jogo, e
+     tem de estar visível mesmo com a cabeça virada procurando quem atirou. */
+  if (jogando && !caindo && travadoPor.size){
+    const pisca = Math.sin(Date.now()/110) > -0.2;
+    h2.textAlign = 'center';
+    h2.font = '900 ' + Math.max(14, H*0.030).toFixed(0) + 'px system-ui, sans-serif';
+    h2.fillStyle = pisca ? 'rgba(255,90,80,.98)' : 'rgba(255,90,80,.35)';
+    h2.fillText('TRAVADO' + (travadoPor.size > 1 ? ' ×' + travadoPor.size : ''), W/2, H*0.155);
+    h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
+    h2.fillStyle = 'rgba(255,214,120,.9)';
+    h2.fillText(contra > 0 ? 'SOLTE CHAMA (Z)' : 'SEM CHAMA', W/2, H*0.155 + Math.max(16, H*0.028));
+    h2.textAlign = 'left';
+    /* Aqui eu tinha posto o clarão vermelho nas bordas junto, e a foto mostrou
+       por que não presta: estar travado DURA — às vezes o combate inteiro —, e
+       o clarão pintava a tela de vermelho o tempo todo. Clarão de borda é para
+       o instante em que se leva tiro; gasto continuamente, ele deixa de
+       significar qualquer coisa e ainda atrapalha ver o inimigo. O texto
+       piscando e o alarme no ouvido bastam, e são o que um caça de verdade
+       dá. */
+  }
+
+  /* --- AS CHAMAS QUE SOBRAM, no vidro, ao lado da arma ------------------------ */
+  if (jogando && !caindo){
+    presoNoAviao();
+    const y = H - Math.max(16, H*0.030), x = W*0.5 + Math.max(120, W*0.145);
+    h2.textAlign = 'left';
+    h2.font = '800 ' + Math.max(9, H*0.015).toFixed(0) + 'px ui-monospace, monospace';
+    h2.fillStyle = contraEspera > 0 ? 'rgba(255,214,120,.45)'
+                 : contra > 0 ? 'rgba(255,214,120,.9)' : 'rgba(255,90,80,.8)';
+    h2.fillText('CHAMA ' + contra, x, y);
+    for (let i = 0; i < CONTRA_TOTAL; i++){
+      const w = Math.max(3, W*0.005), g = Math.max(5, W*0.0072);
+      h2.fillStyle = i < contra ? 'rgba(255,214,120,.75)' : 'rgba(255,214,120,.16)';
+      h2.fillRect(x + i*g, y + 5, w, Math.max(4, H*0.008));
+    }
+    presoNaTela();
   }
 
   if (jogando && !caindo){ presoNoAviao(); desenhaRadar(); presoNaTela(); }
@@ -5730,6 +5952,7 @@ document.addEventListener('keydown', e => {
      apertar no meio do jogo, depois de se acomodar melhor na cadeira */
   if (e.key==='c'||e.key==='C'){ if (Cabeca.ligada) Cabeca.centraliza(); else Cabeca.liga(); }
   if (e.key==='x'||e.key==='X') Cabeca.inverte();     // o lado do olhar
+  if (e.key==='z'||e.key==='Z') largaContramedida();
   if (e.key==='g'||e.key==='G') mexeTrem();
   if (e.key==='f'||e.key==='F') mexeFlap();
   if (e.key==='w'||e.key==='W') tecla.mais=true;
@@ -5878,6 +6101,14 @@ function reinicia(){
   for (const f of faiscas) cena.remove(f.no); faiscas = [];
   for (const c of cogumelos) cena.remove(c.no); cogumelos = [];
   for (const f of fumos) cena.remove(f.no); fumos = [];
+  for (const c of chamas) cena.remove(c.no); chamas = [];
+  contra = CONTRA_TOTAL; contraEspera = 0;
+  /* a fita do nariz é do voo passado: sem limpar, a mira lê no primeiro
+     segundo do voo novo direções que não têm nada a ver — e podem estar até
+     ATRÁS da câmera, o que apagava a mira inteira. Foi a prova `novo` que
+     pegou, renderizando um quadro logo depois de recomeçar. */
+  historiaNariz = []; tJogo = 0;
+  travadoPor.clear(); somAlerta(false);
   Mira.solta(); MiraTiro.solta();
   montaMapa(); montaChao(); montaPista(); montaCidade(); montaTambores(); montaAlvos();
   montaTrilhos();
@@ -5901,6 +6132,7 @@ function fim(){
      ganhar a missão com o alvo travado deixava o alarme tocando na tela de
      fim, para sempre. */
   Mira.solta(); MiraTiro.solta();
+  travadoPor.clear(); somAlerta(false);
   if (estolando){ estolando = false; somEstol(false); }
   estresse = 0; somBuffet(0); sacudidaFixa = 0; sacudida = 0; pulso = 0;
   Controles.treme('metralha', false); Controles.treme('estol', false);
@@ -6514,6 +6746,7 @@ const Tripulacao = {
       case 'arma':  trocaArma(d.a); break;
       case 'fogo':  atirando = !!d.v; break;
       case 'visao': cockpit = !cockpit; esqueceRadar(); break;
+      case 'chama': if (m.papel === 'piloto') largaContramedida(); break;
       case 'trem':  if (m.papel === 'piloto') mexeTrem(d.v); break;
       case 'flap':  if (m.papel === 'piloto') mexeFlap(d.v); break;
     }
@@ -6599,6 +6832,7 @@ const Controles = {
     missil:  [130, 35, 320],
     bomba:   [500],
     travou:  [80, 40, 80, 40, 150],
+    alertado:[60, 50, 60, 50, 60, 50, 180],   // nervoso, curto, repetido
     levou:   [240, 45, 280],
     explode: [180, 35, 340],
     bateu:   [700, 70, 460, 70, 900],
@@ -6788,6 +7022,17 @@ const Batalha = {
   },
 
   /* ---- o correio ---- */
+  /* avisa o alvo de que ele está na minha mira, e avisa todo mundo quando
+     solto chama. Fora da batalha não custa nada: `paraTodos` não faz nada
+     sem sala. */
+  avisaTrava(alvoId, on){
+    if (!this.ligada || !alvoId) return;
+    this.paraTodos({ t:'trava', em:alvoId, de:this.eu, on:!!on }, null);
+  },
+  avisaChamas(){
+    if (!this.ligada) return;
+    this.paraTodos({ t:'chamas', id:this.eu }, null);
+  },
   paraTodos(o, menos){
     if (this.anfitriao){
       for (const j of this.conexoes){ if (j.id === menos) continue;
@@ -6821,6 +7066,39 @@ const Batalha = {
       case 'tiro': {
         if (d.para === this.eu) this.levaTiro(d);
         else if (this.anfitriao) this.paraTodos(d, de ? de.id : null);
+        break;
+      }
+      /* --- ALGUÉM ESTÁ ME TRAVANDO ----------------------------------------
+         Sem este aviso a contramedida seria adivinhação: o piloto não teria
+         como saber a hora de gastar chama. É o receptor de alerta radar de um
+         caça, e existe pelo mesmo motivo — a defesa só é uma escolha quando se
+         sabe que há uma ameaça. */
+      case 'trava': {
+        if (d.em === this.eu){
+          if (d.on){
+            if (!travadoPor.has(d.de)){
+              mostraAviso('TRAVADO! SOLTE CHAMA', '#ff6a6a', 1400);
+              Controles.bate('alertado'); somAlerta(true);
+            }
+            travadoPor.set(d.de, Date.now());
+          } else {
+            travadoPor.delete(d.de);
+            if (!travadoPor.size) somAlerta(false);
+          }
+        } else if (this.anfitriao) this.paraTodos(d, de ? de.id : null);
+        break;
+      }
+      /* --- ALGUÉM SOLTOU CHAMA --------------------------------------------
+         Cada um resolve no SEU jogo o que a chama do outro faz com a SUA
+         trava — que é onde a trava mora. O recado só conta o que aconteceu e
+         onde; a regra fica em `chamaDoOutro`. */
+      case 'chamas': {
+        if (d.id !== this.eu){
+          const o = this.outros.get(d.id);
+          if (o) soltaChamas(o.x, o.y - 40, o.z, { x:0, z:0 }, { y:-1 });
+          chamaDoOutro(d.id);
+        }
+        if (this.anfitriao) this.paraTodos(d, de ? de.id : null);
         break;
       }
       case 'saiu': this.tira(d.id); break;
