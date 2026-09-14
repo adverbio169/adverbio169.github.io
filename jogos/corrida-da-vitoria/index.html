@@ -160,7 +160,9 @@
     <div class="chaves">
       <div class="chave"><span class="icone">🔄</span><span>Jogue com o <b>celular deitado</b></span></div>
       <div class="chave"><span class="icone">📱</span><span><b>Incline o celular</b>: para a direita ela vai para frente, para a esquerda ela volta</span></div>
-      <div class="chave"><span class="icone">👆</span><span><b>Toque na tela</b> para pular</span></div>
+      <div class="chave"><span class="icone">👉</span><span><b>Toque na direita</b> para pular</span></div>
+      <div class="chave"><span class="icone">👈</span><span><b>Toque na esquerda</b>: mortal para trás</span></div>
+      <div class="chave"><span class="icone">⭐</span><span>No ar dá para pular <b>mais uma vez</b>. Pise nos bichinhos e pegue a estrela</span></div>
       <div class="chave"><span class="icone">⌨️</span><span>No computador: <b>→</b> acelera, <b>←</b> segura e <b>espaço</b> pula</span></div>
     </div>
     <button class="jogar" id="btnComecar" type="button">Começar</button>
@@ -262,8 +264,9 @@
   var olhos = [], chiquinhas = [];
   var solidos = [], blocos = [], coracoes = [], molas = [], decors = [];
   var inimigos = [], estrelas3d = [], particulas = [], vagalumes = [], borboletas = [];
-  var baloes = [], rastros = [], rastroRelogio = 0, corRastro = 0;
-  var jogador = { x: 0, y: 0, vy: 0, vel: 0, noChao: true, giro: 0, girando: false, passo: 0 };
+  var baloes = [], rastros = [], rastroRelogio = 0, corRastro = 0, pontinhos = [];
+  var jogador = { x: 0, y: 0, vy: 0, vel: 0, noChao: true, giro: 0, girando: false, passo: 0,
+                  empurrao: 0, giroDir: 1, pulosNoAr: 0 };
   var estado = "menu";
   var dist = 0, pontos = 0, vidas = 3, xMax = 0, limiteTras = -12;
   var olhando = Math.PI / 2, adianteAtual = 3;
@@ -274,7 +277,7 @@
   var teclas = { esq: false, dir: false };
   var recorde = 0, DIST_CAM = 20, ADIANTE = 3;
 
-  var faseAtual = 0, deitado = true;
+  var faseAtual = 0, deitado = true, poder = 0, aura;
 
   var el = {
     hud: document.getElementById("hud"),
@@ -384,6 +387,8 @@
         var t = ctx.currentTime;
         if (tipo === "coracao") { sino(1046.5, t, 0.22, 0.22); sino(1568, t + 0.055, 0.3, 0.18); }
         else if (tipo === "pulo") varre(t, 320, 760, 0.16, "square", 0.12);
+        else if (tipo === "mortal") { varre(t, 260, 900, 0.22, "square", 0.13); sino(1046, t + .1, .26, .14); }
+        else if (tipo === "poder") { [0, 4, 7, 12, 16].forEach(function (n, i) { sino(659 * Math.pow(2, n / 12), t + i * 0.07, 0.5, 0.2); }); }
         else if (tipo === "mola") varre(t, 260, 1300, 0.3, "square", 0.15);
         else if (tipo === "batida") varre(t, 380, 70, 0.35, "sawtooth", 0.2);
         else if (tipo === "estrela") { sino(1318.5, t, .3, .24); sino(1760, t + .07, .34, .22); sino(2637, t + .15, .5, .18); }
@@ -925,7 +930,7 @@
   // Um rastro de cores quando ela corre solta.
   function soltarRastro(dt) {
     rastroRelogio -= dt;
-    if (Math.abs(jogador.vel) < 8 || rastroRelogio > 0) return;
+    if ((Math.abs(jogador.vel) < 8 && poder <= 0) || rastroRelogio > 0) return;
     rastroRelogio = 0.055;
     for (var i = 0; i < rastros.length; i++) {
       var r = rastros[i];
@@ -953,6 +958,60 @@
       r.obj.scale.multiplyScalar(1 - dt * 1.5);
       r.obj.material.opacity = Math.max(0, r.viva * 1.7);
       if (r.viva <= 0) r.obj.visible = false;
+    }
+  }
+
+  var texPonto = {};
+  function texturaTexto(txt, cor) {
+    var chave = txt + cor;
+    if (texPonto[chave]) return texPonto[chave];
+    var c = document.createElement("canvas");
+    c.width = 256; c.height = 128;
+    var x = c.getContext("2d");
+    x.font = "bold 86px Outfit, system-ui, sans-serif";
+    x.textAlign = "center"; x.textBaseline = "middle";
+    x.lineWidth = 16; x.lineJoin = "round"; x.strokeStyle = "#18181C";
+    x.strokeText(txt, 128, 66);
+    x.fillStyle = cor; x.fillText(txt, 128, 66);
+    var t = new THREE.CanvasTexture(c);
+    if (THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace;
+    texPonto[chave] = t;
+    return t;
+  }
+
+  function novoPonto() {
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false }));
+    sp.scale.set(1.5, 0.75, 1);
+    sp.visible = false;
+    sp.renderOrder = 5;
+    cena.add(sp);
+    return { obj: sp, viva: 0 };
+  }
+
+  function mostrarPonto(x, y, txt, cor) {
+    for (var i = 0; i < pontinhos.length; i++) {
+      var p = pontinhos[i];
+      if (p.viva > 0) continue;
+      p.viva = 0.9;
+      p.obj.visible = true;
+      p.obj.material.map = texturaTexto(txt, cor);
+      p.obj.material.needsUpdate = true;
+      p.obj.material.opacity = 1;
+      p.obj.position.set(x, y + 0.4, 0.6);
+      return;
+    }
+  }
+
+  function moverPontos(dt) {
+    for (var i = 0; i < pontinhos.length; i++) {
+      var p = pontinhos[i];
+      if (p.viva <= 0) continue;
+      p.viva -= dt;
+      p.obj.position.y += dt * 1.7;
+      p.obj.material.opacity = Math.max(0, Math.min(1, p.viva * 1.8));
+      var e = 1 + (0.9 - p.viva) * 0.35;
+      p.obj.scale.set(1.5 * e, 0.75 * e, 1);
+      if (p.viva <= 0) p.obj.visible = false;
     }
   }
 
@@ -1025,8 +1084,13 @@
   /* ======================= geração do caminho ======================== */
   function livre(lista) { for (var i = 0; i < lista.length; i++) if (!lista[i].ativo) return lista[i]; return null; }
 
-  function porSolido(x0, comp, topoY, espessura) {
+  function porSolido(x0, comp, topoY, espessura, sobeDesce) {
     var s = livre(solidos); if (!s) return;
+    s.movAmp = sobeDesce || 0;
+    s.movVel = 0.9 + Math.random() * 0.5;
+    s.movFase = Math.random() * 6.28;
+    s.baseY = topoY;
+    s.obj.position.y = 0;
     var alt = espessura || 1.3;
     s.ativo = true; s.obj.visible = true;
     s.x0 = x0; s.x1 = x0 + comp; s.y = topoY;
@@ -1117,8 +1181,9 @@
     }
     if (r < 0.64) {                                  // plataformas sobre o vão
       porSolido(x, 9, 0);
-      porSolido(x + 12.5, 4.6, 2.4, 0.7);
-      linhaCoracoes(x + 13.2, 3.6, 3, 1.3);
+      var elevador = Math.random() < 0.55 ? 1.5 : 0;  // às vezes a plataforma sobe e desce
+      porSolido(x + 12.5, 4.6, 2.8, 0.7, elevador);
+      linhaCoracoes(x + 13.2, 4.2, 3, 1.3);
       porSolido(x + 21, 12, 0);
       if (Math.random() < 0.45) porInimigo(x + 25, 0, x + 22, x + 31);
       porEstrela(x + 17.5, 4.6);
@@ -1303,6 +1368,12 @@
     relogio = new THREE.Clock();
     heroi = criarHeroi();
     heroi.rotation.y = Math.PI / 2;              // de frente para a direita
+    aura = new THREE.Mesh(new THREE.SphereGeometry(1.5, 20, 14),
+      new THREE.MeshBasicMaterial({ color: 0xFFD24A, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    aura.position.y = 1.6;
+    aura.visible = false;
+    heroi.add(aura);
+
     heroi.traverse(function (o) {                // só as peças, não as cascas de contorno
       if (o.isMesh && !o.userData.casca && o !== sombra) o.castShadow = true;
     });
@@ -1328,6 +1399,7 @@
     for (var ib = 0; ib < 6; ib++) borboletas.push(novaBorboleta(ib));
     for (var ba = 0; ba < 7; ba++) baloes.push(novoBalao(ba));
     for (var ra = 0; ra < 22; ra++) rastros.push(novoRastro());
+    for (var pp = 0; pp < 10; pp++) pontinhos.push(novoPonto());
     for (var a = 0; a < 16; a++) decors.push({ obj: criarArvore(), tipo: "arvore" });
     for (var n = 0; n < 8; n++) decors.push({ obj: criarNuvem(), tipo: "nuvem" });
     for (var h = 0; h < 5; h++) decors.push({ obj: criarMorro(), tipo: "morro" });
@@ -1452,7 +1524,8 @@
     window.addEventListener("keydown", function (e) {
       if (e.code === "ArrowLeft" || e.code === "KeyA") teclas.esq = true;
       if (e.code === "ArrowRight" || e.code === "KeyD") teclas.dir = true;
-      if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") { pular(); e.preventDefault(); }
+      if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") { pular(1); e.preventDefault(); }
+      if (e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyZ") { pular(-1); e.preventDefault(); }
       if (e.code === "Enter" && estado !== "jogando") comecar();
     });
     window.addEventListener("keyup", function (e) {
@@ -1474,7 +1547,7 @@
       }
     });
     canvas.addEventListener("pointerup", function () {
-      if (toqueAtivo && !toqueMoveu) pular();
+      if (toqueAtivo && !toqueMoveu) pular(toqueX < window.innerWidth / 2 ? -1 : 1);
       toqueAtivo = false; alvoToque = null;
     });
     canvas.addEventListener("pointercancel", function () { toqueAtivo = false; alvoToque = null; });
@@ -1530,6 +1603,8 @@
     dist = 0; pontos = 0; vidas = 3; xMax = 0; limiteTras = -12;
     invencivel = 0; tremor = 0; tempo = 0; olhando = Math.PI / 2; adianteAtual = 3;
     faseAtual = 0; temaDe = 0; temaPara = 0; trans = 1; aplicarTema(1);
+    poder = 0; if (aura) { aura.visible = false; aura.material.opacity = 0; }
+    jogador.empurrao = 0; jogador.giroDir = 1; jogador.pulosNoAr = 0;
     el.faixaFase.classList.remove("on"); tempoFaixa = 0;
     estavaNoChao = true; quedaForte = 0;
     jogador.x = 0; jogador.y = 0; jogador.vy = 0; jogador.vel = 0;
@@ -1545,8 +1620,8 @@
     el.fim.classList.remove("on");
     el.hud.classList.add("ativo");
     var noComputador = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
-    el.aviso.textContent = noComputador ? "→ e ← andam, espaço pula"
-      : "Incline o celular para andar. Um toque pula.";
+    el.aviso.textContent = noComputador ? "→ e ← andam · espaço pula · shift dá mortal"
+      : "Incline para andar · direita pula · esquerda dá mortal";
     setTimeout(function () { if (estado === "jogando") el.aviso.textContent = ""; }, 4600);
     Som.musica(true);
   }
@@ -1570,17 +1645,33 @@
     el.fim.classList.add("on");
   }
 
-  function pular() {
+  // lado: 1 = salto normal (polegar direito), -1 = mortal para trás (esquerdo)
+  function pular(lado) {
     if (estado !== "jogando") return;
-    if (jogador.noChao) {
+    var podeChao = jogador.noChao;
+    var podeAr = !jogador.noChao && jogador.pulosNoAr < 1;
+    if (!podeChao && !podeAr) return;
+    if (podeAr) jogador.pulosNoAr++;
+    else jogador.pulosNoAr = 0;
+
+    if (lado < 0) {                               // mortal para trás
+      jogador.vy = PULO * 1.06;
+      jogador.empurrao = (jogador.vel >= 0 ? -1 : 1) * 9.5;
+      jogador.giroDir = -1;
+      Som.efeito("mortal");
+    } else {
       jogador.vy = PULO;
-      jogador.noChao = false;
-      jogador.girando = true; jogador.giro = 0;
+      jogador.empurrao = 0;
+      jogador.giroDir = 1;
       Som.efeito("pulo");
     }
+    jogador.noChao = false;
+    jogador.girando = true; jogador.giro = 0;
+    explodir(jogador.x, jogador.y + 0.15, 0xE6D9BC, 5, 2.4);
   }
 
   function perderVida() {
+    if (poder > 0) return;                           // com o poder da estrela ela não se machuca
     vidas--;
     invencivel = 1.5;
     tremor = 0.5;
@@ -1633,6 +1724,7 @@
     estrelas.position.x = camera.position.x;
     moverParticulas(dt);
     moverRastros(dt);
+    moverPontos(dt);
     moverBichinhos(dt);
     render3d.render(cena, camera);
   }
@@ -1666,9 +1758,12 @@
     if (alvoToque !== null) alvo = clamp(alvoToque, -1, 1) * VELMAX;
     if (teclas.dir) alvo = VELMAX;
     if (teclas.esq) alvo = -VELMAX;
+    if (poder > 0) alvo *= 1.3;                      // e mais rápida
     jogador.vel += (alvo - jogador.vel) * Math.min(1, dt * 5);
     if (Math.abs(jogador.vel) < 0.05) jogador.vel = 0;
-    jogador.x += jogador.vel * dt;
+    jogador.empurrao *= Math.pow(0.06, dt);        // o recuo do mortal vai sumindo
+    if (Math.abs(jogador.empurrao) < 0.05) jogador.empurrao = 0;
+    jogador.x += (jogador.vel + jogador.empurrao) * dt;
 
     if (jogador.x > xMax) { dist += (jogador.x - xMax) * 0.55; xMax = jogador.x; }
     limiteTras = Math.max(limiteTras, xMax - 34);   // até onde o mundo ainda existe atrás
@@ -1700,12 +1795,24 @@
       if (topo <= jogador.y + 0.35 && (chaoAbaixo === null || topo > chaoAbaixo)) chaoAbaixo = topo;
     }
     if (jogador.noChao) {
-      if (!estavaNoChao && quedaForte < -9) explodir(jogador.x, jogador.y + 0.1, 0xE6D9BC, 8, 3);
+      jogador.pulosNoAr = 0;
+      if (!estavaNoChao && quedaForte < -9) {
+        explodir(jogador.x, jogador.y + 0.1, 0xE6D9BC, 10, 3.4);
+        tremor = Math.max(tremor, 0.16);
+      }
       seguro.x = jogador.x; seguro.y = jogador.y;
     }
     estavaNoChao = jogador.noChao;
     quedaForte = jogador.vy;
     if (invencivel > 0) invencivel -= dt;
+    if (poder > 0) {
+      poder -= dt;
+      aura.visible = true;
+      aura.material.color.setHSL((tempo * 0.6) % 1, 0.9, 0.6);
+      aura.material.opacity = (poder < 1.5 ? poder / 1.5 : 1) * (0.2 + Math.abs(Math.sin(tempo * 7)) * 0.14);
+      aura.scale.setScalar(1 + Math.sin(tempo * 9) * 0.05);
+      if (poder <= 0) aura.visible = false;
+    }
     if (tremor > 0) tremor -= dt;
 
     if (jogador.y < -8) { caiuNoBuraco(); if (estado !== "jogando") return; }
@@ -1717,9 +1824,10 @@
     heroi.rotation.y = olhando;
     if (jogador.girando) {                       // mortal para a frente
       jogador.giro = Math.min(Math.PI * 2, jogador.giro + dt * 8.5);
-      var hh = 1.5;
-      corpoTodo.rotation.x = jogador.giro;
-      corpoTodo.position.set(0, hh * (1 - Math.cos(jogador.giro)), -hh * Math.sin(jogador.giro));
+      var ang = jogador.giro * jogador.giroDir;     // o mortal gira ao contrário
+      var hh = 1.5;                                 // pivô na barriga nos dois sentidos
+      corpoTodo.rotation.x = ang;
+      corpoTodo.position.set(0, hh * (1 - Math.cos(ang)), -hh * Math.sin(ang));
       if (jogador.giro >= Math.PI * 2 || jogador.noChao) {
         jogador.girando = false; jogador.giro = 0;
         corpoTodo.rotation.x = 0; corpoTodo.position.set(0, 0, 0);
@@ -1778,6 +1886,12 @@
       e.pes[1].position.y = 0.07 + Math.max(0, -Math.sin(tempo * 9 + e.fase)) * 0.11;
       if (e.x1 < xMax - 44) { e.ativo = false; e.obj.visible = false; }
     });
+    solidos.forEach(function (s3) {                  // elevadores
+      if (!s3.ativo || !s3.movAmp) return;
+      var novoY = s3.baseY + Math.sin(tempo * s3.movVel + s3.movFase) * s3.movAmp;
+      s3.obj.position.y = novoY - s3.baseY;
+      s3.y = novoY;
+    });
     estrelas3d.forEach(function (es) {
       if (!es.ativo) return;
       es.obj.rotation.y += dt * 2.4;
@@ -1806,6 +1920,7 @@
         c.ativo = false; c.obj.visible = false;
         pontos++; Som.efeito("coracao");
         explodir(p.x, p.y, c.obj.material.color.getHex(), 7, 3.6);
+        mostrarPonto(p.x, p.y, "+1", "#FFFFFF");
       }
     });
 
@@ -1824,8 +1939,10 @@
       if (Math.abs(es.x - px) < 1.15 && es.obj.position.y > py - 0.7 && es.obj.position.y < py + ALTURA + 0.5) {
         es.ativo = false; es.obj.visible = false;
         pontos += 5;
-        explodir(es.x, es.obj.position.y, 0xFFC83D, 24, 7);
-        Som.efeito("estrela");
+        poder = 7;                                   // sete segundos de invencível
+        explodir(es.x, es.obj.position.y, 0xFFC83D, 26, 7.5);
+        mostrarPonto(es.x, es.obj.position.y, "PODER!", "#FFD24A");
+        Som.efeito("poder");
       }
     }
 
@@ -1833,11 +1950,13 @@
       var bi = inimigos[w];
       if (!bi.ativo) continue;
       if (Math.abs(bi.x - px) < 0.98 && py < bi.y + 1.1 && py + ALTURA > bi.y + 0.15) {
-        if (jogador.vy < -1 && py > bi.y + 0.4) {           // pisou em cima
+        if (poder > 0 || (jogador.vy < -1 && py > bi.y + 0.4)) {   // pisou em cima (ou está com o poder)
           bi.ativo = false; bi.obj.visible = false;
           explodir(bi.x, bi.y + 0.6, 0xFFD35A, 16, 6);
           jogador.vy = 11.5; jogador.girando = true; jogador.giro = 0;
           pontos += 2; Som.efeito("pisar");
+          mostrarPonto(bi.x, bi.y + 1, "+2", "#FFE066");
+          tremor = Math.max(tremor, 0.24);
         } else if (invencivel <= 0) {
           perderVida();
           jogador.x = bi.x + (jogador.vel >= 0 ? -1 : 1) * 1.15;
