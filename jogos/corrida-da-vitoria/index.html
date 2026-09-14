@@ -58,6 +58,31 @@
   }
   #faixaFase.on{opacity:1; transform:translate(-50%,-50%) scale(1)}
 
+  /* o jogo é de tela deitada: em pé, pede para girar e espera */
+  #girar{
+    position:fixed; inset:0; display:none; place-items:center; z-index:20;
+    background:linear-gradient(180deg,#CFE7F2,#E7F1E4 60%,#FBF3E2);
+    padding:24px; text-align:center;
+  }
+  body.emPe #girar{display:grid}
+  #girar .caixa{display:flex; flex-direction:column; align-items:center; gap:20px; max-width:22rem}
+  #girar p{margin:0; font-size:clamp(16px,4.6vw,20px); font-weight:600; line-height:1.45; color:var(--tinta)}
+  #girar small{font-size:clamp(13px,3.6vw,15px); color:#5a5765; font-weight:500}
+  .fone{
+    width:88px; height:146px; border:5px solid var(--tinta); border-radius:16px;
+    background:var(--papel); position:relative; animation:deita 2.4s ease-in-out infinite;
+  }
+  .fone::after{
+    content:""; position:absolute; left:50%; bottom:7px; transform:translateX(-50%);
+    width:26px; height:5px; border-radius:3px; background:var(--tinta);
+  }
+  @keyframes deita{
+    0%,22%{transform:rotate(0deg)}
+    48%,78%{transform:rotate(-90deg)}
+    100%{transform:rotate(0deg)}
+  }
+  @media (prefers-reduced-motion:reduce){ .fone{animation:none; transform:rotate(-90deg)} }
+
   .tela{
     position:fixed; inset:0; display:none; padding:20px;
     background:linear-gradient(180deg,rgba(207,231,242,.25) 0%,rgba(207,231,242,.66) 45%,rgba(207,231,242,.86) 100%);
@@ -120,11 +145,20 @@
 </div>
 <div id="faixaFase"></div>
 
+<div id="girar">
+  <div class="caixa">
+    <div class="fone" aria-hidden="true"></div>
+    <p>Vire o celular deitado para jogar</p>
+    <small>O jogo é de tela deitada — assim você enxerga a pista inteira.</small>
+  </div>
+</div>
+
 <div class="tela on" id="telaInicio">
   <div class="folha">
     <h1>Corrida da Vitória</h1>
     <p class="instr">O desenho da Vitória saiu do papel e foi correr.<br>Ela corre sozinha: pule os buracos, pegue os corações<br>e desvie dos blocos vermelhos.</p>
     <div class="chaves">
+      <div class="chave"><span class="icone">🔄</span><span>Jogue com o <b>celular deitado</b></span></div>
       <div class="chave"><span class="icone">📱</span><span><b>Incline o celular</b>: para a direita ela vai para frente, para a esquerda ela volta</span></div>
       <div class="chave"><span class="icone">👆</span><span><b>Toque na tela</b> para pular</span></div>
       <div class="chave"><span class="icone">⌨️</span><span>No computador: <b>→</b> acelera, <b>←</b> segura e <b>espaço</b> pula</span></div>
@@ -248,7 +282,7 @@
   var teclas = { esq: false, dir: false };
   var recorde = 0, DIST_CAM = 20, ADIANTE = 3;
 
-  var faseAtual = 0;
+  var faseAtual = 0, deitado = true;
 
   var el = {
     hud: document.getElementById("hud"),
@@ -1174,7 +1208,9 @@
     aplicarTema(1);                              // pinta a primeira fase
     ligarControles();
     window.addEventListener("resize", aoRedimensionar);
+    window.addEventListener("orientationchange", function () { setTimeout(aoRedimensionar, 250); });
     ajustarCamera();
+    conferirOrientacao();
     prepararMundo();
     requestAnimationFrame(quadro);
   }
@@ -1244,6 +1280,34 @@
   function aoRedimensionar() {
     render3d.setSize(window.innerWidth, window.innerHeight);
     ajustarCamera();
+    conferirOrientacao();
+  }
+
+  // No celular em pé o jogo espera: a rolagem lateral pede a tela deitada.
+  function conferirOrientacao() {
+    var toque = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+    var emPe = window.innerHeight > window.innerWidth;
+    deitado = !(toque && emPe);
+    document.body.classList.toggle("emPe", !deitado);
+    if (!deitado) Som.musica(false);
+    else if (estado === "jogando") Som.musica(true);
+  }
+
+  // No Android dá para pedir tela cheia e travar deitado; no iPhone é ignorado.
+  function tentarDeitar() {
+    if (!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches)) return;
+    try {
+      var raiz = document.documentElement;
+      var pedido = raiz.requestFullscreen ? raiz.requestFullscreen()
+                 : (raiz.webkitRequestFullscreen ? raiz.webkitRequestFullscreen() : null);
+      if (pedido && pedido.then) {
+        pedido.then(function () {
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock("landscape").catch(function () {});
+          }
+        }).catch(function () {});
+      }
+    } catch (e) {}
   }
 
   /* ============================ controles ============================ */
@@ -1312,7 +1376,8 @@
   }
 
   function pedirSensorEComecar() {
-    Som.ligar();                                 // o AudioContext precisa nascer no toque (iOS)
+    Som.ligar();
+    tentarDeitar();                                 // o AudioContext precisa nascer no toque (iOS)
     var D = window.DeviceOrientationEvent;
     if (D && typeof D.requestPermission === "function") {
       D.requestPermission().then(function (r) {
@@ -1345,11 +1410,9 @@
     el.inicio.classList.remove("on");
     el.fim.classList.remove("on");
     el.hud.classList.add("ativo");
-    var deitado = window.innerWidth / window.innerHeight >= 0.85;
     var noComputador = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
     el.aviso.textContent = noComputador ? "→ e ← andam, espaço pula"
-      : (deitado ? "Incline o celular para andar. Um toque pula."
-                 : "Vire o celular deitado para ver mais pista");
+      : "Incline o celular para andar. Um toque pula.";
     setTimeout(function () { if (estado === "jogando") el.aviso.textContent = ""; }, 4600);
     Som.musica(true);
   }
@@ -1429,8 +1492,8 @@
   function quadro() {
     requestAnimationFrame(quadro);
     var dt = Math.min(relogio.getDelta(), 0.05);
-    if (estado === "jogando") passo(dt);
-    else ocioso(dt);
+    if (estado === "jogando" && deitado) passo(dt);
+    else if (estado !== "jogando") ocioso(dt);
     fundo.position.x = camera.position.x;
     astro.position.x = camera.position.x + 16;
     estrelas.position.x = camera.position.x;
