@@ -4138,3 +4138,47 @@ e ao tocar manda {"t":"chama"}                                  ✔
 assinatura é `recebe(MEMBRO, DADO)`, nessa ordem, e eu inverti. O `d.t` veio
 indefinido e a função saiu na primeira linha sem fazer nada — parecendo que o
 jogo ignorava o botão.)*
+
+---
+
+> *"Na versão só do celular não tem algumas mudanças ainda."*
+
+Verdade, e por um descuido de simetria: eu tinha dado a contramedida ao
+**teclado** (Z) e ao **controle de celular** (o botão DEFESA), e esqueci de quem
+joga **só no telefone** — ali a própria tela do jogo é o controle, e os botões
+de dedo são outro lugar no código. Sem DEFESA na tela, quem joga sozinho no
+celular era o único que não tinha como fugir de um míssil.
+
+Agora o `#dedos` tem o mesmo botão, no mesmo lugar da mão: um círculo âmbar
+logo acima do gatilho vermelho, com o número de cargas dentro, cinza quando
+acaba e apagado enquanto recarrega. E o "zerar" de lá também recentra o olhar,
+igual ao do controle.
+
+Duas coisas se esconderam atrás dele, e as duas por eu ter uma **lista escrita à
+mão**:
+
+1. **O olho e a qualidade.** No modo de dedo eles tinham sido empurrados para a
+   direita, acima do gatilho — que é exatamente onde o DEFESA nasceu. Subir mais
+   não resolvia (em cima, na mesma coluna, moram a vida e o recorde), então eles
+   trocaram de lado: coluna da esquerda, logo acima do seletor de armas, a única
+   faixa livre de ponta a ponta nas três telas testadas.
+
+2. **O radar.** O disco procura sozinho um canto onde não encoste em nada — mas
+   procurava numa lista de nomes (`#dArma, #dFogo, .dedoM, #dCima`), e o botão
+   novo não estava nela. Resultado: disco desenhado por baixo do DEFESA. Trocada
+   a lista de nomes pela família inteira (`#dedos > *`), o próximo botão já entra
+   na conta sozinho.
+
+```
+844x390 (iPhone deitado)   colisões: nenhuma | fora da tela: nenhum   ✔
+915x412 (Android)          colisões: nenhuma | fora da tela: nenhum   ✔
+667x375 (pequeno)          colisões: nenhuma | fora da tela: nenhum   ✔
+um toque: 12 -> 11 cargas, 8 chamas no ar, mostrador acompanha        ✔
+toque logo em seguida (dentro da espera): recusa, não gasta carga     ✔
+"zerar" sem câmera nenhuma: não estoura                               ✔
+```
+
+*(A primeira rodada desse teste disse "colisões: nenhuma" e estava mentindo: a
+lista de elementos conferidos era escrita à mão e o botão novo não estava nela
+— o mesmo defeito do radar, no próprio instrumento de medir. Um teste que só
+olha o que eu lembrei de listar aprova qualquer coisa que eu esquecer.)*

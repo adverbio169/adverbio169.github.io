@@ -142,6 +142,18 @@
          font:900 min(4vw,17px)/1 inherit;letter-spacing:2px;color:#fff;background:#d8422f;
          box-shadow:0 6px 0 #8f2a1d;cursor:pointer}
   #dFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
+  /* a contramedida mora colada no gatilho, pelo mesmo motivo de sempre:
+     soltar chama é decisão de meio segundo com o dedo já ali */
+  #dChama{right:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-right));
+          bottom:calc(10px + min(26vw,120px) + 12px + env(safe-area-inset-bottom));
+          width:min(19vw,88px);height:min(19vw,88px);border:0;border-radius:50%;
+          display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;
+          font:900 min(2.9vw,12px)/1 inherit;letter-spacing:1.2px;color:#2a1f05;
+          background:#ffc24d;box-shadow:0 5px 0 #a8761f;cursor:pointer}
+  #dChama b{font-size:min(4vw,16px);opacity:.9}
+  #dChama:active{transform:translateY(3px);box-shadow:0 2px 0 #a8761f}
+  #dChama.vazio{background:#6b6257;color:#cfc6b8;box-shadow:0 5px 0 #3f3931}
+  #dChama.espera{opacity:.5}
   #dArma{left:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-left));
          bottom:calc(10px + env(safe-area-inset-bottom));
          width:min(32vw,180px);height:min(19vw,86px);border-radius:14px;
@@ -177,10 +189,16 @@
   body.dedos #cComb{top:154px;left:calc(14px + min(13vw,58px));transform:none;min-width:0;padding:6px 10px}
   body.dedos #cComb .val{font-size:17px}
   body.dedos #cArma{display:none}
-  /* o olho e a qualidade ficavam debaixo da tira do acelerador: recuam a
-     largura dela, e sobem acima do gatilho */
-  body.dedos #btVisao{left:auto;right:calc(14px + min(13vw,58px));bottom:calc(14px + min(26vw,120px) + 16px)}
-  body.dedos #btQual{left:auto;right:calc(70px + min(13vw,58px));bottom:calc(14px + min(26vw,120px) + 16px)}
+  /* o olho e a qualidade ficavam debaixo da tira do acelerador. Foram para a
+     direita, acima do gatilho — e aí o botão DEFESA ocupou justamente aquele
+     lugar e passou por cima dos dois. Subir mais não resolve: em cima, na
+     mesma coluna, estão a vida e o recorde. Então eles trocam de lado: ficam
+     na coluna da ESQUERDA, logo acima do seletor de armas, que é a única
+     faixa livre de ponta a ponta. */
+  body.dedos #btVisao{left:calc(14px + min(13vw,58px));
+       bottom:calc(22px + min(19vw,86px) + env(safe-area-inset-bottom))}
+  body.dedos #btQual{left:calc(70px + min(13vw,58px));
+       bottom:calc(22px + min(19vw,86px) + env(safe-area-inset-bottom))}
   body.dedos #cMotor,body.dedos #convite{display:none}
   /* As tiras laterais ocupam a borda inteira, e os painéis de canto ficavam
      por baixo delas. Com os botões na tela, tudo recua a largura da tira. */
@@ -321,6 +339,9 @@
 <div id="dedos">
   <div class="dedoM" id="dNitro"><i id="dNitroCarga"></i><b>NITRO</b></div>
   <div class="dedoM" id="dAcel"><i id="dAcelBarra"></i><span id="dAcelNum">70%</span></div>
+  <!-- DEFESA acima do FOGO, igual ao controle de celular: quem joga só no
+       telefone tem os mesmos recursos de quem joga com dois aparelhos -->
+  <button id="dChama">DEFESA <b id="dChamaN">12</b></button>
   <button id="dFogo">FOGO</button>
   <div id="dArma"><b id="dArmaNome">NUCLEAR</b><i id="dArmaMun">6</i>
     <span class="dica">&lsaquo; deslize &rsaquo;</span></div>
@@ -450,10 +471,12 @@
        text-align:left;max-width:40ch;background:rgba(255,255,255,.05);border-radius:8px;padding:8px 10px"></p>
     <p class="txt" style="font-size:12.5px;color:#7d8cab">No computador: setas voam, <b>A</b> e <b>D</b> são o leme,
        <b>W</b> e <b>S</b> são o acelerador, <b>Shift</b> é o nitro, <b>G</b> o trem de pouso,
-       <b>F</b> os flapes, <b>espaço</b> atira, <b>V</b> troca a vista, <b>1 2 3</b> trocam de arma.</p>
+       <b>F</b> os flapes, <b>espaço</b> atira, <b>V</b> troca a vista, <b>1 2 3</b> trocam de arma,
+       <b>Z</b> solta as chamas de defesa, <b>C</b> liga o olhar com a cabeça.</p>
     <p class="txt" style="font-size:12.5px;color:#7d8cab">No celular, cada movimento é um comando:
        <b>girar de lado</b> = aileron, <b>puxar a borda de cima</b> = profundor,
-       <b>apontar o aparelho para o lado</b> = leme.</p>
+       <b>apontar o aparelho para o lado</b> = leme. O botão <b>DEFESA</b>, em cima do gatilho,
+       solta as chamas que fazem o míssil perder o rumo.</p>
   </div>
 </div>
 
@@ -11687,8 +11710,13 @@ function radarOnde(){
   _radarQuando = agora;
 
   const obst = [];
+  /* a lista dos comandos de dedo era escrita um a um — e o botão DEFESA, que
+     nasceu depois, não estava nela: o disco foi desenhado por baixo dele. Uma
+     lista de nomes que precisa ser lembrada a cada botão novo é um defeito à
+     espera; agora vale a família inteira (`#dedos > *`), e o que aparecer
+     amanhã já entra na conta sozinho. */
   for (const el of document.querySelectorAll(
-        '.painel, .bt, #convite, #dArma, #dFogo, .dedoM, #dCima')){
+        '.painel, .bt, #convite, #dedos > *')){
     if (getComputedStyle(el).display === 'none') continue;
     const q = el.getBoundingClientRect();
     if (q.width > 0 && q.height > 0) obst.push(q);
@@ -13141,7 +13169,11 @@ const Dedos = (function(){
   /* ---- trem, flapes e zerar ---- */
   el('dTrem').onclick = e => { e.preventDefault(); mexeTrem(); tremeAqui(35); };
   el('dFlap').onclick = e => { e.preventDefault(); mexeFlap(); tremeAqui([18,40,18]); };
-  el('dZerar').onclick = e => { e.preventDefault(); Controle.calibrar(); tremeAqui(25); };
+  el('dChama').onclick = e => { e.preventDefault(); largaContramedida(); tremeAqui([30,40,30]); };
+  /* o zerar daqui também recentra o olhar, pela mesma razão do botão do
+     controle: são dois "retos", e o botão é um só */
+  el('dZerar').onclick = e => { e.preventDefault(); Controle.calibrar();
+                                if (Cabeca.ligada) Cabeca.centraliza(); tremeAqui(25); };
 
   D.mostra = liga => {
     D.ligado = !!liga;
@@ -13158,6 +13190,10 @@ const Dedos = (function(){
     el('dArmaMun').textContent = munInfinita ? '∞' : 'x' + municao[arma];
     const t = el('dTrem'); t.textContent = 'TREM ' + (trem ? '▼' : '▲'); t.classList.toggle('ligado', trem);
     const f = el('dFlap'); f.textContent = 'FLAPE ' + flap; f.classList.toggle('ligado', flap > 0);
+    const ch = el('dChama');
+    if (ch){ el('dChamaN').textContent = contra;
+             ch.classList.toggle('vazio', contra <= 0);
+             ch.classList.toggle('espera', contraEspera > 0); }
   };
   return D;
 })();
