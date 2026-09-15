@@ -5162,3 +5162,84 @@ grande, tudo o que não pegava sol virava **mostarda suja**. Reflexo claro
 
 (A escolha também vive no `localStorage`, em `aviao3d.pintura`, para dar para
 experimentar os três sem recompilar.)
+
+---
+
+## O lado escuro que não era sombra
+
+> *"o lado escuro tem que ser de acordo com o sol lá. e não sair pintado de lado
+> escuro."*
+
+Certíssimo, e a causa é uma linha de `fundePorCor`.
+
+Metade do avião é **espelhada** com `scale.x = -1`: estabilizador, costela de
+asa, cerca de ponta, friso de chapa — tudo o que existe aos pares. Espelho tem
+determinante **negativo**, e determinante negativo inverte o sentido em que os
+triângulos são desenhados.
+
+Enquanto o espelho mora no objeto, o three cuida disso sozinho: ele olha o
+determinante da matriz do mundo e vira a face. Mas a fusão **assa a matriz na
+geometria** — e aí o objeto passa a ter determinante positivo com os triângulos
+ao contrário. O renderizador desenha a face de DENTRO da peça, cuja normal
+aponta para o lado errado, e ela fica escura faça o sol o que fizer.
+
+Era por isso que o estabilizador esquerdo e as costelas de um lado saíam dois
+tons abaixo dos gêmeos do outro lado, **em qualquer ângulo** — e era isso que eu
+vinha tentando consertar mexendo na luz, que era o lugar errado.
+
+```js
+if (mx.determinant() < 0){        // inverte a ordem dos vértices de cada triângulo
+  const p = g2.attributes.position.array, nm = g2.attributes.normal.array;
+  for (let i = 0; i < p.length; i += 9)
+    for (let k = 0; k < 3; k++){
+      let t = p[i+3+k]; p[i+3+k] = p[i+6+k]; p[i+6+k] = t;
+      t = nm[i+3+k];    nm[i+3+k] = nm[i+6+k]; nm[i+6+k] = t;
+    }
+}
+```
+
+Com a malha certa, a `luzPropria` — a parcela da própria cor que cada tinta
+devolve — voltou de 0,34 para **0,13**. Ela existe só para a sombra não virar
+borra; quem decide o lado escuro é o sol.
+
+## As costelas da asa
+
+> *"o que é interessante do dragão é a asa pintada em radial. É visível a sua
+> movimentação."*
+
+É a melhor observação desta conversa. A asa do dragão tem **varetas azuis
+saindo em leque** da raiz sobre a membrana amarela — e é por causa delas que dá
+para VER a asa recolher: superfície lisa se mexe sem dar sinal nenhum, linha em
+leque gira na frente do olho.
+
+O caça ganhou duas **costelas pintadas** atravessando a corda, em faixas de
+envergadura. Como todo o resto da pintura, não é decalque por cima: a asa é
+lofteada em pedaços que dividem as MESMAS estações, então as faixas se
+encontram sem degrau e sem brigar por profundidade. A cor da costela é sempre
+o contrário da do painel, seja qual for o esquema escolhido.
+
+## E as peças escuras ridículas
+
+**O painel antirreflexo** era uma CAIXA pousada numa altura escrita na mão
+(y=30,6) sobre um casco que naquela estação está em y≈21. Nove unidades de ar
+embaixo — uma tábua preta pairando no nariz. Agora é uma faixa que segue a
+casca, pela mesma `faixaNoCasco` da pintura lateral: nasce da tabela de seções
+e não tem como descolar.
+
+**O encosto do banco** tinha 30 de altura e o topo saía em y=50, acima da capota
+(que ali vale uns 46): de fora, uma caixa preta espiando por cima do vidro.
+Vinte e dois, e ele fica dentro da bolha, que é onde mora.
+
+E **preto absoluto** (`0x11161f`) num avião azul-claro não lê como peça: lê como
+buraco. Num caça as partes "pretas" são cinza-fosco escuro, que ainda recebe luz
+e ainda tem forma.
+
+## O rabo do dragão, que era uma tábua
+
+O estabilizador dele era uma caixa de **72 × 9 × 44**, com a ponta sendo outra
+caixa de 16 × 10. Nove de espessura numa corda de 44 são **20%** — o dobro da
+asa mais gorda que já voou, e é por isso que ele lia como tábua de cortar pão.
+Agora é um pedaço de asa de verdade, pela mesma função que faz a asa do caça:
+perfil simétrico, afilado, enflechamento na tabela, ponta arredondada. Espessura
+na raiz 5,7 em vez de 9; na ponta, 2,9 em vez de 10. A deriva foi de 10 para 6 e
+o leme de 9 para 5,5.

@@ -1676,7 +1676,37 @@ function fundePorCor(raiz){
     let n = 0;
     const partes = lista.map(o => {
       const g2 = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
-      g2.applyMatrix4(new THREE.Matrix4().multiplyMatrices(paraRaiz, o.matrixWorld));
+      const mx = new THREE.Matrix4().multiplyMatrices(paraRaiz, o.matrixWorld);
+      g2.applyMatrix4(mx);
+      /* --- O LADO ESCURO QUE NÃO ERA SOMBRA -----------------------------------
+         "O lado escuro tem que ser de acordo com o sol, e não sair pintado de
+         lado escuro."
+
+         Estava certíssimo, e a causa é esta linha. Metade do avião é ESPELHADA
+         com `scale.x = -1` — estabilizador, costela de asa, cerca, friso, tudo
+         o que existe aos pares. Espelho tem determinante NEGATIVO: ele inverte
+         o sentido em que os triângulos são desenhados.
+
+         Enquanto o espelho mora no objeto, o three cuida disso sozinho (ele
+         olha o determinante da matriz do mundo e vira a face). Mas aqui a
+         matriz é ASSADA na geometria, e aí o objeto passa a ter determinante
+         positivo com os triângulos ao contrário: o renderizador desenha a face
+         de DENTRO da peça, cuja normal aponta para o lado errado — e ela fica
+         escura faça o sol o que fizer. Era por isso que o estabilizador
+         esquerdo e as costelas de um lado saíam dois tons abaixo dos gêmeos do
+         outro lado, em qualquer ângulo.
+
+         Determinante negativo, inverte-se a ordem dos vértices de cada
+         triângulo. Aí a peça espelhada volta a ser uma peça, e o lado escuro
+         passa a ser o que o sol decidir. */
+      if (mx.determinant() < 0){
+        const p = g2.attributes.position.array, nm = g2.attributes.normal.array;
+        for (let i = 0; i < p.length; i += 9)
+          for (let k = 0; k < 3; k++){
+            let t = p[i+3+k]; p[i+3+k] = p[i+6+k]; p[i+6+k] = t;
+            t = nm[i+3+k];    nm[i+3+k] = nm[i+6+k]; nm[i+6+k] = t;
+          }
+      }
       n += g2.attributes.position.count;
       return g2;
     });
@@ -2343,6 +2373,25 @@ const AD02 = {
 /* clareia uma cor 0xRRGGBB em direção ao branco (0 = igual, 1 = branco).
    Serve para tirar a cor da superfície móvel da MESMA tinta do corpo, em vez
    de escolher um segundo azul na mão que briga com o primeiro. */
+/* --- LUZ PRÓPRIA: o avião chapado ------------------------------------------
+   "Tira as sombras, deixa ele uniforme."
+
+   O que escurecia a asa não era sombra projetada (o avião não recebe sombra de
+   nada): era o `N·L` do sol. Superfície plana virada para cima pega um ângulo,
+   o dorso curvo da fuselagem pega outro, e a asa saía dois tons abaixo do
+   corpo — o avião parecia montado com peças de lotes diferentes de tinta.
+
+   A saída não é mexer na luz da cena, que é do mundo inteiro: é dar a cada
+   tinta do avião uma parcela da PRÓPRIA COR como luz própria. Isso levanta o
+   lado escuro sem lavar o lado claro, e o resultado é a leitura de cartaz que
+   o dragão sempre teve: cor chapada, forma pela silhueta e pela pintura, não
+   pelo sombreado. */
+function luzPropria(cor, k){
+  const r = (cor >> 16) & 255, g2 = (cor >> 8) & 255, b = cor & 255;
+  const m = v2 => Math.round(v2*k);
+  return (m(r) << 16) | (m(g2) << 8) | m(b);
+}
+
 function clareia(cor, q){
   /* na mão, em sRGB. THREE.Color guarda a cor em espaço LINEAR desde a r152:
      clarear lá dentro e devolver com getHex() dá um salto muito maior do que o
@@ -2355,17 +2404,28 @@ function clareia(cor, q){
 
 function montaAD02(corCorpo, corDetalhe, corVidro, simples){
   const g = new THREE.Group();
-  const mCorpo   = new THREE.MeshPhongMaterial({ color: corCorpo,  shininess: 58, specular: 0x4a6a92 });
+  /* 0,34 chapava o avião inteiro e matava o sol junto com o defeito — e o
+     defeito não era luz, era malha espelhada (ver `fundePorCor`). Com a malha
+     certa, basta um empurrãozinho para o lado na sombra não virar borra. */
+  const CHAPA = 0.13;    // quanto da própria cor volta como luz própria
+  const mCorpo   = new THREE.MeshPhongMaterial({ color: corCorpo,  shininess: 34,
+                     specular: 0x3d5877, emissive: luzPropria(corCorpo, CHAPA) });
   /* o reflexo era 0x6b5a20, um marrom: numa área grande, tudo o que não pegava
      sol virava mostarda suja. Reflexo claro e brilho baixo deixam o amarelo ser
      amarelo também na sombra. */
-  const mAmarelo = new THREE.MeshPhongMaterial({ color: corDetalhe, shininess: 30, specular: 0xefe0a8 });
+  const mAmarelo = new THREE.MeshPhongMaterial({ color: corDetalhe, shininess: 24,
+                     specular: 0xcbbf8c, emissive: luzPropria(corDetalhe, CHAPA) });
   const mEscuro  = new THREE.MeshPhongMaterial({ color: 0x16223c,  shininess: 40 });
   const mVidro   = new THREE.MeshPhongMaterial({ color: corVidro, shininess: 170, specular: 0xdcecff,
                                                  transparent: true, opacity: 0.55 });
   const mBranco  = new THREE.MeshPhongMaterial({ color: 0xf6f9ff, shininess: 60 });
   const mFriso   = new THREE.MeshPhongMaterial({ color: 0x17458f, shininess: 40 });
-  const mPreto   = new THREE.MeshPhongMaterial({ color: 0x11161f, shininess: 50 });
+  /* 0x11161f é preto de verdade, e preto absoluto num avião azul-claro não lê
+     como peça: lê como BURACO. Num caça as partes "pretas" — antirreflexo,
+     banco, painel — são cinza-fosco escuro, que ainda recebe luz e ainda tem
+     forma. */
+  const mPreto   = new THREE.MeshPhongMaterial({ color: 0x1e2530, shininess: 26 });
+  const mFosco   = new THREE.MeshPhongMaterial({ color: 0x27303d, shininess: 12 });
   /* --- A COR DAS SUPERFÍCIES MÓVEIS -----------------------------------------
      A regra anterior era "móvel = cor oposta": painel de asa amarelo, flape e
      aileron azuis. Lida de longe, essa regra ARREBENTA o avião: a troca de cor
@@ -2450,17 +2510,27 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        encaixe até ali no azul do corpo, e a ponta em amarelo. As duas séries
        de anéis nascem de naEstacao(0,86), então as superfícies se encontram
        exatamente — não é decalque colado por cima, é a pintura da asa. */
-    if (ESQ.bordo){
-      /* o bordo de ataque em outra cor: duas séries de anéis que dividem a
-         MESMA estação de corda (0,16), então as superfícies se encontram sem
-         degrau e sem brigar por profundidade. */
+    /* --- AS COSTELAS: a asa mostrando que está varrendo -----------------------
+       "No dragão a asa é pintada em radial. É visível a sua movimentação."
+
+       É a melhor observação desta conversa inteira. A asa do dragão tem
+       varetas azuis saindo em leque da raiz sobre a membrana amarela — e é por
+       causa delas que dá para VER a asa recolher: a superfície lisa se mexe
+       sem dar sinal nenhum, as linhas em leque giram na frente do olho.
+
+       Aqui são duas costelas pintadas atravessando a corda, em faixas de
+       envergadura. Como todo o resto da pintura, não é decalque por cima: a
+       asa é lofteada em pedaços que dividem as MESMAS estações, então as
+       faixas se encontram sem degrau e sem brigar por profundidade. */
+    const RIB = ESQ.painel === 'A' ? mCorpo : mAmarelo;   // sempre o contrário do painel
+    const COSTELAS = [0, 0.24, 0.31, 0.56, 0.63, 0.86];
+    const f0 = ESQ.bordo ? BORDO : 0;
+    if (ESQ.bordo)
       dentro.add(pedacoDeAsa(M.asa, 0, 0.86, 0, BORDO, tinta('bordo'), 7, 4));
-      dentro.add(pedacoDeAsa(M.asa, 0, 0.86, BORDO, M.CORDA_MOVEL, tinta('painel'), 7, 8));
-      dentro.add(pedacoDeAsa(M.asa, 0.86, 1, 0, M.CORDA_MOVEL, tinta('ponta'), 3, 10, true));
-    } else {
-      dentro.add(pedacoDeAsa(M.asa, 0, 0.86, 0, M.CORDA_MOVEL, tinta('painel'), 7, 10));
-      dentro.add(pedacoDeAsa(M.asa, 0.86, 1, 0, M.CORDA_MOVEL, tinta('ponta'), 3, 10, true));
-    }
+    for (let i = 0; i < COSTELAS.length - 1; i++)
+      dentro.add(pedacoDeAsa(M.asa, COSTELAS[i], COSTELAS[i+1], f0, M.CORDA_MOVEL,
+                             (i % 2) ? RIB : tinta('painel'), 3, 8));
+    dentro.add(pedacoDeAsa(M.asa, 0.86, 1, 0, M.CORDA_MOVEL, tinta('ponta'), 3, 10, true));
     /* --- A RAIZ GROSSA DO PAINEL -------------------------------------------
        O painel encosta na luva de TOPO, e topo não fecha: girando, a raiz do
        painel varre um leque e abre um vão por onde se enxerga o céu. Era o que
@@ -2638,8 +2708,18 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     const arco = new THREE.Mesh(new THREE.TorusGeometry(1, 0.075, 6, 20, Math.PI), mAmarelo);
     arco.scale.set(21*k + 0.4, 24*k + 0.4, 3); arco.position.set(0, 30, 150); g.add(arco);
   }
-  const antirreflexo = new THREE.Mesh(new THREE.BoxGeometry(30, 1.2, 34), mPreto);
-  antirreflexo.position.set(0, 30.6, 190); antirreflexo.rotation.x = 0.17; g.add(antirreflexo);
+  /* O PAINEL ANTIRREFLEXO seguia o mesmo caminho errado de todo o resto que já
+     consertei aqui: era uma CAIXA pousada numa altura escrita na mão (y=30,6)
+     sobre um casco que naquela estação está em y≈21. Nove unidades de ar
+     embaixo — uma tábua preta pairando no nariz, e a peça escura mais ridícula
+     do avião. Agora é uma faixa que segue a casca, como a pintura da lateral:
+     nasce da tabela de seções e não tem como descolar. */
+  for (const lado of [-1, 1])
+    g.add(faixaNoCasco(M.secoes, lado, t => {
+      const z = 208 - t*46;                 // do fim do radome à base do vidro
+      const larg = 0.30 + t*0.34;           // estreita no bico, abre na cabine
+      return { z, a0: Math.PI/2, a1: Math.PI/2 - larg };
+    }, mFosco, 10));
   /* o aro: TorusGeometry(1,1) tem raio EXTERNO 2 — escalado, ele virava uma
      mancha amarela do dobro da cabine na frente dela. Tubo fino resolve. */
   const moldura = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 6, 26), mAmarelo);
@@ -2731,10 +2811,13 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     {
       const piso = new THREE.Mesh(new THREE.BoxGeometry(30, 3, 62), mEscuro);
       piso.position.set(0, 18, 122); g.add(piso);
-      const assento = new THREE.Mesh(caixaViva(20, 6, 26, 2.4), mPreto);
+      const assento = new THREE.Mesh(caixaViva(17, 5, 23, 2.2), mFosco);
       assento.position.set(0, 22, 112); g.add(assento);
-      const encosto = new THREE.Mesh(caixaViva(20, 30, 6, 2.4), mPreto);
-      encosto.position.set(0, 35, 98); encosto.rotation.x = -0.16; g.add(encosto);
+      /* o encosto tinha 30 de altura e o topo saía em y=50, acima da capota
+         (que ali vale uns 46): de fora, uma caixa preta espiando por cima do
+         vidro. Vinte e dois, e ele fica DENTRO da bolha, que é onde mora. */
+      const encosto = new THREE.Mesh(caixaViva(17, 22, 6, 2.2), mFosco);
+      encosto.position.set(0, 31, 99); encosto.rotation.x = -0.16; g.add(encosto);
       const apoio = new THREE.Mesh(caixaViva(16, 9, 7, 2.4), mEscuro);
       apoio.position.set(0, 50, 96); g.add(apoio);
       const painel = new THREE.Mesh(caixaViva(24, 14, 4, 1.4), mEscuro);
@@ -3096,8 +3179,11 @@ function montaDragaoClassico(corCorpo, corDetalhe, corVidro, asasMoveis){
   const g = new THREE.Group();
   /* Brinquedo de plástico brilha POUCO e escuro. Reflexo claro estourava uma
      mancha branca no meio do azul e comia o desenho todo. */
-  const mCorpo  = new THREE.MeshPhongMaterial({ color: corCorpo,   shininess: 42, specular: 0x38506e });
-  const mAmarelo= new THREE.MeshPhongMaterial({ color: corDetalhe, shininess: 46, specular: 0x6b5a20 });
+  const CHAPA_D = 0.13;
+  const mCorpo  = new THREE.MeshPhongMaterial({ color: corCorpo,   shininess: 30,
+                    specular: 0x2e4560, emissive: luzPropria(corCorpo, CHAPA_D) });
+  const mAmarelo= new THREE.MeshPhongMaterial({ color: corDetalhe, shininess: 24,
+                    specular: 0xcbbf8c, emissive: luzPropria(corDetalhe, CHAPA_D) });
   const mEscuro = new THREE.MeshPhongMaterial({ color: 0x16305a,   shininess: 30 });
   const mVidro  = new THREE.MeshPhongMaterial({ color: corVidro, shininess: 150, specular: 0xbcd4f0,
                                                 transparent: true, opacity: 0.74 });
@@ -3331,7 +3417,8 @@ function montaDragaoClassico(corCorpo, corDetalhe, corVidro, asasMoveis){
   const dv = new THREE.Shape();
   dv.moveTo(-170, 10); dv.lineTo(-182, 124); dv.lineTo(-150, 126); dv.lineTo(-120, 14);
   dv.closePath();
-  const deriva = fazForma(dv, 10, mCorpo);
+  /* 10 de espessura numa corda de ~50: a deriva também era tábua. Seis. */
+  const deriva = fazForma(dv, 6, mCorpo);
   deriva.rotation.y = -Math.PI/2; deriva.position.set(0, 6, 0); g.add(deriva);
   const brasao = new THREE.Mesh(new THREE.ConeGeometry(17, 32, 3), mAmarelo);
   brasao.position.set(0, 80, -150); brasao.rotation.set(Math.PI/2, 0, 0); g.add(brasao);
@@ -3351,18 +3438,29 @@ function montaDragaoClassico(corCorpo, corDetalhe, corVidro, asasMoveis){
      E é a escolha certa para ESTE avião: o dragão é um brinquedo de peças
      grandes, e aba fina de comando some nele. A asa varrendo já conta a
      velocidade — que é a informação que interessa — e o resto fica limpo. */
+  /* --- O ESTABILIZADOR, QUE ERA UMA TÁBUA ---------------------------------
+     Uma caixa de 72 x 9 x 44, com a ponta sendo outra caixa de 16 x 10. Nove
+     de espessura numa corda de 44 são 20% — o dobro da asa mais gorda que já
+     voou, e é por isso que ele lia como tábua de cortar pão. Agora é um
+     pedaço de asa de verdade, da mesma função que faz a asa do caça: perfil
+     simétrico, afilado, com o enflechamento na tabela e a ponta arredondada.
+     Espessura na raiz: 5,7 em vez de 9; na ponta, 2,9 em vez de 10. */
+  const ESTAB_D = [
+    { x:  6, zLE: -142, corda: 52, y: 0, tt: 0.11 },
+    { x: 48, zLE: -156, corda: 44, y: 0, tt: 0.10 },
+    { x: 86, zLE: -172, corda: 32, y: 0, tt: 0.09 }
+  ];
   for (const lado of [-1, 1]){
-    const e2 = new THREE.Mesh(new THREE.BoxGeometry(72, 9, 44), mCorpo);
-    e2.position.set(lado*42, 0, -168); e2.rotation.y = -lado*0.28;
-    e2.castShadow = true; g.add(e2);
-    const pt = new THREE.Mesh(new THREE.BoxGeometry(16, 10, 40), mAmarelo);
-    pt.position.set(lado*76, 0, -174); pt.rotation.y = -lado*0.28; g.add(pt);
+    const e2 = pedacoDeAsa(ESTAB_D, 0, 0.80, 0, 1, mCorpo, 5, 9);
+    e2.scale.x = lado; e2.castShadow = true; g.add(e2);
+    const pt = pedacoDeAsa(ESTAB_D, 0.80, 1, 0, 1, mAmarelo, 3, 9, true);
+    pt.scale.x = lado; g.add(pt);
   }
   {
     const lm = new THREE.Shape();
     lm.moveTo(6, 10); lm.lineTo(-6, 124); lm.lineTo(-38, 120); lm.lineTo(-26, 14);
     lm.closePath();
-    const leme = fazForma(lm, 9, mAmarelo);
+    const leme = fazForma(lm, 5.5, mAmarelo);
     leme.rotation.y = -Math.PI/2; leme.position.set(0, 6, -176); g.add(leme);
   }
 
