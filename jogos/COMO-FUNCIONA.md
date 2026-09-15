@@ -5111,3 +5111,30 @@ e é o que deixa a asa ser a linha de cima do desenho. Em `y = -22` o topo do
 motor encosta no plano da asa e para ali — e o pilone, que era um tijolo deitado
 porque ligava a asa a um motor na mesma altura dela, virou um pilone de verdade.
 O fogo foi junto, para a saída de verdade (`x = 86`, `z = -114`).
+
+### A pintura, em duas companhias
+
+> *"alterna aí entre azul e amarelo, não predominantemente azul."*
+
+A divisão certa não é por **peça** — foi o erro antigo: luva azul, painel
+amarelo, e a troca de cor caindo exatamente em cima da juntura, que o olho lê
+como borda de objeto. É por **função**:
+
+```
+amarelo .... tudo o que VOA:     asa inteira (luva, painel, flape, aileron)
+                                 e o estabilizador com o profundor
+azul ....... tudo o que CARREGA: fuselagem, deriva, leme, bocais
+             e a ponta da asa, que fecha o desenho
+```
+
+A asa fica de uma cor só da raiz à ponta, então não há emenda nenhuma para a cor
+denunciar; e o avião alterna forte, porque asa e cauda são **metade do que se
+vê**. É a divisão dos aviões de acrobacia, e pela mesma razão: de longe, o que
+se lê primeiro é a asa.
+
+O risco da dobradiça mudou de azul-friso para escuro, porque agora ele mora em
+cima do amarelo.
+
+```
+a cena inteira .. 380 ordens de desenho
+```
