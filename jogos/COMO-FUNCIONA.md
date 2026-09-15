@@ -5243,3 +5243,50 @@ Agora é um pedaço de asa de verdade, pela mesma função que faz a asa do caç
 perfil simétrico, afilado, enflechamento na tabela, ponta arredondada. Espessura
 na raiz 5,7 em vez de 9; na ponta, 2,9 em vez de 10. A deriva foi de 10 para 6 e
 o leme de 9 para 5,5.
+
+---
+
+## O leme girava no eixo errado
+
+Achado pela prova `cmdsinal`, que mede a PEÇA e não o número — e que vinha
+dizendo *"a ponta do leme foi para 0"* havia muito tempo, o que eu tinha lido
+como arredondamento.
+
+A deriva é desenhada **deitada** e posta em pé com `derivaNo.rotation.z = PI/2`.
+Nesse quadro o eixo local Y do leme vira o **X do mundo**: girar em `y` fazia o
+leme **cabecear para cima e para baixo**, como um profundorzinho empoleirado na
+ponta da deriva. Quem vira em torno da vertical do mundo ali é o X local.
+
+```js
+cmd.leme.rotation.x = -cmdLem * LEM_MAX;   // era .y
+```
+
+Medido agora: pedal para a direita, o nariz guina −0,149 e a ponta do leme vai
+para −14,3 — **o mesmo lado**, que é a regra (é o leme que empurra a cauda para
+o outro lado).
+
+## O celular
+
+O caminho do celular como manche não passa pela tela: o aparelho manda
+`Controle.volante`, `Controle.manche` e `Controle.leme`, e `eixos()` os lê no
+modo `sensor`. A prova `celular.js` injeta esses valores direto, sem depender da
+internet, e mede o avião:
+
+```
+volante 35°  -> banco -120°/s, ailerons 18,4 / -18,4   (espelhado à esquerda)
+manche 22°   -> profundor 17,5°;  a 28° (curso cheio), 26,4°: bate no batente
+leme 0,8     -> leme 23,8°
+mão quase parada (2°/2°) -> profundor 0°   (a zona morta segura o tremor)
+```
+
+E os botões: `dedos` confere os controles de dedo do próprio jogo em três
+tamanhos de tela (nenhuma colisão, nada fora da tela, manete, TREM, FLAPE,
+seletor de arma e gatilho), e `defesa2` confere a página do controle remoto nas
+duas orientações.
+
+**O que não dá para verificar daqui:** a sala em rede. O `0.peerjs.com`, que é o
+balcão onde os dois navegadores se acham, está bloqueado pela política de rede
+deste ambiente (`connect_rejected`). Por isso `batalha` falha nos passos 1 a 3
+(os dois abrem salas diferentes e nunca se enxergam) e `teste3d-celular` expira
+esperando o código da sala. Os passos que não dependem do balcão passam: tiro,
+dano, abate e o celular virando piloto.

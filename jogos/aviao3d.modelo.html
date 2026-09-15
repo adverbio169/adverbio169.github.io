@@ -7011,7 +7011,14 @@ function arruma(){
        leme que empurra a cauda para o outro lado. Também estava invertido, e
        também foi a prova que disse (`cmdsinal`), comparando para onde o nariz
        de fato foi. Deduzir sinal neste jogo já me custou caro demais. */
-    cmd.leme.rotation.y = -cmdLem * LEM_MAX;
+    /* ROTATION.X, não .y — e isto só apareceu quando a prova mediu a PEÇA em
+       vez do número. A deriva é desenhada DEITADA e posta em pé com
+       `derivaNo.rotation.z = PI/2`. Nesse quadro, o eixo local Y do leme vira
+       o X do mundo: girar em `y` fazia o leme cabecear para cima e para baixo,
+       como um profundorzinho empoleirado na ponta da deriva. Quem vira em
+       torno da vertical do mundo é o X local. O teste dizia "a ponta do leme
+       foi para 0" há muito tempo, e eu li como arredondamento. */
+    cmd.leme.rotation.x = -cmdLem * LEM_MAX;
   }
   desenhaVortices();
   for (const j of jatos){
