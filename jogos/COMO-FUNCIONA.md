@@ -4863,3 +4863,80 @@ peça, e é o teste que devia existir desde o começo:
 avião inteiro CRU  : 0 / 15 / 7 / 552 / 237 / 569
 avião inteiro FUND : 0 / 15 / 6 / 552 / 237 / 569   ✔ iguais
 ```
+
+---
+
+## A vetoração de empuxo
+
+> *"agora quero ver a vetoração da turbina"* — com a foto do Su-57 e o bocal
+> circulado.
+
+O bocal já mudava de área (abria na pós-combustão, fechava no seco). Agora ele
+faz a outra coisa, que é diferente e mais importante: a **seção divergente
+inteira se inclina**, e o jato sai torto. Empuxo virando comando.
+
+Por isso a peça tem dois grupos encaixados. `vetor` gira; as pétalas moram
+dentro dele e só abrem e fecham. O anel convergente e o aro externo ficam
+**fora** do `vetor` — num bocal de verdade a articulação é entre a garganta e a
+saída, e é ali que se vê o rasgo.
+
+### Três regras, e nenhuma é enfeite
+
+1. **Sem empuxo não há vetoração.** Bocal torto com a manete fechada é desenho,
+   não física. Com o motor em marcha lenta ele volta ao reto — medido: 0,0°.
+2. **O curso encolhe com a velocidade.** A 1.400 são 17,9° de bocal por unidade
+   de comando; a 4.200, 5,1°. Rápido o avião já tem comando de sobra no ar, e o
+   limite de vetoração cai com a pressão dinâmica, como num avião de verdade.
+3. **A rolagem entra diferencial:** um bocal desce, o outro sobe (±4,2°). É o
+   que o Su-57 e o F-22 fazem para rolar com o ar parado, e é a única parte
+   disso que um bocal só não consegue.
+
+E a **chama vai junto** — é ela que se vê de longe, não a pétala.
+
+### A autoridade deixou de ter um piso inventado
+
+A autoridade dos comandos era `q²` com um piso de **0,25 escrito na mão**, para
+o avião nunca ficar sem comando nenhum. Agora o piso tem dono:
+
+```js
+const semAr = Math.max(0, 1 - q*q);
+const daTurbina = VET_AUTORIDADE * empuxoVet * semAr * semAr;
+const autoridade = Math.max(0.25, Math.min(1.15, q*q + daTurbina));
+```
+
+O termo do motor só vale **onde o ar já não vale**. E ao QUADRADO: com
+`(1 - q*q)` simples ele ainda emprestava 8% de comando em cruzeiro — medido, o
+profundor a 3.000 saltava de 13,4° para 14,5° sem ninguém pedir. Elevado ao
+quadrado sobram 1,5% em cruzeiro e um quarto de autoridade extra devagar.
+Manete fechada, nada disso existe: quem plana em marcha lenta cai igual a antes,
+e os testes de estol e de pouso não mudaram uma linha.
+
+### Dois bugs achados no caminho
+
+**As pétalas apontavam para dentro do avião.** `p.rotation.x = -Math.PI/2`
+deitava a pétala para +z, que neste modelo é a FRENTE. As dez sumiam dentro da
+fuselagem e o bocal era só o aro, com uns cacos de chapa aparecendo em volta.
+A turbina nunca teve pétala nenhuma para ver. Com +PI/2 elas deitam para trás.
+
+**O rastro engrossava para trás.** O cone da chama estava com a PONTA no bocal e
+a BOCA lá atrás, terminando num disco chapado: um cano de plástico, não um jato.
+Jato sai grosso do bocal e afina até sumir — `rotation.x = -Math.PI/2`.
+
+E de quebra os **losangos de choque** deixaram de ser toros: toro visto de lado é
+uma rosquinha, e eram três argolas brancas penduradas no rastro. Losango de
+choque é um nó de luz — uma bolinha achatada resolve nos dois ângulos e ainda
+custa menos triângulo.
+
+### E o serrilhado
+
+As pétalas terminam em **ponta, alternando comprida e curta** — o dente de serra
+do Su-57 e do F-22, que quebra o eco do radar e mistura o jato com o ar frio mais
+depressa. Na primeira tentativa elas afinavam para 34% da largura na saída e as
+dez viravam espinhos de ouriço: entre uma e a vizinha sobrava mais vão do que
+chapa. A 41%, com 2% de sobreposição na raiz, o anel volta a ler como
+**superfície**, e o serrilhado aparece como recorte dela.
+
+```
+jogador ......... 72 malhas  (eram 62: garganta, tampo e três atuadores por bocal)
+a cena inteira .. 466 ordens de desenho
+```

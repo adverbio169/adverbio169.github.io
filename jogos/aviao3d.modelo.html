@@ -858,6 +858,22 @@ const TAXA_ROL = 3.4, TAXA_ARF = 1.5, TAXA_LEME = 0.55;
    comentário grande em `eixos()` sobre por que virou VELOCIDADE. */
 const ROL_CHEIO = 40, ROL_MORTO = 6, NIVELA = 1.5, NIVELA_ATE = 32;
 const ARF_CHEIO = 28, ARF_MORTO = 3;   // curso do profundor, em graus de celular
+/* --- VETORAÇÃO DE EMPUXO ---------------------------------------------------
+   Curso do bocal, em radianos: 18° em arfagem, 12° em guinada, 9° de
+   diferencial para a rolagem. São os números do Su-57 (±20° em arfagem) um
+   pouco encolhidos, porque aqui os dois bocais ficam colados no eixo e um
+   curso cheio atravessaria o vizinho.
+
+   VET_V1/VET_V2: a faixa em que o curso vai encolhendo. Abaixo de 1.400 o
+   bocal tem tudo; acima de 3.600 sobra pouco mais de um quarto. */
+const VET_ARF = 0.32, VET_GUI = 0.21, VET_ROL = 0.16;
+const VET_V1 = 1400, VET_V2 = 3600;
+/* quanto o motor empresta de autoridade quando o ar não dá mais. É o que
+   substitui o antigo piso de 0,25 por uma razão FÍSICA: o rabo continua sendo
+   empurrado porque a turbina está empurrando, não porque o número tinha um
+   mínimo escrito na mão. */
+const VET_AUTORIDADE = 0.38;
+let vetArf = 0, vetGui = 0, vetRol = 0;   // onde o bocal está agora
 const RAIO_PEGA = 340, GASTO = 3.0, GASTO_TURBO = 4.6;
 const DA_NORMAL = 20, DA_AZUL = 32, TURBO_SEG = 5;
 const RAIO_NUKE = 9000, RAIO_POMBO = 170, RAIO_AVIAO = 430, RAIO_HELI = 400;
@@ -1581,7 +1597,7 @@ const MEDIDAS_CACA = {
   nome: 'CAÇA AD-02',
   roda: 103,
   cabine: { frente: 118, cima: 40 },
-  jatos: [{ x: -26, y: -7, z: -232 }, { x: 26, y: -7, z: -232 }],
+  jatos: [{ x: -26, y: -7, z: -252 }, { x: 26, y: -7, z: -252 }],
   fogo: { raio: 14, nucleo: 7.5, anel: 6.5 },
   ponta: null,                   // vem da tabela AD02, que é mais exata
   pivo:  null
@@ -1893,47 +1909,111 @@ function fuselagem(secoes, mat, de, ate){
    ========================================================================== */
 function bocalVariavel(raio, mMetal, mEscuro){
   const grupo = new THREE.Group();
-  /* Dez pétalas, não catorze. Cada pétala é uma ORDEM DE DESENHO — elas giram
-     cada uma na sua dobradiça, então não dá para cozinhar entre si — e a conta
-     da cena subiu de 372 para 471 quando o AD-02 entrou, com os dois bocais
-     respondendo por trinta e duas delas. A dez, o anel continua lendo como
-     anel de pétalas e a cena volta a caber. */
+  /* --- O BOCAL VETORADO, DO JEITO DO Su-57 ---------------------------------
+     Duas coisas diferentes acontecem neste bocal, e é bom não confundi-las:
+
+       ABRIR  — as pétalas escancaram na pós-combustão e fecham no seco. É a
+                garganta mudando de área. O bocal continua apontando para trás.
+       VETORAR— a seção divergente INTEIRA se inclina, e o jato sai torto. É
+                empuxo virando comando: o motor empurra o rabo do avião para
+                onde o piloto quiser, mesmo com o ar parado.
+
+     Por isso a peça tem dois grupos encaixados. `vetor` gira (arfagem e
+     guinada); as pétalas moram dentro dele e só abrem e fecham. O anel
+     convergente e o aro externo ficam FORA do `vetor`: num bocal de verdade a
+     articulação é entre a garganta e a saída, e é ali que se vê o rasgo.
+
+     E as pétalas terminam em PONTA, alternando comprida e curta. É o serrilhado
+     do Su-57 e do F-22: dente de serra na saída quebra o eco do radar e mistura
+     o jato com o ar frio mais depressa. Visto de trás, é o que faz um bocal
+     moderno não parecer um cano cortado. */
   const N = 10, petalas = [];
-  const chapa = (larg, comp, esp) => {
+  const vetor = new THREE.Group();
+  grupo.add(vetor);
+
+  /* uma pétala: trapézio que afina para trás e acaba num dente */
+  const chapa = (larg, comp, dente, esp) => {
     const f = new THREE.Shape();
     f.moveTo(-larg/2, 0); f.lineTo(larg/2, 0);
-    f.lineTo(larg*0.34, -comp); f.lineTo(-larg*0.34, -comp);
+    /* a pétala afina POUCO (0,82 da largura na saída). Afinando para 0,34 como
+       na primeira versão, as dez viravam espinhos de ouriço: entre uma e a
+       vizinha sobrava mais vão do que chapa, e o bocal deixava de ser um tubo.
+       Num bocal de verdade as pétalas quase se encostam — é isso que faz o
+       anel ler como SUPERFÍCIE, e o serrilhado aparecer como recorte dela. */
+    f.lineTo(larg*0.41, -comp);
+    f.lineTo(0, -comp - dente);          // a ponta do dente
+    f.lineTo(-larg*0.41, -comp);
     f.closePath();
-    const g2 = new THREE.ExtrudeGeometry(f, { depth: esp, bevelEnabled: false });
-    return g2;
+    return new THREE.ExtrudeGeometry(f, { depth: esp, bevelEnabled: false });
   };
-  // anel convergente, fixo
+
   const conv = new THREE.Mesh(new THREE.CylinderGeometry(raio*0.82, raio, 16, N*2, 1, true), mEscuro);
-  conv.rotation.x = Math.PI/2; conv.position.z = 8; grupo.add(conv);
-  const larg = 2*Math.PI*raio/N * 0.92;
+  conv.rotation.x = Math.PI/2; conv.position.z = 8;
+  /* a GARGANTA escura dentro do bocal: sem ela, vetorado, aparece o vazio do
+     casco pelo rasgo da articulação */
+  const garganta = new THREE.Mesh(new THREE.CylinderGeometry(raio*0.88, raio*0.72, 46, N*2, 1, false), mEscuro);
+  garganta.rotation.x = Math.PI/2; garganta.position.z = 16; vetor.add(garganta);
+  /* e o TAMPO: um disco escuro fundo, que é o que se vê quando se olha um jato
+     por trás. Sem ele aparece o casco azul da fuselagem pelo meio do bocal. */
+  const fundoBocal = new THREE.Mesh(new THREE.CircleGeometry(raio*0.88, N*2), mEscuro);
+  fundoBocal.position.z = 39; fundoBocal.rotation.y = Math.PI; vetor.add(fundoBocal);
+
+  const larg = 2*Math.PI*raio/N * 1.02;   // um tico de sobreposição: bocal não tem fresta
   for (let i = 0; i < N; i++){
     const eixo = new THREE.Group();
     eixo.rotation.z = i/N*Math.PI*2;
-    const p = new THREE.Mesh(chapa(larg, 24, 1.6), mMetal);
+    const dente = (i % 2) ? larg*0.62 : larg*0.22;     // comprida, curta, comprida...
+    const p = new THREE.Mesh(chapa(larg, 17, dente, 1.6), mMetal);
     p.position.set(0, raio, 0);
-    p.rotation.x = -Math.PI/2;      // a pétala pendura para trás
+    /* +PI/2, não -PI/2. Com o sinal trocado a pétala deitava para +z, que
+       neste modelo é a FRENTE: as dez sumiam dentro da fuselagem e o bocal
+       ficava sendo só o aro, com uns cacos de chapa aparecendo em volta. Era
+       por isso que a turbina nunca teve pétala nenhuma para ver. */
+    p.rotation.x = Math.PI/2;       // a pétala deita para TRÁS
     eixo.add(p);
-    grupo.add(eixo);
+    vetor.add(eixo);
     petalas.push(eixo);
+  }
+  /* --- OS ATUADORES ---------------------------------------------------------
+     Três hastes por fora, a 120°, ligando o anel fixo à seção que gira. São
+     elas que mostram que a coisa é MECÂNICA e não um jato entortando sozinho:
+     vetorado, uma encolhe enquanto a outra estica. Moram no `vetor` porque
+     acompanham a saída; o pé de cada uma fica para a frente, no aro fixo. */
+  const hastes = [];
+  for (let i = 0; i < 3; i++){
+    const a = i/3*Math.PI*2 + 0.5;
+    const h = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 30, 6), mMetal);
+    h.rotation.x = Math.PI/2;
+    h.position.set(Math.cos(a)*(raio + 3.5), Math.sin(a)*(raio + 3.5), 0);
+    vetor.add(h); hastes.push(h);
   }
   const aro = new THREE.Mesh(new THREE.TorusGeometry(raio, 1.8, 7, N*2), mMetal);
   grupo.userData.fixos = [conv, aro];     // quem não mexe vai para a fusão geral
   grupo.remove(conv);
   grupo.userData.petalas = petalas;
-  /* O SINAL. Na primeira tentativa o bocal abria uma FLOR no seco — as pétalas
-     escancarando para fora com o motor em marcha lenta, o oposto do que
-     acontece. A pétala pendura para trás em -PI/2; girar MAIS negativo joga a
-     ponta para fora, mais positivo fecha. Então seco é positivo. */
-  grupo.userData.abre = a => {        // 0 = seco (fechado), 1 = pós-combustão
-    const ang = 0.30 - a*0.34;
-    for (const e of petalas) e.children[0].rotation.x = -Math.PI/2 + ang;
+  grupo.userData.vetor = vetor;
+  /* O SINAL DO ABRIR. Com a pétala deitada para trás em +PI/2, somar ângulo
+     joga a PONTA para fora (a saída escancara) e subtrair converge. Seco é uma
+     garganta estreita; pós-combustão é a flor aberta. */
+  grupo.userData.abre = a => {
+    const ang = -0.13 + a*0.27;
+    for (const e of petalas) e.children[0].rotation.x = Math.PI/2 + ang;
+  };
+  /* E O VETORAR: arfagem e guinada, em radianos. O bocal segue a MESMA
+     convenção de sinal do profundor e do leme, para os três lerem juntos. */
+  grupo.userData.vetora = (arf, guin) => {
+    vetor.rotation.x = arf;
+    vetor.rotation.y = guin;
+    /* as hastes esticam e encolhem com a inclinação: cada uma mede o quanto o
+       seu lado do anel andou */
+    for (let i = 0; i < 3; i++){
+      const a = i/3*Math.PI*2 + 0.5;
+      const curso = (Math.sin(a)*arf - Math.cos(a)*guin)*raio;
+      hastes[i].scale.y = Math.max(0.35, 1 + curso/26);
+    }
   };
   grupo.userData.abre(0.25);
+  grupo.userData.vetora(0, 0);
   return grupo;
 }
 
@@ -2349,7 +2429,10 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        foi o que você viu. Agora os dois bocais ficam colados no eixo, como num
        F/A-18, e a cauda passa por fora deles. */
     const bocal = bocalVariavel(14, mMetal, mEscuro);
-    bocal.position.set(lado*M.MOTOR_X, -7, -214);
+    /* o bocal SAI do casco: em -214 ele ficava rente ao corte de popa (-212) e
+       as pétalas nasciam dentro da fuselagem, sem duto nenhum para ver. Em
+       -224 o anel fica de fora, e por trás dele aparece a garganta escura. */
+    bocal.position.set(lado*M.MOTOR_X, -7, -224);
     g.add(bocal);
     for (const fixo of bocal.userData.fixos){      // o anel e o aro, no corpo
       fixo.position.add(bocal.position); g.add(fixo);
@@ -3238,13 +3321,23 @@ function montaGaragem(){
     const fogo = (cor, op) => new THREE.MeshBasicMaterial({ color: cor, transparent: true,
       opacity: op, fog: false, depthWrite: false, side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending });
+    /* -PI/2, não +PI/2: com o sinal trocado o cone ficava com a PONTA no bocal
+       e a BOCA lá atrás — o rastro engrossava conforme se afastava e terminava
+       num disco chapado, que é um cano de plástico, não um jato. Jato sai
+       grosso do bocal e afina até sumir. */
     const env = new THREE.Mesh(new THREE.ConeGeometry(F.raio, 150, 14, 1, true), fogo(0x7fc4ff, 0.30));
-    env.rotation.x = Math.PI/2; env.position.z = -75; g.add(env);
+    env.rotation.x = -Math.PI/2; env.position.z = -75; g.add(env);
     const nuc = new THREE.Mesh(new THREE.ConeGeometry(F.nucleo, 62, 12, 1, true), fogo(0xffffff, 0.85));
-    nuc.rotation.x = Math.PI/2; nuc.position.z = -31; g.add(nuc);
+    nuc.rotation.x = -Math.PI/2; nuc.position.z = -31; g.add(nuc);
     const anelChoque = [];
     for (let i = 0; i < 3; i++){
-      const a2 = new THREE.Mesh(new THREE.TorusGeometry(F.anel, 1.5, 5, 14), fogo(0xffe6b0, 0.7));
+      /* ANEL de verdade era um TORO — e toro visto de lado é uma ROSQUINHA
+         branca. De trás lia como anel, de perfil (que é como o jogador vê o
+         próprio avião) viravam três argolas de plástico penduradas no rastro.
+         Losango de choque é um NÓ de luz: uma bolinha achatada resolve nos dois
+         ângulos, e ainda custa menos triângulo. */
+      const a2 = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 7), fogo(0xffe6b0, 0.55));
+      a2.scale.set(F.anel*0.85, F.anel*0.85, F.anel*1.5);
       a2.position.z = -46 - i*38; anelChoque.push(a2); g.add(a2);
     }
     aviao.add(g);
@@ -5968,7 +6061,23 @@ function atualiza(dt){
      O piso de 0,25 existe para o avião nunca ficar sem comando nenhum; o teto
      de 1,15 dá o troco de manobrar mais firme em alta. */
   const q = voo/VOO_BASE;
-  const autoridade = Math.max(0.25, Math.min(1.15, q*q));
+  /* --- AUTORIDADE: o ar MAIS o motor ----------------------------------------
+     A autoridade era só `q*q` com um piso de 0,25 escrito na mão. Agora o piso
+     tem dono: o bocal vetorado. O motor empurra o rabo mesmo com o ar parado,
+     e por isso o termo dele só vale onde o ar já não vale — `(1 - q*q)`. Em
+     cruzeiro não muda nada; devagar, com a manete aberta, o avião continua
+     obedecendo, que é exatamente para o que a vetoração serve.
+
+     Manete fechada, nada disso existe: quem plana com o motor em marcha lenta
+     cai igualzinho a antes. */
+  const empuxoVet = turbinando ? 1 : motor;
+  /* ao QUADRADO: com `(1 - q*q)` simples o motor ainda emprestava 8% de comando
+     em cruzeiro, e não é para isso que a vetoração serve — medido, o profundor
+     em 3.000 saltava de 13,4° para 14,5° sem ninguém pedir. Elevando ao
+     quadrado, em cruzeiro sobra 2% e devagar continua valendo um quarto. */
+  const semAr = Math.max(0, 1 - q*q);
+  const daTurbina = VET_AUTORIDADE * empuxoVet * semAr * semAr;
+  const autoridade = Math.max(0.25, Math.min(1.15, q*q + daTurbina));
   rol *= autoridade;
 
   let r = giraPar(eixoD, eixoC, -rol*dt); eixoD = r[0]; eixoC = r[1];
@@ -6617,6 +6726,35 @@ function arruma(){
   if (aviao.userData.bocais){
     const a = turbinando ? 1 : Math.max(0, Math.min(1, (motor - 0.25)/0.7))*0.75;
     for (const b of aviao.userData.bocais) b.userData.abre(a);
+  }
+  /* --- A VETORAÇÃO ---------------------------------------------------------
+     O bocal lê os MESMOS comandos que as superfícies (`cmdArf`, `cmdLem`,
+     `cmdRol`), e por isso os quatro se movem juntos: puxar o manche levanta o
+     profundor E aponta os dois jatos. Três regras:
+
+       1. Sem empuxo não há vetoração. Bocal torto com a manete fechada é
+          desenho, não física — com o motor em marcha lenta ele volta ao reto.
+       2. O curso encolhe com a velocidade. A 4.000 o avião já tem comando de
+          sobra no ar, e vetorar ali só arrancaria o rabo: é assim num avião de
+          verdade, onde o limite de vetoração cai com a pressão dinâmica.
+       3. A rolagem entra DIFERENCIAL: um bocal desce, o outro sobe. É o que o
+          Su-57 e o F-22 fazem para rolar com o ar parado, e é a única parte
+          disso que não dá para fazer com um bocal só. */
+  if (aviao.userData.bocais && aviao.userData.bocais.length){
+    const empuxo = turbinando ? 1 : motor;
+    const rapido = Math.max(0, Math.min(1, (voo - VET_V1)/(VET_V2 - VET_V1)));
+    const curso = empuxo * (1 - 0.72*rapido);
+    vetArf += (cmdArf*VET_ARF*curso - vetArf) * 0.18;
+    vetGui += (-cmdLem*VET_GUI*curso - vetGui) * 0.18;
+    vetRol += (cmdRol*VET_ROL*curso - vetRol) * 0.18;
+    const bs = aviao.userData.bocais;
+    for (let i = 0; i < bs.length; i++){
+      const lado = bs.length > 1 ? (i === 0 ? -1 : 1) : 0;
+      const arf = vetArf + lado*vetRol;
+      bs[i].userData.vetora(arf, vetGui);
+      /* e a CHAMA vai junto — é ela que se vê de longe, não a pétala */
+      if (jatos[i]){ jatos[i].g.rotation.x = arf; jatos[i].g.rotation.y = vetGui; }
+    }
   }
   for (const o of obstaculos){
     if (!o.no) continue;
@@ -8082,6 +8220,7 @@ function reinicia(){
              * Math.max(0, Math.min(1, (voo - ASA_V1)/(ASA_V2 - ASA_V1)));
   for (const v2 of vortices){ v2.pontos.length = 0; v2.malha.visible = false; v2.espera = 0; }
   cmdRol = cmdArf = cmdLem = 0;
+  vetArf = vetGui = vetRol = 0;
   saiuDoChao = noChao ? 0 : 99;
   terrenoAFrente = terrenoJa = 0;
   Alarmes.zera();
