@@ -4940,3 +4940,63 @@ chapa. A 41%, com 2% de sobreposição na raiz, o anel volta a ler como
 jogador ......... 72 malhas  (eram 62: garganta, tampo e três atuadores por bocal)
 a cena inteira .. 466 ordens de desenho
 ```
+
+### O bocal, refeito até ficar peça
+
+> *"ainda tem imperfeições... deixa perfeito"*
+
+A primeira versão do bocal vetorado era só um **anel de pétalas**. De perto
+virava um ouriço e de perfil o rastro parecia nascer do nada, porque entre uma
+pétala e a vizinha se via o céu. Bocal de verdade tem **carcaça**: as pétalas
+são as chapas de fora, e por trás delas existe um tubo. Agora são três camadas,
+e é o que o faz ler como peça em qualquer ângulo:
+
+```
+garganta ... o túnel escuro por dentro, com a tampa lá no fundo (z = +33)
+carcaça .... o casco entre as pétalas, escuro, tapa toda fresta
+pétalas .... as chapas de fora, que abrem e fecham, serrilhadas
+soquete .... fixo, no casco: é ele que aparece pelo rasgo quando vetora
+```
+
+Sete correções, e cada uma tinha causa:
+
+| o que se via | a causa |
+|---|---|
+| bocal mais alto que a popa | raio 14 num casco de 35 de altura. Caça de verdade fica em ¾ da altura local — **raio 12** |
+| anel de engrenagem | a pétala afinava para 34% da largura na saída: sobrava mais vão do que chapa. **97%**, e elas quase se encostam |
+| pote tapado | o tubo de dentro era fechado e a tampa caía 7 unidades à frente da saída. Agora ela mora a **30 de profundidade** |
+| casco azul por entre as pétalas | tubo com `FrontSide` visto por trás mostra a face que o three joga fora. Tudo o que é tubo aqui é **DoubleSide** |
+| anel azul dentro do túnel | com `rotation.x = -PI/2` o `radiusTop` do cilindro é que vai parar atrás — o tubo estava **estreito na saída** e largo na frente |
+| pulseira de cromo | `mMetal` é o metal polido do trem de pouso, brilho 90. Bocal de caça é titânio revenido: **fosco e escuro** |
+| alfinetes espetados ao lado | os atuadores eram cilindros claros soltos, com as tampas brancas. Agora escuros, colados na carcaça, nascendo de um cepo na gola |
+
+E, vetorado, ainda dava para ver o casco azul **raspando a parede do tubo**: o
+soquete fixo, que antes tinha 20 de comprimento, passou a 36. O que aparece pelo
+rasgo da articulação é o fundo do motor, que é o que existe ali.
+
+### O anel de pétalas virou UMA malha
+
+As pétalas eram dez malhas, uma por dobradiça — vinte ordens de desenho só nos
+dois bocais. Mas elas abrem **todas pelo mesmo ângulo**: não há uma pétala que
+faça diferente das outras. Então não precisa de dobradiça nenhuma. As posições
+dos vértices são escritas direto, e `abre()` reescreve as mesmas posições:
+
+```js
+const põe = (ux, uy, tx, ty, d, sEst, fora) => {
+  const R = raio + sEst*sb + fora;          // sb = sin(abertura)
+  pos[k++] = ux*R + tx*d;  pos[k++] = uy*R + ty*d;  pos[k++] = -sEst*cb;
+};
+```
+
+672 vértices por bocal — reescrever isso custa menos que uma única ordem de
+desenho a mais. **Catorze pétalas numa malha só**, e o anel ficou mais fino do
+que quando eram dez.
+
+E de quebra, dois frisos de chapa estavam **fora da fuselagem** (o de z=−40
+sobrava oito unidades no ar): viravam aletinhas pretas espetadas na lateral, que
+de perfil liam como um risco de faca no avião. O x de cada um agora sai da
+tabela do casco, com `pontoNoCasco`.
+
+```
+a cena inteira .. 437 ordens de desenho  (eram 466 com as pétalas soltas)
+```

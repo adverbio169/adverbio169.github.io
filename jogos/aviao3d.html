@@ -8445,106 +8445,195 @@ function fuselagem(secoes, mat, de, ate){
 function bocalVariavel(raio, mMetal, mEscuro){
   const grupo = new THREE.Group();
   /* --- O BOCAL VETORADO, DO JEITO DO Su-57 ---------------------------------
-     Duas coisas diferentes acontecem neste bocal, e é bom não confundi-las:
+     Duas coisas diferentes acontecem aqui, e é bom não confundi-las:
 
        ABRIR  — as pétalas escancaram na pós-combustão e fecham no seco. É a
-                garganta mudando de área. O bocal continua apontando para trás.
+                área de saída mudando. O bocal continua apontando para trás.
        VETORAR— a seção divergente INTEIRA se inclina, e o jato sai torto. É
                 empuxo virando comando: o motor empurra o rabo do avião para
                 onde o piloto quiser, mesmo com o ar parado.
 
-     Por isso a peça tem dois grupos encaixados. `vetor` gira (arfagem e
-     guinada); as pétalas moram dentro dele e só abrem e fecham. O anel
-     convergente e o aro externo ficam FORA do `vetor`: num bocal de verdade a
-     articulação é entre a garganta e a saída, e é ali que se vê o rasgo.
+     Por isso a peça tem dois grupos encaixados. `vetor` gira; as pétalas moram
+     dentro dele e só abrem e fecham. O anel convergente e a gola externa ficam
+     FORA do `vetor` — num bocal de verdade a articulação é entre a garganta e
+     a saída, e é ali que se vê o rasgo.
 
-     E as pétalas terminam em PONTA, alternando comprida e curta. É o serrilhado
-     do Su-57 e do F-22: dente de serra na saída quebra o eco do radar e mistura
-     o jato com o ar frio mais depressa. Visto de trás, é o que faz um bocal
-     moderno não parecer um cano cortado. */
-  const N = 10, petalas = [];
+     E O QUE ELE TEM DE SÓLIDO. A primeira versão era só o anel de pétalas: de
+     perto virava um ouriço, e de perfil o rastro parecia nascer do nada,
+     porque entre uma pétala e a vizinha se via o céu. Bocal de verdade tem
+     CARCAÇA: as pétalas são as chapas de fora, e por trás delas existe um
+     tubo. Aqui são três camadas, e é o que o faz ler como peça em qualquer
+     ângulo:
+
+        garganta ..... o tubo escuro por dentro, que é o buraco que se vê
+        carcaça ...... o casco entre as pétalas, escuro, tapa toda fresta
+        pétalas ...... as chapas de fora, que abrem e fecham, serrilhadas
+     ------------------------------------------------------------------------ */
+  const N = 14;                    // catorze, e numa malha só (ver ANEL abaixo)
+  const COMP = 19, ESP = 1.5;      // comprimento e espessura da pétala
   const vetor = new THREE.Group();
   grupo.add(vetor);
 
-  /* uma pétala: trapézio que afina para trás e acaba num dente */
-  const chapa = (larg, comp, dente, esp) => {
-    const f = new THREE.Shape();
-    f.moveTo(-larg/2, 0); f.lineTo(larg/2, 0);
-    /* a pétala afina POUCO (0,82 da largura na saída). Afinando para 0,34 como
-       na primeira versão, as dez viravam espinhos de ouriço: entre uma e a
-       vizinha sobrava mais vão do que chapa, e o bocal deixava de ser um tubo.
-       Num bocal de verdade as pétalas quase se encostam — é isso que faz o
-       anel ler como SUPERFÍCIE, e o serrilhado aparecer como recorte dela. */
-    f.lineTo(larg*0.41, -comp);
-    f.lineTo(0, -comp - dente);          // a ponta do dente
-    f.lineTo(-larg*0.41, -comp);
-    f.closePath();
-    return new THREE.ExtrudeGeometry(f, { depth: esp, bevelEnabled: false });
-  };
+  /* --- POR DENTRO: um TÚNEL, não um tampão --------------------------------
+     Duas armadilhas aqui, e caí nas duas.
 
-  const conv = new THREE.Mesh(new THREE.CylinderGeometry(raio*0.82, raio, 16, N*2, 1, true), mEscuro);
-  conv.rotation.x = Math.PI/2; conv.position.z = 8;
-  /* a GARGANTA escura dentro do bocal: sem ela, vetorado, aparece o vazio do
-     casco pelo rasgo da articulação */
-  const garganta = new THREE.Mesh(new THREE.CylinderGeometry(raio*0.88, raio*0.72, 46, N*2, 1, false), mEscuro);
-  garganta.rotation.x = Math.PI/2; garganta.position.z = 16; vetor.add(garganta);
-  /* e o TAMPO: um disco escuro fundo, que é o que se vê quando se olha um jato
-     por trás. Sem ele aparece o casco azul da fuselagem pelo meio do bocal. */
-  const fundoBocal = new THREE.Mesh(new THREE.CircleGeometry(raio*0.88, N*2), mEscuro);
-  fundoBocal.position.z = 39; fundoBocal.rotation.y = Math.PI; vetor.add(fundoBocal);
+     A primeira: o tubo de dentro estava FECHADO (`openEnded: false`), e a
+     tampa de trás dele caía SETE unidades à frente da saída. De trás o bocal
+     parecia um pote tapado, não um buraco. Agora a tampa mora lá no fundo, a
+     trinta de distância, e o que se vê pela saída é profundidade.
 
-  const larg = 2*Math.PI*raio/N * 1.02;   // um tico de sobreposição: bocal não tem fresta
-  for (let i = 0; i < N; i++){
-    const eixo = new THREE.Group();
-    eixo.rotation.z = i/N*Math.PI*2;
-    const dente = (i % 2) ? larg*0.62 : larg*0.22;     // comprida, curta, comprida...
-    const p = new THREE.Mesh(chapa(larg, 17, dente, 1.6), mMetal);
-    p.position.set(0, raio, 0);
-    /* +PI/2, não -PI/2. Com o sinal trocado a pétala deitava para +z, que
-       neste modelo é a FRENTE: as dez sumiam dentro da fuselagem e o bocal
-       ficava sendo só o aro, com uns cacos de chapa aparecendo em volta. Era
-       por isso que a turbina nunca teve pétala nenhuma para ver. */
-    p.rotation.x = Math.PI/2;       // a pétala deita para TRÁS
-    eixo.add(p);
-    vetor.add(eixo);
-    petalas.push(eixo);
+     A segunda: tubo com `FrontSide` visto por trás mostra a face de dentro,
+     que é justamente a que o three joga fora. Por isso o céu azul da fuselagem
+     aparecia por entre as pétalas. Tudo o que é tubo aqui é DoubleSide. */
+  const mTunel = new THREE.MeshPhongMaterial({ color: 0x0d1524, shininess: 18,
+                                               side: THREE.DoubleSide });
+  /* e o tubo alarga PARA A SAÍDA, não para dentro. Com `rotation.x = -PI/2` o
+     `radiusTop` do cilindro é que vai parar atrás — estava com o lado estreito
+     na saída e o largo lá na frente, e a tampa do fundo, mais estreita que o
+     tubo naquele ponto, deixava um anel por onde se via o casco azul. */
+  const garganta = new THREE.Mesh(
+    new THREE.CylinderGeometry(raio*0.96, raio*0.74, 62, N, 1, true), mTunel);
+  garganta.rotation.x = -Math.PI/2; garganta.position.z = 3; vetor.add(garganta);
+  const tampa = new THREE.Mesh(new THREE.CircleGeometry(raio*0.76, N), mTunel);
+  tampa.position.z = 33; vetor.add(tampa);
+
+  /* --- a carcaça: o casco que tapa as frestas entre as pétalas -------------
+     Fica um fio ABAIXO da linha das pétalas para não brigar com elas, e vai um
+     pouco além do dente curto: assim, por qualquer fresta, o que aparece é
+     chapa escura e não o céu. */
+  const carcaca = new THREE.Mesh(
+    new THREE.CylinderGeometry(raio - 0.5, raio - 0.5, COMP + 12, N, 1, true), mTunel);
+  carcaca.rotation.x = -Math.PI/2; carcaca.position.z = -COMP*0.5 + 5; vetor.add(carcaca);
+
+  /* --- O ANEL DE PÉTALAS, NUMA MALHA SÓ -------------------------------------
+     As pétalas eram dez malhas separadas, uma por dobradiça: vinte ordens de
+     desenho só nos dois bocais, e ainda assim um anel grosseiro. Mas elas
+     abrem TODAS PELO MESMO ÂNGULO — não há uma pétala que faça diferente das
+     outras. Então não precisa de dobradiça nenhuma: dá para escrever as
+     posições dos vértices direto, e `abre()` reescreve as mesmas posições.
+
+     Uma malha, catorze pétalas, e o anel ficou mais fino do que quando eram
+     dez. 672 vértices por bocal — reescrever isso custa menos que uma única
+     ordem de desenho a mais. */
+  const A0 = (2*Math.PI*raio/N)*0.545;     // meia-largura na dobradiça
+  const A1 = A0*0.97;                      // e na saída: quase reta, ver abaixo
+  /* afinar demais é o que fazia o ouriço: com a ponta em 34% da largura,
+     entre uma pétala e a vizinha sobrava mais vão do que chapa. */
+  const petalGeo = new THREE.BufferGeometry();
+  const CARAS = 16;                        // 3+3 tampas + 5 quadrados de lado
+  const VERT = N*CARAS*3;
+  const pos = new Float32Array(VERT*3);
+  petalGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  /* --- A CHAPA DA PÉTALA, com tinta própria ---------------------------------
+     `mMetal` é o metal polido do trem de pouso: brilho 90 e reflexo quase
+     branco. No bocal ele virava um arco cremoso que era a coisa mais brilhante
+     do avião inteiro — e bocal de caça é a peça mais QUEIMADA que existe,
+     titânio revenido, fosco e escuro. */
+  const mChapa = new THREE.MeshPhongMaterial({ color: 0x3e444e, shininess: 22,
+                                               specular: 0x4b525c });
+  const anel = new THREE.Mesh(petalGeo, mChapa);
+  anel.castShadow = true;
+  vetor.add(anel);
+
+  /* escreve o anel inteiro para um dado ângulo de abertura */
+  function desenhaAnel(beta){
+    const sb = Math.sin(beta), cb = Math.cos(beta);
+    let k = 0;
+    const põe = (ux, uy, tx, ty, d, sEst, fora) => {
+      const R = raio + sEst*sb + fora;
+      pos[k++] = ux*R + tx*d;
+      pos[k++] = uy*R + ty*d;
+      pos[k++] = -sEst*cb;
+    };
+    for (let i = 0; i < N; i++){
+      const f = i/N*Math.PI*2, ux = Math.cos(f), uy = Math.sin(f);
+      const tx = -uy, ty = ux;
+      const dente = (i % 2) ? A0*0.95 : A0*0.34;    // comprida, curta, comprida
+      /* o contorno da pétala: dobradiça larga, saída quase igual, e a ponta
+         do dente no meio */
+      const C = [[-A0, 0], [A0, 0], [A1, COMP], [0, COMP + dente], [-A1, COMP]];
+      const tri = [[0,1,2],[0,2,3],[0,3,4]];
+      for (const [a,b,c] of tri){          // tampa de fora
+        põe(ux,uy,tx,ty, C[a][0], C[a][1], ESP);
+        põe(ux,uy,tx,ty, C[b][0], C[b][1], ESP);
+        põe(ux,uy,tx,ty, C[c][0], C[c][1], ESP);
+      }
+      for (const [a,b,c] of tri){          // tampa de dentro (ordem invertida)
+        põe(ux,uy,tx,ty, C[c][0], C[c][1], 0);
+        põe(ux,uy,tx,ty, C[b][0], C[b][1], 0);
+        põe(ux,uy,tx,ty, C[a][0], C[a][1], 0);
+      }
+      for (let j = 0; j < 5; j++){         // os cinco lados
+        const p0 = C[j], p1 = C[(j+1)%5];
+        põe(ux,uy,tx,ty, p0[0], p0[1], 0);   põe(ux,uy,tx,ty, p1[0], p1[1], 0);
+        põe(ux,uy,tx,ty, p1[0], p1[1], ESP);
+        põe(ux,uy,tx,ty, p0[0], p0[1], 0);   põe(ux,uy,tx,ty, p1[0], p1[1], ESP);
+        põe(ux,uy,tx,ty, p0[0], p0[1], ESP);
+      }
+    }
+    petalGeo.attributes.position.needsUpdate = true;
+    petalGeo.computeVertexNormals();
+    petalGeo.computeBoundingSphere();
   }
+
+  /* --- fora do `vetor`: a gola fixa e o convergente ------------------------- */
+  /* O SOQUETE FIXO. Ele era um anel curto de 20, e bastava: com o bocal reto,
+     as pétalas tapam tudo. Vetorado, não — o tubo de dentro se inclina junto e
+     a linha de visão passa RASPANDO a parede dele e sai no casco azul. Um
+     soquete comprido, escuro e parado resolve: o que aparece pelo rasgo da
+     articulação é o fundo do motor, que é o que existe ali de verdade. */
+  const conv = new THREE.Mesh(
+    new THREE.CylinderGeometry(raio*0.88, raio*1.06, 36, N, 1, true), mTunel);
+  conv.rotation.x = -Math.PI/2; conv.position.z = 20;
+  /* a GOLA: era um toro de raio 1,8 — visto de perto, um arame em volta do
+     bocal. Um anel curto e chato lê como estrutura, que é o que ela é. */
+  /* escura, não polida: em metal claro ela virava uma pulseira de cromo em
+     volta do bocal, e era a coisa mais brilhante do avião inteiro. */
+  const gola = new THREE.Mesh(
+    new THREE.CylinderGeometry(raio + 1.1, raio + 1.1, 6, N, 1, true), mEscuro);
+  gola.rotation.x = -Math.PI/2; gola.position.z = 3;
+
   /* --- OS ATUADORES ---------------------------------------------------------
-     Três hastes por fora, a 120°, ligando o anel fixo à seção que gira. São
-     elas que mostram que a coisa é MECÂNICA e não um jato entortando sozinho:
-     vetorado, uma encolhe enquanto a outra estica. Moram no `vetor` porque
-     acompanham a saída; o pé de cada uma fica para a frente, no aro fixo. */
+     Três hastes a 120°, ligando a estrutura fixa à seção que gira. São elas que
+     mostram que a coisa é MECÂNICA e não um jato entortando sozinho: vetorado,
+     uma encolhe enquanto a outra estica.
+
+     Elas eram cilindros claros soltos no ar, com as tampas brancas de tão
+     polidas — pareciam alfinetes espetados ao lado do bocal. Agora são escuras,
+     coladas na carcaça, e cada uma nasce de um cepo na gola fixa. */
   const hastes = [];
   for (let i = 0; i < 3; i++){
-    const a = i/3*Math.PI*2 + 0.5;
-    const h = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 30, 6), mMetal);
+    const a = i/3*Math.PI*2 + 0.45;
+    const h = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 17, 5), mEscuro);
     h.rotation.x = Math.PI/2;
-    h.position.set(Math.cos(a)*(raio + 3.5), Math.sin(a)*(raio + 3.5), 0);
+    h.position.set(Math.cos(a)*(raio + 2.4), Math.sin(a)*(raio + 2.4), -2);
     vetor.add(h); hastes.push(h);
+    const cepo = new THREE.Mesh(new THREE.BoxGeometry(3.0, 3.0, 4.5), mEscuro);
+    cepo.position.set(Math.cos(a)*(raio + 2.4), Math.sin(a)*(raio + 2.4), 7);
+    grupo.add(cepo);
   }
-  const aro = new THREE.Mesh(new THREE.TorusGeometry(raio, 1.8, 7, N*2), mMetal);
-  grupo.userData.fixos = [conv, aro];     // quem não mexe vai para a fusão geral
-  grupo.remove(conv);
-  grupo.userData.petalas = petalas;
+
+  grupo.userData.fixos = [conv, gola];     // quem não mexe vai para a fusão geral
+  grupo.userData.petalas = [];             // não há mais uma malha por pétala
   grupo.userData.vetor = vetor;
-  /* O SINAL DO ABRIR. Com a pétala deitada para trás em +PI/2, somar ângulo
-     joga a PONTA para fora (a saída escancara) e subtrair converge. Seco é uma
-     garganta estreita; pós-combustão é a flor aberta. */
+  grupo.userData.hastes = hastes;   // para o teste medir o curso do atuador
+
+  /* ABRIR: 0 = seco (saída estreita), 1 = pós-combustão (a flor aberta). */
+  let betaAtual = null;
   grupo.userData.abre = a => {
-    const ang = -0.13 + a*0.27;
-    for (const e of petalas) e.children[0].rotation.x = Math.PI/2 + ang;
+    const beta = -0.09 + a*0.19;
+    if (betaAtual !== null && Math.abs(beta - betaAtual) < 0.002) return;
+    betaAtual = beta; desenhaAnel(beta);
   };
-  /* E O VETORAR: arfagem e guinada, em radianos. O bocal segue a MESMA
-     convenção de sinal do profundor e do leme, para os três lerem juntos. */
+  /* VETORAR: arfagem e guinada, em radianos, na MESMA convenção de sinal do
+     profundor e do leme — os três leem juntos. */
   grupo.userData.vetora = (arf, guin) => {
     vetor.rotation.x = arf;
     vetor.rotation.y = guin;
-    /* as hastes esticam e encolhem com a inclinação: cada uma mede o quanto o
-       seu lado do anel andou */
     for (let i = 0; i < 3; i++){
-      const a = i/3*Math.PI*2 + 0.5;
+      const a = i/3*Math.PI*2 + 0.45;
       const curso = (Math.sin(a)*arf - Math.cos(a)*guin)*raio;
-      hastes[i].scale.y = Math.max(0.35, 1 + curso/26);
+      hastes[i].scale.y = Math.max(0.40, 1 + curso/22);
     }
   };
   grupo.userData.abre(0.25);
@@ -8736,7 +8825,7 @@ const AD02 = {
     { z: -96, w:  59, hCima:  23, hBaixo:  34, yc: -3, n: 3.6 },
     { z:-160, w:  56, hCima:  20, hBaixo:  28, yc: -4, n: 3.2 },
     { z:-186, w:  50, hCima:  18, hBaixo:  22, yc: -6, n: 3.0 },
-    { z:-202, w:  46, hCima:  16, hBaixo:  19, yc: -7, n: 3.0 },
+    { z:-202, w:  46, hCima:  17, hBaixo:  21, yc: -7, n: 3.0 },
     /* O CORTE DE POPA. A fuselagem terminava em ponta lá em -248, e os bocais
        ficavam ENTERRADOS nela — o que se via eram dois anéis escuros afundados
        na barriga. Em avião a jato o casco acaba num corte reto e os bocais
@@ -8963,7 +9052,12 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        raiz do profundor, que nasce em x=36 — dois sólidos no mesmo lugar, que
        foi o que você viu. Agora os dois bocais ficam colados no eixo, como num
        F/A-18, e a cauda passa por fora deles. */
-    const bocal = bocalVariavel(14, mMetal, mEscuro);
+    /* raio 12, não 14. Com 14 o anel de pétalas chegava a 36 de diâmetro numa
+       popa de 35 de altura: os dois bocais ficavam mais ALTOS que a fuselagem
+       em que moram, sobrando por cima e por baixo — a cara de peça parafusada
+       depois. Num caça de verdade o bocal fica em torno de três quartos da
+       altura local do casco (F/A-18, Su-27). Com 12 ele cabe. */
+    const bocal = bocalVariavel(12, mMetal, mEscuro);
     /* o bocal SAI do casco: em -214 ele ficava rente ao corte de popa (-212) e
        as pétalas nasciam dentro da fuselagem, sem duto nenhum para ver. Em
        -224 o anel fica de fora, e por trás dele aparece a garganta escura. */
@@ -9213,8 +9307,11 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     /* o ferrão entre os dois bocais, onde mora o paraquedas de freio */
     /* o ferrão entre os dois bocais (onde mora o paraquedas de freio) — fino e
        ENTRE eles, não por cima: era ele que tapava os bocais */
+    /* e ele PARA antes dos bocais. Com o bocal recuado para -224, o ferrão
+       chegava até -266 e aparecia por cima dos dois, como um dedo apontando
+       para o meio do rastro. */
     const ferrao = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), mCorpo);
-    ferrao.scale.set(5.5, 6.5, 40); ferrao.position.set(0, -4, -226); g.add(ferrao);
+    ferrao.scale.set(5.0, 5.8, 30); ferrao.position.set(0, -4, -212); g.add(ferrao);
   }
 
   if (!simples){   // detalhe de perto: o avião de fundo não leva
@@ -9317,9 +9414,15 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       /* Os frisos eram caixas de 2 por 40 em quase preto: de perto, fita isolante
          colada na fuselagem. Linha de chapa é um RISCO — fina, curta e só um tom
          abaixo da pintura. */
-      for (const [z, x, alt] of [[196, 22, 18], [140, 30, 22], [64, 37, 26], [-40, 62, 28], [-130, 60, 24]]){
+      /* e o x de cada friso sai da TABELA DO CASCO, não de um número escrito
+         na mão. Dois deles estavam FORA da fuselagem — o de z=-40 sobrava oito
+         unidades no ar — e viravam duas aletinhas pretas espetadas na lateral,
+         que de perfil liam como um risco de faca no avião. */
+      for (const [z, alt] of [[196, 18], [140, 22], [64, 26], [-40, 28], [-130, 24]]){
+        const sec = secaoEm(M.secoes, z);
+        const p = pontoNoCasco(sec, 0, -0.35);     // rente à casca, por dentro
         const friso = new THREE.Mesh(caixaViva(1.1, alt, 1.2, 0.3), mFriso);
-        friso.position.set(lado*(x + 0.5), -2, z); g.add(friso);
+        friso.position.set(lado*p.x, p.y, z); g.add(friso);
       }
     }
 
@@ -9856,14 +9959,22 @@ function montaGaragem(){
     const fogo = (cor, op) => new THREE.MeshBasicMaterial({ color: cor, transparent: true,
       opacity: op, fog: false, depthWrite: false, side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending });
-    /* -PI/2, não +PI/2: com o sinal trocado o cone ficava com a PONTA no bocal
-       e a BOCA lá atrás — o rastro engrossava conforme se afastava e terminava
-       num disco chapado, que é um cano de plástico, não um jato. Jato sai
-       grosso do bocal e afina até sumir. */
-    const env = new THREE.Mesh(new THREE.ConeGeometry(F.raio, 150, 14, 1, true), fogo(0x7fc4ff, 0.30));
-    env.rotation.x = -Math.PI/2; env.position.z = -75; g.add(env);
-    const nuc = new THREE.Mesh(new THREE.ConeGeometry(F.nucleo, 62, 12, 1, true), fogo(0xffffff, 0.85));
-    nuc.rotation.x = -Math.PI/2; nuc.position.z = -31; g.add(nuc);
+    /* O CONE DO RASTRO, com a BASE NA ORIGEM. Duas correções na mesma peça:
+
+       1. -PI/2, não +PI/2. Com o sinal trocado o cone ficava com a ponta no
+          bocal e a boca lá atrás: o rastro engrossava ao se afastar e acabava
+          num disco chapado. Jato sai grosso do bocal e afina até sumir.
+       2. a base tem de ficar em z=0. Ela estava no MEIO do cone, e o cone
+          cresce pelo meio: na pós-combustão, com o comprimento em 2,6, metade
+          dele entrava avião adentro e a outra metade virava uma agulha de 390
+          atravessando a tela. Trazendo a base para a origem, esticar só estica
+          para trás — que é para onde sai jato. */
+    const coneJato = (r, h) => { const g2 = new THREE.ConeGeometry(r, h, 14, 1, true);
+                                 g2.translate(0, h/2, 0); return g2; };
+    const env = new THREE.Mesh(coneJato(F.raio, 86), fogo(0x7fc4ff, 0.30));
+    env.rotation.x = -Math.PI/2; env.position.z = 0; g.add(env);
+    const nuc = new THREE.Mesh(coneJato(F.nucleo, 40), fogo(0xffffff, 0.85));
+    nuc.rotation.x = -Math.PI/2; nuc.position.z = 0; g.add(nuc);
     const anelChoque = [];
     for (let i = 0; i < 3; i++){
       /* ANEL de verdade era um TORO — e toro visto de lado é uma ROSQUINHA
@@ -9872,8 +9983,12 @@ function montaGaragem(){
          Losango de choque é um NÓ de luz: uma bolinha achatada resolve nos dois
          ângulos, e ainda custa menos triângulo. */
       const a2 = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 7), fogo(0xffe6b0, 0.55));
-      a2.scale.set(F.anel*0.85, F.anel*0.85, F.anel*1.5);
-      a2.position.z = -46 - i*38; anelChoque.push(a2); g.add(a2);
+      /* a forma do losango fica guardada: o laço do quadro mexe no TAMANHO, e
+         se ele usar setScalar por cima da escala esticada, o nó de luz vira
+         uma bolinha de raio 1 e some. */
+      a2.userData.base = [F.anel*0.80, F.anel*0.80, F.anel*1.6];
+      a2.scale.set(...a2.userData.base);
+      a2.position.z = -30 - i*26; anelChoque.push(a2); g.add(a2);
     }
     aviao.add(g);
     jatos.push({ g, env, nuc, aneis: anelChoque });
@@ -13228,10 +13343,11 @@ function arruma(){
     j.env.material.opacity = (turbinando ? 0.55 : 0.10 + q*0.16) * (0.85 + Math.random()*0.3);
     j.nuc.material.opacity = (turbinando ? 0.9 : 0.25 + q*0.35) * (0.85 + Math.random()*0.3);
     j.aneis.forEach((a2, i) => {
-      a2.visible = turbinando;              // anel de choque só em pós-combustão
-      a2.position.z = -46 - i*38*comp*0.9;
-      a2.material.opacity = 0.6 * (0.7 + Math.random()*0.6);
-      a2.scale.setScalar(1 - i*0.14);
+      a2.visible = turbinando;              // losango de choque só em pós-combustão
+      a2.position.z = -(26 + i*30)*comp*0.42;
+      a2.material.opacity = 0.55 * (0.7 + Math.random()*0.6);
+      const k = (1 - i*0.16)*(0.9 + Math.random()*0.2), B = a2.userData.base;
+      a2.scale.set(B[0]*k, B[1]*k, B[2]*k);
     });
   }
   /* trem e flapes: os dois se mexem devagar, senão aparecem e somem de um
