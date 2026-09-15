@@ -4587,3 +4587,92 @@ avião, não o avião fica pendurado na altura do modelo antigo.
 movia o avião na mão e tirava o retrato no mesmo quadro, sem deixar a câmera,
 que é mola, chegar no lugar dela. Ela ficava 360 unidades mais perto do que fica
 de verdade.)*
+
+---
+
+## A garagem: dois aviões, e a junta que não estava colada
+
+### "as peças não estão conectadas uma a outra, simples assim"
+
+Essa frase resolveu dois dias de diagnóstico errado. Eu vinha explicando que o
+caça parecia tosco por causa da **luz** (pouco contraste no azul escuro) e das
+**proporções** (fino demais na distância da câmera de perseguição). As duas
+coisas são verdade e nenhuma das duas era o problema.
+
+O problema era literal: na raiz da asa havia um **buraco**. A asa de geometria
+variável gira em torno de um pivô que fica dentro da luva; quando ela varre para
+trás, o bordo de ataque da raiz sai de cima da fuselagem e abre uma fresta por
+onde se vê o fundo do céu. Parado na garagem, com a asa aberta, não aparecia.
+Voando, com a asa recolhida, o avião se partia em pedaços soltos no ar.
+
+Avião de verdade tem isso resolvido há sessenta anos: uma **carenagem que anda
+com a asa**. O F-111 e o Tornado têm exatamente essa peça — um calço em forma de
+gota que gira junto e tapa a fresta em qualquer ângulo de enflechamento. Foi o
+que entrou:
+
+```js
+const cordaRaiz = M.asa[0].corda, meioRaiz = M.asa[0].zLE - cordaRaiz*0.5;
+for (const alt of [7.5, -7.5]){              // uma em cima, uma embaixo
+  const sela = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), mCorpo);
+  sela.scale.set(30, 11, cordaRaiz*0.60);
+  sela.position.set(0, alt*0.5, meioRaiz);
+  dentro.add(sela);                          // DENTRO da asa: gira com ela
+}
+```
+
+e, do lado de fora, uma bolha fixa na luva cobrindo a boca do pivô. As duas
+juntas se sobrepõem em todo o curso, de asa aberta (−0,10 rad) a asa recolhida
+(0,77 rad). A lição: quando alguém diz que está feio, vale medir o que ele está
+vendo antes de explicar por que ele está enganado.
+
+### A garagem
+
+> *"inclusive não quero perder o dragão. deixa ele como opção para escolher,
+> inclusive retira as superfícies móveis. deixa só as asas variáveis. tava
+> show."*
+
+O caça não substitui o dragão: os dois convivem. Na capa há dois botões, e a
+escolha fica no `localStorage`.
+
+Trocar de avião no meio de um jogo 3D não é trocar um modelo: é trocar um monte
+de números que o resto do código usa. A altura do trem (`RODA`), onde ficam os
+bocais para pendurar a chama, onde nasce o vórtice de ponta de asa, onde a
+câmera de dentro senta. Antes, tudo isso eram constantes soltas espalhadas pelo
+arquivo — e foi por isso que a primeira troca quebrou com
+`ASA_RAIZ_X is not defined`.
+
+Agora cada carcaça carrega as suas medidas, e o jogo lê da que estiver montada:
+
+```js
+const MEDIDAS_DRAGAO = { nome: 'DRAGÃO', roda: 158,
+  cabine: { frente: 40, cima: 26 },
+  jatos: [{x:-82,y:-6,z:-110}, {x:82,y:-6,z:-110}],
+  ponta: { x:250, y:15, z:-50 }, pivo: { x:30, z:6 } };
+const MEDIDAS_CACA   = { nome: 'CAÇA AD-02', roda: 103,
+  cabine: { frente: 118, cima: 40 },
+  jatos: [{x:-26,y:-7,z:-232}, {x:26,y:-7,z:-232}],
+  ponta: null, pivo: null };      // esses vêm da tabela de projeto AD02
+```
+
+`montaGaragem()` é a única função que sabe trocar: derruba o avião velho, monta o
+escolhido, pendura o fogo nos bocais **dele**, refaz os apelidos que o resto do
+código usa (`tremNo`, `flapNos`, `jatos`) e remonta o inimigo e o outro jogador
+com a mesma carcaça. O `montaDragao` que o jogo chama virou um despachante de
+duas linhas.
+
+### O dragão perdeu as superfícies móveis (de propósito)
+
+O pedido foi explícito e está certo. O dragão nunca teve aileron nem profundor —
+ele tinha asas inteiras que batiam. Enfiar quatro superfícies articuladas num
+bicho que não é avião ficava exatamente como ficou: confuso. Ele ficou com o que
+funcionava — **asa de geometria variável**, que nele lê como asa de morcego
+abrindo e fechando — e nada mais. Medido: voando reto as asas ficam em 0°,
+puxando vão a 24°; com força 0,75 na curva, 29,9°.
+
+```
+caça AD-02 ..... RODA 103 · comandos: aileron, flape, profundor, leme · asas 2
+dragão ......... RODA 158 · comandos: nenhum                          · asas 2
+```
+
+A escolha sobrevive ao recarregar a página, os dois voam, e o aviso de canto diz
+qual está no hangar.
