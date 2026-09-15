@@ -8145,6 +8145,23 @@ const MEDIDAS_CACA = {
    aplicar a matriz e emendar os vetores.)                                   */
 function fundePorCor(raiz){
   raiz.updateMatrixWorld(true);
+  /* --- A CONTA TEM DE SER NO QUADRO DA RAIZ, NÃO NO DO MUNDO ----------------
+     Esta função assava a geometria com `o.matrixWorld` e pendurava a malha
+     pronta em `raiz`. Enquanto a raiz é o avião inteiro, parado na origem, dá
+     no mesmo. Mas quando a raiz é uma PEÇA QUE SE MEXE — o profundor, que mora
+     em z=-230; o aileron, na sua dobradiça; o painel da asa, no pivô —, o
+     deslocamento da peça entrava DUAS VEZES: uma assada na geometria e outra
+     na posição do grupo.
+
+     Era isso que jogava o profundor 231 unidades atrás da cauda e o aileron 58
+     atrás da asa. Não era luz, não era proporção, não era pintura: as peças
+     que se mexem estavam voando soltas ao lado do avião, exatamente como você
+     disse desde o começo.
+
+     Agora a geometria é assada no quadro da PRÓPRIA raiz (mundo desfeito pela
+     inversa), e o grupo continua com a sua posição. Para o avião inteiro, que
+     está na identidade, nada muda. */
+  const paraRaiz = new THREE.Matrix4().copy(raiz.matrixWorld).invert();
   const porCor = new Map(), velhas = [];
   raiz.traverse(o => {
     if (!o.isMesh) return;
@@ -8157,7 +8174,7 @@ function fundePorCor(raiz){
     let n = 0;
     const partes = lista.map(o => {
       const g2 = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
-      g2.applyMatrix4(o.matrixWorld);      // normais inclusive: o three cuida disso
+      g2.applyMatrix4(new THREE.Matrix4().multiplyMatrices(paraRaiz, o.matrixWorld));
       n += g2.attributes.position.count;
       return g2;
     });
@@ -9698,9 +9715,15 @@ function montaDragao(corCorpo, corDetalhe, corVidro, asasMoveis, tipo){
   const moveis = [...(U.asas||[]), U.comandos && U.comandos.profundor,
                   U.comandos && U.comandos.leme, ...(U.rotores||[]),
                   ...(U.bocais||[]), U.trem].filter(Boolean);
-  for (const m of moveis) g.remove(m);
+  /* e cada uma volta para o SEU pai, não para `g`. O leme não é filho de `g`:
+     ele mora dentro da deriva, que é quem fica em pé. Com `g.remove(leme)` —
+     que só tira filhos diretos — ele não saía, era cozinhado junto com o resto
+     do avião, e sobrava um grupo VAZIO no lugar: o leme deixava de existir,
+     congelado dentro da cauda, e o pedal não mexia nada. */
+  const pais = moveis.map(m => m.parent);
+  for (const m of moveis) if (m.parent) m.parent.remove(m);
   fundePorCor(g);
-  for (const m of moveis) g.add(m);
+  moveis.forEach((m, i) => (pais[i] || g).add(m));
   /* e dentro de cada peça que se mexe: a asa tem painel + aba, o trem tem
      dezenas de peças, o rotor tem nove pás */
   for (const asa of U.asas || []){

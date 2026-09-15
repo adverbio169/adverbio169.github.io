@@ -4768,3 +4768,98 @@ no ângulo de ataque alto, que é justamente para o que elas servem.
 a cena inteira .. 408 ordens de desenho  (eram 400; o azul de superfície móvel
                   é um material novo em cada carcaça)
 ```
+
+---
+
+## A causa de verdade: a fusão assava as peças móveis no lugar errado
+
+> *"as peças tudo solta no avião"*
+
+Três diagnósticos meus antes deste estavam errados — a luz, as proporções, a
+pintura. Todos melhoraram o avião e **nenhum era a causa**. A causa é um bug, e
+é medível.
+
+### O bug
+
+`fundePorCor(raiz)` cozinha as peças por material para baixar o número de
+ordens de desenho. Ela fazia assim:
+
+```js
+g2.applyMatrix4(o.matrixWorld);   // geometria no quadro do MUNDO
+...
+raiz.add(malha);                  // e pendurada na raiz
+```
+
+Enquanto a raiz é o avião inteiro, parado na origem, isso dá no mesmo — o
+quadro do mundo e o quadro da raiz são iguais. Mas a função também é chamada
+**dentro de cada peça que se mexe**, para cozinhar as partes dela entre si. E aí
+a raiz **não** está na origem:
+
+| peça | onde ela mora |
+|---|---|
+| profundor | z = −230 |
+| aileron / flape | na sua dobradiça |
+| painel da asa | no pivô do enflechamento, x = ±126 |
+
+O deslocamento da peça entrava **duas vezes**: uma assada na geometria, outra na
+posição do grupo. Medido, comparando o modelo cru com o modelo fundido:
+
+```
+                    centro z (cru)   centro z (fundido)
+profundor .............. -249            -480     <- 231 atrás da cauda
+aileron direito ........  -99            -157     <-  58 atrás da asa
+avião inteiro (comprimento) 569           791     <- 222 a mais de "avião"
+```
+
+Era exatamente isso que você estava vendo: **as superfícies móveis voando soltas
+ao lado do avião**. E ficou mais visível, não menos, depois que a pintura
+melhorou — antes o profundor solto era uma tábua amarela e se confundia com a
+decoração; depois virou uma tábua azul-clara nítida flutuando atrás da cauda.
+
+A correção é uma linha: assar no quadro da **própria raiz**.
+
+```js
+const paraRaiz = new THREE.Matrix4().copy(raiz.matrixWorld).invert();
+...
+g2.applyMatrix4(new THREE.Matrix4().multiplyMatrices(paraRaiz, o.matrixWorld));
+```
+
+Para o avião inteiro, que está na identidade, `paraRaiz` é a identidade e nada
+muda. Para cada peça móvel, o deslocamento deixa de ser contado duas vezes.
+
+### E o leme não existia
+
+Achado no mesmo teste. A lista de peças que se mexem era solta assim:
+
+```js
+for (const m of moveis) g.remove(m);    // só tira FILHOS DIRETOS
+```
+
+O leme não é filho direto de `g`: ele mora dentro da deriva, que é o grupo que
+põe a deriva em pé. `g.remove(leme)` não fazia nada, `fundePorCor(g)` cozinhava
+o leme junto com o resto do avião, e sobrava um **grupo vazio** no lugar. O leme
+deixava de existir: congelado dentro da cauda, e o pedal não mexia nada — embora
+o teste de comandos continuasse dizendo "leme 21,8°", porque ele media a
+rotação do grupo, não a peça no céu.
+
+Agora cada peça volta para o **seu** pai:
+
+```js
+const pais = moveis.map(m => m.parent);
+for (const m of moveis) if (m.parent) m.parent.remove(m);
+fundePorCor(g);
+moveis.forEach((m, i) => (pais[i] || g).add(m));
+```
+
+### A lição do teste
+
+Os testes passavam. Todos eles. Porque mediam **números do estado do jogo** — o
+ângulo do grupo, a posição da dobradiça, o enflechamento — e nunca *onde a
+malha estava de verdade na cena*. O teste que achou o bug em três minutos
+compara a caixa envolvente do modelo cru com a do modelo fundido, peça por
+peça, e é o teste que devia existir desde o começo:
+
+```
+avião inteiro CRU  : 0 / 15 / 7 / 552 / 237 / 569
+avião inteiro FUND : 0 / 15 / 6 / 552 / 237 / 569   ✔ iguais
+```
