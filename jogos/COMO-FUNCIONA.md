@@ -5138,3 +5138,27 @@ cima do amarelo.
 ```
 a cena inteira .. 380 ordens de desenho
 ```
+
+### Três esquemas para escolher olhando
+
+Discutir cor no escuro não dá. Então a decisão saiu do código e virou uma
+palavra — `PINTURA_AD02`, com três esquemas, e um `tinta(parte)` que é o
+**único lugar** que decide cor de peça:
+
+```
+'asas'   amarelo tudo o que voa, azul tudo o que carrega
+'bordo'  azul, com o BORDO DE ATAQUE e as pontas em amarelo   <- o escolhido
+'meio'   asa amarela com o bordo de ataque azul
+```
+
+A fatia de bordo de ataque é 16% da corda, e sai da **mesma tabela de perfil**
+que o resto da asa: duas séries de anéis que dividem a estação de corda 0,16, de
+modo que as superfícies se encontram sem degrau e sem brigar por profundidade.
+Não é decalque por cima — é a asa pintada.
+
+E o amarelo ficou limpo. O reflexo dele era `0x6b5a20`, um marrom: numa área
+grande, tudo o que não pegava sol virava **mostarda suja**. Reflexo claro
+(`0xefe0a8`) e brilho baixo deixam o amarelo ser amarelo também na sombra.
+
+(A escolha também vive no `localStorage`, em `aviao3d.pintura`, para dar para
+experimentar os três sem recompilar.)

@@ -1596,6 +1596,11 @@ function recolocaNuvem(n, emVolta){
 /* qual avião está na garagem. Fica guardado no aparelho: quem escolheu o
    dragão encontra o dragão da próxima vez. */
 let tipoDeAviao = 'caca';
+/* qual esquema de pintura do caça: 'asas', 'bordo' ou 'meio' (ver ESQ em
+   montaAD02). Fica no localStorage para dar para experimentar sem recompilar. */
+let PINTURA_AD02 = 'bordo';
+try { const q = localStorage.getItem('aviao3d.pintura');
+      if (q === 'asas' || q === 'bordo' || q === 'meio') PINTURA_AD02 = q; } catch(e){}
 try { const t = localStorage.getItem('aviao3d.aviao'); if (t === 'dragao' || t === 'caca') tipoDeAviao = t; } catch(e){}
 
 const MEDIDAS_DRAGAO = {
@@ -2351,7 +2356,10 @@ function clareia(cor, q){
 function montaAD02(corCorpo, corDetalhe, corVidro, simples){
   const g = new THREE.Group();
   const mCorpo   = new THREE.MeshPhongMaterial({ color: corCorpo,  shininess: 58, specular: 0x4a6a92 });
-  const mAmarelo = new THREE.MeshPhongMaterial({ color: corDetalhe, shininess: 54, specular: 0x6b5a20 });
+  /* o reflexo era 0x6b5a20, um marrom: numa área grande, tudo o que não pegava
+     sol virava mostarda suja. Reflexo claro e brilho baixo deixam o amarelo ser
+     amarelo também na sombra. */
+  const mAmarelo = new THREE.MeshPhongMaterial({ color: corDetalhe, shininess: 30, specular: 0xefe0a8 });
   const mEscuro  = new THREE.MeshPhongMaterial({ color: 0x16223c,  shininess: 40 });
   const mVidro   = new THREE.MeshPhongMaterial({ color: corVidro, shininess: 170, specular: 0xdcecff,
                                                  transparent: true, opacity: 0.55 });
@@ -2379,6 +2387,22 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
      mostra é o RISCO da dobradiça, e o movimento. E o movimento agora existe —
      26° de profundor, 30° de aileron. Não precisa de tinta para se ver. */
   const mMovel   = mCorpo;
+  /* --- OS ESQUEMAS DE PINTURA ------------------------------------------------
+     Três, para escolher olhando em vez de discutindo:
+
+       'asas'   amarelo tudo o que voa, azul tudo o que carrega
+       'bordo'  azul, com o BORDO DE ATAQUE e as pontas em amarelo
+       'meio'   asa amarela com o bordo de ataque azul: o amarelo quebrado por
+                uma linha, para não virar uma prancha de mostarda
+
+     `tinta(parte)` é o único lugar que decide cor. Trocar de esquema é trocar
+     uma palavra. */
+  const ESQ = {
+    asas:  { luva:'A', painel:'A', bordo:null, ponta:'C', abas:'A', estab:'A', prof:'A' },
+    bordo: { luva:'C', painel:'C', bordo:'A',  ponta:'A', abas:'C', estab:'C', prof:'A' },
+    meio:  { luva:'A', painel:'A', bordo:'C',  ponta:'C', abas:'A', estab:'A', prof:'C' }
+  }[PINTURA_AD02] || {};
+  const tinta = p => ESQ[p] === 'A' ? mAmarelo : mCorpo;
   const M = AD02;
 
   /* --- CASCO ------------------------------------------------------------
@@ -2408,7 +2432,13 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        para a cor denunciar; e o avião alterna forte, porque asa e cauda são
        metade do que se vê. É a divisão dos aviões de acrobacia, e é a mesma
        razão: de longe, o que se lê primeiro é a asa. */
-    g.add(espelha(pedacoDeAsa(M.luva, 0, 1, 0, 1, mAmarelo, 4, 10)));
+    const BORDO = 0.16;                 // a fatia de corda que é bordo de ataque
+    if (ESQ.bordo){
+      g.add(espelha(pedacoDeAsa(M.luva, 0, 1, 0, BORDO, tinta('bordo'), 4, 4)));
+      g.add(espelha(pedacoDeAsa(M.luva, 0, 1, BORDO, 1, tinta('luva'), 4, 8)));
+    } else {
+      g.add(espelha(pedacoDeAsa(M.luva, 0, 1, 0, 1, tinta('luva'), 4, 10)));
+    }
 
     const pivo = new THREE.Group();
     pivo.position.set(lado*M.PIVO.x, 0, M.PIVO.z);
@@ -2420,8 +2450,17 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        encaixe até ali no azul do corpo, e a ponta em amarelo. As duas séries
        de anéis nascem de naEstacao(0,86), então as superfícies se encontram
        exatamente — não é decalque colado por cima, é a pintura da asa. */
-    dentro.add(pedacoDeAsa(M.asa, 0, 0.86, 0, M.CORDA_MOVEL, mAmarelo, 7, 10));
-    dentro.add(pedacoDeAsa(M.asa, 0.86, 1, 0, M.CORDA_MOVEL, mCorpo, 3, 10, true));
+    if (ESQ.bordo){
+      /* o bordo de ataque em outra cor: duas séries de anéis que dividem a
+         MESMA estação de corda (0,16), então as superfícies se encontram sem
+         degrau e sem brigar por profundidade. */
+      dentro.add(pedacoDeAsa(M.asa, 0, 0.86, 0, BORDO, tinta('bordo'), 7, 4));
+      dentro.add(pedacoDeAsa(M.asa, 0, 0.86, BORDO, M.CORDA_MOVEL, tinta('painel'), 7, 8));
+      dentro.add(pedacoDeAsa(M.asa, 0.86, 1, 0, M.CORDA_MOVEL, tinta('ponta'), 3, 10, true));
+    } else {
+      dentro.add(pedacoDeAsa(M.asa, 0, 0.86, 0, M.CORDA_MOVEL, tinta('painel'), 7, 10));
+      dentro.add(pedacoDeAsa(M.asa, 0.86, 1, 0, M.CORDA_MOVEL, tinta('ponta'), 3, 10, true));
+    }
     /* --- A RAIZ GROSSA DO PAINEL -------------------------------------------
        O painel encosta na luva de TOPO, e topo não fecha: girando, a raiz do
        painel varre um leque e abre um vão por onde se enxerga o céu. Era o que
@@ -2444,7 +2483,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       { x: -14, zLE: r0.zLE +  4, corda: r0.corda +  8, y: 0, tt: 0.132, tor: 0 },
       { x:  18, zLE: r0.zLE,      corda: r0.corda,      y: 0, tt: 0.108, tor: 0 }
     ];
-    dentro.add(pedacoDeAsa(raizGrossa, 0, 1, 0, 1, mAmarelo, 5, 12));
+    dentro.add(pedacoDeAsa(raizGrossa, 0, 1, 0, 1, tinta('luva'), 5, 12));
     pivo.add(dentro);
 
     /* FLAPE e AILERON: mesma planta, mesma espessura, só a faixa de corda é
@@ -2452,7 +2491,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     const abas = {};
     /* flape e aileron: azul de superfície móvel, e um friso escuro na linha da
        dobradiça — é assim que se enxerga a aba sem partir a asa em duas cores. */
-    for (const [nome, faixa, mat] of [['flape', M.FLAP, mAmarelo], ['aileron', M.AIL, mAmarelo]]){
+    for (const [nome, faixa, mat] of [['flape', M.FLAP, tinta('abas')], ['aileron', M.AIL, tinta('abas')]]){
       const meio = naEstacao(M.asa, (faixa[0] + faixa[1])/2);
       const eixo = new THREE.Group();
       eixo.position.set(lado*0, 0, 0);
@@ -2473,7 +2512,8 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        precisar pintá-la de outra cor. */
     for (const faixa of [M.FLAP, M.AIL])
       dentro.add(pedacoDeAsa(M.asa, faixa[0], faixa[1],
-                             M.CORDA_MOVEL - 0.026, M.CORDA_MOVEL - 0.004, mEscuro, 4, 3));
+                             M.CORDA_MOVEL - 0.026, M.CORDA_MOVEL - 0.004,
+                             ESQ.abas === 'A' ? mEscuro : mFriso, 4, 3));
 
     pivo.userData.abas = abas;
     asas.push(pivo);
@@ -2485,7 +2525,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
      um avião fica estável sem ficar preguiçoso. */
   const comandos = { flapes: [], ailerons: [], profundor: null, leme: null };
   for (const lado of [-1, 1]){
-    const fixo = pedacoDeAsa(M.estab, 0, 1, 0, 0.62, mAmarelo, 5, 9, true);
+    const fixo = pedacoDeAsa(M.estab, 0, 1, 0, 0.62, tinta('estab'), 5, 9, true);
     fixo.scale.x = lado; g.add(fixo);
   }
   const profundor = new THREE.Group();
@@ -2493,7 +2533,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     const meio = naEstacao(M.estab, 0.5);
     const z = meio.zLE - 0.62*meio.corda;
     for (const lado of [-1, 1]){
-      const p = pedacoDeAsa(M.estab, 0, 1, 0.615, 1, mAmarelo, 5, 5);
+      const p = pedacoDeAsa(M.estab, 0, 1, 0.615, 1, tinta('prof'), 5, 5);
       p.scale.x = lado; p.position.z = -z; profundor.add(p);
     }
     profundor.position.set(0, 0, z);
