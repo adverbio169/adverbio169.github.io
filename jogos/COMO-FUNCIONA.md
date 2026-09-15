@@ -4388,3 +4388,87 @@ cenários montados em cima da pista — que muda o piso —, um `saiuDoChao` que
 sobrevivia de um cenário para o outro, e uma inclinação posta na mão que o
 `endireitaEixos()` recalcula para zero no quadro seguinte. A nona era o SINK
 RATE de verdade.)*
+
+---
+
+## As superfícies que mexem, e a hélice que saiu
+
+> *"Vê se esse modelo fica melhor. Quero as superfícies móveis: aileron, flap,
+> profundor, leme. Pode tirar as hélices, deixar só mesmo as turbinas."*
+> (com três folhas de projeto do "LUCAS — Avião-Dragão AD-01" em anexo)
+
+As folhas mostram hélice de três pás E duas turbinas laterais; a instrução
+escrita diz para tirar a hélice. Segui a instrução — é uma linha para voltar
+atrás se você preferir o contrário.
+
+### Por que superfícies móveis não são enfeite
+
+Num jogo em terceira pessoa **o avião é o instrumento**. Ver o aileron
+levantar do lado de dentro da curva, ou o profundor inteiro girar quando se
+puxa, conta o que a máquina está fazendo antes de qualquer número do HUD — e é
+o que separa uma máquina de um boneco rígido escorregando pelo céu.
+
+Quatro superfícies, cada uma com a sua dobradiça:
+
+| | onde mora | como se move |
+|---|---|---|
+| **aileron** | na ponta de cada asa, girado no ângulo do bordo de fuga | um sobe, o outro desce |
+| **flape** | na raiz da asa (já existia, do pouso) | desce com o seletor de flapes |
+| **profundor** | cauda, **inteiriço** (o estabilizador todo gira, como num F-14) | sobe e desce com o manche |
+| **leme** | dobradiça na linha de fuga da deriva | gira com o pedal |
+
+Três decisões:
+
+1. **O aileron é da asa, não do avião.** Ele entra no pivô da asa e enflecha
+   junto — aileron parado enquanto a asa varre ficaria boiando no ar. Medido: a
+   dobradiça dele recua de z=−48 para z=−123 quando a asa recolhe.
+2. **O profundor é inteiriço.** Meia aba girando some a 300 metros; o
+   estabilizador inteiro girando, não. E combina com um avião de asa variável —
+   é a mesma solução do F-14.
+3. **Elas leem o AVIÃO, não o manche.** As três saem de `rol`, `cab` e `leme`,
+   que são as mesmas contas que acabaram de girar os eixos, normalizadas pela
+   taxa máxima de cada um. A diferença importa: com o nivelador automático
+   trabalhando, ou no estol, o avião gira sem ninguém pedir — e um aileron
+   preso ao manche ficaria parado justamente quando a asa está trabalhando.
+
+Os batentes (24°, 17°, 22°) são maiores que os de um avião de verdade de
+propósito: a 300 metros, 20° de aileron não se enxerga. O que importa é **ler**
+a manobra, não copiar a mecânica.
+
+### Os sinais, e duas inversões que a prova pegou
+
+Deduzir sinal neste jogo já me custou caro (o olhar com a cabeça, o
+deslocamento do HUD, o lado do `eixoD` que aparece à esquerda da tela). Então
+desta vez escrevi a prova pela **regra física**, que não depende de tela nem de
+como eu chamo cada lado:
+
+```
+o aileron que SOBE está na asa que DESCE        -> estava invertido  ✘ -> ✔
+a ponta do profundor vai para onde o nariz vai  -> certo de primeira ✔
+a ponta do leme vai para o lado que o nariz guina -> estava invertido ✘ -> ✔
+```
+
+A prova mede qual ponta de asa cai de verdade, e para onde o nariz de fato foi.
+Duas das três estavam trocadas — e nenhuma das duas teria aparecido numa foto
+parada.
+
+### O motor
+
+Com a hélice fora, as turbinas deixam de ser enfeite e viram o motor: cresceram
+(raio 23 → 28, comprimento 82 → 96) e ganharam o que faltava para lerem como
+turbina — uma **tomada aberta com o rotor girando lá dentro**, escondido no
+bocal, onde não tapa a cara do dragão (que foi o defeito que derrubou a hélice
+da primeira vez, lá atrás). O rotor gira mais rápido do que a hélice girava:
+turbina parada é a coisa mais morta que existe num avião.
+
+```
+peças que mexem: aileron ×2, profundor, leme, rotor ×2, asa ×2
+malhas do avião: 46 (as pás de cada rotor e o profundor são fundidos entre si)
+a cena inteira: 372 ordens de desenho — menos que as 398 de duas semanas atrás
+```
+
+*(E uma armadilha de desempenho que apareceu no caminho: `clone()` copia o
+`userData` passando por JSON, e um `Object3D` lá dentro faz o JSON serializar a
+**malha inteira** — geometria e tudo — a cada jogador que entra na sala. O molde
+dos outros jogadores agora entra na sala com o `userData` limpo; as asas dele já
+eram reencontradas pelo `lado` de cada pivô.)*

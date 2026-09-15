@@ -1000,6 +1000,13 @@ const ASA_FECHADA = 0.56;      // rad: 32° para trás, a silhueta de alta
 const ASA_V1 = 1500, ASA_V2 = 3600;   // entre estas velocidades ela varre
 const ASA_TAXA = 0.24;         // rad por segundo: uns 2,8 s de ponta a ponta
 let enflecha = ASA_ABERTA;     // onde a asa está agora
+/* --- AS SUPERFÍCIES DE COMANDO ---------------------------------------------
+   Quanto cada uma gira no batente, em radianos, e onde estão agora. Os
+   batentes são generosos de propósito: num avião de verdade o aileron anda
+   uns 20°, mas num brinquedo visto de trás a 300 metros, 20° não se enxerga.
+   Aqui o que importa é LER a manobra, não copiar a mecânica. */
+const AIL_MAX = 0.42, ARF_MAX = 0.30, LEM_MAX = 0.38;
+let cmdRol = 0, cmdArf = 0, cmdLem = 0;
 /* --- A HISTÓRIA DO NARIZ ----------------------------------------------------
    "A linha entre a mira externa e a central não pode ser retilínea. Tem que
    ser o traçado onde a bala vai: se o avião faz várias curvas, o traço das
@@ -1679,6 +1686,68 @@ function fazAsasDeDragao(mCorpo, mAmarelo, cozinhaAparte){
   return nos;
 }
 
+/* AS SUPERFÍCIES DE COMANDO — aileron, profundor e leme.
+
+   Cada uma é um GRUPO com a dobradiça na origem e a peça pendurada atrás: é o
+   que faz o giro parecer uma dobradiça em vez de a peça mergulhar no avião. As
+   três regras de onde cada uma mora:
+
+   · O AILERON é da asa, não do avião: ele entra no pivô da asa e enfleha
+     junto. Aileron parado enquanto a asa varre ficaria boiando no ar.
+   · O PROFUNDOR é INTEIRIÇO: o estabilizador todo gira (como num F-14). Meia
+     aba girando some a 300 metros; o estabilizador inteiro, não. E é o que
+     combina com um avião de asa variável.
+   · O LEME tem a dobradiça na linha de fuga da deriva, que é inclinada — o
+     desenho dele é feito RELATIVO a essa linha, e o grupo é que fica no
+     lugar. Assim ele acompanha o corte da cauda sem fresta.                */
+function fazComandos(mCorpo, mAmarelo, movel, asasNos){
+  const ailerons = [];
+  for (const lado of [-1, 1]){
+    const pivo = new THREE.Group();
+    /* NA ASA, NÃO ATRÁS DELA. A primeira tentativa foi uma prancha reta e
+       larga colada no bordo de fuga: na foto de cima ela passava do festão e
+       ficava pendurada no ar, lendo como tábua e não como comando. Agora ela é
+       menor, mora ENTRE os festões (x de 120 a 210, onde a membrana tem corda
+       de sobra) e vem GIRADA no mesmo ângulo do bordo de fuga — a linha da
+       dobradiça de um aileron é paralela ao bordo, sempre. Um fio acima da
+       membrana: parada ela lê como painel da asa, levantada vira aileron. */
+    /* a 13 ela ficava ENTERRADA na membrana (que vai de 6 a 14 de altura) e
+       sumia no neutro; a 16 ela pousa em cima da asa e se vê sempre */
+    pivo.position.set(lado*135, 16, -68);          // já descontada a raiz (±30, 6)
+    pivo.rotation.y = -lado*0.19;                  // acompanha o bordo de fuga
+    const aba = new THREE.Mesh(new THREE.BoxGeometry(92, 5, 40), mCorpo);
+    aba.position.set(0, 0, -20);
+    aba.castShadow = true;
+    pivo.add(aba);
+    pivo.userData.comando = lado < 0 ? 'aileronE' : 'aileronD';
+    asasNos[lado < 0 ? 0 : 1].add(pivo);
+    ailerons.push(pivo);
+  }
+  /* o profundor inteiro, com dobradiça no bordo de ataque dele */
+  const profundor = new THREE.Group();
+  for (const lado of [-1, 1]){
+    const e2 = new THREE.Mesh(new THREE.BoxGeometry(72, 9, 44), mCorpo);
+    e2.position.set(lado*42, 0, -16); e2.rotation.y = -lado*0.28;
+    e2.castShadow = true; profundor.add(e2);
+    const pt = new THREE.Mesh(new THREE.BoxGeometry(16, 10, 40), mAmarelo);
+    pt.position.set(lado*76, 0, -22); pt.rotation.y = -lado*0.28; profundor.add(pt);
+  }
+  fundePorCor(profundor);                 // quatro peças viram duas
+  profundor.position.set(0, 0, -152);     // só agora ele vai para a cauda
+  profundor.userData.comando = 'profundor';
+  /* o leme: o desenho sai da dobradiça (z = -176) para trás */
+  const lm = new THREE.Shape();
+  lm.moveTo(6, 10); lm.lineTo(-6, 124); lm.lineTo(-38, 120); lm.lineTo(-26, 14);
+  lm.closePath();
+  const pa = fazForma(lm, 9, mAmarelo);
+  pa.rotation.y = -Math.PI/2;
+  const leme = new THREE.Group();
+  leme.position.set(0, 6, -176);
+  leme.add(pa);
+  leme.userData.comando = 'leme';
+  return { ailerons, profundor, leme };
+}
+
 function montaDragao(corCorpo, corDetalhe, corVidro, asasMoveis){
   const g = new THREE.Group();
   /* Brinquedo de plástico brilha POUCO e escuro. Reflexo claro estourava uma
@@ -1855,88 +1924,91 @@ function montaDragao(corCorpo, corDetalhe, corVidro, asasMoveis){
   const asasNos = fazAsasDeDragao(mCorpo, mAmarelo, !!asasMoveis);
   if (!asasMoveis) for (const no of asasNos) g.add(no);
 
-  /* --- turbinas --- */
+  /* --- TURBINAS ------------------------------------------------------------
+     "Pode tirar as hélices, deixar só mesmo as turbinas."
+
+     Com a hélice fora, elas deixam de ser enfeite e passam a ser O MOTOR do
+     avião — então cresceram (raio 23 para 28, comprimento 82 para 96) e
+     ganharam o que faltava para lerem como turbina e não como tubo: uma
+     TOMADA aberta na frente com o rotor girando lá dentro. É o mesmo truque
+     da hélice antiga, mas escondido dentro do bocal, onde não tapa a cara do
+     dragão — que era o defeito que derrubou a hélice da primeira vez. */
+  const rotores = [];
   for (const lado of [-1, 1]){
-    /* Estavam em x=62 com raio 23: nessa altura o casco ainda tem raio 50, e
-       metade da turbina ficava DENTRO do avião. De lado não se via turbina
-       nenhuma. Saíram para 82 e subiram um pouco, apoiadas num pilarzinho —
-       agora são duas peças soltas, que é o que a folha de modelo pede. */
-    const t = new THREE.Mesh(new THREE.CylinderGeometry(23, 21, 82, 12), mCorpo);
-    t.rotation.x = Math.PI/2; t.position.set(lado*82, -6, -66);
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(28, 25, 96, 14), mCorpo);
+    t.rotation.x = Math.PI/2; t.position.set(lado*86, -4, -60);
     t.castShadow = true; g.add(t);
-    const pil = new THREE.Mesh(new THREE.BoxGeometry(36, 13, 40), mCorpo);
-    pil.position.set(lado*62, -8, -66); pil.rotation.z = lado*0.10; g.add(pil);
-    const aroT = new THREE.Mesh(new THREE.TorusGeometry(22, 4.2, 5, 12), mAmarelo);
-    aroT.position.set(lado*82, -6, -106); g.add(aroT);
-    const bocal = new THREE.Mesh(new THREE.CylinderGeometry(19, 20, 16, 12, 1, true), mEscuro);
-    bocal.rotation.x = Math.PI/2; bocal.position.set(lado*82, -6, -104); g.add(bocal);
-    const tomada = new THREE.Mesh(new THREE.TorusGeometry(21, 3.4, 5, 12), mAmarelo);
-    tomada.position.set(lado*82, -6, -26); g.add(tomada);
+    const pil = new THREE.Mesh(new THREE.BoxGeometry(40, 14, 44), mCorpo);
+    pil.position.set(lado*64, -6, -60); pil.rotation.z = lado*0.10; g.add(pil);
+    // a saída: aro amarelo e o bocal escuro por dentro
+    const aroT = new THREE.Mesh(new THREE.TorusGeometry(26, 4.6, 5, 14), mAmarelo);
+    aroT.position.set(lado*86, -4, -108); g.add(aroT);
+    const bocal = new THREE.Mesh(new THREE.CylinderGeometry(22, 24, 20, 14, 1, true), mEscuro);
+    bocal.rotation.x = Math.PI/2; bocal.position.set(lado*86, -4, -104); g.add(bocal);
+    // a entrada: aro amarelo, e o duto escuro que dá fundo ao rotor
+    const tomada = new THREE.Mesh(new THREE.TorusGeometry(26, 4.0, 5, 14), mAmarelo);
+    tomada.position.set(lado*86, -4, -12); g.add(tomada);
+    const duto = new THREE.Mesh(new THREE.CylinderGeometry(24, 24, 26, 14, 1, true), mEscuro);
+    duto.rotation.x = Math.PI/2; duto.position.set(lado*86, -4, -22); g.add(duto);
+    /* o ROTOR, que gira com o motor. Sete pás chatas e um cone no meio: de
+       longe vira um disco escuro, de perto dá para ver girando. */
+    const rotor = new THREE.Group();
+    for (let i = 0; i < 7; i++){
+      const pa = new THREE.Mesh(new THREE.BoxGeometry(6, 40, 3), mEscuro);
+      pa.position.set(Math.sin(i/7*6.283)*11, Math.cos(i/7*6.283)*11, 0);
+      pa.rotation.z = i/7*6.283; pa.rotation.y = 0.5;
+      rotor.add(pa);
+    }
+    const cubo2 = new THREE.Mesh(new THREE.ConeGeometry(8, 20, 8), mAmarelo);
+    cubo2.rotation.x = Math.PI/2; cubo2.position.z = 8; rotor.add(cubo2);
+    /* oito peças viram duas: o rotor gira, então não pode entrar na fusão
+       geral, mas nada impede de cozinhar as pás dele entre si. E a fusão é
+       feita com o grupo ainda na origem — depois é que ele vai para a asa. */
+    fundePorCor(rotor);
+    rotor.position.set(lado*86, -4, -18);
+    rotores.push(rotor);
   }
 
-  /* --- cauda: deriva alta lá atrás, com o brasão --- */
+  /* --- CAUDA: deriva fixa + LEME que mexe, e o profundor inteiriço ---------
+     O leme é uma peça à parte, com dobradiça na linha de fuga da deriva. E o
+     profundor aqui é INTEIRIÇO (o estabilizador todo gira, como num F-14) —
+     que é o que combina com uma asa de geometria variável, e ainda por cima é
+     o que dá para ver de longe: meia aba girando some, o estabilizador
+     inteiro girando não. */
   const dv = new THREE.Shape();
-  dv.moveTo(-186, 10); dv.lineTo(-200, 124); dv.lineTo(-150, 126); dv.lineTo(-120, 14);
+  dv.moveTo(-170, 10); dv.lineTo(-182, 124); dv.lineTo(-150, 126); dv.lineTo(-120, 14);
   dv.closePath();
   const deriva = fazForma(dv, 10, mCorpo);
   deriva.rotation.y = -Math.PI/2; deriva.position.set(0, 6, 0); g.add(deriva);
   const brasao = new THREE.Mesh(new THREE.ConeGeometry(17, 32, 3), mAmarelo);
-  brasao.position.set(0, 82, -172); brasao.rotation.set(Math.PI/2, 0, 0); g.add(brasao);
-  for (const lado of [-1, 1]){
-    const e2 = new THREE.Mesh(new THREE.BoxGeometry(72, 9, 44), mCorpo);
-    e2.position.set(lado*42, 0, -168); e2.rotation.y = -lado*0.28;
-    e2.castShadow = true; g.add(e2);
-    const pt = new THREE.Mesh(new THREE.BoxGeometry(16, 10, 40), mAmarelo);
-    pt.position.set(lado*76, 0, -174); pt.rotation.y = -lado*0.28; g.add(pt);
-  }
+  brasao.position.set(0, 80, -150); brasao.rotation.set(Math.PI/2, 0, 0); g.add(brasao);
 
-  /* --- HÉLICE ---------------------------------------------------------------
-     Esta peça já estragou o avião uma vez. Eram quatro pás PRETAS de 150 de
-     ponta a ponta, plantadas a 258: de frente — que é como o inimigo aparece
-     e como a gente vê o avião na capa — o que se via era uma CRUZ PRETA em
-     cima da cara. O rosto é a razão de ser deste modelo e a hélice o cobria.
+  /* --- AS SUPERFÍCIES QUE MEXEM -------------------------------------------
+     Aileron, profundor e leme: as três que o piloto move. (O flape é a
+     quarta, e ele já morava na asa desde os flapes de pouso.)
 
-     Três correções, todas pela mesma razão (não tapar a cara):
+     Elas existem por um motivo que não é enfeite: num jogo em terceira
+     pessoa, o avião É o instrumento. Ver o aileron levantar do lado de dentro
+     da curva, ou o profundor inteiro girar quando se puxa, diz o que o avião
+     está fazendo antes de qualquer número do HUD — e é o que faz a máquina
+     parecer máquina em vez de um boneco rígido escorregando pelo céu. */
+  const comandos = fazComandos(mCorpo, mAmarelo, !!asasMoveis, asasNos);
+  if (!asasMoveis){ g.add(comandos.profundor); g.add(comandos.leme); }
 
-     1. DUAS pás, não quatro. Hélice de brinquedo é de duas, e duas tapam
-        metade do que quatro tapavam.
-     2. AZUIS com a ponta amarela, e mais curtas (104 de ponta a ponta, contra
-        os 52 de raio da cabeça). Azul sobre azul some; preto sobre azul é um
-        risco no meio da testa.
-     3. Mais à frente, em 282, à frente do bico inteiro.
-
-     E o disco: hélice de verdade, girando, não é pá nenhuma — é um véu
-     redondo meio transparente. Acima de um certo giro as pás somem e entra o
-     disco, que é o que o olho espera ver e ainda deixa a cara aparecer
-     através dele. */
-  const helice = new THREE.Group();
-  const cubo = new THREE.Mesh(new THREE.ConeGeometry(13, 30, 8), mCorpo);
-  cubo.rotation.x = Math.PI/2; cubo.position.z = 13; helice.add(cubo);
-  const eixo = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 26, 8), mCorpo);
-  eixo.rotation.x = Math.PI/2; eixo.position.z = -16; helice.add(eixo);
-  const pas = new THREE.Group();
-  for (const giro of [0, Math.PI]){
-    const pa = new THREE.Mesh(new THREE.BoxGeometry(11, 104, 5), mCorpo);
-    pa.rotation.z = giro; pa.rotation.y = 0.26; pas.add(pa);
-    const ponta = new THREE.Mesh(new THREE.BoxGeometry(11, 16, 6), mAmarelo);
-    ponta.position.set(Math.sin(giro)*-44, Math.cos(giro)*44, 0);
-    ponta.rotation.z = giro; pas.add(ponta);
-  }
-  helice.add(pas);
-  const disco = new THREE.Mesh(new THREE.CircleGeometry(54, 20),
-    new THREE.MeshBasicMaterial({ color: 0x9fc4ee, transparent: true, opacity: 0,
-                                  side: THREE.DoubleSide, depthWrite: false }));
-  disco.position.z = 2; disco.visible = false; helice.add(disco);
-  /* a fusão acontece AQUI, antes da hélice entrar: ela é a única peça do
-     avião que se mexe por conta própria e por isso não pode ser cozinhada */
+  /* a fusão acontece AQUI: o que se mexe por conta própria — asa, comandos e
+     rotor — não pode ser cozinhado junto com o resto, senão vira um bloco só */
   fundePorCor(g);
-  /* e as asas com dobradiça entram DEPOIS, pela mesma razão */
-  if (asasMoveis){ for (const no of asasNos) g.add(no); g.userData.asas = asasNos; }
-  helice.position.set(0, -4, 274);
-  g.add(helice);
-  g.userData.helice = helice;
-  g.userData.pas = pas;
-  g.userData.disco = disco;
+  if (asasMoveis){
+    for (const no of asasNos) g.add(no);
+    g.userData.asas = asasNos;
+    g.add(comandos.profundor); g.add(comandos.leme);
+    g.userData.comandos = comandos;
+    for (const r of rotores) g.add(r);
+    g.userData.rotores = rotores;
+  } else {
+    for (const r of rotores) g.add(r);      // já fundidos: ficam parados
+  }
+  g.userData.helice = null;                 // não tem mais hélice: só turbina
   return g;
 }
 
@@ -4833,6 +4905,19 @@ function atualiza(dt){
   if (Math.abs(leme) > 0.002){ r = giraPar(eixoF, eixoD, leme*TAXA_LEME*dt); eixoF = r[0]; eixoD = r[1]; }
   endireitaEixos();
 
+  /* --- O QUE AS SUPERFÍCIES VÃO MOSTRAR ------------------------------------
+     Elas não leem o manche: leem o que o avião ESTÁ FAZENDO — as mesmas
+     `rol`, `cab` e `leme` que acabaram de girar os eixos, normalizadas pela
+     taxa máxima de cada eixo. A diferença importa: com o nivelador automático
+     trabalhando, ou no estol, o avião gira sem ninguém pedir, e um aileron
+     presoao manche ficaria parado justamente quando a asa está trabalhando.
+     Assim o desenho nunca mente. O filtro é curto (uns 0,1 s) porque comando
+     de avião é rápido — mas não instantâneo, que aí pisca. */
+  const laco = Math.min(1, dt*11);
+  cmdRol += (Math.max(-1, Math.min(1, rol/TAXA_ROL)) - cmdRol) * laco;
+  cmdArf += (Math.max(-1, Math.min(1, cab/TAXA_ARF)) - cmdArf) * laco;
+  cmdLem += (Math.max(-1, Math.min(1, leme)) - cmdLem) * laco;
+
 
   /* a fita da história do nariz, um quadro por vez */
   tJogo += dt;
@@ -5327,6 +5412,23 @@ function arruma(){
   aviao.visible = !cockpit;
   /* a asa varrendo: o pivô de cada lado gira para o seu lado */
   for (const no of aviao.userData.asas || []) no.rotation.y = no.userData.lado * enflecha;
+  /* e as superfícies de comando mostrando a manobra */
+  const cmd = aviao.userData.comandos;
+  if (cmd){
+    /* AILERON: um sobe e o outro desce — é disso que vem a rolagem. E o que
+       manda o sinal é uma regra que não depende de tela nem de como eu chamo
+       cada lado: o aileron que SOBE está na asa que DESCE (ele mata a
+       sustentação daquela asa). Escrevi na primeira vez ao contrário; a prova
+       `ailsinal` pegou, medindo qual ponta de asa cai de verdade. */
+    cmd.ailerons[0].rotation.x = -cmdRol * AIL_MAX;
+    cmd.ailerons[1].rotation.x =  cmdRol * AIL_MAX;
+    cmd.profundor.rotation.x = cmdArf * ARF_MAX;
+    /* LEME: a ponta dele vai para o MESMO lado para onde o nariz guina — é o
+       leme que empurra a cauda para o outro lado. Também estava invertido, e
+       também foi a prova que disse (`cmdsinal`), comparando para onde o nariz
+       de fato foi. Deduzir sinal neste jogo já me custou caro demais. */
+    cmd.leme.rotation.y = -cmdLem * LEM_MAX;
+  }
   desenhaVortices();
   for (const j of jatos){
     // a chama cresce com o acelerador e estoura no nitro; o tremido a cada
@@ -5349,6 +5451,15 @@ function arruma(){
   /* A HÉLICE gira com o motor. Ela não mede nada e não muda nada no voo —
      mas é o que faz o avião parecer LIGADO parado na pista, e é a primeira
      coisa que o olho procura num avião de hélice. */
+  /* O ROTOR DA TURBINA gira com o motor — é o que faz o avião parecer LIGADO
+     parado na pista. Era a hélice que fazia esse serviço; com ela fora, são os
+     dois rotores dentro das tomadas. E eles giram MAIS rápido que a hélice
+     girava: turbina parada é a coisa mais morta que existe num avião. */
+  if (aviao.userData.rotores){
+    const giro = (noChao && voo < 30 ? (motor > 0.05 ? 0.5 : 0) : 1.1 + (voo/VOO_TURBO)*2.2)
+               * (turbinando ? 1.5 : 1);
+    for (const r2 of aviao.userData.rotores) r2.rotation.z -= giro;
+  }
   if (aviao.userData.helice){
     const rpm = noChao && voo < 30 ? (motor > 0.05 ? 9 : 0)
               : 16 + (voo/VOO_TURBO)*26 + (turbinando ? 10 : 0);
@@ -6833,6 +6944,7 @@ function reinicia(){
            : ASA_ABERTA + (ASA_FECHADA - ASA_ABERTA)
              * Math.max(0, Math.min(1, (voo - ASA_V1)/(ASA_V2 - ASA_V1)));
   for (const v2 of vortices){ v2.pontos.length = 0; v2.malha.visible = false; v2.espera = 0; }
+  cmdRol = cmdArf = cmdLem = 0;
   saiuDoChao = noChao ? 0 : 99;
   terrenoAFrente = terrenoJa = 0;
   Alarmes.zera();
@@ -7991,6 +8103,12 @@ function meuNome(){
   return n;
 }
 const modeloOutro = montaDragao(0x4a9f6a, 0xffd42a, 0x16325c, true);   // gente de verdade também enflecha
+/* O userData deste molde é jogado fora de propósito. `clone()` copia userData
+   passando por JSON, e um Object3D lá dentro faz o JSON serializar a MALHA
+   INTEIRA — geometria e tudo — a cada jogador que entra. As referências não
+   sobreviveriam ao clone mesmo (é por isso que `poe()` reencontra as asas pelo
+   `lado` de cada pivô); o que se ganha aqui é não pagar por elas. */
+modeloOutro.userData = {};
 
 function abrirSala(){
   if (typeof Peer !== 'function'){ estadoSala('nao', 'a biblioteca de conexão não carregou'); return; }
