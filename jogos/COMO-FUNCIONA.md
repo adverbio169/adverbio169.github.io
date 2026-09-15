@@ -4472,3 +4472,118 @@ a cena inteira: 372 ordens de desenho — menos que as 398 de duas semanas atrá
 **malha inteira** — geometria e tudo — a cada jogador que entra na sala. O molde
 dos outros jogadores agora entra na sala com o `userData` limpo; as asas dele já
 eram reencontradas pelo `lado` de cada pivô.)*
+
+---
+
+## O AD-02: o avião refeito como projeto de aeronave
+
+> *"Não achei legal. Tá uma confusão completa o avião. Tá muito grosseiro,
+> partes muito grossas, parece um montão de madeira voando. Quero que ele
+> respeite a física. Refaça o projeto como se fosse um avião de verdade."*
+
+### A causa era numérica, não de gosto
+
+A fuselagem do AD-01 tinha **116 de diâmetro para 480 de comprimento**: esbeltez
+**4,1:1**, um tonel. Caça de verdade é 7:1 ou 8:1. E com o corpo gordo daquele
+jeito, tudo o que se pendura nele precisa ser grosso para não sumir — o avião
+inteiro engrossa junto. Não adiantava refinar peça por peça sem mexer nisso.
+
+O AD-02 está em **7,6:1**, e a fuselagem deixou de ser um torno: são **14
+seções** loftadas, cada uma uma superelipse com largura, altura para cima e para
+baixo (podem ser diferentes — é o que dá barriga chata com dorso arredondado) e
+um expoente que diz quão "quadrada" ela é. Bico redondo com radome cinza, deck
+da cabine erguido, tronco largo onde moram os motores, cone de cauda.
+
+### A asa é uma asa
+
+Cada superfície é gerada por um **perfil NACA** (0010 na raiz, 0008 na ponta)
+varrido ao longo de estações com corda, enflechamento, diedro e **torção**. E
+cada superfície móvel é **recortada da mesma planta**: o flape começa
+exatamente onde a parte fixa termina, na linha de 70% da corda. É isso que faz
+o olho ler "aileron" em vez de "tábua colada por cima".
+
+Pintura: **toda superfície móvel é da cor oposta à peça em que mora** (asa
+amarela → flape e aileron azuis; cauda azul → profundor e leme amarelos). É
+convenção de avião de acrobacia e responde direto ao pedido de *ver* cada
+superfície.
+
+### A revisão de projeto — quatro erros que só a conta pega
+
+| | antes | depois | faixa |
+|---|---|---|---|
+| esbeltez da fuselagem | 4,1:1 | **7,6:1** | 7 a 8 |
+| margem estática · asa aberta | 17,4% | **10,9%** | 5 a 15% |
+| margem estática · recolhida | 37,7% | **24,6%** | |
+| área da cauda | 45% da asa | **22%** | F/A-18: 24% |
+| ângulo de viragem lateral | 66° | **61°** | < 63° |
+| carga na bequilha | 7,2% | **13,9%** | 8 a 15% |
+
+1. **Centragem com a asa recolhida** — o problema clássico da geometria
+   variável, e eu não tinha olhado: ao enflechar, o centro aerodinâmico recua e
+   a margem estática dispara (o avião vira um caminhão em arfagem justamente na
+   velocidade em que se quer manobrar). Corrigido com **pivô de 110 para 126**
+   (painel móvel menor, menos passeio), **enflechamento máximo de 54° para 44°**
+   e o combustível recuado — que é o que um Tornado faz de verdade.
+2. **Viragem lateral 66°** (limite 63°): tombaria numa curva de táxi mais firme.
+   Bitola do trem de 108 para 144.
+3. **Carga na bequilha 7,2%** — apareceu *porque* eu recuei o CG. **CG e trem
+   principal andam sempre juntos**: recuei as pernas principais também.
+4. **Regra das áreas**: a distribuição somava o pico do tronco com o pico da asa
+   no mesmo lugar. Estreitei o tronco onde a asa passa — a **cintura de
+   garrafa**, que dá para ver na planta.
+
+E o que faltava por completo: **torção de asa**. A ponta tem 2,4° de incidência
+a menos que a raiz, para a raiz estolar primeiro. Asa sem torção estola pela
+ponta — justo onde mora o aileron — e aí o avião cai de asa em vez de baixar o
+nariz.
+
+*(Duas correções minhas geraram um erro só: cresci a cauda 12% para acertar o
+volume de cauda, e depois puxei a raiz para dentro para o profundor não flutuar
+— e puxar a raiz para dentro aumenta a envergadura de novo. As duas juntas
+dobraram a cauda, e foi o Adverbio quem viu de olho: "o profundor é do tamanho
+da asa?".)*
+
+### O que testei de biblioteca, e o que ficou
+
+- **`three-subdivide` — descartada.** Subdivisão de Loop *aproxima* a
+  superfície: caixa não ganha canto quebrado, ela **derrete e encolhe**. Os
+  frisos viraram pastilhas, a crista virou bolhas, e custou **8× mais
+  triângulos** (1.116 → 8.928). O que eu queria era **chanfrar**, e chanfro sai
+  de graça no `ExtrudeGeometry` com bisel: `caixaViva()` custa 2× em vez de 8×.
+- **`three-bvh-csg` — funciona, ficou na gaveta.** Cortou a tomada na fuselagem
+  em **45 ms** (só precisou de um UV falso, porque as cascas nascem sem UV). Mas
+  para o mesmo resultado bastou modelar o **duto** — quatro paredes, fundo
+  escuro e beiço. Furo é o que o olho vê, não o que a topologia diz, e assim o
+  jogo não carrega 200 KB de biblioteca para desenhar dois buracos.
+
+### O custo, e o nível de detalhe
+
+Trocar um dragão de 46 malhas por um caça de 59 levou a cena de 372 para **483
+ordens de desenho** — e o culpado não era o jogador: era o **inimigo**, que
+passou de 7 para 17 ordens. Cada MATERIAL novo vira uma ordem depois da fusão,
+e o AD-02 tem treze materiais.
+
+Então o inimigo ganhou **nível de detalhe**: voa longe e em bando, leva a
+silhueta, a pintura e as superfícies que mexem, e deixa para trás cabine por
+dentro, trem, cargas, sondas, luzes e frisos. **8 malhas, 13 mil triângulos.**
+A cena voltou para **400** — 28 a mais que o dragão, com um avião muito melhor.
+
+```
+jogador ......... 59 malhas / 23.000 triângulos  (47 visíveis com o trem em cima)
+inimigo ......... 8 malhas / 12.900
+outro jogador ... 49 malhas
+a cena inteira .. 400 ordens de desenho  (dragão: 372)
+```
+
+### O contrato com o jogo
+
+`montaDragao` continua sendo o nome que o jogo chama — por dentro é o AD-02. Ele
+entrega `userData.asas`, `userData.comandos` (ailerons, flapes, profundor,
+leme), `userData.rotores`, `userData.bocais` (com `abre(0..1)`) e
+`userData.trem`. E o `RODA` do jogo caiu de 158 para **103**: a altura sai do
+avião, não o avião fica pendurado na altura do modelo antigo.
+
+*(E a foto que assustou — o avião gigante na pista — era erro meu de teste: eu
+movia o avião na mão e tirava o retrato no mesmo quadro, sem deixar a câmera,
+que é mola, chegar no lugar dela. Ela ficava 360 unidades mais perto do que fica
+de verdade.)*
