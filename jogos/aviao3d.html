@@ -8668,6 +8668,19 @@ const AD02 = {
    E não é só malha: cada MATERIAL novo vira uma ordem de desenho depois da
    fusão, e era isso que custava caro (17 ordens por inimigo contra 7 do modelo
    antigo, vezes uma dúzia de inimigos no céu). */
+/* clareia uma cor 0xRRGGBB em direção ao branco (0 = igual, 1 = branco).
+   Serve para tirar a cor da superfície móvel da MESMA tinta do corpo, em vez
+   de escolher um segundo azul na mão que briga com o primeiro. */
+function clareia(cor, q){
+  /* na mão, em sRGB. THREE.Color guarda a cor em espaço LINEAR desde a r152:
+     clarear lá dentro e devolver com getHex() dá um salto muito maior do que o
+     pedido — 13% viraram um azul lavado quase branco. Aqui a conta é feita nos
+     mesmos bytes em que a cor foi escrita. */
+  const r = (cor >> 16) & 255, g = (cor >> 8) & 255, b = cor & 255;
+  const m = v => Math.min(255, Math.round(v + (255 - v)*q));
+  return (m(r) << 16) | (m(g) << 8) | m(b);
+}
+
 function montaAD02(corCorpo, corDetalhe, corVidro, simples){
   const g = new THREE.Group();
   const mCorpo   = new THREE.MeshPhongMaterial({ color: corCorpo,  shininess: 58, specular: 0x4a6a92 });
@@ -8678,6 +8691,19 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
   const mBranco  = new THREE.MeshPhongMaterial({ color: 0xf6f9ff, shininess: 60 });
   const mFriso   = new THREE.MeshPhongMaterial({ color: 0x17458f, shininess: 40 });
   const mPreto   = new THREE.MeshPhongMaterial({ color: 0x11161f, shininess: 50 });
+  /* --- A COR DAS SUPERFÍCIES MÓVEIS -----------------------------------------
+     A regra anterior era "móvel = cor oposta": painel de asa amarelo, flape e
+     aileron azuis. Lida de longe, essa regra ARREBENTA o avião: a troca de cor
+     caía exatamente em cima da juntura entre a luva e o painel, e olho humano
+     lê borda de cor como borda de OBJETO. Daí o avião parecer um monte de
+     tábuas soltas mesmo com as peças encostadas.
+
+     Avião de verdade pinta a superfície móvel da mesma cor da peça onde ela
+     mora, e marca a dobradiça com um RISCO. É o que está aqui: um azul dois
+     tons acima do corpo — perto dá para ver cada aba, longe a asa é uma asa
+     só. O amarelo volta a ser o que era para ser: faixa de identificação. */
+  const mMovel   = new THREE.MeshPhongMaterial({ color: clareia(corCorpo, 0.17),
+                                                 shininess: 58, specular: 0x3a5a86 });
   const M = AD02;
 
   /* --- CASCO ------------------------------------------------------------
@@ -8692,8 +8718,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
   const asas = [];
   for (const lado of [-1, 1]){
     const espelha = no => { no.scale.x = lado; return no; };
-    /* a luva é parte do CORPO e por isso é azul: o amarelo fica só nos
-       painéis que voam, e aí a asa se lê de longe */
+    /* luva e painel: a MESMA cor. A asa é uma peça só, da fuselagem à ponta. */
     g.add(espelha(pedacoDeAsa(M.luva, 0, 1, 0, 1, mCorpo, 4, 10)));
 
     const pivo = new THREE.Group();
@@ -8702,36 +8727,43 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     const dentro = new THREE.Group();
     dentro.scale.x = lado;
     // a parte fixa do painel, de ponta a ponta
-    dentro.add(pedacoDeAsa(M.asa, 0, 1, 0, M.CORDA_MOVEL, mAmarelo, 8, 10, true));
-    /* --- A CARENAGEM DA DOBRADIÇA -----------------------------------------
+    /* o painel fixo em duas partes que dividem a MESMA estação (t=0,86): do
+       encaixe até ali no azul do corpo, e a ponta em amarelo. As duas séries
+       de anéis nascem de naEstacao(0,86), então as superfícies se encontram
+       exatamente — não é decalque colado por cima, é a pintura da asa. */
+    dentro.add(pedacoDeAsa(M.asa, 0, 0.86, 0, M.CORDA_MOVEL, mCorpo, 7, 10));
+    dentro.add(pedacoDeAsa(M.asa, 0.86, 1, 0, M.CORDA_MOVEL, mAmarelo, 3, 10, true));
+    /* --- A RAIZ GROSSA DO PAINEL -------------------------------------------
        O painel encosta na luva de TOPO, e topo não fecha: girando, a raiz do
-       painel varre um leque e abre um vão que se enxerga o céu através. Era o
-       que fazia o avião parecer um monte de peças soltas.
+       painel varre um leque e abre um vão por onde se enxerga o céu. Era o que
+       fazia o avião parecer um monte de peças soltas.
 
-       Num avião de asa variável isso é resolvido por uma carenagem que ANDA
-       COM A ASA (o F-111 e o Tornado têm exatamente isso, e o F-14 usa um selo
-       flexível). Então a peça entra aqui dentro, no grupo que gira: ela cobre a
-       raiz do painel em qualquer enflechamento, porque vai junto.
+       A primeira tentativa foi um par de BOLHAS (duas esferas achatadas, uma
+       por cima e uma por baixo). Tapava o vão e ficava horrível: duas bolotas
+       grudadas na asa, como se o painel estivesse parafusado na luva. De cima
+       o avião virava um feixe de salsichas paralelas.
 
-       Duas: uma por cima e uma por baixo, achatadas, do tamanho da corda da
-       raiz — não uma bolinha de 19 como a de antes, que não cobria nada. */
-    const cordaRaiz = M.asa[0].corda, meioRaiz = M.asa[0].zLE - cordaRaiz*0.5;
-    for (const alt of [7.5, -7.5]){
-      const sela = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), mCorpo);
-      sela.scale.set(30, 11, cordaRaiz*0.60);
-      sela.position.set(0, alt*0.5, meioRaiz);
-      dentro.add(sela);
-    }
+       O jeito certo é o dos aviões de verdade: a raiz do painel é simplesmente
+       MAIS GROSSA, e essa raiz grossa entra por dentro da luva. Não é peça
+       colada — é a mesma asa, com o perfil engordando até a dobradiça, que é
+       onde mora a caixa do pivô. Aqui isso é um pedaço de asa com a MESMA
+       família de perfil, três estações, engrossando de 11% na juntura para 15%
+       lá dentro, e alongando a corda para cobrir o leque que a raiz varre. */
+    const r0 = M.asa[0];
+    const raizGrossa = [
+      { x: -38, zLE: r0.zLE + 10, corda: r0.corda + 20, y: 0, tt: 0.150, tor: 0 },
+      { x: -14, zLE: r0.zLE +  4, corda: r0.corda +  8, y: 0, tt: 0.132, tor: 0 },
+      { x:  18, zLE: r0.zLE,      corda: r0.corda,      y: 0, tt: 0.108, tor: 0 }
+    ];
+    dentro.add(pedacoDeAsa(raizGrossa, 0, 1, 0, 1, mCorpo, 5, 12));
     pivo.add(dentro);
 
     /* FLAPE e AILERON: mesma planta, mesma espessura, só a faixa de corda é
        outra. Cada um no seu grupo, com a dobradiça na linha de 70% de corda. */
     const abas = {};
-    /* A REGRA DA PINTURA: toda superfície móvel é da COR OPOSTA à da peça em que
-       ela mora. Asa amarela -> flape e aileron azuis; cauda azul -> profundor e
-       leme amarelos. É uma convenção de avião de acrobacia, e aqui ela responde
-       direto ao pedido: dá para ver cada superfície móvel, parada ou mexendo. */
-    for (const [nome, faixa, mat] of [['flape', M.FLAP, mCorpo], ['aileron', M.AIL, mCorpo]]){
+    /* flape e aileron: azul de superfície móvel, e um friso escuro na linha da
+       dobradiça — é assim que se enxerga a aba sem partir a asa em duas cores. */
+    for (const [nome, faixa, mat] of [['flape', M.FLAP, mMovel], ['aileron', M.AIL, mMovel]]){
       const meio = naEstacao(M.asa, (faixa[0] + faixa[1])/2);
       const eixo = new THREE.Group();
       eixo.position.set(lado*0, 0, 0);
@@ -8746,6 +8778,14 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       pivo.add(eixo);
       abas[nome] = eixo;
     }
+    /* o risco da dobradiça: uma tira estreitíssima de corda, na cor do friso,
+       tirada da MESMA planta — por isso ela acompanha o afilamento da asa em
+       vez de ser uma barra reta atravessada. É o que faz a aba aparecer sem
+       precisar pintá-la de outra cor. */
+    for (const faixa of [M.FLAP, M.AIL])
+      dentro.add(pedacoDeAsa(M.asa, faixa[0], faixa[1],
+                             M.CORDA_MOVEL - 0.026, M.CORDA_MOVEL - 0.004, mFriso, 4, 3));
+
     pivo.userData.abas = abas;
     asas.push(pivo);
     g.add(pivo);
@@ -8764,7 +8804,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     const meio = naEstacao(M.estab, 0.5);
     const z = meio.zLE - 0.62*meio.corda;
     for (const lado of [-1, 1]){
-      const p = pedacoDeAsa(M.estab, 0, 1, 0.615, 1, mAmarelo, 5, 5);
+      const p = pedacoDeAsa(M.estab, 0, 1, 0.615, 1, mMovel, 5, 5);
       p.scale.x = lado; p.position.z = -z; profundor.add(p);
     }
     profundor.position.set(0, 0, z);
@@ -8781,7 +8821,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
   {
     const meio = naEstacao(M.deriva, 0.5);
     const z = meio.zLE - 0.60*meio.corda;
-    const p = pedacoDeAsa(M.deriva, 0, 1, 0.595, 1, mAmarelo, 5, 5);
+    const p = pedacoDeAsa(M.deriva, 0, 1, 0.595, 1, mMovel, 5, 5);
     p.position.z = -z;
     leme.add(p); leme.position.z = z;
     leme.userData.comando = 'leme';
@@ -9010,7 +9050,14 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     quilha.moveTo(-158, 0); quilha.lineTo(-192, -30); quilha.lineTo(-206, -29); quilha.lineTo(-200, 0);
     quilha.closePath();
     const q = fazFormaFina(quilha, 5, mCorpo);
-    q.rotation.y = -Math.PI/2; q.position.set(lado*34, -22, 0); g.add(q);
+    q.rotation.y = -Math.PI/2;
+    /* INCLINADAS PARA FORA. Em pé, vistas de trás, as duas viravam dois postes
+       embaixo do avião — cara de trem de pouso esquecido do lado de fora. Toda
+       quilha ventral de caça é cantada (F-16, Su-27, F/A-18E): inclinada, ela
+       lê como quilha e ainda trabalha melhor, porque fica fora da sombra da
+       fuselagem no ângulo de ataque alto, que é justo para o que ela serve. */
+    const qNo = new THREE.Group();
+    qNo.add(q); qNo.position.set(lado*34, -22, 0); qNo.rotation.z = lado*0.40; g.add(qNo);
     const estrake = new THREE.Mesh(caixaViva(3, 5, 76, 1.2), mCorpo);
     estrake.position.set(lado*30, 8, 166); estrake.rotation.set(0, lado*0.13, -lado*0.5); g.add(estrake);
   }
@@ -9053,9 +9100,8 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     raizAsa.scale.set(16, 13, 116); raizAsa.position.set(lado*30, -4, -14); g.add(raizAsa);
     /* a bolha da luva no ponto do pivô: fecha o lado de dentro da junta, que a
        carenagem que gira não alcança */
-    const naLuva = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mCorpo);
-    naLuva.scale.set(26, 12, 96);
-    naLuva.position.set(lado*(M.PIVO.x - 8), 0, M.PIVO.z - 20); g.add(naLuva);
+    /* (aqui havia mais uma bolha, fixa na luva. Saiu junto com as outras: a
+       raiz grossa do painel já cobre a juntura em todo o curso.) */
     const raizEstab = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), mCorpo);
     raizEstab.scale.set(10, 8, 46); raizEstab.position.set(lado*50, -8, -192); g.add(raizEstab);
   }

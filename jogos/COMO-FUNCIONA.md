@@ -4676,3 +4676,95 @@ dragão ......... RODA 158 · comandos: nenhum                          · asas 
 
 A escolha sobrevive ao recarregar a página, os dois voam, e o aviso de canto diz
 qual está no hangar.
+
+---
+
+## As duas bolhas, e a pintura que partia o avião em dois
+
+> *"pra que essas duas bolhas nas asas?? fixando a asa móvel como a parte
+> fixa?? que coisa feia da porra"*
+
+Estava certo, e a bolha era minha. Para tapar a fresta da raiz da asa variável
+eu tinha grudado **duas esferas achatadas** (uma por cima, uma por baixo) no
+grupo que gira. Tapava o vão e ficava horrível: de cima, o avião virava um
+**feixe de salsichas paralelas** — luva, bolha, bolha, painel —, e a asa parecia
+parafusada na fuselagem.
+
+O jeito certo é o dos aviões de verdade: a raiz do painel é simplesmente **mais
+grossa**, e essa raiz grossa entra por dentro da luva. Não é peça colada, é a
+mesma asa engordando até a dobradiça — que é exatamente onde mora a caixa do
+pivô num avião de asa variável. Três estações da **mesma família de perfil**,
+subindo de 10,8% de espessura na juntura para 15% lá dentro:
+
+```js
+const r0 = M.asa[0];
+const raizGrossa = [
+  { x: -38, zLE: r0.zLE + 10, corda: r0.corda + 20, y: 0, tt: 0.150 },
+  { x: -14, zLE: r0.zLE +  4, corda: r0.corda +  8, y: 0, tt: 0.132 },
+  { x:  18, zLE: r0.zLE,      corda: r0.corda,      y: 0, tt: 0.108 }
+];
+dentro.add(pedacoDeAsa(raizGrossa, 0, 1, 0, 1, mCorpo, 5, 12));
+```
+
+Conferido nas duas pontas do curso: asa aberta (−0,10 rad) e asa totalmente
+recolhida (0,77 rad). Sem fresta nas duas, e sem bolota. A terceira bolha, a que
+era fixa na luva, saiu junto — não fazia mais falta.
+
+### A regra de pintura estava errada
+
+Essa foi a causa que eu não tinha enxergado, e é a que mais pesava.
+
+A regra antiga era *"superfície móvel = cor oposta"*: painel de asa **amarelo**,
+flape e aileron azuis; cauda azul, profundor e leme amarelos. Parece boa no
+papel — é convenção de avião de acrobacia — e destruía o avião na tela. O
+motivo é de olho, não de gosto: **a troca de cor caía exatamente em cima da
+juntura** entre a luva (azul) e o painel (amarelo). Olho humano lê borda de cor
+como **borda de objeto**. Com as peças perfeitamente encostadas, o avião
+continuava parecendo um monte de tábuas soltas — porque a pintura estava
+desenhando a linha de separação para o observador.
+
+A regra nova é a dos aviões de verdade:
+
+```
+asa, luva, cauda, corpo ..... a mesma tinta: a asa é UMA peça, da raiz à ponta
+flape, aileron, profundor, leme ... o mesmo azul, 17% mais claro
+a dobradiça .................. um risco fino, tirado da mesma planta da asa
+amarelo ...................... só identificação: pontas, cabine, deriva, bico
+```
+
+A ponta amarela não é decalque colado por cima: o painel fixo é lofteado em
+**duas partes que dividem a mesma estação** (t = 0,86). As duas séries de anéis
+nascem de `naEstacao(0,86)`, então as superfícies se encontram exatamente — não
+há z-fighting nem degrau.
+
+E o risco da dobradiça é uma tira estreitíssima de corda (de 67,4% a 69,6%)
+tirada da **mesma tabela** da asa, e por isso acompanha o afilamento em vez de
+ser uma barra reta atravessada. É o que faz a aba aparecer sem partir a asa em
+duas cores.
+
+### Um bug de cor que valia registrar
+
+`clareia()` primeiro clareava com `THREE.Color`:
+
+```js
+const c = new THREE.Color(cor); c.r += (1-c.r)*q; ... return c.getHex();
+```
+
+13% pedidos saíram como um azul lavado quase branco. Motivo: **desde a r152 o
+`THREE.Color` guarda a cor em espaço LINEAR**. Somar 13% do caminho até o branco
+lá dentro é muito mais do que somar 13% em sRGB — no canal vermelho, 31 virou
+105 em vez de 60. A conta passou a ser feita nos mesmos bytes em que a cor foi
+escrita.
+
+### E as quilhas ventrais
+
+Vistas de trás, as duas quilhas embaixo da cauda estavam **em pé** e viravam
+dois postes — cara de trem de pouso que ficou esquecido do lado de fora. Toda
+quilha ventral de caça é **cantada** (F-16, Su-27, F/A-18E). Inclinadas 23°,
+lêem como quilha — e ainda trabalham melhor, porque saem da sombra da fuselagem
+no ângulo de ataque alto, que é justamente para o que elas servem.
+
+```
+a cena inteira .. 408 ordens de desenho  (eram 400; o azul de superfície móvel
+                  é um material novo em cada carcaça)
+```
