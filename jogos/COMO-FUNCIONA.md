@@ -5000,3 +5000,114 @@ tabela do casco, com `pontoNoCasco`.
 ```
 a cena inteira .. 437 ordens de desenho  (eram 466 com as pétalas soltas)
 ```
+
+---
+
+## "O avião antigo me dava mais sensação de movimento"
+
+Por incrível que pareça, medido, o caça já ocupava **mais tela** que o dragão
+(0,60 contra 0,47 de largura) e já tinha **mais peças**. Então não era tamanho
+nem quantidade. Era **amplitude**: no dragão, uma coisa GRANDE mexia o tempo
+todo — as asas batendo. No caça, as coisas mexiam uns poucos graus.
+
+Três causas, todas medíveis.
+
+### 1. A superfície lia a taxa, não o manche
+
+Esta era a principal, e explica o *"o profundor nem parece que se mexe"*.
+
+A superfície lia só a **taxa** — o quanto o avião está de fato girando. E a taxa
+é multiplicada pela `autoridade`, que cai com o quadrado da velocidade.
+Resultado: puxando o manche até o fim a 2.000, o profundor ia a **8,7° de um
+curso de 17°**. Metade. Devagar, que é quando se manobra mais, ele mal saía do
+lugar.
+
+E é ao contrário num avião: puxar o manche até o fim leva o profundor até o
+**batente**, sempre. O que a velocidade muda é o efeito, não o ângulo.
+
+```js
+const mostra = (pedido, taxa) => Math.abs(pedido) >= Math.abs(taxa) ? pedido : taxa;
+cmdArf += (Math.max(-1, Math.min(1, mostra(arfCurva, cab/TAXA_ARF))) - cmdArf) * laco;
+```
+
+Com a mão no manche vale o pedido e a peça vai ao fundo; com a mão solta vale a
+taxa, e o nivelador automático continua aparecendo — que era a razão de ler a
+taxa em primeiro lugar.
+
+### 2. O curso era pequeno demais para a distância
+
+17° de profundor é o número de um avião de verdade. Só que, na câmera de
+perseguição, 17° numa peça de 40 de corda movem a borda **uns dez pixels**. Não
+se lê. Caça de combate real vai a 25-30°; adotando o teto da faixa, a peça
+aparece sem o avião deixar de ser avião.
+
+```
+                 antes   agora
+profundor .....  13,6°   26,3°
+aileron .......  19,1°   29,8°
+leme ..........  21,8°   29,8°
+bocal vetorado    7,4°   19,0°
+```
+
+### 3. A asa só lia a velocidade
+
+Em cruzeiro ela ficava parada no mesmo lugar o tempo todo. Mas asa de geometria
+variável **abre na manobra**, e isso não é licença poética: recolhida ela tem
+pouca sustentação e muita carga de ponta; o F-14 abre a asa sozinho quando o
+piloto puxa.
+
+```js
+const puxando = Math.min(1, Math.abs(cmdArf)*1.15);
+const alvoAsa = ASA_ABERTA + (ASA_FECHADA - ASA_ABERTA)*t*(1 - 0.62*puxando);
+```
+
+Medido: a 4.200, mão solta a asa fica em **44,1°**; puxando, ela vem para
+**13,2°**. Trinta e um graus de asa, em cerca de um segundo, toda vez que se
+manobra. É a peça grande que se mexe o tempo todo — a mesma que o dragão tinha,
+só que pelo motivo certo.
+
+A velocidade dela também subiu: `ASA_TAXA` de 0,24 para **0,52 rad/s**. Os 0,24
+eram o tempo de um F-14 de verdade e ficavam lentos demais para se ver —
+entrando numa curva, a asa chegava na frente quando a curva já tinha acabado.
+
+```
+                        DRAGÃO   CAÇA
+peças que se moveram       9      16
+quanto se moveram       18,8    26,3
+```
+
+### E a pintura de remendo
+
+> *"alguns flaps com cores diferentes, o profundor também tem uma cor
+> diferente... tá uma merda isso"*
+
+Eu tinha posto as superfícies móveis num azul 17% mais claro, para se poder
+apontar cada uma parada. Lido na tela não deu "aba": deu **tinta mal
+combinada** — um flape aqui, outro ali e o profundor lá atrás, cada um de um
+azul ligeiramente diferente, como avião remendado com peça de ferro-velho.
+
+Avião pintado de uma cor só tem a superfície móvel **da mesma cor**. Quem a
+mostra é o risco da dobradiça — e o movimento. E o movimento agora existe.
+De quebra, um material a menos por carcaça: a cena caiu de 464 para **397
+ordens de desenho**.
+
+### A luz
+
+`luzPiloto`, a luz fraca presa na câmera, valia 0,55. Na câmera de perseguição,
+com o sol vindo de frente, o que se vê do avião é justamente a face virada para
+a câmera — e ela ficava na sombra, o azul virando quase preto e o desenho todo
+sumindo junto. Ela é a **luz de chave** do fotógrafo: vem de onde está o olho, e
+é ela que faz o objeto ter forma em vez de silhueta. Agora vale **1,05**.
+
+### E as turbinas do dragão
+
+> *"as turbinas estão vazando acima das asas."*
+
+Em `y = -4`, com raio 28, a turbina subia até `y = +24` — e a asa naquela
+estação está em `y ≈ 4`. A metade de cima do motor, e o fogo junto, apareciam
+**por cima da asa**, como se o jato vazasse pelo extradorso. Turbina pendurada
+em pilone fica ABAIXO da asa: é assim em todo avião que carrega motor em pilone,
+e é o que deixa a asa ser a linha de cima do desenho. Em `y = -22` o topo do
+motor encosta no plano da asa e para ali — e o pilone, que era um tijolo deitado
+porque ligava a asa a um motor na mesma altura dela, virou um pilone de verdade.
+O fogo foi junto, para a saída de verdade (`x = 86`, `z = -114`).

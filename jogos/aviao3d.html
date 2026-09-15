@@ -7401,7 +7401,7 @@ const ARF_CHEIO = 28, ARF_MORTO = 3;   // curso do profundor, em graus de celula
 
    VET_V1/VET_V2: a faixa em que o curso vai encolhendo. Abaixo de 1.400 o
    bocal tem tudo; acima de 3.600 sobra pouco mais de um quarto. */
-const VET_ARF = 0.32, VET_GUI = 0.21, VET_ROL = 0.16;
+const VET_ARF = 0.42, VET_GUI = 0.30, VET_ROL = 0.24;
 const VET_V1 = 1400, VET_V2 = 3600;
 /* quanto o motor empresta de autoridade quando o ar não dá mais. É o que
    substitui o antigo piso de 0,25 por uma razão FÍSICA: o rabo continua sendo
@@ -7557,14 +7557,23 @@ const ASA_ABERTA = -0.10;      // rad: um fio à frente da posição de desenho
    arfagem justamente na velocidade em que se quer manobrar. */
 const ASA_FECHADA = 0.77;
 const ASA_V1 = 1500, ASA_V2 = 3600;   // entre estas velocidades ela varre
-const ASA_TAXA = 0.24;         // rad por segundo: uns 2,8 s de ponta a ponta
+const ASA_TAXA = 0.52;         // rad por segundo: uns 1,7 s de ponta a ponta
+/* 0,24 era o tempo de um F-14 de verdade (uns 7 s de ponta a ponta na escala
+   deste avião) e ficava LENTO demais para se ver: entrando numa curva, a asa
+   chegava na frente quando a curva já tinha acabado. Agora ela acompanha o
+   manche. */
 let enflecha = ASA_ABERTA;     // onde a asa está agora
 /* --- AS SUPERFÍCIES DE COMANDO ---------------------------------------------
    Quanto cada uma gira no batente, em radianos, e onde estão agora. Os
    batentes são generosos de propósito: num avião de verdade o aileron anda
    uns 20°, mas num brinquedo visto de trás a 300 metros, 20° não se enxerga.
    Aqui o que importa é LER a manobra, não copiar a mecânica. */
-const AIL_MAX = 0.42, ARF_MAX = 0.30, LEM_MAX = 0.38;
+/* CURSO DAS SUPERFÍCIES. 17° de profundor é o número de um avião de
+   verdade — e de longe, na câmera de perseguição, 17° numa peça de 40 de
+   corda movem a borda uns dez pixels. Não se lê. Caça de combate real vai a
+   25-30° de profundor e 25° de aileron; adotando o teto da faixa, a peça
+   aparece sem o avião deixar de ser avião. */
+const AIL_MAX = 0.52, ARF_MAX = 0.46, LEM_MAX = 0.52;
 let cmdRol = 0, cmdArf = 0, cmdLem = 0;
 /* --- A HISTÓRIA DO NARIZ ----------------------------------------------------
    "A linha entre a mira externa e a central não pode ser retilínea. Tem que
@@ -7824,7 +7833,12 @@ sol.shadow.bias = -0.0009;
 cena.add(sol); cena.add(sol.target);
 /* uma luz fraca presa na câmera, só para nada ficar preto quando o avião vira
    a barriga para o sol */
-const luzPiloto = new THREE.DirectionalLight(0xdfeaff, 0.55);
+/* 0,55 era pouco. Na câmera de perseguição, com o sol vindo de frente, o que
+   se vê do avião é justamente a face virada para a câmera — e ela ficava na
+   sombra, o azul virando quase preto e o desenho todo sumindo junto. Esta luz
+   é a "luz de chave" do fotógrafo: vem de onde está o olho, e é ela que faz o
+   objeto ter forma em vez de silhueta. */
+const luzPiloto = new THREE.DirectionalLight(0xdfeaff, 1.05);
 luzPiloto.position.set(0, 0.4, 1);
 cam.add(luzPiloto); cam.add(luzPiloto.target);
 luzPiloto.target.position.set(0, 0, -1);
@@ -8123,7 +8137,9 @@ const MEDIDAS_DRAGAO = {
   nome: 'DRAGÃO',
   roda: 158,                    // altura do centro com o trem no chão
   cabine: { frente: 40, cima: 26 },
-  jatos: [{ x: -82, y: -6, z: -110 }, { x: 82, y: -6, z: -110 }],
+  /* o fogo mora na SAÍDA DE VERDADE: x=86 (o eixo do motor, não 82), y junto
+     com ele lá embaixo, e z=-114, que é onde o bocal escuro acaba. */
+  jatos: [{ x: -86, y: -22, z: -114 }, { x: 86, y: -22, z: -114 }],
   fogo: { raio: 17, nucleo: 9, anel: 8 },
   ponta: { x: 250, y: 15, z: -50 },        // a ponta da asa, para o vórtice
   pivo:  { x: 30, z: 6 }
@@ -8888,8 +8904,16 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
      mora, e marca a dobradiça com um RISCO. É o que está aqui: um azul dois
      tons acima do corpo — perto dá para ver cada aba, longe a asa é uma asa
      só. O amarelo volta a ser o que era para ser: faixa de identificação. */
-  const mMovel   = new THREE.MeshPhongMaterial({ color: clareia(corCorpo, 0.17),
-                                                 shininess: 58, specular: 0x3a5a86 });
+  /* E ELA É A MESMA TINTA. Eu tinha posto as superfícies móveis num azul 17%
+     mais claro, para se poder apontar cada uma parada. Lido na tela não deu
+     "aba", deu TINTA MAL COMBINADA: um flape aqui, outro ali e o profundor lá
+     atrás, cada um de um azul ligeiramente diferente, como avião remendado com
+     peça de ferro-velho.
+
+     Avião pintado de uma cor só tem a superfície móvel da mesma cor: quem a
+     mostra é o RISCO da dobradiça, e o movimento. E o movimento agora existe —
+     26° de profundor, 30° de aileron. Não precisa de tinta para se ver. */
+  const mMovel   = mCorpo;
   const M = AD02;
 
   /* --- CASCO ------------------------------------------------------------
@@ -9734,23 +9758,32 @@ function montaDragaoClassico(corCorpo, corDetalhe, corVidro, asasMoveis){
      TOMADA aberta na frente com o rotor girando lá dentro. É o mesmo truque
      da hélice antiga, mas escondido dentro do bocal, onde não tapa a cara do
      dragão — que era o defeito que derrubou a hélice da primeira vez. */
+  /* A ALTURA DELAS. Em y=-4, com raio 28, a turbina subia até y=+24 — e a asa
+     naquela estação está em y≈4. As duas metades de cima do motor (e o fogo
+     junto) apareciam POR CIMA da asa, como se o jato vazasse pelo extradorso.
+     Turbina pendurada na asa fica ABAIXO dela: é assim em todo avião que
+     carrega motor em pilone, e é o que deixa a asa ser a linha de cima do
+     desenho. Em y=-22 o topo do motor encosta no plano da asa e para ali. */
+  const MOTOR_Y = -22;
   const rotores = [];
   for (const lado of [-1, 1]){
     const t = new THREE.Mesh(new THREE.CylinderGeometry(28, 25, 96, 14), mCorpo);
-    t.rotation.x = Math.PI/2; t.position.set(lado*86, -4, -60);
+    t.rotation.x = Math.PI/2; t.position.set(lado*86, MOTOR_Y, -60);
     t.castShadow = true; g.add(t);
-    const pil = new THREE.Mesh(new THREE.BoxGeometry(40, 14, 44), mCorpo);
-    pil.position.set(lado*64, -6, -60); pil.rotation.z = lado*0.10; g.add(pil);
+    /* e o pilone cresce para alcançar: ele ligava a asa a um motor que estava
+       na mesma altura dela, então era um tijolo deitado. Agora é um pilone. */
+    const pil = new THREE.Mesh(caixaViva(30, 34, 46, 3), mCorpo);
+    pil.position.set(lado*66, MOTOR_Y/2 + 2, -60); pil.rotation.z = lado*0.10; g.add(pil);
     // a saída: aro amarelo e o bocal escuro por dentro
     const aroT = new THREE.Mesh(new THREE.TorusGeometry(26, 4.6, 5, 14), mAmarelo);
-    aroT.position.set(lado*86, -4, -108); g.add(aroT);
+    aroT.position.set(lado*86, MOTOR_Y, -108); g.add(aroT);
     const bocal = new THREE.Mesh(new THREE.CylinderGeometry(22, 24, 20, 14, 1, true), mEscuro);
-    bocal.rotation.x = Math.PI/2; bocal.position.set(lado*86, -4, -104); g.add(bocal);
+    bocal.rotation.x = Math.PI/2; bocal.position.set(lado*86, MOTOR_Y, -104); g.add(bocal);
     // a entrada: aro amarelo, e o duto escuro que dá fundo ao rotor
     const tomada = new THREE.Mesh(new THREE.TorusGeometry(26, 4.0, 5, 14), mAmarelo);
-    tomada.position.set(lado*86, -4, -12); g.add(tomada);
+    tomada.position.set(lado*86, MOTOR_Y, -12); g.add(tomada);
     const duto = new THREE.Mesh(new THREE.CylinderGeometry(24, 24, 26, 14, 1, true), mEscuro);
-    duto.rotation.x = Math.PI/2; duto.position.set(lado*86, -4, -22); g.add(duto);
+    duto.rotation.x = Math.PI/2; duto.position.set(lado*86, MOTOR_Y, -22); g.add(duto);
     /* o ROTOR, que gira com o motor. Sete pás chatas e um cone no meio: de
        longe vira um disco escuro, de perto dá para ver girando. */
     const rotor = new THREE.Group();
@@ -9766,7 +9799,7 @@ function montaDragaoClassico(corCorpo, corDetalhe, corVidro, asasMoveis){
        geral, mas nada impede de cozinhar as pás dele entre si. E a fusão é
        feita com o grupo ainda na origem — depois é que ele vai para a asa. */
     fundePorCor(rotor);
-    rotor.position.set(lado*86, -4, -18);
+    rotor.position.set(lado*86, MOTOR_Y, -18);
     rotores.push(rotor);
   }
 
@@ -12809,8 +12842,25 @@ function atualiza(dt){
      Assim o desenho nunca mente. O filtro é curto (uns 0,1 s) porque comando
      de avião é rápido — mas não instantâneo, que aí pisca. */
   const laco = Math.min(1, dt*11);
-  cmdRol += (Math.max(-1, Math.min(1, rol/TAXA_ROL)) - cmdRol) * laco;
-  cmdArf += (Math.max(-1, Math.min(1, cab/TAXA_ARF)) - cmdArf) * laco;
+  /* --- E TAMBÉM O QUE SE PEDE ----------------------------------------------
+     "o profundor nem parece que se mexe."
+
+     Estava certo, e a culpa era desta conta. A superfície lia só a TAXA — o
+     quanto o avião está de fato girando —, e a taxa é dividida pela
+     `autoridade`, que cai com a velocidade. Resultado: puxando o manche até o
+     fim a 2.000, o profundor ia a 8,7° de um curso de 17°. Metade. Devagar,
+     quando é justamente quando se manobra mais, ele mal saía do lugar.
+
+     E é ao contrário num avião: puxar o manche até o fim leva o profundor até
+     o BATENTE, sempre. O que a velocidade muda é o efeito, não o ângulo.
+
+     Então a superfície mostra o MAIOR dos dois: o que o piloto pediu ou o que
+     o avião está fazendo. Com a mão no manche vale o pedido, e ela vai ao
+     fundo; com a mão solta vale a taxa, e o nivelador continua aparecendo —
+     que era a razão de ler a taxa em primeiro lugar. */
+  const mostra = (pedido, taxa) => Math.abs(pedido) >= Math.abs(taxa) ? pedido : taxa;
+  cmdRol += (Math.max(-1, Math.min(1, mostra(e.lat, rol/TAXA_ROL))) - cmdRol) * laco;
+  cmdArf += (Math.max(-1, Math.min(1, mostra(arfCurva, cab/TAXA_ARF))) - cmdArf) * laco;
   cmdLem += (Math.max(-1, Math.min(1, leme)) - cmdLem) * laco;
 
 
@@ -12825,7 +12875,21 @@ function atualiza(dt){
   {
     const querAberta = flap > 0 || trem || noChao;
     const t = Math.max(0, Math.min(1, (voo - ASA_V1)/(ASA_V2 - ASA_V1)));
-    const alvoAsa = querAberta ? ASA_ABERTA : ASA_ABERTA + (ASA_FECHADA - ASA_ABERTA)*t;
+    /* --- E ELA ABRE NA MANOBRA ---------------------------------------------
+       A asa só lia a VELOCIDADE. Em cruzeiro ela ficava parada no mesmo lugar
+       o tempo todo — e era isso que fazia o dragão, com as asas batendo, dar
+       mais sensação de movimento que um caça tecnicamente melhor: no dragão
+       alguma coisa grande mexia o tempo inteiro.
+
+       Mas asa de geometria variável ABRE na manobra, e isso não é licença
+       poética: recolhida ela tem pouca sustentação e muita carga de ponta; o
+       F-14 abre a asa sozinho quando o piloto puxa. Então puxar o manche traz
+       a asa para a frente, e soltar manda de volta. Vira a peça grande que se
+       mexe o tempo todo — a mesma que o dragão tinha, só que pelo motivo
+       certo. */
+    const puxando = Math.min(1, Math.abs(cmdArf)*1.15);
+    const alvoAsa = querAberta ? ASA_ABERTA
+                  : ASA_ABERTA + (ASA_FECHADA - ASA_ABERTA)*t*(1 - 0.62*puxando);
     const passo = ASA_TAXA*dt;
     enflecha += Math.max(-passo, Math.min(passo, alvoAsa - enflecha));
   }
