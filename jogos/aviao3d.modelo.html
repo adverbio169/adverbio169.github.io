@@ -56,6 +56,13 @@
   #cDist{top:14px;left:14px}
   #cRec{top:14px;right:14px;text-align:right}
   #cPontos{top:96px;left:14px}
+  #cMissao{top:180px;left:14px;max-width:238px}
+  #cMissao .rot{margin-bottom:4px}
+  #cMissao #mConta{color:#ffd257;letter-spacing:0}
+  .mi{font-size:11.5px;font-weight:600;color:#c3d3ee;line-height:1.55;white-space:nowrap;
+      overflow:hidden;text-overflow:ellipsis}
+  .mi b{color:#ffd257;font-weight:800}
+  .mi.ok{color:#5eff9a;text-decoration:line-through;opacity:.75}
   #cComb{top:14px;left:50%;transform:translateX(-50%);text-align:center;min-width:180px}
   #barra{height:7px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden;margin-bottom:5px}
   #barra i{display:block;height:100%;width:100%;background:#5eff9a;border-radius:99px;transition:width .15s}
@@ -203,7 +210,9 @@
   body.dedos #cMotor,body.dedos #convite{display:none}
   /* As tiras laterais ocupam a borda inteira, e os painéis de canto ficavam
      por baixo delas. Com os botões na tela, tudo recua a largura da tira. */
-  body.dedos #cDist,body.dedos #cPontos{left:calc(14px + min(13vw,58px))}
+  body.dedos #cDist,body.dedos #cPontos,body.dedos #cMissao{left:calc(14px + min(13vw,58px))}
+  body.dedos #cMissao{top:166px;max-width:44vw}
+  body.dedos .mi{font-size:10px;line-height:1.45}
   body.dedos #cRec,body.dedos #cVida{right:calc(14px + min(13vw,58px))}
   body.dedos #cGente{left:calc(14px + min(13vw,58px))}
   body.dedos #cDist,body.dedos #cRec{padding:6px 10px}
@@ -231,7 +240,10 @@
      mora exatamente ali (left:128, largura mínima 186). A fileira de baixo
      está cheia — o canto de cima à esquerda, abaixo dos painéis e acima do
      radar, é o vão que sobra. */
-  #btCabeca{left:14px;top:180px;display:none}
+  /* o botão da cabeça morava em top:180 — que agora é o painel de objetivos.
+     Desceu para baixo dele; a coluna da esquerda, de cima para baixo, é:
+     distância, pontos, OBJETIVOS, cabeça, o aviso de teste e o radar. */
+  #btCabeca{left:14px;top:300px;display:none}
   #btCabeca.pode{display:block}
   #btCabeca.on{background:rgba(94,255,154,.18);border-color:rgba(94,255,154,.5);color:#bfffd6}
   #btCabeca.perdeu{background:rgba(255,194,77,.16);border-color:rgba(255,194,77,.45);color:#ffe1a8}
@@ -318,6 +330,8 @@
 <div class="painel" id="cVida"><div class="rot">Fuselagem</div>
   <div id="barraV"><i id="vidaBarra"></i></div>
   <div class="val"><span id="vVida">100</span><small>%</small></div></div>
+<div class="painel" id="cMissao"><div class="rot">Objetivos <span id="mConta">0/4</span></div>
+  <div id="mList"></div></div>
 <div class="painel" id="cGente"><span class="pt"></span><b id="vGente">1</b> no ar
   <span id="salaGente"></span></div>
 <div class="painel" id="cPouso"><div class="rot">Velocidade</div>
@@ -953,12 +967,47 @@ const ACEL_CHAO = 145*VEL, FREIO_CHAO = 330*VEL;
 /* O quanto o avião AFUNDA na faixa de estresse, antes do estol declarado.
    Escala com a velocidade do jogo: é uma velocidade, como as outras. */
 const AFUNDA = 900*VEL;
+/* --- AS PISTAS DO MAPA -----------------------------------------------------
+   Eram quatro constantes soltas descrevendo UMA pista. Viraram uma tabela, e
+   com ela o mapa ganhou um segundo aeroporto sem que nada mais precisasse
+   saber que existem dois: quem pergunta "estou sobre asfalto?" pergunta à
+   lista.
+
+   Cada pista tem centro, rumo, meio-comprimento e meia-largura. O rumo é o da
+   cabeceira sul, em radianos — a CENTRAL corre para o norte (rumo 000, que é
+   por isso que a cabeceira dela se chama 36); a do VALE corre para o leste
+   (rumo 090), é mais curta e mais estreita, e fica no canto noroeste do mapa:
+   um aeroporto de interior, para se ter aonde ir. */
+const PISTAS = [
+  { nome:'CENTRAL', sigla:'36', cx: 0,      cz: (PISTA_Z0 + PISTA_Z1)/2, rumo: 0,
+    meiaC: (PISTA_Z1 - PISTA_Z0)/2, meia: PISTA_MEIA },
+  { nome:'VALE',    sigla:'09', cx: -46000, cz: 38000,                   rumo: Math.PI/2,
+    meiaC: 5400,                    meia: 520 }
+];
+/* o ponto (x,z) no referencial de uma pista: quanto AO LONGO dela e quanto
+   DE TRAVÉS. É a única conta de geometria que o resto do jogo precisa. */
+function naPistaLocal(p, x, z, folgaC, folgaL){
+  const dx = x - p.cx, dz = z - p.cz;
+  const c = Math.cos(p.rumo), sn = Math.sin(p.rumo);
+  const aoLongo = dx*sn + dz*c, deTraves = dx*c - dz*sn;
+  return Math.abs(deTraves) < p.meia + (folgaL || 0) &&
+         Math.abs(aoLongo)  < p.meiaC + (folgaC || 0);
+}
 /* uma tarja folgada em volta do asfalto, onde não nasce prédio nem alvo */
 function perto_da_pista(x, z){
-  return Math.abs(x) < PISTA_MEIA + 2600 && z > PISTA_Z0 - 3000 && z < PISTA_Z1 + 3000;
+  return PISTAS.some(p => naPistaLocal(p, x, z, 3000, 2600));
 }
 function sobreAPista(x, z){
-  return Math.abs(x) < PISTA_MEIA && z > PISTA_Z0 - 400 && z < PISTA_Z1 + 400;
+  return PISTAS.some(p => naPistaLocal(p, x, z, 400, 0));
+}
+/* qual pista está embaixo (ou a mais perto), para os avisos e a bússola */
+function pistaPerto(x, z){
+  let melhor = PISTAS[0], d = Infinity;
+  for (const p of PISTAS){
+    const q = Math.hypot(x - p.cx, z - p.cz);
+    if (q < d){ d = q; melhor = p; }
+  }
+  return melhor;
 }
 function velMin(){ return ESTOL[flap] || ESTOL[0]; }
 const ARMAS = {
@@ -974,9 +1023,22 @@ const estradaXv = z => -21000 + Math.sin(z/13000)*1800;
    VALOR dele também é usado, e é o que cria bairros: onde o campo é forte fica
    o centro, com torres altas e escuras; na borda ficam os subúrbios, baixos e
    claros. Sai de graça — é a mesma conta, lida com mais atenção. */
+/* --- A CIDADE NOVA ---------------------------------------------------------
+   O mapa tinha cidade em toda parte, mas nenhuma com NOME: o campo de seno
+   espalha bairros iguais por 120 mil unidades, e voando por cima um lugar era
+   igual ao outro. Faltava um destino.
+
+   PORTO ALTO é um morro plantado à mão nesse mesmo campo — uma gaussiana
+   somada ao seno. Como tudo o mais (os prédios, os alvos, a cor da grama, os
+   bairros altos do miolo) já lê `campoCidade`, a cidade inteira aparece
+   sozinha a partir desta soma: torres no centro, galpões na periferia, alvos
+   entre elas. Uma linha de código, um destino no mapa. */
+const CIDADE2 = { nome:'PORTO ALTO', x: 44000, z: -36000, raio: 17000 };
 function campoCidade(x, z){
-  return Math.sin(x/17000 + 0.6) + Math.sin(z/15000 - 0.4)
-       + Math.sin((x + z)/11000)*0.7 + Math.sin((x - z)/23000)*0.5;
+  const base = Math.sin(x/17000 + 0.6) + Math.sin(z/15000 - 0.4)
+             + Math.sin((x + z)/11000)*0.7 + Math.sin((x - z)/23000)*0.5;
+  const dx = x - CIDADE2.x, dz = z - CIDADE2.z, r = CIDADE2.raio;
+  return base + 2.4*Math.exp(-(dx*dx + dz*dz)/(2*(r*0.62)*(r*0.62)));
 }
 function ehCidade(x, z){ return campoCidade(x, z) > 0.62; }
 function baralha(a,b){ return Math.abs(Math.sin(a*127.1 + b*311.7) * 43758.5453) % 1; }
@@ -1407,33 +1469,38 @@ let pista = null;
 function montaPista(){
   if (pista) cena.remove(pista);
   pista = new THREE.Group();
-  const compr = PISTA_Z1 - PISTA_Z0, meioZ = (PISTA_Z0 + PISTA_Z1)/2;
-  const laje = (larg, comp, cor, x, z, y) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(larg, comp),
-      new THREE.MeshLambertMaterial({ color: cor }));
-    m.rotation.x = -Math.PI/2;
-    m.position.set(x, PISTA_Y + y, z);
-    m.receiveShadow = y < 1;
-    m.userData.sombra = false;
-    pista.add(m);
-    return m;
-  };
-  laje(PISTA_MEIA*2, compr, 0x3c4048, 0, meioZ, 0);                 // o asfalto
-  laje(PISTA_MEIA*2 + 260, compr + 260, 0x6f7a5e, 0, meioZ, -2);    // o acostamento
-  // as duas bordas brancas
-  for (const lado of [-1, 1]) laje(26, compr - 400, 0xe8eef5, lado*(PISTA_MEIA - 60), meioZ, 1);
-  // o tracejado do meio
-  for (let z = PISTA_Z0 + 700; z < PISTA_Z1 - 700; z += 1400) laje(26, 700, 0xe8eef5, 0, z, 1);
-  // as barras das duas cabeceiras
-  for (const [z0, sinal] of [[PISTA_Z0 + 220, 1], [PISTA_Z1 - 220, -1]])
-    for (let k = -3; k <= 3; k++){
-      if (k === 0) continue;
-      laje(58, 900, 0xe8eef5, k*118, z0 + sinal*450, 1);
-    }
-  // faixas de toque, o alvo de quem pousa
-  for (const [z0, sinal] of [[PISTA_Z0, 1], [PISTA_Z1, -1]])
-    for (const lado of [-1, 1])
-      laje(110, 1100, 0xe8eef5, lado*250, z0 + sinal*2400, 1);
+  /* uma pista é desenhada SEMPRE deitada no eixo Z, em torno da origem, e o
+     grupo dela é que gira e se muda para o lugar. Assim o desenho não sabe de
+     rumo nenhum, e acrescentar a terceira pista um dia é uma linha na tabela. */
+  for (const P of PISTAS){
+    const no = new THREE.Group();
+    no.position.set(P.cx, 0, P.cz);
+    no.rotation.y = P.rumo;
+    const C = P.meiaC*2, M = P.meia;
+    const laje = (larg, comp, cor, x, z, y) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(larg, comp),
+        new THREE.MeshLambertMaterial({ color: cor }));
+      m.rotation.x = -Math.PI/2;
+      m.position.set(x, PISTA_Y + y, z);
+      m.receiveShadow = y < 1;
+      m.userData.sombra = false;
+      no.add(m);
+      return m;
+    };
+    laje(M*2, C, 0x3c4048, 0, 0, 0);                 // o asfalto
+    laje(M*2 + 260, C + 260, 0x6f7a5e, 0, 0, -2);    // o acostamento
+    for (const lado of [-1, 1]) laje(26, C - 400, 0xe8eef5, lado*(M - 60), 0, 1);
+    for (let z = -P.meiaC + 700; z < P.meiaC - 700; z += 1400) laje(26, 700, 0xe8eef5, 0, z, 1);
+    for (const [z0, sinal] of [[-P.meiaC + 220, 1], [P.meiaC - 220, -1]])
+      for (let k = -3; k <= 3; k++){
+        if (k === 0) continue;
+        laje(58, 900, 0xe8eef5, k*118, z0 + sinal*450, 1);
+      }
+    for (const [z0, sinal] of [[-P.meiaC, 1], [P.meiaC, -1]])
+      for (const lado of [-1, 1])
+        laje(110, 1100, 0xe8eef5, lado*250, z0 + sinal*2400, 1);
+    pista.add(no);
+  }
   cena.add(pista);
 }
 
@@ -5432,7 +5499,7 @@ function nuclear(x, z){
   for (const a of alvos){
     if (!a.vivo) continue;
     if ((a.x-x)*(a.x-x) + (a.z-z)*(a.z-z) > R2) continue;
-    a.vivo = false; alvosDestruidos++; pontos += 500;
+    a.vivo = false; alvosDestruidos++; pontos += 500; if (Missoes) Missoes.marca('alvos');
     if (a.no) a.no.visible = false;
     mostraAviso('ALVO DESTRUÍDO! ' + alvosDestruidos + '/' + alvosTotal, '#ffd257', 1600);
   }
@@ -5918,7 +5985,7 @@ function atingeAlvo(x, z, raio){
   for (const a of alvos){
     if (!a.vivo) continue;
     if (Math.hypot(a.x-x, a.z-z) < raio + a.r){
-      a.vivo = false; alvosDestruidos++; pontos += 500;
+      a.vivo = false; alvosDestruidos++; pontos += 500; if (Missoes) Missoes.marca('alvos');
       if (a.no) a.no.visible = false;
       explode(a.x, CHAO+200, a.z, 2.2);
       mostraAviso('ALVO DESTRUÍDO! ' + alvosDestruidos + '/' + alvosTotal, '#ffd257', 1500);
@@ -6153,7 +6220,7 @@ function aterra(queda, campo){
   mostraAviso((campo ? (macio ? 'POUSO NO CAMPO! +' : 'POUSOU NO CAMPO! +')
                      : (macio ? 'POUSO DE MANUAL! +' : 'POUSOU! +')) + ganho,
               macio ? '#7fffa8' : '#ffd257', 1800);
-  if (Missoes) Missoes.marca(campo ? 'campo' : 'pista');
+  if (Missoes) Missoes.pousou(campo, pistaPerto(aviaoX, aviaoZ).nome);
   solta(aviaoX, (campo ? CHAO : PISTA_Y) + 40, aviaoZ, campo ? 22 : 14,
         campo ? 0xbba06a : 0xd8d8d8, 40, 260);
   bip(220, 0.10, 'square', 0.05);
@@ -6281,6 +6348,7 @@ function rolaNoChao(dt, e){
   const vDecola = velMin()*DECOLA;
   if (voo >= vDecola && arfChao > ARF_CHAO*0.45){
     noChao = false;
+    if (Missoes) Missoes.marca('decolar');
     aviaoY += 12;
     Controles.bate('tocou');
     mostraAviso('NO AR! recolha o trem', '#7fd8ff', 1700);
@@ -6848,6 +6916,7 @@ function atualiza(dt){
   if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
 
   distancia += voo*dt;
+  if (Missoes) Missoes.passo(dt);
   poeCamera(dt);
   atualizaTiros(dt);
   Batalha.passo(dt);
@@ -7303,8 +7372,24 @@ function bussola(y){
   }
   marcaBussola(cx, meia, y + H*0.052, maisPerto(tambores, t => !t.pego), '#ffd257', false);
   marcaBussola(cx, meia, y + H*0.056, maisPerto(alvos, a => a.vivo), '#ff6a5a', true);
-  // a cabeceira do sul: sem ela ninguém acha a pista para voltar
-  if (!noChao) marcaBussola(cx, meia, y + H*0.052, { x: 0, z: PISTA_Z0 + 2400 }, '#7fffa8', false);
+  /* OS DESTINOS. Sem seta na bússola, "vá até Porto Alto" é procurar uma
+     cidade em cento e vinte mil unidades de mapa — que não é desafio, é
+     tédio. Cada objetivo aberto ganha a sua seta, e ela some quando ele é
+     cumprido: a bússola conta o que falta.
+
+       verde   as cabeceiras das duas pistas (a de casa e a do vale)
+       azul    a cidade nova, enquanto não foi sobrevoada */
+  if (!noChao){
+    for (const P of PISTAS){
+      // a cabeceira do sul de cada pista, no referencial dela
+      const c = Math.cos(P.rumo), sn = Math.sin(P.rumo), d = -P.meiaC + 2400;
+      const alvoP = { x: P.cx + sn*d, z: P.cz + c*d };
+      const cor = (P.nome === 'VALE' && Missoes && !Missoes.lista()[3].feito) ? '#5effd8' : '#7fffa8';
+      marcaBussola(cx, meia, y + H*0.052, alvoP, cor, false);
+    }
+    if (Missoes && !Missoes.lista()[2].feito)
+      marcaBussola(cx, meia, y + H*0.060, { x: CIDADE2.x, z: CIDADE2.z }, '#9fd8ff', true);
+  }
   if (Batalha.ligada){
     let perto = null, dp = 1e9;
     for (const o of Batalha.outros.values()){
@@ -8387,12 +8472,91 @@ function desenhaHUD(){
     h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
     h2.textAlign = 'left'; h2.fillStyle = 'rgba(127,216,255,.7)';
     h2.fillText('TESTE · ' + quais + ' sem fim (tecla ' + teclas + ')', 16,
-                Math.max(Batalha.ligada && Batalha.quantos() > 1 ? 246 : 190, H*0.34));
+                Math.max(Batalha.ligada && Batalha.quantos() > 1 ? 352 : 344, H*0.34));
   }
 }
 
 /* --- painel em HTML --- */
 const $ = id => document.getElementById(id);
+/* =============================================================================
+   AS MISSÕES — o que fazer quando não há ninguém para derrubar
+
+   "Ao jogar solo, crie alguns objetivos a cumprir."
+
+   O jogo solo tinha pontos e distância, que são placar, não objetivo: nada
+   dizia PARA ONDE ir. Um placar mede o que você fez; um objetivo faz você
+   querer fazer alguma coisa. Então são quatro, na ordem em que um piloto os
+   encontraria, e todos usam o mapa que já existe:
+
+     1. decolar                 — o primeiro, para quem nunca jogou
+     2. derrubar seis alvos     — usa os alvos de chão que já estavam lá
+     3. sobrevoar PORTO ALTO    — dá motivo para atravessar o mapa
+     4. pousar no aeroporto do VALE — o único que exige voltar ao chão longe
+                                     de casa, que é a parte difícil de voar
+
+   O módulo não sabe de nada do jogo: ele recebe avisos (`marca`), conta, e
+   diz o que falta. Quem sabe do jogo chama.
+   ========================================================================== */
+Missoes = (function(){
+  const LISTA = [
+    { id:'decolar', txt:'Decolar',                          meta:1 },
+    { id:'alvos',   txt:'Destruir 6 alvos no chão',          meta:6 },
+    { id:'porto',   txt:'Sobrevoar ' + CIDADE2.nome + ' baixo', meta:1 },
+    { id:'vale',    txt:'Pousar no aeroporto do VALE',       meta:1 }
+  ];
+  const conta = {};
+  let cumpridas = 0, tudo = false, avisou = 0;
+
+  function zera(){
+    for (const m of LISTA) conta[m.id] = 0;
+    cumpridas = 0; tudo = false; avisou = 0;
+  }
+  zera();
+
+  function marca(id, quanto){
+    const m = LISTA.find(q => q.id === id);
+    if (!m || conta[id] >= m.meta) return;
+    conta[id] = Math.min(m.meta, conta[id] + (quanto || 1));
+    if (conta[id] >= m.meta){
+      cumpridas++;
+      pontos += 600;
+      mostraAviso('OBJETIVO: ' + m.txt.toUpperCase() + ' ✔  +600', '#7fffa8', 2200);
+      bip(680, 0.10, 'square', 0.05);
+      setTimeout(() => bip(940, 0.16, 'square', 0.05), 110);
+      if (cumpridas >= LISTA.length && !tudo){
+        tudo = true; pontos += 3000;
+        setTimeout(() => mostraAviso('TODOS OS OBJETIVOS CUMPRIDOS! +3000', '#ffd257', 3600), 1400);
+      }
+    }
+  }
+
+  /* o pouso sabe onde tocou: no campo, na pista de casa ou na do vale */
+  function pousou(campo, nome){
+    if (!campo && nome === 'VALE') marca('vale');
+  }
+
+  /* o único objetivo que se cumpre SÓ por estar em algum lugar */
+  function passo(dt){
+    if (!jogando || caindo || noChao) return;
+    if (conta.porto < 1){
+      const d = Math.hypot(aviaoX - CIDADE2.x, aviaoZ - CIDADE2.z);
+      const altura = (aviaoY - CHAO)/METRO;
+      if (d < CIDADE2.raio*0.75 && altura < 900) marca('porto');
+      else if (d < CIDADE2.raio*0.75 && altura < 1800){
+        avisou -= dt;
+        if (avisou <= 0){ avisou = 3; mostraAviso('DESÇA ABAIXO DE 900 m SOBRE ' + CIDADE2.nome, '#9fd8ff', 1600); }
+      }
+    }
+  }
+
+  function lista(){
+    return LISTA.map(m => ({ txt:m.txt, feito: conta[m.id] >= m.meta,
+                             progresso: m.meta > 1 ? conta[m.id] + '/' + m.meta : '' }));
+  }
+  return { zera, marca, pousou, passo, lista, get cumpridas(){ return cumpridas; },
+           get total(){ return LISTA.length; }, get tudo(){ return tudo; } };
+})();
+
 function pinta(){
   $('vDist').textContent = Math.round(distancia/METRO);
   const pct = Math.max(0, Math.min(100, combustivel));
@@ -8404,6 +8568,16 @@ function pinta(){
   $('vMun').textContent = munInfinita ? '∞' : municao[arma];
   $('vPontos').textContent = pontos;
   $('vAlvos').textContent = alvosDestruidos + '/' + alvosTotal;
+  {
+    const cx = $('mList');
+    if (cx){
+      const L = Missoes.lista();
+      const html = L.map(m => '<div class="mi' + (m.feito ? ' ok' : '') + '">' +
+        (m.feito ? '✔' : '○') + ' ' + m.txt + (m.progresso ? ' <b>' + m.progresso + '</b>' : '') + '</div>').join('');
+      if (cx.dataset.h !== html){ cx.innerHTML = html; cx.dataset.h = html; }
+      $('mConta').textContent = Missoes.cumpridas + '/' + Missoes.total;
+    }
+  }
   $('vMotor').textContent = turbinando ? 'NITRO' : Math.round(motor*100);
   $('barraMotor').style.width = (turbinando ? 100 : motor*100).toFixed(0) + '%';
   $('barraNitro').style.width = nitroCarga.toFixed(0) + '%';
@@ -8615,6 +8789,7 @@ function reinicia(){
   endireitaEixos();
   camF = {x:eixoF.x,y:0,z:eixoF.z}; camC = {x:0,y:1,z:0}; camD = {x:eixoD.x,y:0,z:eixoD.z};
   camPos.set(aviaoX - eixoF.x*CAMD, aviaoY + 210, aviaoZ - eixoF.z*CAMD);
+  if (Missoes) Missoes.zera();
   turbo = 0; combustivel = 100; distancia = 0; subida = 0;
   nitroCarga = 100; nitroBotao = false; turbinando = false;
   avisouEstol = 0; pousos = 0; vida = VIDA_CHEIA;

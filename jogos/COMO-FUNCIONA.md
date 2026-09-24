@@ -5290,3 +5290,87 @@ deste ambiente (`connect_rejected`). Por isso `batalha` falha nos passos 1 a 3
 (os dois abrem salas diferentes e nunca se enxergam) e `teste3d-celular` expira
 esperando o código da sala. Os passos que não dependem do balcão passam: tiro,
 dano, abate e o celular virando piloto.
+
+---
+
+## Objetivos, um segundo aeroporto e uma cidade com nome
+
+### As pistas viraram tabela
+
+Eram quatro constantes soltas descrevendo UMA pista. Viraram uma lista, e com
+ela o mapa ganhou um segundo aeroporto sem que nada mais precisasse saber que
+existem dois — quem pergunta *"estou sobre asfalto?"* pergunta à lista.
+
+```js
+const PISTAS = [
+  { nome:'CENTRAL', cx:0,      cz:2000,  rumo:0,       meiaC:11000, meia:620 },
+  { nome:'VALE',    cx:-46000, cz:38000, rumo:Math.PI/2, meiaC:5400, meia:520 }
+];
+function naPistaLocal(p, x, z, folgaC, folgaL){
+  const dx = x - p.cx, dz = z - p.cz, c = Math.cos(p.rumo), sn = Math.sin(p.rumo);
+  const aoLongo = dx*sn + dz*c, deTraves = dx*c - dz*sn;
+  return Math.abs(deTraves) < p.meia + folgaL && Math.abs(aoLongo) < p.meiaC + folgaC;
+}
+```
+
+É a única conta de geometria que o resto do jogo precisa: `sobreAPista`,
+`perto_da_pista` (a tarja onde não nasce prédio), o desenho, a bússola e o
+pouso no campo saem todos dela. A do VALE corre para o leste (rumo 090), é mais
+curta e mais estreita — um aeroporto de interior, para se ter aonde ir.
+
+E o desenho: cada pista é desenhada **sempre deitada no eixo Z**, em torno da
+origem, e o grupo dela é que gira e se muda para o lugar. Assim o desenho não
+sabe de rumo nenhum, e a terceira pista um dia é uma linha na tabela.
+
+### PORTO ALTO
+
+O mapa tinha cidade em toda parte, mas nenhuma com NOME: o campo de senos
+espalha bairros iguais por 120 mil unidades, e voando por cima um lugar era
+igual ao outro. Faltava um destino.
+
+```js
+const CIDADE2 = { nome:'PORTO ALTO', x: 44000, z: -36000, raio: 17000 };
+function campoCidade(x, z){
+  const base = /* os quatro senos de sempre */;
+  const dx = x - CIDADE2.x, dz = z - CIDADE2.z, r = CIDADE2.raio;
+  return base + 2.4*Math.exp(-(dx*dx + dz*dz)/(2*(r*0.62)*(r*0.62)));
+}
+```
+
+Um morro plantado à mão no mesmo campo. Como tudo o mais — os prédios, os
+alvos, a cor da grama, a regra que faz o miolo ter torres e a periferia
+galpões — já lê `campoCidade`, a cidade inteira aparece sozinha a partir desta
+soma. **Uma linha de código, um destino no mapa:** medido, o núcleo é 3,1 vezes
+mais denso que o resto e a torre mais alta passa de 3.700.
+
+### Os quatro objetivos
+
+O jogo solo tinha pontos e distância, que são **placar, não objetivo**: nada
+dizia para onde ir. Um placar mede o que você fez; um objetivo faz você querer
+fazer alguma coisa.
+
+```
+1. Decolar                          — o primeiro, para quem nunca jogou
+2. Destruir 6 alvos no chão         — usa os alvos que já estavam lá
+3. Sobrevoar PORTO ALTO abaixo de 900 m — dá motivo para atravessar o mapa
+4. Pousar no aeroporto do VALE      — o único que exige voltar ao chão longe
+                                      de casa, que é a parte difícil de voar
+```
+
+Cada um vale 600 pontos; os quatro juntos, mais 3.000. O módulo não sabe de
+nada do jogo: ele recebe avisos (`Missoes.marca`), conta, e diz o que falta.
+Quem sabe do jogo chama — a decolagem, o alvo que morre, o pouso que sabe em
+qual pista tocou.
+
+**E a bússola conta o que falta.** Sem seta, *"vá até Porto Alto"* é procurar
+uma cidade em cento e vinte mil unidades de mapa, o que não é desafio, é tédio.
+Cada objetivo aberto ganha a sua seta — verde para as cabeceiras das duas
+pistas, azul para a cidade — e ela some quando o objetivo é cumprido.
+
+### A coluna da esquerda
+
+O painel de objetivos foi para `top:180`, que era do botão da cabeça. A coluna
+inteira desceu um degrau e agora é: distância, pontos, **objetivos**, cabeça, o
+aviso de teste e o radar. Entrou `hudchoque.js`, que confere em quatro
+resoluções que nada fica em cima de nada nem sai da tela — a mesma prova que
+`dedos.js` já fazia para o celular, que o computador não tinha.
