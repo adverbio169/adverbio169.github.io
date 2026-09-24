@@ -1716,13 +1716,140 @@ function montaRuas(){
    InstancedMesh: a placa de vídeo recebe UMA caixa e uma lista de posições, e
    desenha as centenas de prédios numa passada só. É o que deixa a cidade
    inteira caber no orçamento de um quadro. */
-let cidade = null, cidadeIdx = [];
+let cidade = null, cidadeIdx = [], matCidade = null, lonaCidadeT = null, lonaAcesaT = null;
 const geoCaixa = new THREE.BoxGeometry(1, 1, 1);
+
+/* =============================================================================
+   A TEXTURA DA CIDADE — desenhada, não baixada
+
+   "Quero os prédios não só cinza. Vê aí um pacote de importação para colocar
+   texturas bacanas e leves."
+
+   Fui ver o que existe para importar. `@pmndrs/assets`, que é o pacote de
+   texturas CC0 mais usado com three.js, tem **19 MB**; `three-stdlib`, 26 MB.
+   Este jogo inteiro — cena, física, rede, HUD e o three.js embutido — tem
+   1,3 MB e roda de UM arquivo. Importar qualquer um dos dois seria multiplicar
+   o download por quinze para ganhar uma parede de tijolo.
+
+   Então a textura é DESENHADA aqui, numa lona de 256 por 256, quando a página
+   abre: concreto com grão, uma grade de janelas, e umas acesas. Custa umas
+   quarenta linhas, zero download, zero arquivo novo, e ladrilha perfeita
+   porque foi feita para ladrilhar.
+
+   O PROBLEMA DE VERDADE não é ter a imagem, é o UV. A cidade inteira é UMA
+   caixa instanciada e esticada por matriz — e esticar a caixa estica o UV
+   junto: a janela de um galpão de 300 sairia do mesmo tamanho na tela que a de
+   uma torre de 4.000, quer dizer, quinze vezes maior em metros. A saída é
+   calcular o UV no VÉRTICE a partir da escala da instância, de modo que o
+   ladrilho meça sempre o mesmo em unidades de mundo. São seis linhas de GLSL
+   enfiadas no `uv_vertex`, e é o que faz a mesma malha servir para o galpão e
+   para a torre. */
+const LADRILHO = 480;        // quanto um ladrilho de 8 janelas mede no mundo
+function lonaCidade(){
+  const S = 256, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  /* o reboco: cinza claro com grão, para a parede não ser um plano de cor */
+  g.fillStyle = '#c6cad1'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 4200; i++){
+    const q = 150 + Math.random()*90;
+    g.fillStyle = 'rgba(' + q + ',' + q + ',' + (q + 6) + ',0.26)';
+    g.fillRect(Math.random()*S, Math.random()*S, 2, 2);
+  }
+  /* as JANELAS. Oito por oito, com uma sombra em cima de cada uma (o peitoril)
+     e uma faixa de piso entre as fileiras: é o peitoril que faz a fachada ter
+     relevo sem uma única normal a mais. */
+  const N = 8, m = S/N;
+  for (let iy = 0; iy < N; iy++){
+    g.fillStyle = 'rgba(120,126,136,0.35)';            // a linha do piso
+    g.fillRect(0, iy*m, S, 2);
+    for (let ix = 0; ix < N; ix++){
+      const x = ix*m + m*0.20, y = iy*m + m*0.26, w = m*0.60, h = m*0.46;
+      const r = Math.random();
+      /* três em cada dez estão acesas; o resto é vidro escuro refletindo o
+         céu, e uma em cada vinte está com a persiana meio fechada */
+      const acesa = r < 0.30;
+      g.fillStyle = acesa ? (r < 0.10 ? '#fff0c4' : '#ffe08a') : '#4d5766';
+      g.fillRect(x, y, w, h);
+      if (!acesa && Math.random() < 0.22){             // o vidro tem reflexo
+        g.fillStyle = 'rgba(150,175,205,0.45)';
+        g.fillRect(x, y, w, h*0.42);
+      }
+      g.fillStyle = 'rgba(70,76,86,0.55)';             // o peitoril, por cima
+      g.fillRect(x, y - 2, w, 2);
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+/* o mesmo desenho, só as janelas acesas: é o mapa de EMISSÃO, o que faz a
+   cidade brilhar do lado que está na sombra */
+function lonaAcesa(){
+  const S = 256, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
+  const N = 8, m = S/N;
+  for (let iy = 0; iy < N; iy++)
+    for (let ix = 0; ix < N; ix++){
+      if (Math.random() >= 0.30) continue;
+      g.fillStyle = Math.random() < 0.33 ? '#fff0c4' : '#ffcf72';
+      g.fillRect(ix*m + m*0.20, iy*m + m*0.26, m*0.60, m*0.46);
+    }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+/* --- O UV NO QUADRO DO MUNDO -----------------------------------------------
+   A caixa é 1×1×1 e a instância a estica. Multiplicando a posição local pela
+   escala da instância volta-se ao tamanho REAL da peça; dividindo pelo lado do
+   ladrilho, a janela mede o mesmo em qualquer prédio. A face de cima usa x,z e
+   as laterais usam a altura, senão a fachada deitaria. */
+function uvDoMundo(mat){
+  mat.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader.replace('#include <uv_vertex>', `
+      #include <uv_vertex>
+      #if defined( USE_MAP ) || defined( USE_EMISSIVEMAP )
+      {
+        #ifdef USE_INSTANCING
+          vec3 esc = vec3(length(instanceMatrix[0].xyz),
+                          length(instanceMatrix[1].xyz),
+                          length(instanceMatrix[2].xyz));
+        #else
+          vec3 esc = vec3(1.0);
+        #endif
+        vec3 nA = abs(normal);
+        vec3 p = position * esc;
+        vec2 uvm = nA.y > 0.5 ? vec2(p.x, p.z)
+                 : nA.x > 0.5 ? vec2(p.z, p.y)
+                              : vec2(p.x, p.y);
+        uvm /= ${LADRILHO.toFixed(1)};
+        #ifdef USE_MAP
+          vMapUv = uvm;
+        #endif
+        #ifdef USE_EMISSIVEMAP
+          vEmissiveMapUv = uvm;
+        #endif
+      }
+      #endif
+    `);
+  };
+  mat.customProgramCacheKey = () => 'uvDoMundo';
+  return mat;
+}
 function montaCidade(){
   if (cidade){ cena.remove(cidade); cidade.dispose(); }
   const vivos = predios.filter(p => p.vivo);
-  cidade = new THREE.InstancedMesh(geoCaixa,
-    new THREE.MeshLambertMaterial({ vertexColors: false }), Math.max(1, vivos.length));
+  if (!matCidade){
+    lonaCidadeT = lonaCidade(); lonaAcesaT = lonaAcesa();
+    matCidade = uvDoMundo(new THREE.MeshLambertMaterial({
+      map: lonaCidadeT, emissiveMap: lonaAcesaT, emissive: 0x4a4234 }));
+  }
+  cidade = new THREE.InstancedMesh(geoCaixa, matCidade, Math.max(1, vivos.length));
   cidade.castShadow = true; cidade.receiveShadow = true;
   cidade.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   const m = new THREE.Matrix4(), cor = new THREE.Color();
@@ -1734,9 +1861,22 @@ function montaCidade(){
     /* a cor também conta onde se está: o centro é escuro e azulado (vidro), a
        periferia é clara e amarelada (reboco). É o que dá para reconhecer um
        bairro do alto sem nenhuma placa. */
-    const t = (0.62 + p.tom*0.3) * (1 - (p.centro||0)*0.42);
-    const q = p.centro || 0;
-    cor.setRGB(t*(0.80 + (1-q)*0.14), t*(0.84 + (1-q)*0.05), t*(0.90 + q*0.10));
+    /* --- AS TRÊS TINTAS DE UM QUARTEIRÃO -----------------------------------
+       Com a fachada agora VINDO DA TEXTURA, a cor da instância deixou de ser o
+       prédio e passou a ser a TINTA dele: ela multiplica o reboco e o vidro
+       juntos. Então vale abrir a variação, que antes só ia de cinza a cinza:
+
+         vidro azulado   as torres do miolo
+         reboco claro    o grosso da cidade
+         tijolo quente   os galpões da periferia
+
+       O sorteio é o mesmo `tom` de sempre, e quem decide a mistura é o
+       `centro` — de modo que continua dando para reconhecer um bairro do alto,
+       só que agora pela cor da parede e não pelo tom do cinza. */
+    const q = p.centro || 0, b = p.tom;
+    const frio = Math.max(0, Math.min(1, q*1.15 + (b - 0.5)*0.5));
+    const t = (0.74 + b*0.26) * (1 - q*0.26);
+    cor.setRGB(t*(1.02 - frio*0.30), t*(0.96 - frio*0.10), t*(0.84 + frio*0.28));
     cidade.setColorAt(i, cor);
     cidadeIdx.push(p);
   });
@@ -8932,6 +9072,19 @@ function poeQualidade(q){
   qualidade = q;
   rend.shadowMap.enabled = q >= 2;
   cena.traverse(o => { if (o.isMesh){ o.castShadow = q >= 2 && o.userData.sombra !== false; } });
+  /* --- A FACHADA CUSTA POR PIXEL ------------------------------------------
+     A cidade com janelas lê duas texturas por pixel: a da parede e a das
+     janelas acesas. É barato numa placa de vídeo e caro num computador que
+     desenha por software — medido aqui, no software, a cidade texturizada tira
+     um quinto dos quadros. Então a janela acesa é a primeira coisa que o
+     desenho BAIXO desliga, e a textura inteira a segunda: no baixo a cidade
+     volta a ser cor chapada, que é exatamente o que o "baixo" quer dizer. */
+  if (matCidade){
+    matCidade.emissiveMap = q >= 2 ? lonaAcesaT : null;
+    matCidade.map         = q >= 1 ? lonaCidadeT : null;
+    matCidade.emissive.setHex(q >= 2 ? 0x4a4234 : 0x000000);
+    matCidade.needsUpdate = true;
+  }
   $('btQual').textContent = ['baixo','médio','alto'][q];
   redimensiona();
   mostraAviso('desenho: ' + ['baixo','médio','alto'][q], '#9fd8ff', 900);

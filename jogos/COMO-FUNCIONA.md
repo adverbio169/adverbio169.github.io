@@ -5471,3 +5471,75 @@ cidade com nome, há prédio.
 
 E os objetivos foram de quatro para seis: entraram **12 s de rasante** e
 **pousar numa avenida**.
+
+---
+
+## A textura da cidade: desenhada, não baixada
+
+> *"Quero os prédios não só cinza. Vê aí um pacote de importação para colocar
+> texturas bacanas e leves no projeto."*
+
+Fui ver o que existe para importar, e é por isso que a resposta é não:
+
+```
+@pmndrs/assets   19 MB   o pacote de texturas CC0 mais usado com three.js
+three-stdlib     26 MB   os exemplos do three (e nem tem textura de fachada)
+maath           0,3 MB   é matemática, não imagem
+```
+
+Este jogo inteiro — cena, física, rede, HUD e o three.js embutido — tem **1,3
+MB** e roda de UM arquivo. Importar qualquer um dos dois seria multiplicar o
+download por quinze para ganhar uma parede de tijolo, e ainda quebrar o
+arquivo-único, que é o que faz o jogo abrir de um link.
+
+Então a textura é **desenhada**, numa lona de 256 × 256, quando a página abre:
+reboco com grão, uma grade de oito por oito janelas com peitoril e linha de
+piso, três em cada dez acesas, e o vidro das apagadas com um reflexo de céu na
+metade de cima. Quarenta linhas, zero download, zero arquivo novo — e ladrilha
+perfeita, porque foi feita para ladrilhar.
+
+### O problema de verdade não era a imagem: era o UV
+
+A cidade inteira é **uma** caixa instanciada e esticada por matriz. Esticar a
+caixa estica o UV junto: a janela de um galpão de 300 sairia do mesmo tamanho
+na tela que a de uma torre de 4.000 — quer dizer, quinze vezes maior em metros.
+
+A saída é calcular o UV no VÉRTICE a partir da escala da instância, de modo que
+o ladrilho meça sempre o mesmo em unidades de mundo:
+
+```glsl
+vec3 esc = vec3(length(instanceMatrix[0].xyz),
+                length(instanceMatrix[1].xyz),
+                length(instanceMatrix[2].xyz));
+vec3 p = position * esc;              // a caixa é 1×1×1: isto é o tamanho real
+vec2 uvm = nA.y > 0.5 ? vec2(p.x, p.z)     // o telhado
+         : nA.x > 0.5 ? vec2(p.z, p.y)     // as laterais, em pé
+                      : vec2(p.x, p.y);
+uvm /= 480.0;                         // 480 = quanto mede um ladrilho no mundo
+```
+
+Seis linhas de GLSL enfiadas no `uv_vertex`, com `#ifdef` em volta para só
+tocar nos mapas que existem. É o que faz a mesma malha servir para o galpão e
+para a torre — e continua sendo **uma** ordem de desenho para a cidade inteira.
+
+### As três tintas
+
+Com a fachada vindo da textura, a cor da instância deixou de ser o prédio e
+passou a ser a **tinta** dele: ela multiplica o reboco e o vidro juntos. Então
+valeu abrir a variação, que antes só ia de cinza a cinza — vidro azulado nas
+torres do miolo, reboco claro no grosso da cidade, tijolo quente nos galpões da
+periferia. Continua dando para reconhecer um bairro do alto, agora pela cor da
+parede.
+
+### E o custo
+
+A fachada custa **por pixel**: são duas texturas lidas por pixel de cidade, a
+da parede e a das janelas acesas. Isso é barato numa placa de vídeo e caro num
+computador que desenha por software.
+
+Medir aqui não vale de nada — este contêiner desenha por software e o jogo
+inteiro roda a dois ou três quadros por segundo com ou sem textura, o que é
+ruído, não medida. Então a decisão foi feita pela estrutura, não pelo número:
+a janela acesa é a primeira coisa que o desenho **baixo** desliga, e a textura
+inteira a segunda. No baixo a cidade volta a ser cor chapada, que é exatamente
+o que "baixo" quer dizer; no médio, que é o padrão, a fachada está lá.
