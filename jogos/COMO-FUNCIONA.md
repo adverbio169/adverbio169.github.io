@@ -5543,3 +5543,86 @@ ruído, não medida. Então a decisão foi feita pela estrutura, não pelo núme
 a janela acesa é a primeira coisa que o desenho **baixo** desliga, e a textura
 inteira a segunda. No baixo a cidade volta a ser cor chapada, que é exatamente
 o que "baixo" quer dizer; no médio, que é o padrão, a fachada está lá.
+
+---
+
+## A cidade-modelo é Boa Vista
+
+> *"Cidade não é só prédio. Geralmente uma cidade tem um centro urbano e
+> bairros residenciais periféricos. Pega uma cidade modelo de algum lugar."*
+
+A cidade-modelo é **Boa Vista**, e não por acaso: é a capital do estado de quem
+está jogando, e tem um dos planos urbanos mais reconhecíveis do Brasil. O
+traçado de 1944, do engenheiro Darcy Aleixo Derenusson, é **radial-concêntrico**
+— avenidas saindo em leque da Praça do Centro Cívico, cortadas por anéis. Do
+alto é inconfundível, e é justamente o tipo de coisa que um jogo de avião
+deveria mostrar.
+
+Então PORTO ALTO é radial como Boa Vista, e NOVA ORLA ficou com a grade torta
+da cidade que cresceu ao longo de uma costa. **Duas cidades que não se confundem
+uma com a outra nem de dez mil unidades de altura.**
+
+### A conta do raio
+
+Uma rua radial é uma reta de ângulo fixo — então a distância até ela não é uma
+diferença de ângulo, é o **arco**: o ângulo vezes o raio.
+
+```js
+if (aoMultiplo(Math.atan2(p.v, p.u), Math.PI*2/c.raios) * p.d < RUA_MEIA) return true;
+if (aoMultiplo(p.d, c.malha) < RUA_MEIA) return true;     // os anéis
+```
+
+É por isso que no centro os raios se apertam e na borda ficam largos —
+exatamente como numa cidade radial de verdade, e é por isso que o centro delas é
+sempre um nó.
+
+### A zona
+
+O outro pedaço do pedido, e o mais importante: **cidade não é um campo de
+arranha-céus**. É um núcleo pequeno de torres, um centro expandido em volta,
+bairros de prédio baixo, e periferia de casa. A conta é a fração do raio, e ela
+decide **três** coisas ao mesmo tempo — quão alto, quão largo e quão cheio.
+Casa é baixa, pequena e colada na vizinha; torre é alta, estreita e tem espaço
+em volta.
+
+```
+núcleo      t < 0,20    900 a 3.600 de altura   salta 28% das células
+centro      t < 0,36    420 a 1.500             salta 20%
+bairro      t < 0,60    200 a   620
+residência  t < 0,82    120 a   300
+periferia               95  a   190             vazio 26%
+```
+
+As faixas e os vazios saíram **medidos, não escolhidos**. A primeira tentativa
+deu **um** prédio no núcleo — as ruas radiais convergem e comem metade do miolo,
+e ainda por cima eu descartava 62% do que sobrava — e oitenta e oito casas na
+periferia, que é a maior das faixas em área. Corrigido pela medição:
+
+```
+                 antes    agora
+núcleo               1       17    (mais alta: 3.387)
+centro              37       91
+bairro             258      269
+residência         311      363
+periferia           88      257
+```
+
+O `mag` é o expoente do sorteio da altura: perto de 1 no núcleo, para a torre
+ser comum; ao quadrado na periferia, para a casa de dois andares ser a regra.
+
+### O telhado
+
+O que diferencia um bairro residencial de um centro comercial, visto de cima,
+não é a altura: é o **telhado**. Prédio tem laje; casa tem telhado de duas águas,
+e é vermelho. Sem isso a periferia vira um tabuleiro de caixinhas cinzas, que
+foi o que ficou na primeira versão.
+
+É um prisma de oito triângulos escrito à mão, instanciado: a periferia inteira
+das duas cidades por **uma** ordem de desenho. Telha vermelha desbotada, cada
+casa com o seu tom, e uma em cada sete de amianto cinza, porque bairro de
+verdade é assim.
+
+*(E uma armadilha do three: cor por instância vem de `setColorAt`, que liga
+`USE_INSTANCING_COLOR` sozinho. Pôr `vertexColors: true` junto manda o shader
+procurar um atributo `color` na GEOMETRIA, que não existe — e o telhado inteiro
+saía branco.)*

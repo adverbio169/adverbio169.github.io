@@ -1062,14 +1062,33 @@ const estradaXv = z => -21000 + Math.sin(z/13000)*1800;
    PORTO ALTO é ortogonal, NOVA ORLA é torta, como cidade que cresceu ao longo
    de uma costa. São as duas únicas com ARRUAMENTO desenhado — e é por isso
    que elas são "a cidade" e o resto do mapa é subúrbio. */
+/* --- DUAS CIDADES, DOIS PLANOS ---------------------------------------------
+   "Cidade não é só prédio. Geralmente uma cidade tem um centro urbano e
+   bairros residenciais periféricos. Pega uma cidade modelo de algum lugar."
+
+   A cidade modelo é BOA VISTA, e não por acaso: é a capital do estado de quem
+   está jogando, e tem um dos planos urbanos mais reconhecíveis do Brasil. O
+   traçado de 1944, do engenheiro Darcy Aleixo Derenusson, é RADIAL-CONCÊNTRICO
+   — avenidas saindo em leque da Praça do Centro Cívico, cortadas por anéis. Do
+   alto é inconfundível, e é justamente o tipo de coisa que um jogo de avião
+   deveria mostrar.
+
+   Então PORTO ALTO é radial como Boa Vista, e NOVA ORLA ficou com a grade
+   torta da cidade que cresceu ao longo de uma costa. Duas cidades que não se
+   confundem uma com a outra nem de dez mil unidades de altura.
+
+   E as duas têm ZONA, que é o outro pedaço do pedido: núcleo de torres, centro
+   expandido, bairros, periferia de casas. `zonaDe` é onde isso mora. */
 const CIDADES = [
-  { nome:'PORTO ALTO', x:  44000, z: -36000, raio: 17000, malha: 3100, rumo: 0.00, peso: 2.4 },
+  { nome:'PORTO ALTO', x:  44000, z: -36000, raio: 17000, malha: 3100, rumo: 0.00, peso: 2.4,
+    plano:'radial', raios: 12 },
   /* o peso de NOVA ORLA era 2,1 e o campo de senos ali por baixo vale -1,8:
      a soma dava 0,30, abaixo do 0,62 que faz o terreno virar concreto. O
      resultado era uma cidade inteira plantada em cima de pasto verde, com
      prédios baixos porque `centro` também sai do mesmo número. 3,4 põe o
      chão, as torres e os bairros no lugar. */
-  { nome:'NOVA ORLA',  x: -33000, z:  -9000, raio: 13000, malha: 2700, rumo: 0.62, peso: 3.4 }
+  { nome:'NOVA ORLA',  x: -33000, z:  -9000, raio: 13000, malha: 2700, rumo: 0.62, peso: 3.4,
+    plano:'grade' }
 ];
 const CIDADE2 = CIDADES[0];         // o destino do objetivo, que continua sendo esta
 function campoCidade(x, z){
@@ -1121,15 +1140,52 @@ function emCidadeComNome(x, z){
   for (const c of CIDADES) if (Math.hypot(x - c.x, z - c.z) < c.raio) return c;
   return null;
 }
+/* a distância de um número ao múltiplo mais próximo de `m` — a conta que
+   transforma "onde estou" em "a que distância estou da rua mais próxima" */
+function aoMultiplo(v, m){
+  return Math.abs(((v % m) + m + m/2) % m - m/2);
+}
 function naRua(x, z){
   for (const c of CIDADES){
     const p = naCidade(c, x, z);
     if (p.d > c.raio) continue;
-    const du = Math.abs(((p.u % c.malha) + c.malha + c.malha/2) % c.malha - c.malha/2);
-    const dv = Math.abs(((p.v % c.malha) + c.malha + c.malha/2) % c.malha - c.malha/2);
-    if (du < RUA_MEIA || dv < RUA_MEIA) return true;
+    if (c.plano === 'radial'){
+      /* RADIAL. Duas famílias de rua: os raios, que saem do centro em leque, e
+         os anéis, que são círculos concêntricos. Um raio é uma reta de ângulo
+         fixo — então a distância até ele não é uma diferença de ângulo, é o
+         ARCO: o ângulo vezes o raio. É por isso que no centro os raios se
+         apertam e na borda ficam largos, exatamente como numa cidade radial de
+         verdade (e é por isso que o centro delas é sempre um nó). */
+      if (p.d < 620) return true;                       // a praça do centro
+      const passoAng = Math.PI*2/c.raios;
+      if (aoMultiplo(Math.atan2(p.v, p.u), passoAng)*p.d < RUA_MEIA) return true;
+      if (aoMultiplo(p.d, c.malha) < RUA_MEIA) return true;
+    } else {
+      if (aoMultiplo(p.u, c.malha) < RUA_MEIA) return true;
+      if (aoMultiplo(p.v, c.malha) < RUA_MEIA) return true;
+    }
   }
   return sobreAvenida(x, z);
+}
+/* --- A ZONA -----------------------------------------------------------------
+   Cidade não é um campo de arranha-céus. É um núcleo pequeno de torres, um
+   centro expandido em volta, bairros de prédio baixo, e periferia de casa. A
+   conta é a fração do raio, e ela decide TRÊS coisas ao mesmo tempo: quão
+   alto, quão largo e quão cheio. Casa é baixa, pequena e colada na vizinha;
+   torre é alta, estreita e tem espaço em volta. */
+function zonaDe(c, d){
+  const t = Math.min(1, d/c.raio);
+  /* as faixas e os vazios saíram MEDIDOS, não escolhidos: a primeira tentativa
+     deu UM prédio no núcleo (as ruas radiais convergem e comem metade do
+     miolo, e ainda por cima eu descartava 62% do que sobrava) e oitenta e oito
+     casas na periferia, que é a maior das faixas em área. `mag` é o expoente
+     do sorteio da altura: no núcleo perto de 1, para a torre ser comum; na
+     periferia ao quadrado, para a casa de dois andares ser a regra. */
+  if (t < 0.20) return { nome:'núcleo',    alt:[900, 3600], larg:[230, 430], vazio:0.10, salta:0.28, mag:1.1 };
+  if (t < 0.36) return { nome:'centro',    alt:[420, 1500], larg:[250, 530], vazio:0.12, salta:0.20, mag:1.4 };
+  if (t < 0.60) return { nome:'bairro',    alt:[200,  620], larg:[260, 560], vazio:0.16, salta:0,    mag:1.7 };
+  if (t < 0.82) return { nome:'residência',alt:[120,  300], larg:[220, 420], vazio:0.18, salta:0,    mag:2.0 };
+  return               { nome:'periferia', alt:[ 95,  190], larg:[190, 340], vazio:0.26, salta:0,    mag:2.0 };
 }
 function sobreAvenida(x, z){
   return AVENIDAS.some(a => naPistaLocal(a, x, z, 0, 0));
@@ -1424,7 +1480,11 @@ function montaMapa(){
      seiscentas caixas a mais numa malha INSTANCIADA — quer dizer, zero ordens
      de desenho a mais. */
   for (const c of CIDADES){
-    const p2 = P/2;
+    /* o passo acompanha a zona: casa é pequena e colada, torre é grande e
+       espaçada — com um passo só, ou a periferia fica rala ou o centro fica
+       entupido. Aqui o passo é o da CASA e o centro simplesmente aproveita
+       menos células, que é o que acontece de verdade. */
+    const p2 = P/3;
     for (let zz = c.z - c.raio; zz <= c.z + c.raio; zz += p2)
       for (let xx = c.x - c.raio; xx <= c.x + c.raio; xx += p2){
         const d = Math.hypot(xx - c.x, zz - c.z);
@@ -1432,14 +1492,20 @@ function montaMapa(){
         if (naRua(xx, zz)) continue;
         if (perto_da_pista(xx, zz)) continue;
         if (Math.abs(xx - rioX(zz)) < 1100) continue;
-        /* a borda rareia: cidade não acaba numa parede */
-        if (Math.random() < 0.18 + 0.55*Math.pow(d/c.raio, 2.2)) continue;
-        const centro = Math.max(0, Math.min(1, (campoCidade(xx, zz) - 0.62)/1.5));
-        const alt = 260 + Math.random()*Math.random()*(900 + centro*centro*3800);
-        const larg = (300 + Math.random()*380) * (1 - centro*0.30);
-        predios.push({ x: xx + (Math.random()-0.5)*220, z: zz + (Math.random()-0.5)*220,
+        const Z = zonaDe(c, d);
+        /* o vazio da zona, mais um degrau na borda: cidade não acaba numa
+           parede, ela rareia até virar campo */
+        if (Math.random() < Z.vazio + 0.30*Math.pow(d/c.raio, 4.0)) continue;
+        /* no núcleo e no centro nem toda célula vira prédio: torre ocupa o
+           quarteirão inteiro, e duas do lado da outra viram um bloco só */
+        if (Z.salta && Math.random() < Z.salta) continue;
+        const r = Math.pow(Math.random(), Z.mag);       // o alto é raro — mais na periferia
+        const alt = Z.alt[0] + r*(Z.alt[1] - Z.alt[0]);
+        const larg = Z.larg[0] + Math.random()*(Z.larg[1] - Z.larg[0]);
+        const centro = Math.max(0, Math.min(1, 1 - d/(c.raio*0.55)));
+        predios.push({ x: xx + (Math.random()-0.5)*p2*0.45, z: zz + (Math.random()-0.5)*p2*0.45,
                        w: larg, d: larg*(0.7 + Math.random()*0.6),
-                       h: alt, tom: Math.random(), centro, vivo:true });
+                       h: alt, tom: Math.random(), centro, zona: Z.nome, vivo:true });
       }
   }
 
@@ -1674,6 +1740,29 @@ function montaRuas(){
   for (const c of CIDADES){
     const ux = Math.cos(c.rumo), uz = Math.sin(c.rumo);   // o eixo u da cidade
     const vx = -uz, vz = ux;
+    if (c.plano === 'radial'){
+      /* OS RAIOS, saindo do centro em leque, e OS ANÉIS. O anel é desenhado
+         como um colar de pedacinhos retos: com cinquenta e quatro deles a
+         volta fecha lisa a qualquer altura de que se veja. */
+      for (let k = 0; k < c.raios; k++){
+        const a = k*Math.PI*2/c.raios + c.rumo;
+        const dx = Math.cos(a), dz = Math.sin(a);
+        R.põe(c.x + dx*c.raio/2, c.z + dz*c.raio/2, dx, dz, c.raio/2, RUA_MEIA);
+      }
+      const nA = Math.floor(c.raio/c.malha);
+      for (let k = 1; k <= nA; k++){
+        const rr = k*c.malha, seg = 54, passo = Math.PI*2/seg;
+        for (let j = 0; j < seg; j++){
+          const a = j*passo, a2 = a + passo;
+          const mx = (Math.cos(a) + Math.cos(a2))/2*rr, mz = (Math.sin(a) + Math.sin(a2))/2*rr;
+          const tx = -Math.sin(a + passo/2), tz = Math.cos(a + passo/2);
+          R.põe(c.x + mx, c.z + mz, tx, tz, rr*passo/2 + 30, RUA_MEIA);
+        }
+      }
+      /* a praça do Centro Cívico, que é de onde tudo sai */
+      A.põe(c.x, c.z, 1, 0, 620, 620);
+      continue;
+    }
     const n = Math.floor(c.raio/c.malha);
     for (let k = -n; k <= n; k++){
       const off = k*c.malha;
@@ -1907,11 +1996,35 @@ function derrubaPredio(p){
    então a cidade inteira ganha telhado por duas ordens de desenho. E a baliza
    não é enfeite: ela marca de longe, à noite ou no contraluz, exatamente as
    torres entre as quais dá para passar. */
-let telhados = null, balizas = null;
+let telhados = null, balizas = null, tetos = null;
 const geoTelha = new THREE.BoxGeometry(1, 1, 1);
 const geoBaliza = new THREE.SphereGeometry(1, 6, 5);
+/* --- O TELHADO DE DUAS ÁGUAS ------------------------------------------------
+   O que diferencia um bairro residencial de um centro comercial, visto de
+   cima, não é a altura: é o TELHADO. Prédio tem laje; casa tem telhado de duas
+   águas, e é vermelho. Sem isso a periferia vira um tabuleiro de caixinhas
+   cinzas, que foi o que ficou na primeira versão.
+
+   É um prisma: dois retângulos inclinados encontrando-se numa cumeeira. Cabe
+   numa geometria de oito triângulos, instanciada — a periferia inteira das
+   duas cidades por UMA ordem de desenho. */
+function geoDuasAguas(){
+  const g = new THREE.BufferGeometry();
+  const p = [], i = [];
+  const põe = (x,y,z) => { p.push(x,y,z); return p.length/3 - 1; };
+  const a = põe(-0.5,0,-0.5), b = põe(0.5,0,-0.5), c2 = põe(0.5,0,0.5), d = põe(-0.5,0,0.5);
+  const e = põe(0,1,-0.5),    f2 = põe(0,1,0.5);
+  i.push(a,e,f2, a,f2,d);          // a água de um lado
+  i.push(b,c2,f2, b,f2,e);         // e a do outro
+  i.push(a,b,e);                   // as duas empenas
+  i.push(d,f2,c2);
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(p), 3));
+  g.setIndex(i); g.computeVertexNormals();
+  return g;
+}
+const geoAgua = geoDuasAguas();
 function montaTelhados(){
-  for (const m of [telhados, balizas]) if (m){ cena.remove(m); m.dispose(); }
+  for (const m of [telhados, balizas, tetos]) if (m){ cena.remove(m); m.dispose(); }
   const altos = predios.filter(p => p.vivo && p.h > 700);
   const torres = predios.filter(p => p.vivo && p.h > 2200);
   telhados = new THREE.InstancedMesh(geoTelha,
@@ -1931,10 +2044,33 @@ function montaTelhados(){
     m4.setPosition(p.x, CHAO + p.h + 230, p.z);
     balizas.setMatrixAt(i, m4);
   });
+  /* e as casas: tudo o que é baixo ganha telhado vermelho */
+  const casas = predios.filter(p => p.vivo && p.h <= 330);
+  /* SEM `vertexColors`. Cor por instância no three vem de `setColorAt`, que
+     liga `USE_INSTANCING_COLOR` sozinho; `vertexColors: true` manda o shader
+     procurar um atributo `color` na GEOMETRIA, que não existe aqui — e o
+     telhado inteiro saía branco. É o mesmo caminho que a cidade já usava. */
+  tetos = new THREE.InstancedMesh(geoAgua,
+    new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, casas.length));
+  tetos.castShadow = true;
+  const cor = new THREE.Color();
+  casas.forEach((p, i) => {
+    const b = baralha(p.x*0.009, p.z*0.007);
+    m4.makeScale(p.w*1.10, 52 + b*46, p.d*1.10);
+    m4.setPosition(p.x, CHAO + p.h, p.z);
+    tetos.setMatrixAt(i, m4);
+    /* telha vermelha desbotada, cada casa com o seu tom — e uma em cada sete é
+       de amianto, que é cinza, porque bairro de verdade é assim */
+    if (b < 0.14) cor.setRGB(0.62, 0.62, 0.60);
+    else          cor.setRGB(0.52 + b*0.30, 0.24 + b*0.14, 0.18 + b*0.10);
+    tetos.setColorAt(i, cor);
+  });
   telhados.instanceMatrix.needsUpdate = true;
   balizas.instanceMatrix.needsUpdate = true;
-  telhados.count = altos.length; balizas.count = torres.length;
-  cena.add(telhados); cena.add(balizas);
+  tetos.instanceMatrix.needsUpdate = true;
+  if (tetos.instanceColor) tetos.instanceColor.needsUpdate = true;
+  telhados.count = altos.length; balizas.count = torres.length; tetos.count = casas.length;
+  cena.add(telhados); cena.add(balizas); cena.add(tetos);
 }
 /* a baliza PISCA — é o que a faz ser vista. Uma cor só, compartilhada pelas
    centenas de instâncias: pisca tudo junto, que é o que se vê de longe. */
