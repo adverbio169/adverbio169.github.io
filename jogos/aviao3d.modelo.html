@@ -59,7 +59,7 @@
   #cMissao{top:180px;left:14px;max-width:238px}
   #cMissao .rot{margin-bottom:4px}
   #cMissao #mConta{color:#ffd257;letter-spacing:0}
-  .mi{font-size:11.5px;font-weight:600;color:#c3d3ee;line-height:1.55;white-space:nowrap;
+  .mi{font-size:11px;font-weight:600;color:#c3d3ee;line-height:1.45;white-space:nowrap;
       overflow:hidden;text-overflow:ellipsis}
   .mi b{color:#ffd257;font-weight:800}
   .mi.ok{color:#5eff9a;text-decoration:line-through;opacity:.75}
@@ -243,7 +243,7 @@
   /* o botão da cabeça morava em top:180 — que agora é o painel de objetivos.
      Desceu para baixo dele; a coluna da esquerda, de cima para baixo, é:
      distância, pontos, OBJETIVOS, cabeça, o aviso de teste e o radar. */
-  #btCabeca{left:14px;top:300px;display:none}
+  #btCabeca{left:14px;top:326px;display:none}
   #btCabeca.pode{display:block}
   #btCabeca.on{background:rgba(94,255,154,.18);border-color:rgba(94,255,154,.5);color:#bfffd6}
   #btCabeca.perdeu{background:rgba(255,194,77,.16);border-color:rgba(255,194,77,.45);color:#ffe1a8}
@@ -952,6 +952,21 @@ const POUSO_VEL = 1250*VEL, POUSO_BANCO = 22, POUSO_QUEDA = 620*VEL;   // limite
    menos ponto que o pouso na pista, e a corrida é muito mais curta porque o
    campo freia o avião. */
 const CAMPO_VEL = 980*VEL, CAMPO_BANCO = 12, CAMPO_QUEDA = 380*VEL;
+/* --- POUSO NA AVENIDA -------------------------------------------------------
+   Entre os dois. A avenida é plana e dura como a pista — não tem o capim
+   segurando as rodas —, mas é um terço da largura dela e tem prédio dos dois
+   lados: sair do eixo não é sair para a grama, é bater. Por isso a conta é
+   mais folgada que a do campo e mais apertada que a do aeroporto, e o que a
+   torna difícil não é o número, é a mira. */
+const AVEN_VEL = 1060*VEL, AVEN_BANCO = 15, AVEN_QUEDA = 460*VEL;
+const AV_Y = 11;                      // a altura do asfalto da avenida
+/* a superfície que existe em cada ponto do mapa: asfalto de aeroporto,
+   asfalto de avenida ou chão batido. Uma conta só, e todo o resto pergunta. */
+function pisoEm(x, z){
+  if (sobreAPista(x, z))  return PISTA_Y;
+  if (sobreAvenida(x, z)) return CHAO + AV_Y;
+  return CHAO;
+}
 const FREIO_CAMPO = 620*VEL;          // o capim segurando as rodas
 const CAPOTA_VEL = 1250*VEL;          // fora do asfalto, acima disso capota
 const TAXA_ESTERCA = 0.85;                    // o leme esterça no chão
@@ -1033,12 +1048,95 @@ const estradaXv = z => -21000 + Math.sin(z/13000)*1800;
    bairros altos do miolo) já lê `campoCidade`, a cidade inteira aparece
    sozinha a partir desta soma: torres no centro, galpões na periferia, alvos
    entre elas. Uma linha de código, um destino no mapa. */
-const CIDADE2 = { nome:'PORTO ALTO', x: 44000, z: -36000, raio: 17000 };
+/* --- AS DUAS CIDADES COM NOME ----------------------------------------------
+   O mapa tinha cidade em toda parte, mas nenhuma com NOME: o campo de senos
+   espalha bairros iguais por 120 mil unidades, e voando por cima um lugar era
+   igual ao outro. Faltavam destinos.
+
+   Cada uma é um morro plantado à mão nesse mesmo campo — uma gaussiana somada
+   ao seno. Como tudo o mais (os prédios, os alvos, a cor da grama, a regra que
+   faz o miolo ter torres e a periferia galpões) já lê `campoCidade`, a cidade
+   inteira aparece sozinha a partir desta soma.
+
+   `malha` é o lado do quarteirão e `rumo` a direção em que as ruas correm:
+   PORTO ALTO é ortogonal, NOVA ORLA é torta, como cidade que cresceu ao longo
+   de uma costa. São as duas únicas com ARRUAMENTO desenhado — e é por isso
+   que elas são "a cidade" e o resto do mapa é subúrbio. */
+const CIDADES = [
+  { nome:'PORTO ALTO', x:  44000, z: -36000, raio: 17000, malha: 3100, rumo: 0.00, peso: 2.4 },
+  /* o peso de NOVA ORLA era 2,1 e o campo de senos ali por baixo vale -1,8:
+     a soma dava 0,30, abaixo do 0,62 que faz o terreno virar concreto. O
+     resultado era uma cidade inteira plantada em cima de pasto verde, com
+     prédios baixos porque `centro` também sai do mesmo número. 3,4 põe o
+     chão, as torres e os bairros no lugar. */
+  { nome:'NOVA ORLA',  x: -33000, z:  -9000, raio: 13000, malha: 2700, rumo: 0.62, peso: 3.4 }
+];
+const CIDADE2 = CIDADES[0];         // o destino do objetivo, que continua sendo esta
 function campoCidade(x, z){
-  const base = Math.sin(x/17000 + 0.6) + Math.sin(z/15000 - 0.4)
-             + Math.sin((x + z)/11000)*0.7 + Math.sin((x - z)/23000)*0.5;
-  const dx = x - CIDADE2.x, dz = z - CIDADE2.z, r = CIDADE2.raio;
-  return base + 2.4*Math.exp(-(dx*dx + dz*dz)/(2*(r*0.62)*(r*0.62)));
+  let v = Math.sin(x/17000 + 0.6) + Math.sin(z/15000 - 0.4)
+        + Math.sin((x + z)/11000)*0.7 + Math.sin((x - z)/23000)*0.5;
+  for (const c of CIDADES){
+    const dx = x - c.x, dz = z - c.z, r = c.raio*0.62;
+    v += c.peso*Math.exp(-(dx*dx + dz*dz)/(2*r*r));
+  }
+  return v;
+}
+
+/* --- AS AVENIDAS -----------------------------------------------------------
+   "A cidade tem que convidar o usuário a voar baixo... aterrissar em alguma
+   avenida da cidade."
+
+   Então as duas grandes de cada cidade são pista de verdade: largas,
+   desimpedidas (nenhum prédio nasce em cima delas) e com a mesma conta de
+   `naPistaLocal` que as pistas usam. Pousar numa avenida é mais difícil que
+   pousar no asfalto do aeroporto — é mais estreita e tem prédio dos dois
+   lados — e mais fácil que pousar no capim, porque é plana e dura. */
+const AVENIDAS = [];
+for (const c of CIDADES)
+  for (const [k, extra] of [[0, 0], [1, Math.PI/2]])
+    /* o rumo aqui tem de casar com a GRADE, senão a avenida corta os
+       quarteirões na diagonal. `naPistaLocal` mede ao longo de (sin ρ, cos ρ)
+       e o eixo u da cidade é (cos r, sin r): ρ = π/2 − r resolve o primeiro, e
+       ρ = −r o segundo, que é o perpendicular. */
+    AVENIDAS.push({ nome: c.nome, cidade: c, k,
+                    cx: c.x, cz: c.z, rumo: k === 0 ? Math.PI/2 - c.rumo : -c.rumo,
+                    meiaC: c.raio*0.92, meia: 430 });
+/* --- O ARRUAMENTO ----------------------------------------------------------
+   A cidade era uma nuvem de caixas em posições sorteadas — de cima, cascalho.
+   Cidade de verdade tem QUARTEIRÃO: o que se reconhece do alto não são os
+   prédios, são as linhas entre eles.
+
+   `naRua` é a conta inteira: leva o ponto para o referencial da cidade (que
+   pode estar torto, como NOVA ORLA) e pergunta se ele cai perto de uma das
+   linhas da grade. Prédio não nasce em rua, alvo não nasce em avenida, e o
+   desenho usa a mesma conta — então o que se vê e o que existe são a mesma
+   coisa, que é a única forma de isto não virar decalque. */
+const RUA_MEIA = 150;                  // meia largura da rua comum
+function naCidade(c, x, z){
+  const dx = x - c.x, dz = z - c.z;
+  const co = Math.cos(-c.rumo), sn = Math.sin(-c.rumo);
+  return { u: dx*co - dz*sn, v: dx*sn + dz*co, d: Math.hypot(dx, dz) };
+}
+function emCidadeComNome(x, z){
+  for (const c of CIDADES) if (Math.hypot(x - c.x, z - c.z) < c.raio) return c;
+  return null;
+}
+function naRua(x, z){
+  for (const c of CIDADES){
+    const p = naCidade(c, x, z);
+    if (p.d > c.raio) continue;
+    const du = Math.abs(((p.u % c.malha) + c.malha + c.malha/2) % c.malha - c.malha/2);
+    const dv = Math.abs(((p.v % c.malha) + c.malha + c.malha/2) % c.malha - c.malha/2);
+    if (du < RUA_MEIA || dv < RUA_MEIA) return true;
+  }
+  return sobreAvenida(x, z);
+}
+function sobreAvenida(x, z){
+  return AVENIDAS.some(a => naPistaLocal(a, x, z, 0, 0));
+}
+function avenidaPerto(x, z){
+  for (const a of AVENIDAS) if (naPistaLocal(a, x, z, 0, 0)) return a;
+  return null;
 }
 function ehCidade(x, z){ return campoCidade(x, z) > 0.62; }
 function baralha(a,b){ return Math.abs(Math.sin(a*127.1 + b*311.7) * 43758.5453) % 1; }
@@ -1294,6 +1392,8 @@ function montaMapa(){
       if (Math.abs(xx - estradaXv(zz)) < 700) continue;
       if (Math.abs(xx - TRILHO_X) < 1400) continue;      // a linha férrea
       if (perto_da_pista(xx, zz)) continue;          // o aeroporto é plano
+      if (naRua(xx, zz)) continue;                   // rua é rua, não terreno
+      if (emCidadeComNome(xx, zz)) continue;         // o miolo tem passo próprio
       if (Math.random() < 0.20) continue;
       /* --- BAIRROS ---------------------------------------------------------
          Antes toda a cidade era o mesmo sorteio: caixas cinzas de altura
@@ -1314,6 +1414,35 @@ function montaMapa(){
                      h: alt, tom: Math.random(), centro, vivo:true });
     }
 
+  /* --- O MIOLO DAS CIDADES COM NOME ----------------------------------------
+     O passo global é 2.120, e com ele um quarteirão de 3.100 recebe dois
+     prédios: de cima, cascalho; voando entre eles, nada por onde passar. E
+     "passar entre os prédios" é justamente o que uma cidade tem de oferecer.
+
+     Nas duas cidades com nome o passo cai pela metade e o sorteio aperta: o
+     quarteirão fecha, o desfiladeiro aparece, e o miolo vira miolo. São umas
+     seiscentas caixas a mais numa malha INSTANCIADA — quer dizer, zero ordens
+     de desenho a mais. */
+  for (const c of CIDADES){
+    const p2 = P/2;
+    for (let zz = c.z - c.raio; zz <= c.z + c.raio; zz += p2)
+      for (let xx = c.x - c.raio; xx <= c.x + c.raio; xx += p2){
+        const d = Math.hypot(xx - c.x, zz - c.z);
+        if (d > c.raio) continue;
+        if (naRua(xx, zz)) continue;
+        if (perto_da_pista(xx, zz)) continue;
+        if (Math.abs(xx - rioX(zz)) < 1100) continue;
+        /* a borda rareia: cidade não acaba numa parede */
+        if (Math.random() < 0.18 + 0.55*Math.pow(d/c.raio, 2.2)) continue;
+        const centro = Math.max(0, Math.min(1, (campoCidade(xx, zz) - 0.62)/1.5));
+        const alt = 260 + Math.random()*Math.random()*(900 + centro*centro*3800);
+        const larg = (300 + Math.random()*380) * (1 - centro*0.30);
+        predios.push({ x: xx + (Math.random()-0.5)*220, z: zz + (Math.random()-0.5)*220,
+                       w: larg, d: larg*(0.7 + Math.random()*0.6),
+                       h: alt, tom: Math.random(), centro, vivo:true });
+      }
+  }
+
   let tent = 0;
   /* Eram 18. "Quero mais alvos no chão": 26. O mapa dobrou de tamanho faz
      pouco e continuava com a mesma conta de alvos — havia espaço sobrando. */
@@ -1323,6 +1452,7 @@ function montaMapa(){
     if (!ehCidade(ax, az)) continue;
     if (Math.abs(ax - rioX(az)) < 1200) continue;
     if (perto_da_pista(ax, az)) continue;
+    if (sobreAvenida(ax, az)) continue;
     if (alvos.some(a => Math.hypot(a.x-ax, a.z-az) < 9000*ESPACO)) continue;
     if (Math.hypot(ax, az) < 6000) continue;
     // tipoAlvo marca quem NÃO tem altura própria: o buscador e o míssil
@@ -1504,6 +1634,84 @@ function montaPista(){
   cena.add(pista);
 }
 
+/* --- O ASFALTO DA CIDADE ---------------------------------------------------
+   Todas as ruas de uma cidade cabem em TRÊS malhas: o arruamento comum, as
+   duas avenidas e o tracejado delas. Cada uma é uma só geometria com todos os
+   retângulos costurados dentro — três ordens de desenho para as duas cidades
+   inteiras, em vez de uma por rua.
+
+   O desenho usa a MESMA conta que decide onde nasce prédio (`naRua`): o que se
+   vê e o que existe são a mesma coisa. Rua desenhada por cima de uma regra
+   diferente é decalque, e decalque se descola. */
+let ruas = null;
+function montaRuas(){
+  if (ruas) cena.remove(ruas);
+  ruas = new THREE.Group();
+  /* um retângulo deitado no chão, dado o centro, a direção e as duas medidas */
+  const tira = (arr, cx, cz, dx, dz, meiaC, meia, y) => {
+    const px = -dz, pz = dx;
+    const ax = dx*meiaC, az = dz*meiaC, bx = px*meia, bz = pz*meia;
+    const p = [[cx-ax-bx, cz-az-bz], [cx+ax-bx, cz+az-bz],
+               [cx+ax+bx, cz+az+bz], [cx-ax+bx, cz-az+bz]];
+    const o = arr.length/3;
+    for (const [x, z] of p) arr.push(x, CHAO + y, z);
+    return [o, o+1, o+2, o, o+2, o+3];
+  };
+  const malha = (cor, y) => { const pos = [], idx = []; return { pos, idx, cor, y,
+    põe(cx, cz, dx, dz, mC, m){ idx.push(...tira(pos, cx, cz, dx, dz, mC, m, y)); } }; };
+  /* ASFALTO, e escuro. Na primeira tentativa as ruas saíram 0x5a5f66 — que é
+     quase exatamente a cor do terreno da cidade (a paleta CINZAS) — e de cima
+     a grade sumia: eu tinha desenhado a cidade inteira de cinza sobre cinza.
+     Rua é a coisa mais escura de uma cidade vista do alto. */
+  /* e a ALTURA. Em CHÃO+3 as ruas existiam, eram visíveis e não apareciam:
+     três unidades de separação num buffer de profundidade que cobre 200 mil
+     não sobrevivem à vista de cima — o terreno e o asfalto disputam o mesmo
+     pixel e ganha quem o arredondamento quiser. Nove (acima até do asfalto da
+     pista, que mora em +8) mais `polygonOffset`, que é a ordem explícita de
+     "esta superfície vem por cima". */
+  const R = malha(0x33363c, 9), A = malha(0x26292f, 11), T = malha(0xe4ebf4, 13);
+
+  for (const c of CIDADES){
+    const ux = Math.cos(c.rumo), uz = Math.sin(c.rumo);   // o eixo u da cidade
+    const vx = -uz, vz = ux;
+    const n = Math.floor(c.raio/c.malha);
+    for (let k = -n; k <= n; k++){
+      const off = k*c.malha;
+      const meiaC = Math.sqrt(Math.max(0, c.raio*c.raio - off*off));
+      if (meiaC < 500) continue;
+      // a rua que corre em u, deslocada em v — e a irmã dela
+      R.põe(c.x + vx*off, c.z + vz*off, ux, uz, meiaC, RUA_MEIA);
+      R.põe(c.x + ux*off, c.z + uz*off, vx, vz, meiaC, RUA_MEIA);
+    }
+  }
+  for (const a of AVENIDAS){
+    const dx = Math.sin(a.rumo), dz = Math.cos(a.rumo);
+    A.põe(a.cx, a.cz, dx, dz, a.meiaC, a.meia);
+    // o tracejado do meio, que é o que diz "isto aqui dá para pousar"
+    for (let t = -a.meiaC + 600; t < a.meiaC - 600; t += 1200)
+      T.põe(a.cx + dx*t, a.cz + dz*t, dx, dz, 260, 13);
+  }
+  for (const m of [R, A, T]){
+    if (!m.idx.length) continue;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(m.pos), 3));
+    g.setIndex(m.idx);
+    g.computeVertexNormals();
+    /* DoubleSide, e não é preguiça: os retângulos são costurados na ordem em
+       que os cantos saem da conta, e essa ordem depende do rumo da cidade. Num
+       rumo a face olha para cima, no outro para baixo — e a que olha para
+       baixo o three joga fora, que foi por que a grade existia, era visível,
+       e não aparecia de jeito nenhum vista de cima. */
+    const no = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: m.cor,
+      side: THREE.DoubleSide,
+      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }));
+    no.receiveShadow = m.y < 5;
+    no.userData.sombra = false;
+    ruas.add(no);
+  }
+  cena.add(ruas);
+}
+
 /* --- OS PRÉDIOS: uma caixa só, repetida ----------------------------------
    InstancedMesh: a placa de vídeo recebe UMA caixa e uma lista de posições, e
    desenha as centenas de prédios numa passada só. É o que deixa a cidade
@@ -1539,12 +1747,61 @@ function montaCidade(){
 /* quando um prédio cai, some com ele encolhendo a instância para zero */
 function derrubaPredio(p){
   p.vivo = false;
+  /* o telhado e a baliza caem com ele: sem isto ficava uma caixa-d'água
+     boiando no ar em cima do vazio, que é a cara de bug que mais se nota */
+  if (telhados || balizas) montaTelhados();
   const i = cidadeIdx.indexOf(p);
   if (i < 0 || !cidade) return;
   const m = new THREE.Matrix4();
   m.makeScale(0.0001, 0.0001, 0.0001); m.setPosition(p.x, CHAO, p.z);
   cidade.setMatrixAt(i, m);
   cidade.instanceMatrix.needsUpdate = true;
+}
+
+/* --- O QUE HÁ EM CIMA DOS PRÉDIOS ------------------------------------------
+   Uma caixa lisa vista de cima é uma caixa lisa. O que faz um prédio parecer
+   prédio, voando por cima dele, é o que existe no telhado: a casa de máquinas,
+   a caixa-d'água, e nas torres altas a BALIZA vermelha que a aviação obriga.
+
+   As duas são malhas instanciadas — uma caixinha e uma bolinha repetidas —,
+   então a cidade inteira ganha telhado por duas ordens de desenho. E a baliza
+   não é enfeite: ela marca de longe, à noite ou no contraluz, exatamente as
+   torres entre as quais dá para passar. */
+let telhados = null, balizas = null;
+const geoTelha = new THREE.BoxGeometry(1, 1, 1);
+const geoBaliza = new THREE.SphereGeometry(1, 6, 5);
+function montaTelhados(){
+  for (const m of [telhados, balizas]) if (m){ cena.remove(m); m.dispose(); }
+  const altos = predios.filter(p => p.vivo && p.h > 700);
+  const torres = predios.filter(p => p.vivo && p.h > 2200);
+  telhados = new THREE.InstancedMesh(geoTelha,
+    new THREE.MeshLambertMaterial({ color: 0x9aa2ad }), Math.max(1, altos.length));
+  balizas = new THREE.InstancedMesh(geoBaliza,
+    new THREE.MeshBasicMaterial({ color: 0xff4438 }), Math.max(1, torres.length));
+  telhados.castShadow = true;
+  const m4 = new THREE.Matrix4();
+  altos.forEach((p, i) => {
+    const b = baralha(p.x*0.011, p.z*0.013);
+    m4.makeScale(p.w*(0.26 + b*0.22), 60 + b*150, p.d*(0.26 + b*0.22));
+    m4.setPosition(p.x + (b - 0.5)*p.w*0.28, CHAO + p.h + (30 + b*75), p.z + (b - 0.5)*p.d*0.28);
+    telhados.setMatrixAt(i, m4);
+  });
+  torres.forEach((p, i) => {
+    m4.makeScale(26, 26, 26);
+    m4.setPosition(p.x, CHAO + p.h + 230, p.z);
+    balizas.setMatrixAt(i, m4);
+  });
+  telhados.instanceMatrix.needsUpdate = true;
+  balizas.instanceMatrix.needsUpdate = true;
+  telhados.count = altos.length; balizas.count = torres.length;
+  cena.add(telhados); cena.add(balizas);
+}
+/* a baliza PISCA — é o que a faz ser vista. Uma cor só, compartilhada pelas
+   centenas de instâncias: pisca tudo junto, que é o que se vê de longe. */
+function piscaBalizas(t){
+  if (!balizas) return;
+  const k = 0.42 + 0.58*Math.pow(Math.max(0, Math.sin(t*2.2)), 6);
+  balizas.material.color.setRGB(k, k*0.18, k*0.14);
 }
 
 /* --- TAMBORES DE COMBUSTÍVEL --------------------------------------------- */
@@ -6194,10 +6451,11 @@ function atualizaQueda(dt){
    a constante do ar ela durava meio segundo — não dava tempo nem de ver a
    pista passando.
    ========================================================================== */
-function aterra(queda, campo){
+function aterra(queda, onde){      // onde: 'pista' | 'avenida' | 'campo'
   noChao = true;
-  noCampo = !!campo;
-  aviaoY = (campo ? CHAO : PISTA_Y) + RODA;
+  const campo = onde === 'campo';
+  noCampo = campo;
+  aviaoY = pisoEm(aviaoX, aviaoZ) + RODA;
   // toca com o nariz ainda um pouco em cima, como um pouso de verdade, e o
   // bico desce sozinho na corrida
   arfChao = Math.max(0, Math.min(ARF_CHAO, arfagem));
@@ -6214,14 +6472,16 @@ function aterra(queda, campo){
   parado = 0;
   const macio = queda < 240;
   pousos++;
-  const ganho = campo ? (macio ? 250 : 80) : (macio ? 400 : 150);
+  const TAB = { pista:   { bom:400, ruim:150, txt:['POUSO DE MANUAL! +', 'POUSOU! +'] },
+                avenida: { bom:520, ruim:200, txt:['POUSO NA AVENIDA! +',  'POUSOU NA AVENIDA! +'] },
+                campo:   { bom:250, ruim: 80, txt:['POUSO NO CAMPO! +',    'POUSOU NO CAMPO! +'] } };
+  const t = TAB[onde] || TAB.pista;
+  const ganho = macio ? t.bom : t.ruim;
   pontos += ganho;
   Controles.bate('tocou'); sacode(campo ? 0.34 : (macio ? 0.10 : 0.28));
-  mostraAviso((campo ? (macio ? 'POUSO NO CAMPO! +' : 'POUSOU NO CAMPO! +')
-                     : (macio ? 'POUSO DE MANUAL! +' : 'POUSOU! +')) + ganho,
-              macio ? '#7fffa8' : '#ffd257', 1800);
-  if (Missoes) Missoes.pousou(campo, pistaPerto(aviaoX, aviaoZ).nome);
-  solta(aviaoX, (campo ? CHAO : PISTA_Y) + 40, aviaoZ, campo ? 22 : 14,
+  mostraAviso(t.txt[macio ? 0 : 1] + ganho, macio ? '#7fffa8' : '#ffd257', 1800);
+  if (Missoes) Missoes.pousou(onde, pistaPerto(aviaoX, aviaoZ).nome);
+  solta(aviaoX, pisoEm(aviaoX, aviaoZ) + 40, aviaoZ, campo ? 22 : 14,
         campo ? 0xbba06a : 0xd8d8d8, 40, 260);
   bip(220, 0.10, 'square', 0.05);
   setTimeout(() => bip(160, 0.16, 'square', 0.04), 90);
@@ -6320,8 +6580,8 @@ function rolaNoChao(dt, e){
   /* o piso é o asfalto onde há asfalto e o campo onde não há — e ele é
      recalculado a cada quadro, então rolar do campo para a pista (ou o
      contrário) simplesmente funciona */
-  noCampo = !sobreAPista(aviaoX, aviaoZ);
-  aviaoY = (noCampo ? CHAO : PISTA_Y) + RODA + Math.sin(arfChao)*150;
+  noCampo = !sobreAPista(aviaoX, aviaoZ) && !sobreAvenida(aviaoX, aviaoZ);
+  aviaoY = pisoEm(aviaoX, aviaoZ) + RODA + Math.sin(arfChao)*150;
   distancia += voo*dt;
   if (!infinito) combustivel -= dt * GASTO*(0.30 + 0.5*motor);
   if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
@@ -6656,38 +6916,39 @@ function atualiza(dt){
      O TOQUE. Em cima da pista o solo é o asfalto e dá para pousar; fora
      dela é chão batido e continua sendo batida na certa.
      -------------------------------------------------------------------- */
+  /* --- O TOQUE, NAS TRÊS SUPERFÍCIES --------------------------------------
+     Era um `if` para a pista e um `else` para o resto. Agora são três lugares
+     onde dá para encostar as rodas, cada um com a sua régua, e a diferença
+     entre eles é o que faz o pouso ser uma escolha em vez de um ritual:
+
+       PISTA    larga, longa, marcada. 2.500 de velocidade, 22° de banco.
+       AVENIDA  plana e dura, mas um terço da largura e com prédio dos dois
+                lados — 2.120, 15°, e flape. O difícil é a mira.
+       CAMPO    irregular. 1.960, 12°, flape, e o capim freia o dobro.
+
+     A régua em si é a mesma para os três; o que muda são os números e o
+     recado. Escrever isso três vezes seria três lugares para esquecer de
+     consertar depois. */
   const naPista = sobreAPista(aviaoX, aviaoZ);
-  /* o piso fora da pista era CHAO + 240 — um colchão invisível que impedia de
-     chegar ao capim. Agora as rodas encostam no chão como encostam no asfalto,
-     que é o que permite pousar no campo. */
-  const piso = (naPista ? PISTA_Y : CHAO) + RODA;
+  const naAvenida = !naPista && sobreAvenida(aviaoX, aviaoZ);
+  const onde = naPista ? 'pista' : naAvenida ? 'avenida' : 'campo';
+  const piso = pisoEm(aviaoX, aviaoZ) + RODA;
   if (aviaoY < piso){
-    if (naPista){
-      const queda = -eixoF.y*voo;                 // quanto está descendo, por segundo
-      const banco = Math.abs(voltaCurta(inclinacao));
-      let ruim = '';
-      if (!trem)                    ruim = 'SEM TREM DE POUSO!';
-      else if (banco > POUSO_BANCO) ruim = 'ASA NO CHÃO!';
-      else if (voo > POUSO_VEL)     ruim = 'RÁPIDO DEMAIS!';
-      else if (queda > POUSO_QUEDA) ruim = 'DESCEU RÁPIDO DEMAIS!';
-      if (ruim){ mostraAviso(ruim, '#ff8080', 1500); derruba('chao'); return; }
-      aterra(queda);
-      return;
-    }
-    /* --- O TOQUE NO CAMPO ------------------------------------------------
-       Mesma régua do pouso na pista, apertada, e com flape exigido: é ele que
-       permite chegar na velocidade que um campo aguenta. Errando qualquer
-       item, continua sendo batida. */
-    const queda = -eixoF.y*voo;
+    const LIM = { pista:   { v: POUSO_VEL, b: POUSO_BANCO, q: POUSO_QUEDA, flape:false, nome:'' },
+                  avenida: { v: AVEN_VEL,  b: AVEN_BANCO,  q: AVEN_QUEDA,  flape:true,  nome:' PARA A AVENIDA' },
+                  campo:   { v: CAMPO_VEL, b: CAMPO_BANCO, q: CAMPO_QUEDA, flape:true,  nome:' PARA O CAMPO' } }[onde];
+    const queda = -eixoF.y*voo;                 // quanto está descendo, por segundo
     const banco = Math.abs(voltaCurta(inclinacao));
     let ruim = '';
-    if (!trem)                     ruim = 'SEM TREM DE POUSO!';
-    else if (!flap)                ruim = 'SEM FLAPE — CAMPO PEDE FLAPE!';
-    else if (banco > CAMPO_BANCO)  ruim = 'ASA NO CHÃO!';
-    else if (voo > CAMPO_VEL)      ruim = 'RÁPIDO DEMAIS PARA O CAMPO!';
-    else if (queda > CAMPO_QUEDA)  ruim = 'DESCEU RÁPIDO DEMAIS!';
-    if (!ruim){ aterra(queda, true); return; }
-    if (eixoF.y < -0.30){ mostraAviso(ruim, '#ff8080', 1500); derruba('chao'); return; }
+    if (!trem)                  ruim = 'SEM TREM DE POUSO!';
+    else if (LIM.flape && !flap) ruim = 'SEM FLAPE!';
+    else if (banco > LIM.b)     ruim = 'ASA NO CHÃO!';
+    else if (voo > LIM.v)       ruim = 'RÁPIDO DEMAIS' + LIM.nome + '!';
+    else if (queda > LIM.q)     ruim = 'DESCEU RÁPIDO DEMAIS!';
+    if (!ruim){ aterra(queda, onde); return; }
+    /* na pista errar é bater, sempre: é o lugar feito para pousar e não tem
+       desculpa. Fora dela, quem só raspou ainda tem a chance de arremeter. */
+    if (naPista || eixoF.y < -0.30){ mostraAviso(ruim, '#ff8080', 1500); derruba('chao'); return; }
     aviaoY = piso; mostraAviso(ruim, '#ff8080');
   }
 
@@ -7176,6 +7437,7 @@ function arruma(){
     cmd.leme.rotation.x = -cmdLem * LEM_MAX;
   }
   desenhaVortices();
+  piscaBalizas(Date.now()/1000);
   for (const j of jatos){
     // a chama cresce com o acelerador e estoura no nitro; o tremido a cada
     // quadro é o que a separa de um cone de plástico
@@ -8472,7 +8734,7 @@ function desenhaHUD(){
     h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
     h2.textAlign = 'left'; h2.fillStyle = 'rgba(127,216,255,.7)';
     h2.fillText('TESTE · ' + quais + ' sem fim (tecla ' + teclas + ')', 16,
-                Math.max(Batalha.ligada && Batalha.quantos() > 1 ? 352 : 344, H*0.34));
+                Math.max(Batalha.ligada && Batalha.quantos() > 1 ? 378 : 370, H*0.34));
   }
 }
 
@@ -8499,10 +8761,12 @@ const $ = id => document.getElementById(id);
    ========================================================================== */
 Missoes = (function(){
   const LISTA = [
-    { id:'decolar', txt:'Decolar',                          meta:1 },
-    { id:'alvos',   txt:'Destruir 6 alvos no chão',          meta:6 },
-    { id:'porto',   txt:'Sobrevoar ' + CIDADE2.nome + ' baixo', meta:1 },
-    { id:'vale',    txt:'Pousar no aeroporto do VALE',       meta:1 }
+    { id:'decolar', txt:'Decolar',                              meta:1 },
+    { id:'alvos',   txt:'Destruir 6 alvos no chão',              meta:6 },
+    { id:'porto',   txt:'Sobrevoar ' + CIDADE2.nome + ' baixo',  meta:1 },
+    { id:'rasante', txt:'12 s de rasante na cidade',            meta:12 },
+    { id:'avenida', txt:'Pousar numa avenida',                  meta:1 },
+    { id:'vale',    txt:'Pousar no aeroporto do VALE',          meta:1 }
   ];
   const conta = {};
   let cumpridas = 0, tudo = false, avisou = 0;
@@ -8511,6 +8775,7 @@ Missoes = (function(){
     for (const m of LISTA) conta[m.id] = 0;
     cumpridas = 0; tudo = false; avisou = 0;
   }
+  /* declarado aqui em cima para `zera` não tropeçar na zona morta do `let` */
   zera();
 
   function marca(id, quanto){
@@ -8530,28 +8795,61 @@ Missoes = (function(){
     }
   }
 
-  /* o pouso sabe onde tocou: no campo, na pista de casa ou na do vale */
-  function pousou(campo, nome){
-    if (!campo && nome === 'VALE') marca('vale');
+  /* o pouso sabe onde tocou: numa avenida, no campo, ou em qual aeroporto */
+  function pousou(onde, nome){
+    if (onde === 'avenida') marca('avenida');
+    if (onde === 'pista' && nome === 'VALE') marca('vale');
   }
 
-  /* o único objetivo que se cumpre SÓ por estar em algum lugar */
+  /* --- O RASANTE -------------------------------------------------------
+     "A cidade tem que convidar o usuário a voar baixo, ver a cidade, passar
+     por perto dos prédios."
+
+     Convite não é permissão: voar baixo entre os prédios já era possível e
+     ninguém fazia, porque não dava NADA — só risco. Então dá: cada segundo
+     rente ao chão dentro de uma cidade com nome vale ponto, e o ponto sobe
+     com o tempo que se aguenta lá embaixo (a série quebra no instante em que
+     se sobe). Quarenta por segundo no começo, cento e vinte depois de doze
+     segundos seguidos. É o mesmo desenho do combo de um jogo de skate, e pela
+     mesma razão: o que se quer premiar não é entrar, é FICAR.
+
+     A conta de "estou entre os prédios" não varre a lista de quatro mil
+     caixas todo quadro — pergunta se o ponto cai numa cidade com nome, que é
+     duas distâncias. Onde há cidade com nome, há prédio. */
+  let serie = 0, avisoRas = 0;
   function passo(dt){
-    if (!jogando || caindo || noChao) return;
-    if (conta.porto < 1){
-      const d = Math.hypot(aviaoX - CIDADE2.x, aviaoZ - CIDADE2.z);
-      const altura = (aviaoY - CHAO)/METRO;
-      if (d < CIDADE2.raio*0.75 && altura < 900) marca('porto');
-      else if (d < CIDADE2.raio*0.75 && altura < 1800){
+    if (!jogando || caindo || noChao){ serie = 0; return; }
+    const altura = (aviaoY - CHAO)/METRO;
+    const cidade = emCidadeComNome(aviaoX, aviaoZ);
+
+    if (conta.porto < 1 && cidade === CIDADE2){
+      if (altura < 900) marca('porto');
+      else if (altura < 1800){
         avisou -= dt;
         if (avisou <= 0){ avisou = 3; mostraAviso('DESÇA ABAIXO DE 900 m SOBRE ' + CIDADE2.nome, '#9fd8ff', 1600); }
       }
+    }
+
+    if (cidade && altura < 260){
+      serie += dt;
+      const mult = 1 + Math.min(2, serie/6);
+      pontos += dt*40*mult;
+      marca('rasante', dt);
+      avisoRas -= dt;
+      if (avisoRas <= 0){
+        avisoRas = 2.2;
+        mostraAviso('RASANTE ' + serie.toFixed(0) + 's  ×' + mult.toFixed(1) + '  ' + cidade.nome,
+                    serie > 8 ? '#ffd257' : '#7fd8ff', 1300);
+      }
+    } else if (serie > 0){
+      if (serie > 4) mostraAviso('rasante de ' + serie.toFixed(0) + ' s', '#9fd8ff', 1100);
+      serie = 0; avisoRas = 0;
     }
   }
 
   function lista(){
     return LISTA.map(m => ({ txt:m.txt, feito: conta[m.id] >= m.meta,
-                             progresso: m.meta > 1 ? conta[m.id] + '/' + m.meta : '' }));
+                             progresso: m.meta > 1 ? Math.floor(conta[m.id]) + '/' + m.meta : '' }));
   }
   return { zera, marca, pousou, passo, lista, get cumpridas(){ return cumpridas; },
            get total(){ return LISTA.length; }, get tudo(){ return tudo; } };
@@ -8566,7 +8864,9 @@ function pinta(){
   $('vRec').textContent = Math.round(recorde);
   $('vArma').textContent = ARMAS[arma].nome;
   $('vMun').textContent = munInfinita ? '∞' : municao[arma];
-  $('vPontos').textContent = pontos;
+  /* arredondado: o rasante paga por SEGUNDO, então `pontos` passou a ter casa
+     decimal, e um placar com vírgula pisca dezesseis dígitos por quadro */
+  $('vPontos').textContent = Math.round(pontos);
   $('vAlvos').textContent = alvosDestruidos + '/' + alvosTotal;
   {
     const cx = $('mList');
@@ -8826,7 +9126,7 @@ function reinicia(){
   Alarmes.zera();
   travadoPor.clear(); somAlerta(false);
   Mira.solta(); MiraTiro.solta();
-  montaMapa(); montaChao(); montaPista(); montaCidade(); montaTambores(); montaAlvos();
+  montaMapa(); montaChao(); montaPista(); montaRuas(); montaCidade(); montaTelhados(); montaTambores(); montaAlvos();
   montaTrilhos();
   montaInimigos(); montaPombos(); montaNuvens();
   poeCamera(1);
@@ -10087,7 +10387,7 @@ function abrirSala(){
 abrirSala();
 
 /* desenha uma primeira imagem parada atrás da capa, para não abrir preto */
-montaMapa(); montaChao(); montaPista(); montaCidade(); montaTambores(); montaAlvos();
+montaMapa(); montaChao(); montaPista(); montaRuas(); montaCidade(); montaTelhados(); montaTambores(); montaAlvos();
 montaTrilhos(); montaInimigos(); montaPombos(); montaNuvens();
 aviaoY = 2200; poeCamera(1); arruma(); redimensiona();
 rend.render(cena, cam);

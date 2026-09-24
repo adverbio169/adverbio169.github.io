@@ -5374,3 +5374,100 @@ inteira desceu um degrau e agora é: distância, pontos, **objetivos**, cabeça,
 aviso de teste e o radar. Entrou `hudchoque.js`, que confere em quatro
 resoluções que nada fica em cima de nada nem sai da tela — a mesma prova que
 `dedos.js` já fazia para o celular, que o computador não tinha.
+
+---
+
+## A cidade como lugar de voar
+
+> *"Começa a deixar as cidades mais detalhadas, mais bonitas e atraentes a fazer
+> manobras perto delas. A cidade tem que convidar o usuário a voar baixo, ver a
+> cidade, passar por perto dos prédios... aterrissar em alguma avenida."*
+
+Quatro coisas, e cada uma responde a um pedaço disso.
+
+### 1. Arruamento
+
+A cidade era uma nuvem de caixas em posições sorteadas — de cima, cascalho. O
+que se reconhece de uma cidade do alto não são os prédios: são as **linhas
+entre eles**.
+
+```js
+function naRua(x, z){
+  for (const c of CIDADES){
+    const p = naCidade(c, x, z);            // leva o ponto para o quadro da cidade
+    if (p.d > c.raio) continue;
+    const du = Math.abs(((p.u % c.malha) + c.malha*1.5) % c.malha - c.malha/2);
+    const dv = /* idem em v */;
+    if (du < RUA_MEIA || dv < RUA_MEIA) return true;
+  }
+  return sobreAvenida(x, z);
+}
+```
+
+É a conta inteira, e é a MESMA que decide onde nasce prédio, onde nasce alvo e
+onde o asfalto é desenhado. O que se vê e o que existe são a mesma coisa — rua
+desenhada por cima de uma regra diferente é decalque, e decalque se descola.
+
+As duas cidades com nome têm grades diferentes: **PORTO ALTO** é ortogonal,
+**NOVA ORLA** é torta (rumo 0,62), como cidade que cresceu ao longo de uma
+costa. Todas as ruas cabem em **três malhas** — o arruamento, as avenidas e o
+tracejado delas — costuradas cada uma numa geometria só.
+
+Três armadilhas no caminho, todas do mesmo tipo:
+
+| o que se via | a causa |
+|---|---|
+| cidade cinza sobre cinza | as ruas saíram `0x5a5f66`, que é quase a cor do terreno da cidade. Rua é a coisa mais **escura** vista do alto |
+| ruas existiam, eram visíveis, não apareciam | em CHÃO+3, três unidades num buffer que cobre 200 mil não sobrevivem à vista de cima. Nove, mais `polygonOffset` |
+| a grade sumia num rumo e aparecia no outro | os cantos saem na ordem que a conta dá, e essa ordem depende do rumo da cidade: num, a face olha para cima; no outro, para baixo — e essa o three joga fora. `DoubleSide` |
+
+### 2. O miolo fechou
+
+O passo global é 2.120, e com ele um quarteirão de 3.100 recebe **dois**
+prédios: voando entre eles, não há nada por onde passar. Nas duas cidades com
+nome o passo cai pela metade e o sorteio aperta (e rareia na borda, porque
+cidade não acaba numa parede). São umas seiscentas caixas a mais numa malha
+**instanciada** — quer dizer, zero ordens de desenho a mais — e o desfiladeiro
+aparece.
+
+E os telhados: casa de máquinas e caixa-d'água nos prédios acima de 700, e nas
+torres acima de 2.200 a **baliza vermelha** que a aviação obriga, piscando. Duas
+malhas instanciadas para a cidade inteira. A baliza não é enfeite: ela marca de
+longe exatamente as torres entre as quais dá para passar.
+
+### 3. Pousar na avenida
+
+As duas grandes de cada cidade são pista de verdade: largas (860), desimpedidas
+e medidas pela mesma `naPistaLocal` das pistas. Agora há **três** superfícies
+onde encostar as rodas, e a diferença entre elas é o que faz o pouso ser uma
+escolha em vez de um ritual:
+
+```
+PISTA    larga, longa, marcada          2.500 · 22° · flape opcional · 400/150
+AVENIDA  plana e dura, um terço da       2.120 · 15° · flape · 520/200
+         largura, prédio dos dois lados
+CAMPO    irregular, o capim freia        1.960 · 12° · flape · 250/80
+```
+
+A régua é a mesma para as três; mudam os números e o recado — escrever isso três
+vezes seria três lugares para esquecer de consertar depois. E na pista errar é
+bater, sempre; fora dela, quem só raspou ainda arremete.
+
+### 4. O rasante
+
+Voar baixo entre os prédios já era possível e ninguém fazia, porque não dava
+NADA — só risco. **Convite não é permissão.**
+
+Agora cada segundo rente ao chão dentro de uma cidade com nome vale ponto, e o
+ponto sobe com o tempo que se aguenta lá embaixo: quarenta por segundo no
+começo, cento e vinte depois de doze segundos seguidos. A série quebra no
+instante em que se sobe. É o mesmo desenho do combo de um jogo de skate, e pela
+mesma razão: o que se quer premiar não é entrar, é **ficar**. Medido: treze
+segundos de rasante pagam 1.681 pontos.
+
+A conta de "estou entre os prédios" não varre as quatro mil caixas todo quadro —
+pergunta se o ponto cai numa cidade com nome, que são duas distâncias. Onde há
+cidade com nome, há prédio.
+
+E os objetivos foram de quatro para seis: entraram **12 s de rasante** e
+**pousar numa avenida**.
