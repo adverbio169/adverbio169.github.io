@@ -7448,7 +7448,12 @@ const PISTA_Y = CHAO + 8;                     // o asfalto, um palmo acima do ca
 /* a altura do centro apoiado vem do avião escolhido: `RODA` mora na garagem */
 /* Velocidade mínima para o ar sustentar o avião. Os flapes a derrubam: é para
    isso que eles existem, poder chegar devagar sem cair. */
-const ESTOL = [640*VEL, 540*VEL, 450*VEL];    // sem flape, flape 1, flape 2
+/* As velocidades mínimas desceram de [640, 540, 450]. O estol estava entrando
+   cedo demais — numa curva puxada de cruzeiro o avião já reclamava — e um
+   jogo em que o castigo chega antes do erro cansa. Um oitavo a menos em cada
+   configuração deixa a margem de manobra que o voo normal precisa, sem tirar
+   o estol do jogo: quem puxa sem potência continua caindo. */
+const ESTOL = [560*VEL, 470*VEL, 390*VEL];    // sem flape, flape 1, flape 2
 const FLAP_TETO = [2400*VEL, 1500*VEL, 1150*VEL];  // o quanto cada flape deixa correr
 const TREM_TETO = 1400*VEL;                   // com o trem fora, o avião não corre
 const DECOLA = 1.18;                          // margem sobre o estol para sair do chão
@@ -7457,6 +7462,19 @@ const DECOLA = 1.18;                          // margem sobre o estol para sair 
    preciso reduzir ou baixar flape. Com 1500 a conta era impossível de
    estourar — o arrasto do trem já segurava antes. */
 const POUSO_VEL = 1250*VEL, POUSO_BANCO = 22, POUSO_QUEDA = 620*VEL;   // limites do toque
+/* --- POUSO FORA DA PISTA ---------------------------------------------------
+   "Pode permitir aterrissar no chão mesmo, desde que tenha velocidade
+   compatível, flaps, trem de pouso e etc."
+
+   Campo batido não é asfalto: não tem comprimento marcado, não tem ninguém
+   passando o rolo e o solo é irregular. Então dá, mas com a conta apertada —
+   mais devagar, mais nivelado, descendo mais manso, e com FLAPE, que é o que
+   permite chegar devagar. É um pouso de emergência, e paga como tal: vale
+   menos ponto que o pouso na pista, e a corrida é muito mais curta porque o
+   campo freia o avião. */
+const CAMPO_VEL = 980*VEL, CAMPO_BANCO = 12, CAMPO_QUEDA = 380*VEL;
+const FREIO_CAMPO = 620*VEL;          // o capim segurando as rodas
+const CAPOTA_VEL = 1250*VEL;          // fora do asfalto, acima disso capota
 const TAXA_ESTERCA = 0.85;                    // o leme esterça no chão
 /* No chão a velocidade ganha e perde POR SEGUNDO, não "perseguindo o alvo"
    como no ar. Com a fórmula do ar a corrida de decolagem durava meio segundo
@@ -7504,7 +7522,8 @@ let eixoF={x:0,y:0,z:1}, eixoC={x:0,y:1,z:0}, eixoD={x:1,y:0,z:0};
 let rumo=0, inclinacao=0, arfagem=0, leme=0;
 let voo=VOO_BASE, turbo=0, combustivel=100, distancia=0, recorde=0;
 let motor=MOTOR_PADRAO, nitroBotao=false, nitroCarga=100, turbinando=false;
-let noChao=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0, estolando=false;
+let Missoes = null;          // o painel de objetivos do jogo solo (mais abaixo)
+let noChao=false, noCampo=false, trem=true, flap=0, parado=0, avisouEstol=0, pousos=0, estolando=false;
 let ladoEstol = 0;        // para que lado a asa largou neste estol
 /* --- AS CONTRAMEDIDAS -------------------------------------------------------
    "Quero incluir um antimíssil, contramedida, uns fogos que o avião joga para
@@ -12643,9 +12662,10 @@ function atualizaQueda(dt){
    a constante do ar ela durava meio segundo — não dava tempo nem de ver a
    pista passando.
    ========================================================================== */
-function aterra(queda){
+function aterra(queda, campo){
   noChao = true;
-  aviaoY = PISTA_Y + RODA;
+  noCampo = !!campo;
+  aviaoY = (campo ? CHAO : PISTA_Y) + RODA;
   // toca com o nariz ainda um pouco em cima, como um pouso de verdade, e o
   // bico desce sozinho na corrida
   arfChao = Math.max(0, Math.min(ARF_CHAO, arfagem));
@@ -12662,10 +12682,15 @@ function aterra(queda){
   parado = 0;
   const macio = queda < 240;
   pousos++;
-  pontos += macio ? 400 : 150;
-  Controles.bate('tocou'); sacode(macio ? 0.10 : 0.28);
-  mostraAviso(macio ? 'POUSO DE MANUAL! +400' : 'POUSOU! +150', macio ? '#7fffa8' : '#ffd257', 1800);
-  solta(aviaoX, PISTA_Y + 40, aviaoZ, 14, 0xd8d8d8, 40, 260);
+  const ganho = campo ? (macio ? 250 : 80) : (macio ? 400 : 150);
+  pontos += ganho;
+  Controles.bate('tocou'); sacode(campo ? 0.34 : (macio ? 0.10 : 0.28));
+  mostraAviso((campo ? (macio ? 'POUSO NO CAMPO! +' : 'POUSOU NO CAMPO! +')
+                     : (macio ? 'POUSO DE MANUAL! +' : 'POUSOU! +')) + ganho,
+              macio ? '#7fffa8' : '#ffd257', 1800);
+  if (Missoes) Missoes.marca(campo ? 'campo' : 'pista');
+  solta(aviaoX, (campo ? CHAO : PISTA_Y) + 40, aviaoZ, campo ? 22 : 14,
+        campo ? 0xbba06a : 0xd8d8d8, 40, 260);
   bip(220, 0.10, 'square', 0.05);
   setTimeout(() => bip(160, 0.16, 'square', 0.04), 90);
 }
@@ -12710,6 +12735,23 @@ function rolaNoChao(dt, e){
      do último quadro de voo ficava congelado — e um avião que estolou de volta
      para a pista continuava com o buffet roncando parado no asfalto. */
   estresse = 0;
+  /* --- AS SUPERFÍCIES MEXEM NO CHÃO ---------------------------------------
+     "Parado, ao mover os controles, não há mudança nas superfícies móveis."
+
+     Certo, e a causa é estrutural: `atualiza` desvia para cá e RETORNA antes
+     do trecho que calcula `cmdRol`, `cmdArf` e `cmdLem`. No chão elas ficavam
+     congeladas no último valor do voo — e num avião parado no pátio é
+     justamente quando se mexe no manche para conferir os comandos, que é a
+     primeira coisa que um piloto faz antes de taxiar.
+
+     Aqui não há taxa de rotação para ler (o avião não gira no ar), então elas
+     leem o manche direto, que é o que um teste de comandos parado mostra. */
+  {
+    const laço = Math.min(1, dt*12);
+    cmdRol += (Math.max(-1, Math.min(1, e.lat  || 0)) - cmdRol) * laço;
+    cmdArf += (Math.max(-1, Math.min(1, e.ver  || 0)) - cmdArf) * laço;
+    cmdLem += (Math.max(-1, Math.min(1, e.leme || 0)) - cmdLem) * laço;
+  }
   const força = Math.max(0, Math.min(1, (voo/(velMin()*0.45)) - 0.2));
   const querArf = Math.max(0, e.ver) * ARF_CHAO * força;
   arfChao += (querArf - arfChao) * Math.min(1, dt*ARF_TAXA);
@@ -12743,16 +12785,28 @@ function rolaNoChao(dt, e){
   if (alvo === 0 && voo < 8) voo = 0;
 
   aviaoX += eixoF.x*voo*dt; aviaoZ += eixoF.z*voo*dt;
-  // de bico para cima o avião gira em torno das rodas de trás, e a barriga sobe
-  aviaoY = PISTA_Y + RODA + Math.sin(arfChao)*150;
+  /* o piso é o asfalto onde há asfalto e o campo onde não há — e ele é
+     recalculado a cada quadro, então rolar do campo para a pista (ou o
+     contrário) simplesmente funciona */
+  noCampo = !sobreAPista(aviaoX, aviaoZ);
+  aviaoY = (noCampo ? CHAO : PISTA_Y) + RODA + Math.sin(arfChao)*150;
   distancia += voo*dt;
   if (!infinito) combustivel -= dt * GASTO*(0.30 + 0.5*motor);
   if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
 
-  // saiu do asfalto rolando: capota
-  if (!sobreAPista(aviaoX, aviaoZ)){
-    if (voo > 260){ mostraAviso('SAIU DA PISTA!', '#ff8080', 1500); derruba('chao'); return; }
-    voo = 0;
+  /* FORA DO ASFALTO. Antes isso era morte a partir de 260 — o que fazia
+     sentido quando só se podia pousar na pista. Agora o campo é chão: ele
+     freia forte, sacode, e só capota de verdade acima da velocidade em que o
+     toque já seria proibido. */
+  if (noCampo){
+    if (voo > CAPOTA_VEL){ mostraAviso('TERRENO IRREGULAR!', '#ff8080', 1500); derruba('chao'); return; }
+    /* e o freio do capim cede à manete: com ele valendo cheio sempre, o avião
+       que pousou no campo nunca mais saía de lá — a aceleração no chão (181
+       por segundo com a manete cheia) é menor que o arrasto do terreno. Com a
+       manete fechada ele para em meio segundo, que é o que se quer; com a
+       manete cheia sobra empuxo para uma decolagem curta e sofrida. */
+    voo = Math.max(0, voo - FREIO_CAMPO*(1 - motor*0.92)*dt);
+    if (voo > 120) sacode(0.05 + 0.10*Math.min(1, voo/900));
   }
 
   /* DECOLAR. A atitude já é a que o avião ganhou rotacionando, então sair do
@@ -13070,7 +13124,10 @@ function atualiza(dt){
      dela é chão batido e continua sendo batida na certa.
      -------------------------------------------------------------------- */
   const naPista = sobreAPista(aviaoX, aviaoZ);
-  const piso = naPista ? PISTA_Y + RODA : CHAO + 240;
+  /* o piso fora da pista era CHAO + 240 — um colchão invisível que impedia de
+     chegar ao capim. Agora as rodas encostam no chão como encostam no asfalto,
+     que é o que permite pousar no campo. */
+  const piso = (naPista ? PISTA_Y : CHAO) + RODA;
   if (aviaoY < piso){
     if (naPista){
       const queda = -eixoF.y*voo;                 // quanto está descendo, por segundo
@@ -13084,8 +13141,21 @@ function atualiza(dt){
       aterra(queda);
       return;
     }
-    if (eixoF.y < -0.30){ derruba('chao'); return; }
-    aviaoY = piso; mostraAviso('SUBA!', '#ff8080');
+    /* --- O TOQUE NO CAMPO ------------------------------------------------
+       Mesma régua do pouso na pista, apertada, e com flape exigido: é ele que
+       permite chegar na velocidade que um campo aguenta. Errando qualquer
+       item, continua sendo batida. */
+    const queda = -eixoF.y*voo;
+    const banco = Math.abs(voltaCurta(inclinacao));
+    let ruim = '';
+    if (!trem)                     ruim = 'SEM TREM DE POUSO!';
+    else if (!flap)                ruim = 'SEM FLAPE — CAMPO PEDE FLAPE!';
+    else if (banco > CAMPO_BANCO)  ruim = 'ASA NO CHÃO!';
+    else if (voo > CAMPO_VEL)      ruim = 'RÁPIDO DEMAIS PARA O CAMPO!';
+    else if (queda > CAMPO_QUEDA)  ruim = 'DESCEU RÁPIDO DEMAIS!';
+    if (!ruim){ aterra(queda, true); return; }
+    if (eixoF.y < -0.30){ mostraAviso(ruim, '#ff8080', 1500); derruba('chao'); return; }
+    aviaoY = piso; mostraAviso(ruim, '#ff8080');
   }
 
   if (turbo > 0){ turbo -= dt; if (turbo <= 0){ turbo = 0; mostraAviso('fim do turbo', '#9fd8ff', 900); } }
@@ -13250,12 +13320,28 @@ function atualiza(dt){
        eixos giram juntos: é o corpo inteiro caindo de bico sem mudar a
        inclinação das asas.
        ------------------------------------------------------------------- */
+    /* --- E PERTO DO CHÃO ELE PESA MENOS --------------------------------
+       "O movimento de queda perto do solo tem que diminuir."
+
+       Está certo por dois motivos. O de jogo: estolar a 4.000 de altura é um
+       susto com conserto, estolar na final é perder a partida sem ter o que
+       fazer — e é ali que mais se estola, porque é ali que se voa devagar de
+       propósito. O de física: asa perto do solo trabalha melhor (efeito solo:
+       o chão atrapalha o vórtice de ponta, o arrasto induzido cai e a asa
+       segura mais), e por isso um avião na final larga bem mais manso do que
+       o mesmo avião em altitude.
+
+       Abaixo de 900 acima do chão o estol perde força progressivamente, até
+       um terço dela rente ao solo. Os avisos da cabine continuam todos: o
+       susto fica, a sentença some. */
+    const alturaEstol = aviaoY - CHAO;
+    const solo = 0.34 + 0.66*Math.max(0, Math.min(1, alturaEstol/900));
     let h = vcruz(eixoF, {x:0,y:1,z:0});
     const nh = Math.hypot(h.x, h.y, h.z);
     if (nh > 0.06){
       h = vmul(h, 1/nh);
       // com h = nariz × cima, o ângulo NEGATIVO sempre abaixa o nariz
-      const ang = -falta*1.1*dt;
+      const ang = -falta*0.62*solo*dt;
       eixoF = giraEmTorno(eixoF, h, ang);
       eixoC = giraEmTorno(eixoC, h, ang);
       eixoD = giraEmTorno(eixoD, h, ang);
@@ -13278,11 +13364,11 @@ function atualiza(dt){
        Junto vai uma guinada no mesmo sentido: asa estolada arrasta mais, e é
        esse arrasto assimétrico que, se ninguém fizer nada, vira parafuso.
        Aqui ele não fecha em parafuso de verdade — só ameaça. */
-    const largou = falta*falta;              // ao quadrado: no comecinho quase não puxa
+    const largou = falta*falta*solo;         // ao quadrado: no comecinho quase não puxa
     if (Math.abs(ladoEstol) > 0){
-      let r2 = giraPar(eixoD, eixoC, ladoEstol*largou*1.5*dt);
+      let r2 = giraPar(eixoD, eixoC, ladoEstol*largou*0.85*dt);
       eixoD = r2[0]; eixoC = r2[1];
-      r2 = giraPar(eixoF, eixoD, ladoEstol*largou*0.55*dt);
+      r2 = giraPar(eixoF, eixoD, ladoEstol*largou*0.30*dt);
       eixoF = r2[0]; eixoD = r2[1];
     }
     endireitaEixos();
