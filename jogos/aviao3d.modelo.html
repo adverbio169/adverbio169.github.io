@@ -28,7 +28,7 @@
      OLHA para voar, e nada que não seja de voar deveria morar ali. Foi para o
      canto de baixo, na fileira dos outros botõezinhos (olho, qualidade), que é
      onde moram os comandos que não são do voo. */
-  #btAbreSala{display:none;left:14px;bottom:60px;top:auto;transform:none;
+  #btAbreSala{display:none;left:126px;top:14px;bottom:auto;transform:none;
               font:800 13px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.16em}
   #btAbreSala.ver{display:block}
   #painelSala{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;
@@ -53,22 +53,11 @@
   .rot{font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:#8fa3c8;font-weight:700}
   .val{font-size:26px;font-weight:800;line-height:1.1}
   .val small{font-size:12px;color:#9fb4d8;font-weight:600}
-  #cDist{top:14px;left:14px}
-  #cRec{top:14px;right:14px;text-align:right}
-  #cPontos{top:96px;left:14px}
-  #cMissao{top:180px;left:14px;max-width:238px}
-  #cMissao .rot{margin-bottom:4px}
-  #cMissao #mConta{color:#ffd257;letter-spacing:0}
   .mi{font-size:11px;font-weight:600;color:#c3d3ee;line-height:1.45;white-space:nowrap;
       overflow:hidden;text-overflow:ellipsis}
   .mi b{color:#ffd257;font-weight:800}
   .mi.ok{color:#5eff9a;text-decoration:line-through;opacity:.75}
-  #cComb{top:14px;left:50%;transform:translateX(-50%);text-align:center;min-width:180px}
-  #barra{height:7px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden;margin-bottom:5px}
-  #barra i{display:block;height:100%;width:100%;background:#5eff9a;border-radius:99px;transition:width .15s}
-  #cArma{bottom:14px;left:50%;transform:translateX(-50%);text-align:center}
   /* motor: potência e nitro, do lado oposto aos botões de baixo */
-  #cMotor{bottom:14px;right:14px;text-align:right;min-width:152px}
   /* trem, flape e velocidade: o painel do pouso */
   /* As duas caixas da capa precisam parecer DUAS COISAS. Antes uma era um
      bloco solto e a outra vinha depois de um risquinho, e as duas liam como
@@ -93,37 +82,9 @@
   #btBatalha, #btBatalha2{flex:0 0 auto}
   #ondeComeca{display:flex;gap:8px;width:100%}
   #ondeComeca .op{flex:1;padding:10px 8px}
-  #cVida{top:96px;right:14px;text-align:right;min-width:150px}
-  #barraV{height:7px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden;margin:5px 0}
-  #barraV i{display:block;height:100%;width:100%;background:#5eff9a;border-radius:99px;transition:width .12s}
-  #cVida.ferido{border-color:rgba(255,106,106,.7);box-shadow:0 0 18px rgba(255,106,106,.35)}
   /* quantos estão no ar: só aparece quando há batalha */
   /* embaixo dos pontos, à esquerda: no meio de cima ele batia na bússola */
-  #cGente{display:none;top:186px;left:14px;
-          font-size:12.5px;color:#cfe0f5;letter-spacing:.4px;padding:7px 13px}
-  #cGente.ver{display:block}
-  #cGente b{font-size:16px;font-weight:900;color:#fff}
-  #cGente .pt{display:inline-block;width:8px;height:8px;border-radius:50%;background:#5eff9a;
-              margin-right:7px;box-shadow:0 0 8px #5eff9a}
-  #cGente #salaGente{color:#8fa3c8;margin-left:8px}
-  #cPouso{bottom:14px;left:128px;min-width:186px}
-  #cPouso .lin{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;
-               font-weight:700;color:#8fa3c8;margin-top:3px}
-  #cPouso .lin b{font-weight:800;color:#dce5f5}
-  #cPouso .lin b.ok{color:#5eff9a} #cPouso .lin b.nao{color:#ffb86b}
   /* o leme sai do MEIO para os lados, então a barra é ancorada no centro */
-  #cPouso .tira{height:7px;border-radius:99px;background:rgba(255,255,255,.16);
-                overflow:hidden;margin:5px 0;position:relative}
-  #cPouso .tira.leme::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;
-                background:rgba(255,255,255,.45)}
-  #cPouso .tira.leme i{position:absolute;top:0;bottom:0;left:50%;width:0;
-                background:#ffc24d;border-radius:99px;transition:none}
-  #cPouso.estol{border-color:rgba(255,106,106,.7);box-shadow:0 0 18px rgba(255,106,106,.35)}
-  #cPouso.estol .rot{color:#ff8f8f}
-  #cMotor .tira{height:7px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden;margin:5px 0}
-  #cMotor .tira i{display:block;height:100%;width:67%;border-radius:99px;background:#5eff9a;transition:width .1s linear}
-  #cMotor .tira.nit i{background:#7fd8ff}
-  #cMotor.turbo{border-color:rgba(127,216,255,.65);box-shadow:0 0 18px rgba(127,216,255,.35)}
   /* ---- comandos de dedo (jogando direto no celular) ---- */
   #dedos{display:none}
   body.dedos #dedos{display:block}
@@ -182,21 +143,10 @@
      combustível. A faixa livre é a de BAIXO, entre o seletor de armas e o
      gatilho — e lá ele vira uma tira deitada, com os rótulos escondidos:
      "1849 · mín 640 | Trem EMBAIXO | Flapes 1 | [leme]". */
-  body.dedos #cPouso{left:50%;transform:translateX(-50%);top:auto;
-       bottom:calc(46px + env(safe-area-inset-bottom));min-width:0;
-       display:flex;align-items:center;gap:9px;padding:5px 10px;white-space:nowrap}
-  body.dedos #cPouso .rot{display:none}
-  body.dedos #cPouso .val{font-size:15px}
-  body.dedos #cPouso .val small{font-size:9.5px}
   /* trem e flapes já estão escritos nos próprios botões: aqui seria dizer
      duas vezes, e é justamente o que não cabe num celular pequeno */
-  body.dedos #cPouso .lin{display:none}
-  body.dedos #cPouso .tira{width:46px;margin:0;flex:0 0 46px}
   /* a caixa do combustível desce para a coluna da esquerda e libera o meio de
      cima para os três botões */
-  body.dedos #cComb{top:154px;left:calc(14px + min(13vw,58px));transform:none;min-width:0;padding:6px 10px}
-  body.dedos #cComb .val{font-size:17px}
-  body.dedos #cArma{display:none}
   /* o olho e a qualidade ficavam debaixo da tira do acelerador. Foram para a
      direita, acima do gatilho — e aí o botão DEFESA ocupou justamente aquele
      lugar e passou por cima dos dois. Subir mais não resolve: em cima, na
@@ -207,17 +157,10 @@
        bottom:calc(22px + min(19vw,86px) + env(safe-area-inset-bottom))}
   body.dedos #btQual{left:calc(70px + min(13vw,58px));
        bottom:calc(22px + min(19vw,86px) + env(safe-area-inset-bottom))}
-  body.dedos #cMotor,body.dedos #convite{display:none}
+  body.dedos #convite{display:none}
   /* As tiras laterais ocupam a borda inteira, e os painéis de canto ficavam
      por baixo delas. Com os botões na tela, tudo recua a largura da tira. */
-  body.dedos #cDist,body.dedos #cPontos,body.dedos #cMissao{left:calc(14px + min(13vw,58px))}
-  body.dedos #cMissao{top:166px;max-width:44vw}
   body.dedos .mi{font-size:10px;line-height:1.45}
-  body.dedos #cRec,body.dedos #cVida{right:calc(14px + min(13vw,58px))}
-  body.dedos #cGente{left:calc(14px + min(13vw,58px))}
-  body.dedos #cDist,body.dedos #cRec{padding:6px 10px}
-  body.dedos #cDist .val,body.dedos #cRec .val,body.dedos #cVida .val{font-size:18px}
-  body.dedos #cPontos{top:76px} body.dedos #cVida{top:76px}
 
   #gire{display:none;position:fixed;inset:0;z-index:99;background:#0b1020;
         align-items:center;justify-content:center;text-align:center;
@@ -233,8 +176,13 @@
          font-weight:900;letter-spacing:1px;text-shadow:0 3px 18px #000;opacity:0;transition:opacity .18s;pointer-events:none}
   .bt{position:fixed;z-index:5;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.6);
       color:#dce5f5;border-radius:10px;padding:9px 12px;font:700 14px/1 inherit;cursor:pointer}
-  #btVisao{left:14px;bottom:14px;font-size:22px;padding:7px 11px}
-  #btQual{left:70px;bottom:14px}
+  /* OS BOTÕES SOBEM PARA O CANTO DE CIMA. Eles moravam no rodapé à esquerda
+     desde sempre, porque ali não havia nada; agora ali mora a TELA 1, e a prova
+     de sobreposição acusou os dois por baixo dela. O canto de cima à esquerda,
+     que era das caixas de distância, pontos e objetivos, ficou vazio quando
+     elas viraram páginas — e é para lá que eles vão. */
+  #btVisao{left:14px;top:14px;font-size:22px;padding:7px 11px}
+  #btQual{left:70px;top:14px}
   /* O primeiro lugar que escolhi foi ao lado do olho e da qualidade, em
      `left:130px`. A prova de sobreposição do HUD reprovou na hora: `cPouso`
      mora exatamente ali (left:128, largura mínima 186). A fileira de baixo
@@ -243,7 +191,7 @@
   /* o botão da cabeça morava em top:180 — que agora é o painel de objetivos.
      Desceu para baixo dele; a coluna da esquerda, de cima para baixo, é:
      distância, pontos, OBJETIVOS, cabeça, o aviso de teste e o radar. */
-  #btCabeca{left:14px;top:326px;display:none}
+  #btCabeca{left:14px;top:66px;display:none}
   #btCabeca.pode{display:block}
   #btCabeca.on{background:rgba(94,255,154,.18);border-color:rgba(94,255,154,.5);color:#bfffd6}
   #btCabeca.perdeu{background:rgba(255,194,77,.16);border-color:rgba(255,194,77,.45);color:#ffe1a8}
@@ -319,32 +267,22 @@
 <canvas id="tela3d"></canvas>
 <canvas id="hud"></canvas>
 
-<div class="painel" id="cDist"><div class="rot">Distância</div><div class="val"><span id="vDist">0</span><small>m</small></div></div>
-<div class="painel" id="cRec"><div class="rot">Recorde</div><div class="val"><span id="vRec">0</span><small>m</small></div></div>
-<div class="painel" id="cPontos"><div class="rot">Pontos</div><div class="val" id="vPontos">0</div>
-  <div class="rot" style="margin-top:4px">Alvos <b id="vAlvos">0/0</b></div></div>
-<div class="painel" id="cComb"><div class="rot">Combustível</div><div id="barra"><i id="barraComb"></i></div>
-  <div class="val"><span id="vComb">100</span><small>%</small></div></div>
-<div class="painel" id="cArma"><div class="rot">Arma (1 2 3 · espaço atira · Z chama)</div>
-  <div class="val" style="font-size:19px"><span id="vArma">NUCLEAR</span> <small>x<span id="vMun">6</span></small></div></div>
-<div class="painel" id="cVida"><div class="rot">Fuselagem</div>
-  <div id="barraV"><i id="vidaBarra"></i></div>
-  <div class="val"><span id="vVida">100</span><small>%</small></div></div>
-<div class="painel" id="cMissao"><div class="rot">Objetivos <span id="mConta">0/4</span></div>
-  <div id="mList"></div></div>
-<div class="painel" id="cGente"><span class="pt"></span><b id="vGente">1</b> no ar
-  <span id="salaGente"></span></div>
-<div class="painel" id="cPouso"><div class="rot">Velocidade</div>
-  <div class="val"><span id="vVel">0</span><small>· mín <span id="vVmin">640</span></small></div>
-  <div class="lin">Trem <b id="vTrem">EMBAIXO</b></div>
-  <div class="lin">Flapes <b id="vFlap">0</b></div>
-  <div class="rot" style="margin-top:5px">Leme</div>
-  <div class="tira leme"><i id="barraLeme"></i></div></div>
-<div class="painel" id="cMotor"><div class="rot">Potência (W/S · Shift nitro)</div>
-  <div class="val"><span id="vMotor">67</span><small>%</small></div>
-  <div class="tira"><i id="barraMotor"></i></div>
-  <div class="rot">Nitro</div>
-  <div class="tira nit"><i id="barraNitro"></i></div></div>
+<!-- =============================================================================
+     AS DEZ CAIXAS QUE MORAVAM AQUI
+
+     Distância, Recorde, Pontos, Combustível, Arma, Fuselagem, Objetivos, gente
+     no ar, Velocidade e Potência: dez painéis de cantos redondos, fundo azul
+     translúcido e rótulo cinza em maiúscula, espalhados pelas quatro bordas e
+     visíveis o tempo inteiro, o voo inteiro.
+
+     Eram noventa por cento do que estava na tela, e eu passei três rodadas
+     redesenhando o disco do radar sem tocar em nenhuma delas — por isso o
+     usuário via "exatamente a mesma coisa" a cada entrega.
+
+     O conteúdo das dez está agora nas páginas das TELAS MULTIFUNÇÃO (procure
+     por "AS TELAS MULTIFUNÇÃO" mais abaixo), e a premissa errada que elas
+     carregavam morreu junto: nenhuma informação precisa estar sempre na tela.
+     ========================================================================= -->
 <!-- =========================================================================
      COMANDOS NA TELA, para quem joga DIRETO no celular.
      Só aparecem quando não há um celular separado fazendo de controle: com
@@ -8368,112 +8306,41 @@ function fitaAltura(){
       que ele existe e de que lado ele vem.
    ========================================================================== */
 const RADAR_KM = 26000;                 // o mesmo alcance do buscador do míssil
-/* ONDE O DISCO CABE — uma função à parte porque o desenho e o teste precisam
-   da MESMA resposta. Com o lugar escrito na mão em dois lugares, mudar o
-   desenho fazia o teste ler pixels de onde o radar não estava mais e acusar
-   defeito que não existia.
-
-   Eu tinha chutado "14 do canto, 62 do rodapé" — e caiu bem em cima da caixa
-   da velocidade, que mora no canto de baixo à esquerda e muda de altura
-   conforme o que mostra (trem, flapes, leme). Chute nenhum sobrevive a um
-   painel que cresce, então o disco PERGUNTA à caixa onde ela está e se encosta
-   logo acima dela. */
-/* ONDE O DISCO CABE — e por que ele PROCURA em vez de ter um lugar.
-
-   Três tentativas de escolher o lugar na mão, três atropelamentos:
-
-   1. "14 do canto, 62 do rodapé" — caiu dentro da caixa da velocidade.
-   2. "olhe os painéis colados na borda esquerda" — a caixa da velocidade não é
-      colada (começa em 135), e voltou a ser atropelada.
-   3. "olhe quem cruza a faixa da esquerda" — funcionou no computador e, no
-      celular, o disco foi parar DEBAIXO do seletor de armas: desenhado e
-      invisível, o pior dos dois mundos, porque custa desenho e não mostra nada.
-
-   O erro é sempre o mesmo: eu decidindo de antemão onde há espaço, numa tela
-   cujo conteúdo muda com o modo (dedo ou sensor), com o tamanho e com o que o
-   avião está fazendo. A tela sabe melhor do que eu. Então o disco experimenta
-   os quatro cantos, do maior raio para o menor, e fica no primeiro em que não
-   encosta em nada — e no maior, se nenhum couber inteiro. Painel nenhum
-   precisa ser nomeado e o que aparecer amanhã já entra na conta.
-
-   A busca não roda a cada quadro: a arrumação da tela só muda quando a janela
-   muda ou quando um botão aparece, então meio segundo de memória basta e o
-   custo some. */
-let _radar = null, _radarQuando = 0;
-function radarOnde(){
-  const agora = performance.now();
-  if (_radar !== undefined && agora - _radarQuando < 500) return _radar;
-  _radarQuando = agora;
-  const obst = obstaculosDoHUD();
-  /* o bloco do G no HUD é desenhado na lona e não é elemento nenhum do
-     documento, então entra na lista à mão — senão a tela passa por cima */
-  if (cockpit){
-    const gx = Math.max(10, W*0.052), gy = H*0.50, fG = Math.max(16, H*0.042);
-    obst.push({ left: gx - 8, right: gx + fG*5.2,
-                top: gy - fG*1.15, bottom: gy + fG*0.85 });
-  }
-  /* A TELA É QUADRADA e a prova de encosto é retângulo contra retângulo.
-     Enquanto era um disco isto era distância a um ponto; com a tela
-     retangular, a mesma conta deixaria os quatro cantos por cima dos painéis
-     — e canto de tela é justamente onde ficam os dados escritos. */
-  const m = 12, rMax = Math.max(46, Math.min(W, H) * 0.135);
-  for (let r = rMax; r >= 34; r -= 4){
-    const dentro = [];
-    for (let k = 0; k <= 7; k++){                        // 0 = colado na borda
-      dentro.push(m + r + k*r*0.55);                     // vindo da esquerda
-      dentro.push(W - m - r - k*r*0.55);                 // e da direita
-    }
-    for (const cx of dentro){
-      if (cx - r < 0 || cx + r > W) continue;
-      for (let cy = H - m - r; cy >= m + r; cy -= 8){    // subindo do rodapé
-        if (obst.some(q => bateCaixa(q, cx - r, cy - r, r*2, r*2))) continue;
-        _radar = { cx, cy, r };
-        return _radar;
-      }
-    }
-  }
-  _radar = null;
-  return null;
-}
-/* a arrumação mudou: esquece o que estava decorado */
-addEventListener('resize', () => { _radarQuando = 0; });
-/* trocar cabine/vista de fora muda o que está desenhado na lona */
-function esqueceRadar(){ _radarQuando = 0; }
-
 /* =============================================================================
-   O PAINEL, AGORA COPIADO DO KC-390
+   AS TELAS MULTIFUNÇÃO
 
-   "achei feio. faz o seguinte, pega o painel do KC 390."
+   "pode ter múltiplas telas em uma mesma tela, alternando, por isso mandei a
+   ideia do KC-390 que tem múltiplas telas." E, depois de ver o desenho: "isso...
+   vai deixando mais complexo e completo o jogo... mais detalhes, mais riqueza."
 
-   Fui pesquisar, e a distância entre o que eu tinha desenhado e o painel do
-   Embraer é grande — e é ela que explica o "feio".
+   Eu tinha lido "pega o painel do KC-390" como um pedido de APARÊNCIA e passei
+   três rodadas redesenhando a moldura do radar. O pedido era de IDEIA: aquele
+   avião tem cinco telas e cada uma é MULTIFUNÇÃO — a mesma tela vira mapa,
+   motor, armamento ou sistema conforme a página escolhida.
 
-   O KC-390 tem CINCO TELAS DE 15 POLEGADAS EM PAISAGEM, da família Pro Line
-   Fusion da Collins, com dois HUD e visão sintética. O que eu tinha feito era
-   um MFD militar dos anos 90: caixa preta QUADRADA, moldura grossa e vinte
-   teclinhas em volta. As teclinhas são a diferença mais visível, e o motivo
-   delas some no Fusion: aquele painel é TÁTIL, "com telas intuitivas parecidas
-   com as de um telefone". Tela tátil não precisa de fileira de botões, então a
-   moldura fica FINA e a imagem ocupa quase o vidro inteiro. Era disso que
-   vinha o aperto do meu desenho: eu estava gastando um quinto da tela com
-   botões que o avião não tem.
+   É a resposta certa para o "poluído", e é melhor do que tudo o que eu tinha
+   proposto, por um motivo que só aparece quando se enuncia:
 
-   O arranjo do PFD também é fixo e eu não estava seguindo: é o "T" — atitude
-   no meio, FITA DE VELOCIDADE À ESQUERDA, FITA DE ALTITUDE À DIREITA com a
-   razão de subida colada nela, e o RUMO EMBAIXO. Não é gosto de fabricante; é
-   a arrumação que a aviação inteira usa desde que existe tela, e é por isso
-   que qualquer piloto lê um painel que nunca viu.
+       NENHUMA INFORMAÇÃO PRECISA ESTAR SEMPRE NA TELA.
 
-   E as cores são as do padrão, não as que eu escolhi: céu azul e chão TERRA na
-   bola de atitude, branco para escala e leitura, VERDE para o que está normal,
-   ÂMBAR para atenção, VERMELHO para limite, MAGENTA para o que a navegação
-   pediu. Os meus verdes-fósforo em fundo preto eram de tubo de raios catódicos.
+   Era essa a premissa errada das dez caixas de HTML espalhadas pelas bordas —
+   distância, pontos, objetivos, combustível, recorde, fuselagem, velocidade,
+   arma, potência, gente no ar, todas visíveis o tempo inteiro, para sempre.
+   Com páginas, duas telas mostram duas coisas e as outras oito estão a uma
+   tecla. E sobra espaço para mostrar MAIS do que antes: a munição de cada arma,
+   a razão de subida, o pico de carga, a distância até a pista — coisas que
+   simplesmente não cabiam e que agora cabem.
 
-   Fontes:
-     https://embraer.com/defense-security-air/kc-390-millennium/en/
-     https://www.flightglobal.com/embraer-selects-pro-line-fusion-for-kc-390-cockpit/99722.article
-     https://breakingdefense.com/2025/09/next-gen-kc-390-millennium-expands-multimission-options-for-air-forces/
+   COMO FUNCIONA: duas telas nos cantos de baixo (uma só em tela pequena), cinco
+   páginas cada, teclas Q e E para girar a página de cada uma. A configuração é
+   do jogador: MAPA + ARMAS em combate, MOTOR + VOO para pousar, MAPA + MISSÃO
+   para explorar.
+
+   E as telas ficam nas DUAS vistas, de fora e de dentro. Elas deixaram de ser
+   adereço de cabine e viraram a interface do jogo — o que saiu de cena foram as
+   caixas, não a informação.
    ========================================================================== */
+/* --- as três ferramentas de desenho que as telas usam -------------------- */
 function angInst(grau){ return (grau - 90) * Math.PI/180; }
 function pontoInst(cx, cy, r, grau){
   const a = angInst(grau);
@@ -8483,9 +8350,11 @@ function cantoInst(c, x, y, w, h, r){
   if (c.roundRect){ c.beginPath(); c.roundRect(x, y, w, h, r); }
   else { c.beginPath(); c.rect(x, y, w, h); }
 }
-
-/* a lona guardada de uma face: a chave inclui o tamanho, então mudar a janela
-   redesenha sozinho e nada fica esticado */
+/* A LONA GUARDADA. Aro, escala e letra não mudam enquanto a tela não muda de
+   tamanho; só o conteúdo muda. Pintar a rosa dos ventos sessenta vezes por
+   segundo seria pagar caro por uma imagem parada — então ela é pintada uma vez
+   numa lona à parte e daí em diante é uma cópia. Num celular isso é a diferença
+   entre a tela ser possível e não ser. */
 const _facesInst = new Map();
 function faceInst(chave, larg, alt, pinta){
   const pw = Math.max(16, Math.round(larg*dpr)), ph = Math.max(16, Math.round(alt*dpr));
@@ -8500,213 +8369,422 @@ function faceInst(chave, larg, alt, pinta){
     _facesInst.set(k, c);
     /* a tela muda de tamanho enquanto se arrasta a janela e cada largura vira
        uma lona: sem teto isto viraria um vazamento de memória lento */
-    if (_facesInst.size > 24) _facesInst.delete(_facesInst.keys().next().value);
+    if (_facesInst.size > 16) _facesInst.delete(_facesInst.keys().next().value);
   }
   return c;
 }
 
-/* --- ONDE AS TELAS CABEM ----------------------------------------------------
-   A busca é a mesma de sempre, e continua sendo busca pelo mesmo motivo de
-   três tentativas atrás: eu decidindo de antemão onde há espaço, numa tela
-   cujo conteúdo muda com o modo, com o tamanho e com o que o avião está
-   fazendo, dá errado todas as vezes. A tela sabe melhor do que eu.
+const MFD_PAGS = ['MOTOR', 'MAPA', 'ARMAS', 'MISSÃO', 'VOO'];
+const MFD_TELA = '#070b0f', MFD_FIO = 'rgba(226,236,248,';
+const MFD_CIANO = '#63d8ff', MFD_VERDE = '#3fe070', MFD_AMBAR = '#ffc046',
+      MFD_VERM = '#ff6a58', MFD_CLARO = '#e2ecf8', MFD_ROT = '#8fa3b8',
+      MFD_FRACO = '#6d8095';
+/* a esquerda começa no motor e a direita no mapa: é a dupla que serve para
+   quase tudo, e quem quiser outra coisa gira em duas teclas */
+let mfdPag = [0, 1];
 
-   O que mudou é que agora são DUAS telas e há uma ordem entre elas: o PFD
-   escolhe primeiro, porque é o instrumento primário, e o MFD escolhe depois
-   desviando dele. */
-function obstaculosDoHUD(){
-  const obst = [];
-  for (const el of document.querySelectorAll('.painel, .bt, #convite, #dedos > *')){
-    if (getComputedStyle(el).display === 'none') continue;
-    const q = el.getBoundingClientRect();
-    if (q.width > 0 && q.height > 0) obst.push(q);
-  }
-  const fa = fitaAlturaOnde();
-  if (fa) obst.push({ left: fa.cx - fa.larg/2 - 30, right: fa.cx + fa.larg/2 + 44,
-                      top: fa.cy - fa.meia - 10, bottom: fa.cy + fa.meia + 34 });
-  return obst;
+function mfdQuantas(){ return (W < 900 || H < 500) ? 1 : 2; }
+/* --- ONDE AS TELAS FICAM ----------------------------------------------------
+   No computador é canto de baixo, esquerda e direita, e pronto.
+
+   NO MODO DEDO NÃO DÁ. Medido num iPhone deitado: a manete ocupa a borda
+   direita inteira, o nitro a esquerda, o FOGO o canto de baixo à direita e o
+   seletor de arma o de baixo à esquerda. A tela no canto caía em cima de três
+   deles — e um instrumento debaixo do polegar não é instrumento, é um botão
+   que não funciona.
+
+   Então, com os botões na tela, a tela do instrumento PERGUNTA onde sobra: ela
+   se encaixa na faixa livre do rodapé, entre o seletor de arma e o FOGO. É a
+   mesma lição de sempre neste arquivo — eu decidindo de antemão onde há espaço
+   dá errado todas as vezes, porque o conteúdo muda com o modo e com o tamanho.
+
+   A medida não é por quadro: a arrumação só muda quando a janela muda ou um
+   botão aparece, então meio segundo de memória basta e o custo some. */
+let _mfdVaga = null, _mfdQuando = -1e9;
+function mfdVagaNoDedo(){
+  const agora = performance.now();
+  if (agora - _mfdQuando < 500) return _mfdVaga;
+  _mfdQuando = agora;
+  const r = id => { const e = document.getElementById(id);
+    if (!e || getComputedStyle(e).display === 'none') return null;
+    const q = e.getBoundingClientRect();
+    return q.width > 1 ? q : null; };
+  const arma = r('dArma'), fogo = r('dFogo'), chama = r('dChama');
+  const x0 = (arma ? arma.right : 0) + 8, x1 = (fogo ? fogo.left : W) - 8;
+  const y1 = H - 8, y0 = (chama ? chama.bottom : H*0.4) + 8;
+  const w = x1 - x0, h = Math.min(y1 - y0, w*0.655);
+  _mfdVaga = (w < 150 || h < 88) ? null : { x: x0, y: y1 - h, w, h };
+  return _mfdVaga;
 }
-const bateCaixa = (q, x, y, w, h) => !(x + w <= q.left || q.right <= x ||
-                                       y + h <= q.top  || q.bottom <= y);
-/* --- A TELA TÁTICA ----------------------------------------------------------
-   "o hud tá ok. o que não tô gostando é as coisas do painel de instrumentos...
-   não tá parecendo um caça moderno. tá feio, quase que poluído."
+function mfdOnde(k){
+  if (k === 0 && mfdQuantas() < 2) return null;
+  if (document.body.classList.contains('dedos')) return k ? mfdVagaNoDedo() : null;
+  /* a largura sai da tela e tem teto: numa tela de computador grande, uma
+     tela de instrumento com 30% da largura viraria um televisor */
+  const w = Math.max(188, Math.min(W*0.255, 372));
+  const h = w*0.655;
+  const mx = Math.max(10, W*0.012), my = Math.max(10, H*0.030);
+  return { x: k ? W - mx - w : mx, y: H - my - h, w, h };
+}
+/* a caixa do mapa, quando alguma tela estiver mostrando a página MAPA. Existe
+   porque os testes perguntam onde o radar está, e porque o desenho e o teste
+   têm de ler a MESMA resposta — chute escrito na mão não sobrevive a um painel
+   que muda de lugar. */
+function radarOnde(){
+  for (let k = 0; k < 2; k++){
+    if (MFD_PAGS[mfdPag[k]] !== 'MAPA') continue;
+    const o = mfdOnde(k);
+    if (!o) continue;
+    const m = mfdMedidas(o);
+    return { cx: m.mapaCx, cy: m.mapaCy, r: m.mapaR };
+  }
+  return null;
+}
+function esqueceRadar(){ /* nada a decorar: o lugar das telas é fixo */ }
+function mfdGira(k, d){
+  if (!mfdOnde(k)) k = 1;                 // em tela pequena só existe a direita
+  mfdPag[k] = (mfdPag[k] + (d || 1) + MFD_PAGS.length) % MFD_PAGS.length;
+}
 
-   O erro era meu, e num nível acima do desenho: eu fui buscar o painel de um
-   CARGUEIRO. O KC-390 é um avião de transporte, e o PFD dele — fita de
-   velocidade, fita de altitude, razão de subida, fita de rumo, bola de
-   atitude — existe porque num transporte o piloto voa OLHANDO PARA DENTRO.
-   Num caça não: o piloto voa olhando para FORA, e tudo o que ele precisa para
-   voar está no HUD. Eu tinha desenhado, com muito capricho, a segunda cópia
-   de um instrumento que o jogo já tinha — e "segunda cópia de tudo" é
-   exatamente a definição de poluído.
+/* as medidas de dentro de uma tela, num lugar só: cabeçalho, corpo e abas */
+function mfdMedidas(o){
+  const abas = Math.max(15, o.h*0.115);
+  const cab = Math.max(13, o.h*0.105);
+  const pad = Math.max(7, o.w*0.038);
+  const cy = o.y + cab, ch = o.h - cab - abas;
+  const mapaR = Math.min(ch, o.w*0.48)*0.50;
+  return { abas, cab, pad, corpoY: cy, corpoH: ch,
+           /* medido: com 7,5% e 9,8% da altura as seis linhas do corpo ficavam
+              encostadas umas nas outras e o algarismo batia na barra */
+           f: Math.max(7, o.h*0.060),           // corpo de letra do rótulo
+           fv: Math.max(9, o.h*0.080),          // e do valor
+           mapaCx: o.x + pad + o.w*0.23, mapaCy: cy + ch/2, mapaR };
+}
 
-   O painel de um caça moderno se define pelo que NÃO tem. Vidro grande e
-   escuro, pouquíssima marca, símbolo grande. Sem aro de metal, sem parafuso,
-   sem fileira de teclas, sem barra de segmentos, sem cinco cores de destaque.
-   O F-35 levou isso ao limite: UMA tela de vinte polegadas e mais nada.
+/* --- as peças de desenho, todas iguais em qualquer página --------------- */
+function mfdBarra(x, y, w, h, frac, cor){
+  h2.fillStyle = 'rgba(226,236,248,.12)'; h2.fillRect(x, y, w, h);
+  h2.fillStyle = cor;
+  h2.fillRect(x, y, w*Math.max(0, Math.min(1, frac)), h);
+}
+function mfdLinha(o, m, i, rot, val, cor, frac, corBar){
+  const y = m.corpoY + m.corpoH*(i + 0.5)/6;
+  const x = o.x + m.pad, w = o.w - m.pad*2;
+  h2.textBaseline = 'middle';
+  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'left'; h2.fillStyle = MFD_ROT;
+  h2.fillText(rot, x, y);
+  if (frac !== undefined){
+    const bx = x + w*0.30, bw = w*0.44, bh = Math.max(4, m.corpoH*0.055);
+    mfdBarra(bx, y - bh/2, bw, bh, frac, corBar || MFD_VERDE);
+  }
+  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'right'; h2.fillStyle = cor || MFD_CLARO;
+  h2.fillText(val, x + w, y);
+}
 
-   Então sobrou UMA tela, e ela mostra só o que o HUD não mostra: onde estão as
-   coisas. O G voltou para o HUD, o motor virou uma linha de texto no rodapé, e
-   saíram daqui a bola de atitude, as três fitas, as barras verticais, a coluna
-   de dados, os anéis numerados, o aro de liga e as vinte teclas.
+/* --- AS CINCO PÁGINAS --------------------------------------------------- */
+function mfdPaginaMotor(o, m){
+  const pv = Math.max(0, Math.min(100, vida));
+  const pc = Math.max(0, Math.min(100, combustivel));
+  mfdLinha(o, m, 0, 'COMB',  String(Math.round(pc)), pc < 20 ? MFD_VERM : MFD_CLARO,
+           pc/100, pc < 20 ? MFD_VERM : pc < 45 ? MFD_AMBAR : MFD_VERDE);
+  mfdLinha(o, m, 1, 'FUSEL', String(Math.round(pv)), pv < 30 ? MFD_VERM : MFD_CLARO,
+           pv/100, pv < 30 ? MFD_VERM : pv < 65 ? MFD_AMBAR : MFD_VERDE);
+  const pot = turbinando ? 100 : Math.max(0, Math.min(100, motor*100));
+  mfdLinha(o, m, 2, 'POT', turbinando ? 'A/B' : String(Math.round(pot)),
+           turbinando ? MFD_AMBAR : MFD_CLARO, pot/100, turbinando ? MFD_AMBAR : MFD_VERDE);
+  mfdLinha(o, m, 3, 'NITRO', String(Math.round(nitroCarga)),
+           nitroCarga < 20 ? MFD_VERM : MFD_CLARO, nitroCarga/100,
+           nitroCarga < 20 ? MFD_VERM : MFD_CIANO);
+  /* a linha de configuração, que é a que se olha para pousar */
+  const y = m.corpoY + m.corpoH*5.1/6, x = o.x + m.pad, w = o.w - m.pad*2;
+  h2.strokeStyle = MFD_FIO + '.12)'; h2.lineWidth = 1;
+  h2.beginPath(); h2.moveTo(x, y - m.corpoH*0.10); h2.lineTo(x + w, y - m.corpoH*0.10); h2.stroke();
+  h2.textBaseline = 'middle'; h2.textAlign = 'left';
+  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = MFD_ROT; h2.fillText('TREM', x, y);
+  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = trem ? MFD_VERDE : MFD_AMBAR;
+  h2.fillText(trem ? 'FORA' : 'DENTRO', x + w*0.24, y);
+  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = MFD_ROT; h2.fillText('FLAPE', x + w*0.62, y);
+  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'right'; h2.fillStyle = flap ? MFD_VERDE : MFD_CLARO;
+  h2.fillText(String(flap), x + w, y);
+  mfdTeclas(o, m, 'W/S · SHIFT · G · F');
+}
+/* AS TECLAS ESCRITAS NA PÁGINA. A legenda morava no rótulo das caixas de HTML
+   ("Potência (W/S · Shift nitro)") e teria sumido com elas. Um rodapé apagado
+   em cada página é onde se descobre que a tecla existe — e agora a legenda fica
+   junto do que ela comanda, em vez de num rótulo de caixa. */
+function mfdTeclas(o, m, txt){
+  h2.font = '700 ' + (m.f*0.82).toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'right'; h2.textBaseline = 'alphabetic';
+  h2.fillStyle = 'rgba(109,128,149,.75)';
+  h2.fillText(txt, o.x + o.w - m.pad, o.y + o.h - m.abas - m.corpoH*0.055);
+  h2.textBaseline = 'middle';
+}
 
-   A conta de quanto saiu: a versão anterior desenhava por quadro duas
-   molduras, uma bola, quatro fitas com escala, dois arcos, duas barras de
-   segmento e nove blocos de texto. Esta desenha um círculo, doze riscos,
-   quatro letras, os contatos e uma linha de rodapé.
-   -------------------------------------------------------------------------- */
-const TAT_LINHA = 'rgba(226,236,248,';        // o branco de tudo o que é escala
-function desenhaRadar(){
-  const onde = radarOnde();
-  if (!onde) return;
-  const { cx: qcx, cy: qcy, r } = onde;
-  const L = r*2;
-  const vx = qcx - r, vy = qcy - r;
-  const rodape = L*0.115;                      // a única faixa de dados
-  const cx = qcx, cy = vy + (L - rodape)/2;
-  const rRosa = Math.min(L, L - rodape)*0.43, rS = rRosa*0.92;
-  const f1 = Math.max(6.5, L*0.062);
-
-  /* A CAIXA: vidro escuro e um fio de luz na borda. Nada mais. O aro de liga
-     com parafusos e teclas comia um quinto da tela e era o que fazia a coisa
-     parecer uma peça dos anos 90 aparafusada ali. */
-  h2.save();
-  h2.shadowColor = 'rgba(0,0,0,.55)'; h2.shadowBlur = L*0.06; h2.shadowOffsetY = 2;
-  cantoInst(h2, vx, vy, L, L, L*0.035);
-  h2.fillStyle = '#060a0d'; h2.fill();
-  h2.restore();
-  /* um fio de luz na borda e um sopro de reflexo no alto. Dois traços, e são
-     eles que fazem a coisa ler como VIDRO e não como caixa de interface
-     colada por cima da imagem. Mais do que isso vira o aro de antes. */
-  h2.save();
-  cantoInst(h2, vx, vy, L, L, L*0.035); h2.clip();
-  const bri = h2.createLinearGradient(0, vy, 0, vy + L*0.30);
-  bri.addColorStop(0, 'rgba(255,255,255,.055)'); bri.addColorStop(1, 'rgba(255,255,255,0)');
-  h2.fillStyle = bri; h2.fillRect(vx, vy, L, L*0.30);
-  h2.restore();
-  cantoInst(h2, vx + 0.5, vy + 0.5, L - 1, L - 1, L*0.035);
-  h2.strokeStyle = TAT_LINHA + '.16)'; h2.lineWidth = 1; h2.stroke();
-
+function mfdPaginaMapa(o, m){
+  const cx = m.mapaCx, cy = m.mapaCy, rS = m.mapaR;
   const rv = rumoVisto();
-  /* A ROSA: risco só de trinta em trinta e quatro letras. A versão anterior
-     tinha trinta e seis riscos e doze números, e num disco deste tamanho isso
-     não é informação, é textura. */
+  // a rosa: risco de trinta em trinta e quatro letras, e mais nada
   h2.save();
   h2.translate(cx, cy); h2.rotate(-rv);
-  h2.drawImage(faceInst('tat-rosa', rRosa*2, rRosa*2, (c, w) => {
-    const R = w/2;
+  h2.drawImage(faceInst('mfd-rosa', rS*2.3, rS*2.3, (c, w) => {
+    const R = w/2, kr = R*0.87;
     c.textAlign = 'center'; c.textBaseline = 'middle';
     for (let g = 0; g < 360; g += 30){
-      const [x0, y0] = pontoInst(R, R, R, g);
-      const [x1, y1] = pontoInst(R, R, R - R*0.09, g);
+      const [x0, y0] = pontoInst(R, R, kr, g);
+      const [x1, y1] = pontoInst(R, R, kr - R*0.08, g);
       c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1);
-      c.strokeStyle = TAT_LINHA + (g % 90 === 0 ? '.55)' : '.24)');
+      c.strokeStyle = MFD_FIO + (g % 90 === 0 ? '.55)' : '.24)');
       c.lineWidth = 1; c.stroke();
     }
-    c.font = '600 ' + Math.max(6.5, R*0.17).toFixed(1) + 'px system-ui, sans-serif';
+    c.font = '600 ' + Math.max(6, R*0.15).toFixed(1) + 'px system-ui, sans-serif';
     ['N','L','S','O'].forEach((letra, k) => {
-      const [tx, ty] = pontoInst(R, R, R*0.80, k*90);
+      const [tx, ty] = pontoInst(R, R, kr - R*0.19, k*90);
       c.save(); c.translate(tx, ty); c.rotate(k*90*Math.PI/180);
-      c.fillStyle = TAT_LINHA + '.6)';
-      c.fillText(letra, 0, 0); c.restore();
+      c.fillStyle = MFD_FIO + '.6)'; c.fillText(letra, 0, 0); c.restore();
     });
-  }), -rRosa, -rRosa, rRosa*2, rRosa*2);
+  }), -rS*1.15, -rS*1.15, rS*2.3, rS*2.3);
   h2.restore();
-  // o cursor de proa: um traço, não um triângulo
-  h2.strokeStyle = TAT_LINHA + '.85)'; h2.lineWidth = 1.6;
-  h2.beginPath();
-  h2.moveTo(cx, cy - rRosa - L*0.012); h2.lineTo(cx, cy - rRosa + L*0.03); h2.stroke();
-  // dois anéis, fracos
-  h2.strokeStyle = TAT_LINHA + '.10)'; h2.lineWidth = 1;
-  for (const k of [0.5, 1]){ h2.beginPath(); h2.arc(cx, cy, rS*k, 0, 7); h2.stroke(); }
+  h2.strokeStyle = MFD_FIO + '.10)'; h2.lineWidth = 1;
+  h2.beginPath(); h2.arc(cx, cy, rS*0.5, 0, 7); h2.stroke();
 
   h2.save();
-  h2.beginPath(); h2.arc(cx, cy, rS*1.05, 0, 7); h2.clip();
-
+  h2.beginPath(); h2.arc(cx, cy, rS*1.02, 0, 7); h2.clip();
   const esc = rS / RADAR_KM;
-  /* de um ponto do mundo para a tela: o ângulo é o mesmo que a bússola usa
-     para achar o alvo, e aqui ele vira posição em vez de seta */
   const poe = (x, z) => {
     const dx = x - aviaoX, dz = z - aviaoZ;
     const d = Math.hypot(dx, dz);
     const a = Math.atan2(-dx, dz) - rv;
     return { x: cx + Math.sin(a)*d*esc, y: cy - Math.cos(a)*d*esc, d };
   };
-
-  // a pista, num cinza-azulado: é cenário, não é ameaça, e não precisa de
-  // cor própria. Quatro cores de destaque na mesma tela era parte do barulho.
-  h2.strokeStyle = 'rgba(120,170,215,.75)'; h2.lineWidth = Math.max(1.6, L*0.016);
+  let dPista = Infinity;
+  h2.strokeStyle = 'rgba(120,170,215,.8)'; h2.lineWidth = Math.max(1.5, rS*0.07);
   h2.lineCap = 'round';
   for (const P of PISTAS){
     const s2 = Math.sin(P.rumo), c2 = Math.cos(P.rumo);
     const a = poe(P.cx - s2*P.meiaC, P.cz - c2*P.meiaC);
-    const bb = poe(P.cx + s2*P.meiaC, P.cz + c2*P.meiaC);
-    if (Math.min(a.d, bb.d) > RADAR_KM*1.4) continue;
-    h2.beginPath(); h2.moveTo(a.x, a.y); h2.lineTo(bb.x, bb.y); h2.stroke();
+    const b = poe(P.cx + s2*P.meiaC, P.cz + c2*P.meiaC);
+    dPista = Math.min(dPista, Math.hypot(P.cx - aviaoX, P.cz - aviaoZ));
+    if (Math.min(a.d, b.d) > RADAR_KM*1.4) continue;
+    h2.beginPath(); h2.moveTo(a.x, a.y); h2.lineTo(b.x, b.y); h2.stroke();
   }
   h2.lineCap = 'butt';
-
-  // os alvos que faltam: um ponto âmbar, e só
-  h2.fillStyle = 'rgba(255,186,64,.95)';
+  h2.fillStyle = MFD_AMBAR;
   for (const a of alvos){
     if (!a.vivo) continue;      // o campo é `vivo`; `destruido` não existe e o
                                 // radar mostrava alvo já derrubado como se faltasse
     const q = poe(a.x, a.z);
     if (q.d > RADAR_KM) continue;
-    h2.beginPath(); h2.arc(q.x, q.y, Math.max(1.8, L*0.017), 0, 7); h2.fill();
+    h2.beginPath(); h2.arc(q.x, q.y, Math.max(1.6, rS*0.045), 0, 7); h2.fill();
   }
-
-  // os outros aviões: losango vermelho, e os de fora do alcance na borda
-  for (const o of Batalha.outros.values()){
-    if (o.vivo === false) continue;
-    const q = poe(o.x, o.z);
+  let hostis = 0;
+  for (const p of Batalha.outros.values()){
+    if (p.vivo === false) continue;
+    hostis++;
+    const q = poe(p.x, p.z);
     const fora = q.d > RADAR_KM;
     let px = q.x, py = q.y;
     if (fora){
       const ang = Math.atan2(q.y - cy, q.x - cx);
       px = cx + Math.cos(ang)*rS; py = cy + Math.sin(ang)*rS;
     }
-    const t = Math.max(2.4, L*(fora ? 0.018 : 0.026));
+    const t = Math.max(2.2, rS*(fora ? 0.055 : 0.075));
     h2.beginPath();
     h2.moveTo(px, py - t); h2.lineTo(px + t, py); h2.lineTo(px, py + t); h2.lineTo(px - t, py);
     h2.closePath();
-    h2.fillStyle = '#ff5140'; h2.globalAlpha = fora ? 0.55 : 1; h2.fill();
+    h2.fillStyle = MFD_VERM; h2.globalAlpha = fora ? 0.55 : 1; h2.fill();
     h2.globalAlpha = 1;
   }
   h2.restore();
-
-  // o avião: um traço em V, sem preenchimento
-  h2.strokeStyle = TAT_LINHA + '.95)'; h2.lineWidth = 1.5;
+  h2.strokeStyle = MFD_CLARO; h2.lineWidth = 1.4;
   h2.beginPath();
-  h2.moveTo(cx - rS*0.10, cy + rS*0.09); h2.lineTo(cx, cy - rS*0.13);
-  h2.lineTo(cx + rS*0.10, cy + rS*0.09); h2.stroke();
+  h2.moveTo(cx - rS*0.16, cy + rS*0.16); h2.lineTo(cx, cy - rS*0.20);
+  h2.lineTo(cx + rS*0.16, cy + rS*0.16); h2.stroke();
 
-  /* O RODAPÉ: uma linha, quatro grupos, sem molduras nem barras. O motor
-     morava numa coluna de barras verticais com escala gravada; aqui é o
-     algarismo, que é o que se lê de verdade. */
-  h2.font = '700 ' + f1.toFixed(1) + 'px ui-monospace, monospace';
-  h2.textBaseline = 'middle';
-  const ry = vy + L - rodape*0.52;
-  h2.strokeStyle = TAT_LINHA + '.10)'; h2.lineWidth = 1;
-  h2.beginPath();
-  h2.moveTo(vx + L*0.07, vy + L - rodape); h2.lineTo(vx + L - L*0.07, vy + L - rodape);
-  h2.stroke();
+  // a coluna de dados, à direita do disco
+  /* `w` é LARGURA e `x` é COORDENADA, e eu tinha somado as duas escalas:
+     `o.w - m.pad - x` dava 357 − 13 − 1212 = −868, e o valor, escrito em
+     `x + w`, ia parar a oitocentos pixels dali — dentro da OUTRA tela. Os
+     números do mapa apareciam carimbados por cima da página do motor. */
+  const x = o.x + o.w*0.52, w = o.x + o.w - m.pad - x;
   const faltam = alvos.filter(a => a.vivo).length;
-  const pot = turbinando ? 'AB' : String(Math.round(motor*100));
-  const campos = [
-    [pot,                       turbinando ? '#ffba40' : TAT_LINHA + '.9)'],
-    [Math.round(nitroCarga)+'', nitroCarga < 20 ? '#ff5140' : 'rgba(120,200,240,.9)'],
-    [faltam ? faltam + 'T' : '--', faltam ? '#ffba40' : TAT_LINHA + '.45)'],
-    [Math.round(RADAR_KM/METRO/100)/10 + 'k', TAT_LINHA + '.45)']
-  ];
-  h2.textAlign = 'center';
-  campos.forEach(([txt, cor], k) => {
-    h2.fillStyle = cor;
-    h2.fillText(txt, vx + L*(0.175 + k*0.217), ry);
+  const linha = (i, rot, val, cor) => {
+    const y = m.corpoY + m.corpoH*(i + 0.6)/4.4;
+    h2.textBaseline = 'middle';
+    h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'left'; h2.fillStyle = MFD_ROT; h2.fillText(rot, x, y);
+    h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'right'; h2.fillStyle = cor || MFD_CLARO; h2.fillText(val, x + w, y);
+  };
+  linha(0, 'ALVOS', faltam + '/' + Math.max(alvosTotal, faltam), faltam ? MFD_AMBAR : MFD_VERDE);
+  linha(1, 'HOSTIL', String(hostis), hostis ? MFD_VERM : MFD_FRACO);
+  linha(2, 'PISTA', isFinite(dPista) ? Math.round(dPista/METRO) + 'm' : '—');
+  linha(3, 'ALC', Math.round(RADAR_KM/METRO/100)/10 + 'km', MFD_FRACO);
+}
+
+function mfdPaginaArmas(o, m){
+  const x = o.x + m.pad, w = o.w - m.pad*2;
+  h2.textBaseline = 'middle'; h2.textAlign = 'left';
+  h2.font = '800 ' + (m.fv*1.3).toFixed(1) + 'px system-ui, sans-serif';
+  h2.fillStyle = ARMAS[arma].cor;
+  h2.fillText(ARMAS[arma].nome, x, m.corpoY + m.corpoH*0.14);
+  /* a munição de CADA arma, que hoje não aparece em lugar nenhum: só dá para
+     saber quantos mísseis sobraram trocando para o míssil e olhando */
+  let i = 0;
+  for (const k in ARMAS){
+    const y = m.corpoY + m.corpoH*(0.33 + i*0.15);
+    const atual = k === arma;
+    h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'left'; h2.fillStyle = atual ? MFD_CLARO : MFD_ROT;
+    h2.fillText((atual ? '▸ ' : '  ') + ARMAS[k].nome, x, y);
+    h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'right';
+    h2.fillStyle = atual ? ARMAS[k].cor : MFD_ROT;
+    h2.fillText(munInfinita ? '∞' : String(municao[k]), x + w, y);
+    i++;
+  }
+  const y2 = m.corpoY + m.corpoH*0.84;
+  h2.strokeStyle = MFD_FIO + '.12)'; h2.lineWidth = 1;
+  h2.beginPath(); h2.moveTo(x, y2 - m.corpoH*0.10); h2.lineTo(x + w, y2 - m.corpoH*0.10); h2.stroke();
+  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'left'; h2.fillStyle = MFD_ROT; h2.fillText('CHAMAS', x, y2);
+  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = contra ? (contraEspera > 0 ? MFD_AMBAR : MFD_CLARO) : MFD_VERM;
+  h2.fillText(String(contra), x + w*0.34, y2);
+  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = MFD_ROT; h2.fillText('TRAVA', x + w*0.55, y2);
+  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'right';
+  const trav = Mira.travado ? 'TRAVADO' : Mira.alvo ? 'BUSCA' : 'LIVRE';
+  h2.fillStyle = Mira.travado ? MFD_VERDE : Mira.alvo ? MFD_AMBAR : MFD_FRACO;
+  h2.fillText(trav, x + w, y2);
+  mfdTeclas(o, m, '1 2 3 · ESPAÇO · Z');
+}
+
+function mfdPaginaMissao(o, m){
+  const x = o.x + m.pad, w = o.w - m.pad*2;
+  /* OS QUE FALTAM PRIMEIRO. A lista tem seis objetivos e a página mostra
+     cinco: mostrando na ordem original, cumprir os primeiros escondia
+     justamente os que ainda importam. Ordenados por pendência, o que aparece
+     é sempre o que falta fazer — e o contador no alto diz quantos já foram. */
+  const L0 = (Missoes && Missoes.lista) ? Missoes.lista() : [];
+  const L = L0.slice().sort((a, b) => (a.feito ? 1 : 0) - (b.feito ? 1 : 0));
+  h2.textBaseline = 'middle';
+  /* o contador COLA NO NOME da página, e não no canto: no canto ele caía em
+     cima de "TELA 2 · E", que o cabeçalho já escreve ali */
+  h2.textAlign = 'left';
+  h2.font = '800 ' + Math.max(7, m.cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
+  const larguraNome = h2.measureText('MISSÃO').width;
+  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = MFD_CIANO;
+  h2.fillText((Missoes ? Missoes.cumpridas + '/' + Missoes.total : ''),
+              o.x + m.pad + larguraNome + m.f*0.6, o.y + m.cab*0.62);
+  const n = Math.min(5, L.length);
+  for (let i = 0; i < n; i++){
+    const y = m.corpoY + m.corpoH*(0.09 + i*0.145);
+    h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'left'; h2.fillStyle = L[i].feito ? MFD_VERDE : MFD_ROT;
+    h2.fillText((L[i].feito ? '✔ ' : '○ ') + L[i].txt.toUpperCase().slice(0, 17), x, y);
+    if (L[i].progresso){
+      h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+      h2.textAlign = 'right'; h2.fillStyle = L[i].feito ? MFD_VERDE : MFD_CLARO;
+      h2.fillText(String(L[i].progresso), x + w, y);
+    }
+  }
+  const y2 = m.corpoY + m.corpoH*0.86;
+  h2.strokeStyle = MFD_FIO + '.12)'; h2.lineWidth = 1;
+  h2.beginPath(); h2.moveTo(x, y2 - m.corpoH*0.11); h2.lineTo(x + w, y2 - m.corpoH*0.11); h2.stroke();
+  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'left'; h2.fillStyle = MFD_ROT; h2.fillText('PTS', x, y2);
+  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = MFD_CLARO; h2.fillText(String(Math.round(pontos)), x + w*0.18, y2);
+  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = MFD_ROT; h2.fillText('DIST', x + w*0.48, y2);
+  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'right'; h2.fillStyle = MFD_CLARO;
+  h2.fillText(Math.round(distancia/METRO) + 'm', x + w, y2);
+  /* o recorde e quanta gente está no ar: as duas caixinhas menores que
+     existiam, agora uma linha apagada no pé da página */
+  h2.font = '700 ' + (m.f*0.82).toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'left'; h2.fillStyle = 'rgba(109,128,149,.8)';
+  h2.fillText('REC ' + Math.round(recorde) + 'm', x, o.y + o.h - m.abas - m.corpoH*0.055);
+  if (Batalha.ligada && Batalha.quantos() > 1){
+    h2.textAlign = 'right';
+    h2.fillText(Batalha.quantos() + ' NO AR', x + w, o.y + o.h - m.abas - m.corpoH*0.055);
+  }
+  h2.textBaseline = 'middle';
+}
+
+function mfdPaginaVoo(o, m){
+  const alt = Math.round((aviaoY - CHAO)/METRO);
+  const vsi = Math.round(subida/METRO);
+  const gq = Math.abs(cargaG);
+  mfdLinha(o, m, 0, 'VEL',    Math.round(voo/METRO) + '',
+           voo < velMin() ? MFD_VERM : MFD_CLARO);
+  mfdLinha(o, m, 1, 'ALT',    alt + '', alt < 40 ? MFD_AMBAR : MFD_CLARO);
+  mfdLinha(o, m, 2, 'RUMO',   String((Math.round(rumo*180/Math.PI) % 360 + 360) % 360).padStart(3, '0'));
+  mfdLinha(o, m, 3, 'SUBIDA', (vsi >= 0 ? '+' : '') + vsi);
+  mfdLinha(o, m, 4, 'CARGA',  cargaG.toFixed(1) + 'G',
+           gq > 7.5 ? MFD_VERM : gq > 5.5 ? MFD_AMBAR : MFD_VERDE);
+  mfdLinha(o, m, 5, 'PICO',   gMax.toFixed(1) + 'G', MFD_FRACO);
+}
+
+/* --- UMA TELA INTEIRA ---------------------------------------------------- */
+function desenhaMFD(k){
+  const o = mfdOnde(k);
+  if (!o) return;
+  const m = mfdMedidas(o);
+  const nome = MFD_PAGS[mfdPag[k]];
+
+  // a caixa: vidro escuro, um fio de luz na borda e um sopro de reflexo
+  h2.save();
+  h2.shadowColor = 'rgba(0,0,0,.5)'; h2.shadowBlur = o.h*0.10; h2.shadowOffsetY = 2;
+  cantoInst(h2, o.x, o.y, o.w, o.h, Math.max(2, o.h*0.022));
+  h2.fillStyle = MFD_TELA; h2.fill();
+  h2.restore();
+  h2.save();
+  cantoInst(h2, o.x, o.y, o.w, o.h, Math.max(2, o.h*0.022)); h2.clip();
+  const bri = h2.createLinearGradient(0, o.y, 0, o.y + o.h*0.28);
+  bri.addColorStop(0, 'rgba(255,255,255,.05)'); bri.addColorStop(1, 'rgba(255,255,255,0)');
+  h2.fillStyle = bri; h2.fillRect(o.x, o.y, o.w, o.h*0.28);
+  h2.restore();
+
+  // o cabeçalho
+  h2.textBaseline = 'middle';
+  h2.font = '800 ' + Math.max(7, m.cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'left'; h2.fillStyle = MFD_CIANO;
+  h2.fillText(nome, o.x + m.pad, o.y + m.cab*0.62);
+  h2.font = '700 ' + Math.max(6, m.cab*0.44).toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'right'; h2.fillStyle = MFD_FRACO;
+  h2.fillText('TELA ' + (k + 1) + ' · ' + (k ? 'E' : 'Q'), o.x + o.w - m.pad, o.y + m.cab*0.62);
+
+  if (nome === 'MOTOR')  mfdPaginaMotor(o, m);
+  if (nome === 'MAPA')   mfdPaginaMapa(o, m);
+  if (nome === 'ARMAS')  mfdPaginaArmas(o, m);
+  if (nome === 'MISSÃO') mfdPaginaMissao(o, m);
+  if (nome === 'VOO')    mfdPaginaVoo(o, m);
+
+  /* AS ABAS. São a peça que diz "esta tela tem outras páginas" — sem elas
+     ninguém descobre que existe tecla nenhuma. */
+  const ay = o.y + o.h - m.abas, aw = o.w/MFD_PAGS.length;
+  h2.strokeStyle = MFD_FIO + '.14)'; h2.lineWidth = 1;
+  h2.beginPath(); h2.moveTo(o.x, ay + 0.5); h2.lineTo(o.x + o.w, ay + 0.5); h2.stroke();
+  h2.textAlign = 'center'; h2.textBaseline = 'middle';
+  h2.font = '700 ' + Math.max(6, m.abas*0.42).toFixed(1) + 'px system-ui, sans-serif';
+  MFD_PAGS.forEach((p, i) => {
+    const ax = o.x + i*aw, on = i === mfdPag[k];
+    if (on){ h2.fillStyle = MFD_CIANO; h2.fillRect(ax, ay + 1, aw, m.abas - 1); }
+    h2.fillStyle = on ? '#05080b' : MFD_FRACO;
+    h2.fillText(p, ax + aw/2, ay + m.abas*0.56);
   });
   h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
 }
+function desenhaTelas(){ desenhaMFD(0); desenhaMFD(1); }
 
 /* =============================================================================
    O HUD É VIDRO PRESO NO AVIÃO — NÃO É ÓCULOS
@@ -9455,7 +9533,7 @@ function desenhaHUD(){
     presoNaTela();
   }
 
-  if (jogando && !caindo){ presoNoAviao(); desenhaRadar(); presoNaTela(); }
+  if (jogando && !caindo){ presoNoAviao(); desenhaTelas(); presoNaTela(); }
 
   if ((infinito || munInfinita) && jogando){
     // no canto de cima à esquerda, abaixo dos painéis: no rodapé ele
@@ -9586,52 +9664,18 @@ Missoes = (function(){
            get total(){ return LISTA.length; }, get tudo(){ return tudo; } };
 })();
 
+/* --- O QUE SOBROU DE `pinta` -------------------------------------------------
+   Esta função tinha trinta linhas: era ela que enchia as dez caixas de HTML,
+   uma escrita no documento por campo, sessenta vezes por segundo. Com as caixas
+   fora e o conteúdo desenhado nas telas multifunção — que leem as variáveis
+   direto, na hora de desenhar — não sobrou nada para escrever no documento
+   além dos comandos de dedo.
+
+   Ela fica, e não vira chamada direta a `Dedos.pinta()`, porque `pinta` é
+   chamada de vários lugares e porque é aqui que entra o que for de documento
+   daqui para frente. */
 function pinta(){
-  $('vDist').textContent = Math.round(distancia/METRO);
-  const pct = Math.max(0, Math.min(100, combustivel));
-  $('barraComb').style.width = pct.toFixed(1) + '%';
-  $('barraComb').style.background = pct < 20 ? '#ff5a5a' : pct < 45 ? '#ffc24d' : '#5eff9a';
-  $('vComb').textContent = Math.round(pct);
-  $('vRec').textContent = Math.round(recorde);
-  $('vArma').textContent = ARMAS[arma].nome;
-  $('vMun').textContent = munInfinita ? '∞' : municao[arma];
-  /* arredondado: o rasante paga por SEGUNDO, então `pontos` passou a ter casa
-     decimal, e um placar com vírgula pisca dezesseis dígitos por quadro */
-  $('vPontos').textContent = Math.round(pontos);
-  $('vAlvos').textContent = alvosDestruidos + '/' + alvosTotal;
-  {
-    const cx = $('mList');
-    if (cx){
-      const L = Missoes.lista();
-      const html = L.map(m => '<div class="mi' + (m.feito ? ' ok' : '') + '">' +
-        (m.feito ? '✔' : '○') + ' ' + m.txt + (m.progresso ? ' <b>' + m.progresso + '</b>' : '') + '</div>').join('');
-      if (cx.dataset.h !== html){ cx.innerHTML = html; cx.dataset.h = html; }
-      $('mConta').textContent = Missoes.cumpridas + '/' + Missoes.total;
-    }
-  }
-  $('vMotor').textContent = turbinando ? 'NITRO' : Math.round(motor*100);
-  $('barraMotor').style.width = (turbinando ? 100 : motor*100).toFixed(0) + '%';
-  $('barraNitro').style.width = nitroCarga.toFixed(0) + '%';
-  $('barraNitro').style.background = nitroCarga < 15 ? '#ff6a6a' : '#7fd8ff';
-  $('cMotor').classList.toggle('turbo', turbinando);
-  $('vVel').textContent = Math.round(voo);
-  $('vVmin').textContent = velMin();
-  const bT = $('vTrem');
-  bT.textContent = trem ? 'EMBAIXO' : 'RECOLHIDO';
-  bT.className = trem ? 'ok' : '';
-  $('vFlap').textContent = flap === 0 ? '—' : String(flap);
-  $('vFlap').className = flap ? 'ok' : '';
-  $('cPouso').classList.toggle('estol', !noChao && voo < velMin());
   Dedos.pinta();
-  const pv = Math.max(0, Math.min(100, vida));
-  $('vidaBarra').style.width = pv.toFixed(0) + '%';
-  $('vidaBarra').style.background = pv < 30 ? '#ff5a5a' : pv < 65 ? '#ffc24d' : '#5eff9a';
-  $('vVida').textContent = Math.round(pv);
-  $('cVida').classList.toggle('ferido', pv < 30);
-  // a barra do leme cresce do meio para o lado em que o nariz é chutado
-  const bl = $('barraLeme'), lp = Math.max(-1, Math.min(1, leme));
-  bl.style.width = (Math.abs(lp)*50).toFixed(1) + '%';
-  bl.style.left = lp >= 0 ? '50%' : (50 - Math.abs(lp)*50).toFixed(1) + '%';
 }
 
 /* --- o laço --- */
@@ -9695,6 +9739,8 @@ document.addEventListener('keydown', e => {
   if (e.key==='1') trocaArma('bomba');
   if (e.key==='2') trocaArma('missil');
   if (e.key==='3') trocaArma('metralha');
+  if (e.key==='q'||e.key==='Q') mfdGira(0, e.shiftKey ? -1 : 1);
+  if (e.key==='e'||e.key==='E') mfdGira(1, e.shiftKey ? -1 : 1);
   if (e.key==='v'||e.key==='V'){ cockpit = !cockpit; esqueceRadar(); }
   /* C liga; com o olhar já ligado, C recalibra o "reto" — que é o que se quer
      apertar no meio do jogo, depois de se acomodar melhor na cadeira */
@@ -9733,8 +9779,31 @@ addEventListener('blur', () => { nitroBotao = false; tecla.mais = tecla.menos = 
 let toqueIni = null;
 // um toque sem ponto nenhum não pode derrubar o quadro: `touches[0]` vem
 // indefinido em evento sintético, e a exceção matava o laço inteiro
+/* --- AS ABAS NO DEDO --------------------------------------------------------
+   No computador as páginas giram com Q e E. No celular não há tecla nenhuma, e
+   uma tela multifunção que não troca de página é só uma tela. Então a faixa de
+   abas aceita toque — e tem de aceitar ANTES do comando de voo, que escuta a
+   tela inteira: sem isto, tocar numa aba viraria um puxão de manche.
+
+   A prova é geométrica e barata: o toque caiu dentro do retângulo das abas de
+   alguma tela? Se caiu, escolhe a página e o evento acaba ali. */
+function mfdToque(px, py){
+  for (let k = 0; k < 2; k++){
+    const o = mfdOnde(k);
+    if (!o) continue;
+    const m = mfdMedidas(o);
+    const ay = o.y + o.h - m.abas;
+    if (px < o.x || px > o.x + o.w || py < ay || py > o.y + o.h) continue;
+    mfdPag[k] = Math.max(0, Math.min(MFD_PAGS.length - 1,
+                Math.floor((px - o.x)/(o.w/MFD_PAGS.length))));
+    try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
+    return true;
+  }
+  return false;
+}
 addEventListener('touchstart', e => {
   if (!jogando || !e.touches || !e.touches[0]) return;
+  if (mfdToque(e.touches[0].clientX, e.touches[0].clientY)){ toqueIni = null; return; }
   usandoToque = Controle.modo !== 'sensor';
   toqueIni = { x:e.touches[0].clientX, y:e.touches[0].clientY, t:Date.now() };
 }, {passive:true});
@@ -9749,6 +9818,9 @@ addEventListener('touchend', () => {
 }, {passive:true});
 
 $('btVisao').onclick = () => { cockpit = !cockpit; esqueceRadar(); };
+/* clicar na aba também troca, no computador: quem vê uma fileira de abas tenta
+   clicar nela antes de procurar a tecla */
+addEventListener('mousedown', e => { if (jogando) mfdToque(e.clientX, e.clientY); });
 $('btQual').onclick = () => poeQualidade((qualidade + 2) % 3);
 
 /* --- o botão da cabeça ------------------------------------------------------
@@ -10292,15 +10364,9 @@ function estadoBatalha(classe, txt){
   e.className = 'estado ' + classe;
   $('estadoBatalhaTxt').textContent = txt;
 }
-function pintaBatalha(){
-  const n = Batalha.quantos();
-  const c = $('cGente');
-  if (c){
-    c.classList.toggle('ver', Batalha.ligada && n > 1);
-    $('vGente').textContent = n;
-    $('salaGente').textContent = Batalha.anfitriao ? 'sala ' + codigo : '';
-  }
-}
+/* a caixinha "N no ar" saiu do documento junto com as outras nove; a contagem
+   agora é uma linha da página MISSÃO, que é onde ela faz sentido */
+function pintaBatalha(){}
 /* Os dois campos de código — o da capa e o do painel — são a MESMA pergunta
    em dois lugares. Um laço só cuida dos dois, senão eles desandam: a pessoa
    digita num, abre o outro e vê vazio. */

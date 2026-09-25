@@ -5972,3 +5972,64 @@ tamanho do polegar, chamando mais atenção que o próprio horizonte.
 Duas linhas e um fio de luz é o que faz uma tela ler como **vidro** em vez de
 caixa de interface colada por cima da imagem: a borda de um pixel e um sopro de
 reflexo no alto. Mais do que isso vira o aro de antes.
+
+## As telas multifunção (e as dez caixas que finalmente saíram)
+
+"pode ter múltiplas telas em uma mesma tela, alternando, por isso mandei a ideia
+do KC-390 que tem múltiplas telas."
+
+Eu tinha lido "pega o painel do KC-390" como pedido de **aparência** e passei
+três rodadas redesenhando a moldura do radar. O pedido era de **ideia**: aquele
+avião tem cinco telas e cada uma é multifunção — a mesma tela vira mapa, motor,
+armamento ou sistema conforme a página escolhida.
+
+É a resposta certa para o "poluído", e é melhor do que tudo o que eu tinha
+proposto, por um motivo que só aparece quando se enuncia:
+
+> **Nenhuma informação precisa estar sempre na tela.**
+
+Era essa a premissa errada das dez caixas de HTML — distância, pontos,
+objetivos, combustível, recorde, fuselagem, velocidade, arma, potência e gente
+no ar, todas visíveis o tempo inteiro, para sempre.
+
+**Duas telas, cinco páginas cada**, teclas `Q` e `E` (com Shift, para trás), e
+as abas aceitam toque e clique. MOTOR · MAPA · ARMAS · MISSÃO · VOO.
+
+E sobrou espaço para mostrar **mais** do que antes, que é o que o usuário pediu
+em seguida ("mais detalhes, mais riqueza"): a munição de **cada** arma (hoje só
+dá para saber quantos mísseis sobraram trocando de arma e olhando), o estado da
+trava, a razão de subida, o pico de carga, a distância até a pista, a contagem
+de hostis, e os objetivos ordenados com **os que faltam primeiro**.
+
+### Três erros medidos, todos meus
+
+**1. Cortei linhas de CSS, não regras.** Para tirar o estilo das dez caixas eu
+filtrei o arquivo linha a linha. Várias regras tinham várias linhas, e sobraram
+continuações órfãs: o analisador de CSS engoliu a regra seguinte e
+`#dedos{display:none}` parou de valer — os botões de dedo apareceram no
+computador, por cima de tudo. Refeito com um analisador que casa chaves, trata
+comentário como comentário e apara seletores compostos (`a,#morto{}` → `a{}`),
+conferindo no fim que as chaves fecham e que nenhum id morto sobrou.
+
+**2. Misturei coordenada com largura.** Na coluna de dados do mapa escrevi
+`w = o.w - m.pad - x`, com `x` já somado a `o.x`. Deu `357 − 13 − 1212 = −868`,
+e o valor, escrito em `x + w`, ia parar oitocentos pixels à esquerda — **dentro
+da outra tela**. Os números do mapa apareciam carimbados por cima da página do
+motor.
+
+**3. Pus as telas nos cantos e os cantos estavam ocupados.** No modo dedo a
+manete ocupa a borda direita, o nitro a esquerda, o FOGO e o seletor de arma os
+dois cantos de baixo. A prova de sobreposição acusou três colisões. Agora, com
+os botões na tela, a tela do instrumento **pergunta** onde sobra e se encaixa na
+faixa livre do rodapé. É a lição de sempre neste arquivo: eu decidindo de
+antemão onde há espaço dá errado todas as vezes.
+
+De quebra, os botões da vista, da qualidade e da sala subiram para o canto de
+cima à esquerda — que ficou vazio quando as caixas viraram páginas.
+
+### Os testes acompanharam
+
+`hudchoque`, `dedos` e `missoes` mediam as caixas de HTML pelo `id`. Passaram a
+medir as telas (que são desenhadas na lona e por isso entram na lista à mão) e a
+página MISSÃO. Um teste que continua verde medindo coisa que não existe mais é
+pior do que teste nenhum.
