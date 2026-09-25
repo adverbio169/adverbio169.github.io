@@ -5670,3 +5670,52 @@ NOVA ORLA    171 prédios  +    895 casas
 
 *(E o placar passou a ser arredondado nos dois lugares: o rasante paga por
 segundo, e a tela de fim mostrava "Pontos: 765.0111111111112".)*
+
+## A casa (terceira tentativa, e as duas primeiras estavam quebradas)
+
+"a casa ficou uns predios com tentativa de casa... nao ficou legal", e depois
+"nao ficou legal as casas". Duas vezes seguidas, e das duas eu mexi no lugar
+errado — o que vale registrar é *por quê*.
+
+**O erro de fundo era o UV.** O prédio usa UV calculado no quadro do MUNDO
+(`uvDoMundo`): a posição do vértice dividida por um ladrilho fixo, para que a
+janela meça o mesmo numa torre de 3.000 e num galpão de 200. Para o prédio isso
+é certo. Para a casa é errado, e de um jeito traiçoeiro: a conta é centrada na
+peça, então uma parede de 120 de altura dividida por um ladrilho de 200 mostra
+de −0,3 a +0,3 da textura — a **faixa do meio**. A porta, desenhada em 52%–84%
+da altura, e as janelas, em 50%–68%, caíam fora. O que sobrava na parede era
+reboco liso com cacos de janela nas quinas.
+
+A casa não quer isso. Uma `BoxGeometry` já traz UV 0..1 **por face**: uma
+fachada por parede, de graça, em qualquer tamanho de casa. Bastou tirar o
+`uvDoMundo` do material e redesenhar a lona com as medidas de uma fachada
+inteira — barra de cimento no pé, porta no chão, duas janelas na altura de
+janela, sombra de beiral no alto.
+
+**O erro de consequência**: vendo caixas lisas, eu culpei a forma e fui
+engordar o telhado (40% da largura, beiral de 16%). Telhado grande em cima de
+parede vazia não vira casa, vira barraca de circo. Com a fachada aparecendo, o
+telhado voltou para 26% e o beiral para 9%, e a parede subiu de 95–150 para
+130–190 — casa é mais parede que telhado.
+
+**E um terceiro, que só apareceu depois.** Com porta e janela na parede, o olho
+finalmente tinha onde se apoiar, e aí ficou óbvio que cada telhado tinha um
+pano marrom e o outro **branco**. Não era iluminação nem gosto: os triângulos
+das duas águas estavam com o enrolamento ao contrário, e a normal de cada pano
+apontava para dentro e para baixo. A placa estava iluminando o avesso do
+telhado. De quebra, `computeVertexNormals` num telhado indexado tira a média
+nos dois vértices da cumeeira e arredonda a quina — telhado não tem quina
+arredondada. A malha passou a ser desindexada de propósito: uma normal chapada
+por pano.
+
+Fechando: a telha ganhou textura (essa sim com UV no mundo, que é o caso certo
+— telha mede o mesmo em qualquer casa), o chão do bairro deixou de ser a laje
+cinza da cidade e virou quintal (grama pisada, terra batida, cimento de
+calçada), e as casas deixaram de ser sorteadas soltas dentro da célula — cada
+lote é dividido em vagas ao longo da rua, uma casa por vaga, largura aparada
+para caber com vão. Antes havia casa atravessando casa, telhado saindo pela
+parede da vizinha.
+
+O padrão se repete pela enésima vez neste projeto: **toda reclamação visual do
+usuário era um bug medível, não uma questão de gosto**. "Ficou feio" quer
+quase sempre dizer "há um sinal trocado aí".

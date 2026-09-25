@@ -7722,8 +7722,8 @@ function zonaDe(c, d){
   /* daqui para fora não é prédio baixo: é CASA, e casa tem outra tabela.
      Um pavimento (85 a 150, que são quatro a sete metros), planta pequena, e
      o telhado — que na casa é metade do desenho — sai em `montaCasas`. */
-  if (t < 0.80) return { nome:'residência',alt:[ 95, 150], larg:[165, 245], vazio:0.16, salta:0, mag:1.6, casa:true };
-  return               { nome:'periferia', alt:[ 85, 125], larg:[150, 215], vazio:0.24, salta:0, mag:1.8, casa:true };
+  if (t < 0.80) return { nome:'residência',alt:[130, 190], larg:[170, 250], vazio:0.16, salta:0, mag:1.6, casa:true };
+  return               { nome:'periferia', alt:[115, 160], larg:[155, 220], vazio:0.24, salta:0, mag:1.8, casa:true };
 }
 function sobreAvenida(x, z){
   return AVENIDAS.some(a => naPistaLocal(a, x, z, 0, 0));
@@ -8051,13 +8051,24 @@ function montaMapa(){
              entre uma e a vizinha, e bairro não é sítio. Aqui cada célula vira
              um LOTE com duas ou três, encostadas, com a frente virada para o
              mesmo lado — que é o que faz uma rua de bairro parecer uma rua. */
+          /* E EM FILA, CADA UMA NO SEU LOTE. Sorteando o lugar de cada casa
+             dentro da célula eu tinha casa atravessando casa — telhado saindo
+             pela parede da vizinha. O lote é dividido em VAGAS ao longo da
+             frente da rua, uma casa por vaga, e a largura é aparada para caber
+             na vaga com um vão. O recuo (a distância até a rua) é que varia um
+             pouco, e é justamente o que faz a fila não parecer desenhada. */
           const quantas = 2 + (Math.random() < 0.45 ? 1 : 0);
           const giro = Math.random() < 0.5 ? 0 : Math.PI/2;
+          const vaga = p2/quantas, VAO = 34;
           for (let k = 0; k < quantas; k++){
-            const lw = Z.larg[0] + Math.random()*(Z.larg[1] - Z.larg[0]);
-            casas.push({ x: px + (Math.random()-0.5)*p2*0.80,
-                         z: pz + (Math.random()-0.5)*p2*0.80,
-                         w: lw, d: lw*(0.78 + Math.random()*0.40),
+            const lw = Math.min(Z.larg[0] + Math.random()*(Z.larg[1] - Z.larg[0]),
+                                vaga - VAO);
+            const ld = Math.min(lw*(0.78 + Math.random()*0.40), p2*0.52);
+            const ao = (k + 0.5)*vaga - p2/2 + (Math.random()-0.5)*(vaga - lw - VAO);
+            const re = (Math.random()-0.5)*(p2*0.42 - ld);    // o recuo da rua
+            casas.push({ x: xx + (giro ? re : ao),
+                         z: zz + (giro ? ao : re),
+                         w: lw, d: ld,
                          h: Z.alt[0] + Math.pow(Math.random(), Z.mag)*(Z.alt[1] - Z.alt[0]),
                          tom: Math.random(), giro });
           }
@@ -8177,6 +8188,12 @@ const VERDES = [[42,92,51],[56,117,74],[36,80,41],[71,137,90],[87,150,79],
                 [107,143,60],[132,160,74],[47,107,62],[63,110,47],[83,127,54]];
 const CINZAS = [[96,100,105],[86,90,95],[104,107,110],[78,83,88],
                 [74,104,72],[110,104,92],[88,92,98],[99,95,88]];
+/* --- O CHÃO DO BAIRRO -------------------------------------------------------
+   A cidade inteira pousava sobre a mesma laje cinza, e isso entregava o truque:
+   casa de bairro não nasce em concreto, nasce em quintal. Estes são os tons de
+   grama pisada, terra batida e cimento de calçada que ficam ENTRE as casas. */
+const QUINTAIS = [[88,116,72],[102,128,80],[76,104,64],[126,124,96],
+                  [118,106,84],[95,122,76],[134,128,104],[84,110,70]];
 let chao = null;
 function montaChao(){
   if (chao){ cena.remove(chao); chao.geometry.dispose(); }
@@ -8198,7 +8215,10 @@ function montaChao(){
     const x = (Math.floor((cx + MAPA)/lado) + 0.5)*lado - MAPA;
     const z = (Math.floor((cz + MAPA)/lado) + 0.5)*lado - MAPA;
     let rgb;
-    if (ehCidade(x, z)) rgb = CINZAS[Math.floor(baralha(x*0.0017, z*0.0023)*CINZAS.length)];
+    const cn = emCidadeComNome(x, z);
+    const zn = cn ? zonaDe(cn, naCidade(cn, x, z).d) : null;
+    if (zn && zn.casa)  rgb = QUINTAIS[Math.floor(baralha(x*0.0021, z*0.0027)*QUINTAIS.length)];
+    else if (ehCidade(x, z)) rgb = CINZAS[Math.floor(baralha(x*0.0017, z*0.0023)*CINZAS.length)];
     else                rgb = VERDES[Math.floor(baralha(x*0.0013, z*0.0019)*VERDES.length)];
     const dRio = Math.abs(x - rioX(z));
     if (dRio < 620) rgb = [58, 118, 160];
@@ -8468,35 +8488,106 @@ function lonaAcesa(){
    um ladrilho = uma fachada, com porta e janelas no lugar onde uma casa tem —
    e uma malha própria, com as medidas de uma casa e não as de um prédio
    encolhido. */
-const LADRILHO_CASA = 200;      // um ladrilho é UMA fachada de casa
+/* --- A FACHADA DA CASA, UMA POR FACE ---------------------------------------
+   Aqui eu errei duas vezes, e a segunda foi consequência da primeira.
+
+   ERRO 1 — O UV. Eu mandei a casa usar o mesmo truque do prédio: UV calculado
+   no quadro do MUNDO, dividido por um ladrilho fixo. Num prédio isso é certo
+   (a janela tem de medir o mesmo em qualquer torre). Numa casa é errado, e
+   pior: a conta é centrada no meio da peça, então uma parede de 120 de altura
+   dividida por um ladrilho de 200 mostrava de −0,3 a +0,3 da textura — quer
+   dizer, a FAIXA DO MEIO. A porta, que eu tinha desenhado em 52% a 84%, e as
+   janelas, em 50% a 68%, simplesmente não apareciam. As casas eram caixas de
+   reboco liso com uns cacos de janela nas quinas.
+
+   ERRO 2 — Vendo caixas lisas, eu culpei a forma e fui engordar o telhado.
+   Telhado maior em cima de parede vazia não vira casa: vira barraca.
+
+   A casa usa o UV PADRÃO da caixa, que já é 0..1 por face: uma fachada por
+   parede, porta no chão e janelas na altura certa, seja qual for o tamanho. */
 function lonaCasa(){
-  const S = 128, c = document.createElement('canvas');
+  const S = 256, c = document.createElement('canvas');
   c.width = c.height = S;
   const g = c.getContext('2d');
-  g.fillStyle = '#e8e2d6'; g.fillRect(0, 0, S, S);           // o reboco
-  for (let i = 0; i < 1400; i++){                            // o grão
-    const q = 200 + Math.random()*46;
-    g.fillStyle = 'rgba(' + q + ',' + (q-6) + ',' + (q-16) + ',0.30)';
+  const P = v => v*S;
+  g.fillStyle = '#efe9dc'; g.fillRect(0, 0, S, S);            // o reboco
+  for (let i = 0; i < 2600; i++){                             // o grão
+    const q = 212 + Math.random()*40;
+    g.fillStyle = 'rgba(' + q + ',' + (q-7) + ',' + (q-18) + ',0.32)';
     g.fillRect(Math.random()*S, Math.random()*S, 2, 2);
   }
-  /* a barra: a faixa de cimento queimado que quase toda casa tem no pé, e que
-     é o que dá "chão" à parede vista de perto */
-  g.fillStyle = 'rgba(120,112,98,0.30)'; g.fillRect(0, S*0.80, S, S*0.20);
-  // a porta
-  g.fillStyle = '#6b4a33'; g.fillRect(S*0.44, S*0.52, S*0.15, S*0.32);
-  g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(S*0.44, S*0.52, S*0.15, 3);
-  // duas janelas, com caixilho
-  for (const jx of [0.14, 0.70]){
-    g.fillStyle = '#8fa6bd'; g.fillRect(S*jx, S*0.50, S*0.17, S*0.18);
-    g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillRect(S*jx, S*0.50, S*0.17, 2);
-    g.fillStyle = 'rgba(70,60,50,0.45)';
-    g.fillRect(S*(jx + 0.082), S*0.50, 2, S*0.18);
+  /* a BARRA: a faixa de cimento queimado no pé da parede, que quase toda casa
+     tem e que é o que dá chão ao desenho */
+  g.fillStyle = 'rgba(122,114,100,0.34)'; g.fillRect(0, P(0.84), S, P(0.16));
+  g.fillStyle = 'rgba(90,84,74,0.30)';    g.fillRect(0, P(0.84), S, 3);
+  /* o BEIRAL: a sombra que o telhado joga na parede, no alto */
+  g.fillStyle = 'rgba(80,74,66,0.20)'; g.fillRect(0, 0, S, P(0.07));
+
+  /* A PORTA, no chão e no meio — é ela que diz a escala da coisa toda */
+  const pw = P(0.15), px = (S - pw)/2, py = P(0.40), ph = P(0.44);
+  g.fillStyle = '#6a4630'; g.fillRect(px, py, pw, ph);
+  g.fillStyle = 'rgba(255,255,255,0.30)'; g.fillRect(px, py, pw, 3);
+  g.fillStyle = 'rgba(0,0,0,0.30)'; g.fillRect(px + pw*0.72, py + ph*0.52, 4, 4);
+  /* a soleira */
+  g.fillStyle = 'rgba(150,146,138,0.55)';
+  g.fillRect(px - P(0.02), py + ph - 3, pw + P(0.04), 5);
+
+  /* DUAS JANELAS, uma de cada lado, na altura de janela */
+  for (const jx of [0.13, 0.62]){
+    const x = P(jx), y = P(0.38), w = P(0.25), h = P(0.26);
+    g.fillStyle = 'rgba(120,112,100,0.55)'; g.fillRect(x - 3, y - 3, w + 6, h + 6);  // caixilho
+    g.fillStyle = '#93aec6'; g.fillRect(x, y, w, h);                                  // o vidro
+    g.fillStyle = 'rgba(255,255,255,0.40)'; g.fillRect(x, y, w, h*0.34);              // o reflexo
+    g.fillStyle = 'rgba(70,62,54,0.50)'; g.fillRect(x + w/2 - 1.5, y, 3, h);          // o montante
+    g.fillStyle = 'rgba(160,156,148,0.60)'; g.fillRect(x - 4, y + h, w + 8, 5);       // o peitoril
   }
   const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
+
+/* --- A TELHA -----------------------------------------------------------------
+   Faltava a última coisa que distingue casa de caixa com chapéu: o telhado
+   tinha cor chapada. Voando baixo — que é o convite do bairro inteiro — cor
+   chapada não engana ninguém.
+
+   Aqui o UV no quadro do mundo é o certo (ao contrário da parede): a telha
+   mede o mesmo em qualquer casa, e o mapeamento por eixo dominante manda a
+   fiada correr ao longo da cumeeira e as ondas descerem a água. Desenho em
+   tom claro de propósito, porque a cor de cada telhado entra por `setColorAt`
+   e MULTIPLICA o mapa — assim a mesma telha serve de barro, de cimento e de
+   amianto. */
+function lonaTelha(){
+  const S = 128, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S);
+  const FIADAS = 4, ONDAS = 6;
+  const hf = S/FIADAS, lo = S/ONDAS;
+  for (let o = 0; o < ONDAS; o++){            // a onda da telha, ao longo da fiada
+    for (let x = 0; x < lo; x++){
+      const t = x/lo;
+      const luz = 0.72 + 0.28*Math.cos((t - 0.35)*Math.PI*1.9);
+      g.fillStyle = 'rgba(0,0,0,' + (1 - Math.max(0, Math.min(1, luz))).toFixed(3) + ')';
+      g.fillRect(o*lo + x, 0, 1, S);
+    }
+    g.fillStyle = 'rgba(0,0,0,0.30)';         // o vinco entre duas telhas
+    g.fillRect(o*lo, 0, 1.4, S);
+  }
+  for (let i = 0; i < FIADAS; i++){           // a sombra do encaixe de uma fiada na outra
+    g.fillStyle = 'rgba(0,0,0,0.34)'; g.fillRect(0, i*hf, S, 2.5);
+    g.fillStyle = 'rgba(255,255,255,0.26)'; g.fillRect(0, i*hf + 2.5, S, 2);
+  }
+  for (let i = 0; i < 900; i++){              // a encardidura
+    const q = Math.random()*0.16;
+    g.fillStyle = 'rgba(40,36,30,' + q.toFixed(3) + ')';
+    g.fillRect(Math.random()*S, Math.random()*S, 2, 2);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const LADRILHO_TELHA = 72;      // uma telha tem uns 90 cm na escala do jogo
 
 /* --- O UV NO QUADRO DO MUNDO -----------------------------------------------
    A caixa é 1×1×1 e a instância a estica. Multiplicando a posição local pela
@@ -8614,18 +8705,33 @@ const geoBaliza = new THREE.SphereGeometry(1, 6, 5);
    É um prisma: dois retângulos inclinados encontrando-se numa cumeeira. Cabe
    numa geometria de oito triângulos, instanciada — a periferia inteira das
    duas cidades por UMA ordem de desenho. */
+/* --- O TELHADO DE DUAS ÁGUAS -----------------------------------------------
+   Este tinha DOIS defeitos, e os dois só apareceram quando a parede da casa
+   finalmente mostrava porta e janela — antes o olho não tinha onde se apoiar.
+
+   1) O ENROLAMENTO ESTAVA AO CONTRÁRIO. Os triângulos das duas águas estavam
+      na ordem anti-horária vista de FORA, então a normal de cada pano apontava
+      para DENTRO e para BAIXO. O resultado é o que se via na foto: cada casa
+      com um pano marrom e o outro branco, porque a placa estava iluminando o
+      avesso do telhado. Não era gosto, era sinal trocado — de novo.
+   2) AS NORMAIS ERAM MÉDIAS. Os dois vértices da cumeeira são compartilhados
+      pelas duas águas e pelas duas empenas; `computeVertexNormals` tirava a
+      média e arredondava a quina. Telhado não tem quina arredondada.
+
+   Por isso aqui a malha é DESINDEXADA de propósito: cada triângulo tem os
+   vértices só dele, e a normal sai chapada, uma por pano. */
 function geoDuasAguas(){
+  const A=[-0.5,0,-0.5], B=[0.5,0,-0.5], C=[0.5,0,0.5], D=[-0.5,0,0.5];
+  const E=[0,1,-0.5],    F=[0,1,0.5];
+  const tri = [ [A,F,E], [A,D,F],      // a água que cai para o -X
+                [B,E,F], [B,F,C],      // a que cai para o +X
+                [A,E,B],               // e as duas empenas
+                [D,C,F] ];
+  const p = [];
+  for (const t of tri) for (const v of t) p.push(v[0], v[1], v[2]);
   const g = new THREE.BufferGeometry();
-  const p = [], i = [];
-  const põe = (x,y,z) => { p.push(x,y,z); return p.length/3 - 1; };
-  const a = põe(-0.5,0,-0.5), b = põe(0.5,0,-0.5), c2 = põe(0.5,0,0.5), d = põe(-0.5,0,0.5);
-  const e = põe(0,1,-0.5),    f2 = põe(0,1,0.5);
-  i.push(a,e,f2, a,f2,d);          // a água de um lado
-  i.push(b,c2,f2, b,f2,e);         // e a do outro
-  i.push(a,b,e);                   // as duas empenas
-  i.push(d,f2,c2);
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(p), 3));
-  g.setIndex(i); g.computeVertexNormals();
+  g.computeVertexNormals();      // sem índice, sai uma normal por face
   return g;
 }
 const geoAgua = geoDuasAguas();
@@ -8674,17 +8780,20 @@ function montaTelhados(){
    metade do desenho. Com um chapeuzinho de 50 em cima de um bloco de 300 —
    que foi a primeira tentativa — sai prédio de chapéu, que foi exatamente o
    que se viu. */
-let casaCorpo = null, casaTeto = null, matCasa = null, lonaCasaT = null;
+let casaCorpo = null, casaTeto = null, matCasa = null, lonaCasaT = null, matTelha = null;
 function montaCasas(){
   for (const m of [casaCorpo, casaTeto]) if (m){ cena.remove(m); m.dispose(); }
   if (!matCasa){
+    /* sem `uvDoMundo`: a casa quer o UV padrão da caixa, que já é uma fachada
+       por face. Ver o comentário de `lonaCasa`, que é onde esse erro morava. */
     lonaCasaT = lonaCasa();
-    matCasa = uvDoMundo(new THREE.MeshLambertMaterial({ map: lonaCasaT }), LADRILHO_CASA);
+    matCasa = new THREE.MeshLambertMaterial({ map: lonaCasaT });
   }
   const n = Math.max(1, casas.length);
   casaCorpo = new THREE.InstancedMesh(geoCaixa, matCasa, n);
-  casaTeto  = new THREE.InstancedMesh(geoAgua,
-    new THREE.MeshLambertMaterial({ color: 0xffffff }), n);
+  if (!matTelha) matTelha = uvDoMundo(
+    new THREE.MeshLambertMaterial({ map: lonaTelha() }), LADRILHO_TELHA);
+  casaTeto  = new THREE.InstancedMesh(geoAgua, matTelha, n);
   casaCorpo.castShadow = casaTeto.castShadow = true;
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
   const pos = new THREE.Vector3(), esc = new THREE.Vector3(), cor = new THREE.Color();
@@ -8697,12 +8806,14 @@ function montaCasas(){
     const b = baralha(p.x*0.013, p.z*0.017);
     cor.setRGB(0.88 + b*0.12, 0.86 + (1-b)*0.10, 0.78 + b*0.16);
     casaCorpo.setColorAt(i, cor);
-    /* o telhado avança um palmo além da parede (o beiral) e é ALTO */
-    esc.set(p.w*1.16, p.w*0.40, p.d*1.16); pos.set(p.x, CHAO + p.h, p.z);
+    /* o telhado avança um palmo além da parede (o beiral). E é MANSO: 26% da
+       largura. Com 40% em cima de uma parede que não mostrava nada, cada casa
+       virava uma barraca de circo — e o problema nunca foi o telhado. */
+    esc.set(p.w*1.09, p.w*0.26, p.d*1.09); pos.set(p.x, CHAO + p.h, p.z);
     m4.compose(pos, q, esc); casaTeto.setMatrixAt(i, m4);
     const t = baralha(p.z*0.011, p.x*0.007);
-    if (t < 0.13) cor.setRGB(0.58, 0.58, 0.56);        // amianto
-    else          cor.setRGB(0.54 + t*0.32, 0.25 + t*0.13, 0.19 + t*0.09);
+    if (t < 0.13) cor.setRGB(0.54, 0.55, 0.53);        // amianto
+    else          cor.setRGB(0.50 + t*0.28, 0.21 + t*0.12, 0.16 + t*0.08);   // barro
     casaTeto.setColorAt(i, cor);
   });
   for (const m of [casaCorpo, casaTeto]){
