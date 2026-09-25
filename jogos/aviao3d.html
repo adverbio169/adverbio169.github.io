@@ -7718,9 +7718,12 @@ function zonaDe(c, d){
      periferia ao quadrado, para a casa de dois andares ser a regra. */
   if (t < 0.20) return { nome:'núcleo',    alt:[900, 3600], larg:[230, 430], vazio:0.10, salta:0.28, mag:1.1 };
   if (t < 0.36) return { nome:'centro',    alt:[420, 1500], larg:[250, 530], vazio:0.12, salta:0.20, mag:1.4 };
-  if (t < 0.60) return { nome:'bairro',    alt:[200,  620], larg:[260, 560], vazio:0.16, salta:0,    mag:1.7 };
-  if (t < 0.82) return { nome:'residência',alt:[120,  300], larg:[220, 420], vazio:0.18, salta:0,    mag:2.0 };
-  return               { nome:'periferia', alt:[ 95,  190], larg:[190, 340], vazio:0.26, salta:0,    mag:2.0 };
+  if (t < 0.56) return { nome:'bairro',    alt:[200,  620], larg:[260, 560], vazio:0.16, salta:0,    mag:1.7 };
+  /* daqui para fora não é prédio baixo: é CASA, e casa tem outra tabela.
+     Um pavimento (85 a 150, que são quatro a sete metros), planta pequena, e
+     o telhado — que na casa é metade do desenho — sai em `montaCasas`. */
+  if (t < 0.80) return { nome:'residência',alt:[ 95, 150], larg:[165, 245], vazio:0.16, salta:0, mag:1.6, casa:true };
+  return               { nome:'periferia', alt:[ 85, 125], larg:[150, 215], vazio:0.24, salta:0, mag:1.8, casa:true };
 }
 function sobreAvenida(x, z){
   return AVENIDAS.some(a => naPistaLocal(a, x, z, 0, 0));
@@ -7924,9 +7927,9 @@ const Ferrovia = {
 };
 
 /* --- o mapa, montado uma vez --- */
-let predios=[], tambores=[], alvos=[], obstaculos=[];
+let predios=[], casas=[], tambores=[], alvos=[], obstaculos=[];
 function montaMapa(){
-  predios = []; alvos = []; tambores = []; obstaculos = [];
+  predios = []; casas = []; alvos = []; tambores = []; obstaculos = [];
   const PASSO_T = 5200*ESPACO;
   for (let x = -MAPA; x <= MAPA; x += PASSO_T)
     for (let z = -MAPA; z <= MAPA; z += PASSO_T){
@@ -8037,8 +8040,31 @@ function montaMapa(){
         const r = Math.pow(Math.random(), Z.mag);       // o alto é raro — mais na periferia
         const alt = Z.alt[0] + r*(Z.alt[1] - Z.alt[0]);
         const larg = Z.larg[0] + Math.random()*(Z.larg[1] - Z.larg[0]);
+        const px = xx + (Math.random()-0.5)*p2*0.45, pz = zz + (Math.random()-0.5)*p2*0.45;
+        if (Z.casa){
+          /* casa não entra em `predios`: ela não é obstáculo. Com cinco metros
+             de altura não derruba avião nenhum, e pôr duas mil delas na lista
+             de colisão custaria o quadro inteiro — além de que passar rasante
+             por cima do bairro é justamente o que se quer poder fazer. */
+          /* DUAS OU TRÊS POR CÉLULA. A célula do laço tem 707 e a casa tem
+             200: uma por célula deixava meio quarteirão de terreno baldio
+             entre uma e a vizinha, e bairro não é sítio. Aqui cada célula vira
+             um LOTE com duas ou três, encostadas, com a frente virada para o
+             mesmo lado — que é o que faz uma rua de bairro parecer uma rua. */
+          const quantas = 2 + (Math.random() < 0.45 ? 1 : 0);
+          const giro = Math.random() < 0.5 ? 0 : Math.PI/2;
+          for (let k = 0; k < quantas; k++){
+            const lw = Z.larg[0] + Math.random()*(Z.larg[1] - Z.larg[0]);
+            casas.push({ x: px + (Math.random()-0.5)*p2*0.80,
+                         z: pz + (Math.random()-0.5)*p2*0.80,
+                         w: lw, d: lw*(0.78 + Math.random()*0.40),
+                         h: Z.alt[0] + Math.pow(Math.random(), Z.mag)*(Z.alt[1] - Z.alt[0]),
+                         tom: Math.random(), giro });
+          }
+          continue;
+        }
         const centro = Math.max(0, Math.min(1, 1 - d/(c.raio*0.55)));
-        predios.push({ x: xx + (Math.random()-0.5)*p2*0.45, z: zz + (Math.random()-0.5)*p2*0.45,
+        predios.push({ x: px, z: pz,
                        w: larg, d: larg*(0.7 + Math.random()*0.6),
                        h: alt, tom: Math.random(), centro, zona: Z.nome, vivo:true });
       }
@@ -8428,12 +8454,57 @@ function lonaAcesa(){
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
+/* --- A LONA DA CASA --------------------------------------------------------
+   "A casa ficou uns prédios com tentativa de casa. Não ficou legal."
+
+   Estava certo, e o erro era de raiz: eu tinha feito a casa como um PRÉDIO
+   PEQUENO — mesma caixa, mesma fachada de janelas de escritório, só que mais
+   baixa, com um telhadinho por cima. Um bloco de seis andares com chapéu não
+   é uma casa, é um prédio de chapéu.
+
+   Casa é outra coisa, e a diferença não é o tamanho, é o VOCABULÁRIO: parede
+   de reboco claro, UMA porta, duas ou três janelas, e um telhado que é metade
+   da altura da coisa em vez de um remate. Então a casa ganhou lona própria —
+   um ladrilho = uma fachada, com porta e janelas no lugar onde uma casa tem —
+   e uma malha própria, com as medidas de uma casa e não as de um prédio
+   encolhido. */
+const LADRILHO_CASA = 200;      // um ladrilho é UMA fachada de casa
+function lonaCasa(){
+  const S = 128, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = '#e8e2d6'; g.fillRect(0, 0, S, S);           // o reboco
+  for (let i = 0; i < 1400; i++){                            // o grão
+    const q = 200 + Math.random()*46;
+    g.fillStyle = 'rgba(' + q + ',' + (q-6) + ',' + (q-16) + ',0.30)';
+    g.fillRect(Math.random()*S, Math.random()*S, 2, 2);
+  }
+  /* a barra: a faixa de cimento queimado que quase toda casa tem no pé, e que
+     é o que dá "chão" à parede vista de perto */
+  g.fillStyle = 'rgba(120,112,98,0.30)'; g.fillRect(0, S*0.80, S, S*0.20);
+  // a porta
+  g.fillStyle = '#6b4a33'; g.fillRect(S*0.44, S*0.52, S*0.15, S*0.32);
+  g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(S*0.44, S*0.52, S*0.15, 3);
+  // duas janelas, com caixilho
+  for (const jx of [0.14, 0.70]){
+    g.fillStyle = '#8fa6bd'; g.fillRect(S*jx, S*0.50, S*0.17, S*0.18);
+    g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillRect(S*jx, S*0.50, S*0.17, 2);
+    g.fillStyle = 'rgba(70,60,50,0.45)';
+    g.fillRect(S*(jx + 0.082), S*0.50, 2, S*0.18);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 /* --- O UV NO QUADRO DO MUNDO -----------------------------------------------
    A caixa é 1×1×1 e a instância a estica. Multiplicando a posição local pela
    escala da instância volta-se ao tamanho REAL da peça; dividindo pelo lado do
    ladrilho, a janela mede o mesmo em qualquer prédio. A face de cima usa x,z e
    as laterais usam a altura, senão a fachada deitaria. */
-function uvDoMundo(mat){
+function uvDoMundo(mat, ladrilho){
+  const L = (ladrilho || LADRILHO).toFixed(1);
   mat.onBeforeCompile = sh => {
     sh.vertexShader = sh.vertexShader.replace('#include <uv_vertex>', `
       #include <uv_vertex>
@@ -8451,7 +8522,7 @@ function uvDoMundo(mat){
         vec2 uvm = nA.y > 0.5 ? vec2(p.x, p.z)
                  : nA.x > 0.5 ? vec2(p.z, p.y)
                               : vec2(p.x, p.y);
-        uvm /= ${LADRILHO.toFixed(1)};
+        uvm /= ${L};
         #ifdef USE_MAP
           vMapUv = uvm;
         #endif
@@ -8462,7 +8533,7 @@ function uvDoMundo(mat){
       #endif
     `);
   };
-  mat.customProgramCacheKey = () => 'uvDoMundo';
+  mat.customProgramCacheKey = () => 'uvDoMundo' + L;
   return mat;
 }
 function montaCidade(){
@@ -8531,7 +8602,7 @@ function derrubaPredio(p){
    então a cidade inteira ganha telhado por duas ordens de desenho. E a baliza
    não é enfeite: ela marca de longe, à noite ou no contraluz, exatamente as
    torres entre as quais dá para passar. */
-let telhados = null, balizas = null, tetos = null;
+let telhados = null, balizas = null;
 const geoTelha = new THREE.BoxGeometry(1, 1, 1);
 const geoBaliza = new THREE.SphereGeometry(1, 6, 5);
 /* --- O TELHADO DE DUAS ÁGUAS ------------------------------------------------
@@ -8559,7 +8630,7 @@ function geoDuasAguas(){
 }
 const geoAgua = geoDuasAguas();
 function montaTelhados(){
-  for (const m of [telhados, balizas, tetos]) if (m){ cena.remove(m); m.dispose(); }
+  for (const m of [telhados, balizas]) if (m){ cena.remove(m); m.dispose(); }
   const altos = predios.filter(p => p.vivo && p.h > 700);
   const torres = predios.filter(p => p.vivo && p.h > 2200);
   telhados = new THREE.InstancedMesh(geoTelha,
@@ -8581,31 +8652,65 @@ function montaTelhados(){
   });
   /* e as casas: tudo o que é baixo ganha telhado vermelho */
   const casas = predios.filter(p => p.vivo && p.h <= 330);
-  /* SEM `vertexColors`. Cor por instância no three vem de `setColorAt`, que
-     liga `USE_INSTANCING_COLOR` sozinho; `vertexColors: true` manda o shader
-     procurar um atributo `color` na GEOMETRIA, que não existe aqui — e o
-     telhado inteiro saía branco. É o mesmo caminho que a cidade já usava. */
-  tetos = new THREE.InstancedMesh(geoAgua,
-    new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, casas.length));
-  tetos.castShadow = true;
-  const cor = new THREE.Color();
-  casas.forEach((p, i) => {
-    const b = baralha(p.x*0.009, p.z*0.007);
-    m4.makeScale(p.w*1.10, 52 + b*46, p.d*1.10);
-    m4.setPosition(p.x, CHAO + p.h, p.z);
-    tetos.setMatrixAt(i, m4);
-    /* telha vermelha desbotada, cada casa com o seu tom — e uma em cada sete é
-       de amianto, que é cinza, porque bairro de verdade é assim */
-    if (b < 0.14) cor.setRGB(0.62, 0.62, 0.60);
-    else          cor.setRGB(0.52 + b*0.30, 0.24 + b*0.14, 0.18 + b*0.10);
-    tetos.setColorAt(i, cor);
-  });
   telhados.instanceMatrix.needsUpdate = true;
   balizas.instanceMatrix.needsUpdate = true;
-  tetos.instanceMatrix.needsUpdate = true;
-  if (tetos.instanceColor) tetos.instanceColor.needsUpdate = true;
-  telhados.count = altos.length; balizas.count = torres.length; tetos.count = casas.length;
-  cena.add(telhados); cena.add(balizas); cena.add(tetos);
+  telhados.count = altos.length; balizas.count = torres.length;
+  cena.add(telhados); cena.add(balizas);
+}
+
+/* =============================================================================
+   O BAIRRO — a casa não é um prédio pequeno
+
+   Ela tem malha própria, tabela própria e lona própria. Duas malhas
+   instanciadas dão o bairro inteiro das duas cidades: o corpo (caixa, com a
+   fachada de reboco, porta e duas janelas) e o telhado de duas águas.
+
+   TRÊS medidas dizem "casa" em vez de "prédio":
+     um pavimento    85 a 150 de altura, que são quatro a sete metros
+     planta pequena  150 a 245, contra 260 a 560 de prédio
+     telhado GRANDE  quarenta e cinco por cento da largura, não um remate
+
+   O telhado é o que mais conta: num prédio ele é detalhe, numa casa ele é
+   metade do desenho. Com um chapeuzinho de 50 em cima de um bloco de 300 —
+   que foi a primeira tentativa — sai prédio de chapéu, que foi exatamente o
+   que se viu. */
+let casaCorpo = null, casaTeto = null, matCasa = null, lonaCasaT = null;
+function montaCasas(){
+  for (const m of [casaCorpo, casaTeto]) if (m){ cena.remove(m); m.dispose(); }
+  if (!matCasa){
+    lonaCasaT = lonaCasa();
+    matCasa = uvDoMundo(new THREE.MeshLambertMaterial({ map: lonaCasaT }), LADRILHO_CASA);
+  }
+  const n = Math.max(1, casas.length);
+  casaCorpo = new THREE.InstancedMesh(geoCaixa, matCasa, n);
+  casaTeto  = new THREE.InstancedMesh(geoAgua,
+    new THREE.MeshLambertMaterial({ color: 0xffffff }), n);
+  casaCorpo.castShadow = casaTeto.castShadow = true;
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  const pos = new THREE.Vector3(), esc = new THREE.Vector3(), cor = new THREE.Color();
+  casas.forEach((p, i) => {
+    e.set(0, p.giro, 0); q.setFromEuler(e);
+    esc.set(p.w, p.h, p.d); pos.set(p.x, CHAO + p.h/2, p.z);
+    m4.compose(pos, q, esc); casaCorpo.setMatrixAt(i, m4);
+    /* a parede também tem tom: caiada, creme, rosa ou verdinho, que é a cor de
+       rua de bairro em qualquer cidade do Brasil */
+    const b = baralha(p.x*0.013, p.z*0.017);
+    cor.setRGB(0.88 + b*0.12, 0.86 + (1-b)*0.10, 0.78 + b*0.16);
+    casaCorpo.setColorAt(i, cor);
+    /* o telhado avança um palmo além da parede (o beiral) e é ALTO */
+    esc.set(p.w*1.16, p.w*0.40, p.d*1.16); pos.set(p.x, CHAO + p.h, p.z);
+    m4.compose(pos, q, esc); casaTeto.setMatrixAt(i, m4);
+    const t = baralha(p.z*0.011, p.x*0.007);
+    if (t < 0.13) cor.setRGB(0.58, 0.58, 0.56);        // amianto
+    else          cor.setRGB(0.54 + t*0.32, 0.25 + t*0.13, 0.19 + t*0.09);
+    casaTeto.setColorAt(i, cor);
+  });
+  for (const m of [casaCorpo, casaTeto]){
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    m.count = casas.length;
+    cena.add(m);
+  }
 }
 /* a baliza PISCA — é o que a faz ser vista. Uma cor só, compartilhada pelas
    centenas de instâncias: pisca tudo junto, que é o que se vê de longe. */
@@ -15756,6 +15861,7 @@ function poeQualidade(q){
     matCidade.emissive.setHex(q >= 2 ? 0x4a4234 : 0x000000);
     matCidade.needsUpdate = true;
   }
+  if (matCasa){ matCasa.map = q >= 1 ? lonaCasaT : null; matCasa.needsUpdate = true; }
   $('btQual').textContent = ['baixo','médio','alto'][q];
   redimensiona();
   mostraAviso('desenho: ' + ['baixo','médio','alto'][q], '#9fd8ff', 900);
@@ -15950,7 +16056,7 @@ function reinicia(){
   Alarmes.zera();
   travadoPor.clear(); somAlerta(false);
   Mira.solta(); MiraTiro.solta();
-  montaMapa(); montaChao(); montaPista(); montaRuas(); montaCidade(); montaTelhados(); montaTambores(); montaAlvos();
+  montaMapa(); montaChao(); montaPista(); montaRuas(); montaCidade(); montaTelhados(); montaCasas(); montaTambores(); montaAlvos();
   montaTrilhos();
   montaInimigos(); montaPombos(); montaNuvens();
   poeCamera(1);
@@ -15990,7 +16096,9 @@ function fim(){
   p.style.display = 'block';
   p.innerHTML = 'Distância voada: <span>' + m + ' m</span><br>' +
                 'Alvos destruídos: <span>' + alvosDestruidos + ' de ' + alvosTotal + '</span><br>' +
-                'Pontos: <span>' + pontos + '</span><br>Recorde: <span>' + recorde + ' m</span>';
+                /* arredondado aqui também: o rasante paga por segundo e a
+                   tela de fim mostrava "765.0111111111112" */
+                'Pontos: <span>' + Math.round(pontos) + '</span><br>Recorde: <span>' + Math.round(recorde) + ' m</span>';
   $('btSensor').textContent = 'Voar de novo';
   $('btSensor').onclick = () => { p.style.display='none'; if (Controle.modo === 'sensor') Controle.calibrar(); comeca(); };
   $('capa').style.display = 'flex';
@@ -17211,7 +17319,7 @@ function abrirSala(){
 abrirSala();
 
 /* desenha uma primeira imagem parada atrás da capa, para não abrir preto */
-montaMapa(); montaChao(); montaPista(); montaRuas(); montaCidade(); montaTelhados(); montaTambores(); montaAlvos();
+montaMapa(); montaChao(); montaPista(); montaRuas(); montaCidade(); montaTelhados(); montaCasas(); montaTambores(); montaAlvos();
 montaTrilhos(); montaInimigos(); montaPombos(); montaNuvens();
 aviaoY = 2200; poeCamera(1); arruma(); redimensiona();
 rend.render(cena, cam);

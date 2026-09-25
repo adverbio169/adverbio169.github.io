@@ -5626,3 +5626,47 @@ verdade é assim.
 `USE_INSTANCING_COLOR` sozinho. Pôr `vertexColors: true` junto manda o shader
 procurar um atributo `color` na GEOMETRIA, que não existe — e o telhado inteiro
 saía branco.)*
+
+### A casa não é um prédio pequeno
+
+> *"A casa ficou uns prédios com tentativa de casa. Não ficou legal."*
+
+Certo, e o erro era de raiz: eu tinha feito a casa como um **prédio encolhido**
+— mesma caixa, mesma fachada de janelas de escritório, só que mais baixa, com
+um telhadinho por cima. Um bloco de seis andares com chapéu não é uma casa, é
+um prédio de chapéu.
+
+Casa é outra coisa, e a diferença não é o tamanho, é o **vocabulário**:
+
+```
+                  prédio            casa
+parede            janela de         reboco, UMA porta, duas janelas
+                  escritório, 8×8   e a barra de cimento no pé
+altura            200 a 3.600       85 a 150  (um pavimento)
+planta            260 a 560         150 a 245
+telhado           detalhe no topo   45% da largura: metade do desenho
+lista             `predios`         `casas` — e casa NÃO é obstáculo
+```
+
+O telhado é o que mais conta: num prédio ele é detalhe, numa casa ele é metade
+do desenho. Com um chapeuzinho de 50 em cima de um bloco de 300 sai prédio de
+chapéu, que foi exatamente o que se viu.
+
+E casa não entra na lista de colisão. Com cinco metros de altura ela não
+derruba avião nenhum, pôr duas mil na conta de cada quadro custaria o quadro
+inteiro — e passar rasante por cima do bairro é justamente o que se quer poder
+fazer.
+
+**Duas ou três por lote.** A célula do laço tem 707 e a casa tem 200: uma por
+célula deixava meio quarteirão de terreno baldio entre uma e a vizinha, e
+bairro não é sítio. Cada célula virou um lote com duas ou três, encostadas e
+com a frente virada para o mesmo lado — que é o que faz uma rua de bairro
+parecer uma rua.
+
+```
+PORTO ALTO   308 prédios  +  1.735 casas
+NOVA ORLA    171 prédios  +    895 casas
+```
+
+*(E o placar passou a ser arredondado nos dois lugares: o rasante paga por
+segundo, e a tela de fim mostrava "Pontos: 765.0111111111112".)*
