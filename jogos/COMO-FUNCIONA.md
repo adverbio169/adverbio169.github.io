@@ -5918,3 +5918,57 @@ Fontes:
 [Embraer — KC-390 Millennium](https://embraer.com/defense-security-air/kc-390-millennium/en/) ·
 [FlightGlobal — Embraer selects Pro Line Fusion for KC-390 cockpit](https://www.flightglobal.com/embraer-selects-pro-line-fusion-for-kc-390-cockpit/99722.article) ·
 [Breaking Defense — Next-gen KC-390 Millennium](https://breakingdefense.com/2025/09/next-gen-kc-390-millennium-expands-multimission-options-for-air-forces/)
+
+## O painel some quase todo (e o erro estava um nível acima do desenho)
+
+"o hud tá ok. o que não tô gostando é as coisas do painel de instrumentos,
+tanto do controle do celular quanto do controle visual. não tá parecendo um
+caça moderno. tá feio, quase que poluído."
+
+Eu tinha acabado de copiar, com capricho, o painel de um **cargueiro**.
+
+O KC-390 é um avião de transporte, e o PFD dele — fita de velocidade, fita de
+altitude, razão de subida, fita de rumo, bola de atitude — existe porque num
+transporte o piloto voa **olhando para dentro**. Num caça é o contrário: voa-se
+olhando para fora, e tudo o que se precisa para voar está no HUD. Ou seja, eu
+tinha desenhado a **segunda cópia** de um instrumento que o jogo já tinha. E
+"segunda cópia de tudo" é a definição de poluído.
+
+O painel de um caça moderno se define pelo que **não** tem. Vidro grande e
+escuro, pouquíssima marca, símbolo grande. Sem aro de metal, sem parafuso, sem
+fileira de teclas, sem barra de segmentos, sem cinco cores de destaque. O F-35
+levou isso ao limite: uma tela de vinte polegadas e mais nada.
+
+### O que saiu
+
+Da cabine: o PFD inteiro (bola de atitude, três fitas com escala, arco de
+inclinação, símbolo do avião), a moldura de liga com parafusos, as vinte teclas
+de opção, as barras verticais de segmento com escala gravada, a coluna de dados
+e os anéis numerados.
+
+Do celular: o aro de liga de nove pixels em volta do EADI, as listras de
+segmento das colunas, as quatro caixas pretas dos números, as molduras do
+placar, e metade dos degraus da escada de arfagem (os de 5° — num disco do
+tamanho de uma moeda eles eram textura, não informação).
+
+### O que ficou
+
+Na cabine, **uma** tela: o mapa de 360°, uma rosa com quatro letras e riscos de
+trinta em trinta, dois anéis fracos, os contatos, e uma linha de rodapé com
+quatro números. O G voltou para o HUD, que é onde ele mora num caça — duas
+linhas de algarismo no vidro de frente.
+
+A conta de quanto saiu: a versão anterior desenhava por quadro duas molduras,
+uma bola, quatro fitas com escala, dois arcos, duas barras de segmento e nove
+blocos de texto. Esta desenha um círculo, doze riscos, quatro letras, os
+contatos e uma linha. O custo caiu de **0,32 para 0,16 ms** por quadro.
+
+No celular, a bola ficou dessaturada de propósito — quem tem de saltar é o
+símbolo branco, não o cenário — e as colunas de motor viraram enchimento fraco
+com um **fio aceso no topo**, que é como uma fita de motor moderna marca o
+valor. Sem as listras, a coluna cheia tinha virado um bloco de verde neon do
+tamanho do polegar, chamando mais atenção que o próprio horizonte.
+
+Duas linhas e um fio de luz é o que faz uma tela ler como **vidro** em vez de
+caixa de interface colada por cima da imagem: a borda de um pixel e um sopro de
+reflexo no alto. Mais do que isso vira o aro de antes.

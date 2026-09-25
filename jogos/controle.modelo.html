@@ -100,12 +100,15 @@
      de cartão; esta é a caixa de uma tela: liga escura, tela preta afundada e
      um fio claro no alto, que é o que dá relevo sem custar imagem. O miolo é
      uma lona, e quem desenha é o `ADI`. */
+  /* SEM ARO. Tinha um anel de liga de nove pixels em volta, e ele era metade
+     do "poluído": aro de metal com relevo é peça de painel dos anos 80. Num
+     caça moderno a tela é vidro de borda a borda, e o que a delimita é um fio
+     de luz — um pixel. */
   #horizonte{--d:min(72vw,46vh,300px);width:var(--d);height:var(--d);flex-shrink:0;
              border-radius:50%;overflow:hidden;position:relative;
              background:#04070a;
-             border:2px solid #13161a;
-             box-shadow:0 0 0 7px #6b737e, 0 0 0 9px #343941,
-                        inset 0 1px 0 rgba(255,255,255,.16), 0 18px 44px rgba(0,0,0,.55)}
+             border:1px solid rgba(226,236,248,.18);
+             box-shadow:0 14px 40px rgba(0,0,0,.5)}
   #ceu{display:none}            /* o gradiente saiu: a bola agora é desenhada */
   #mira{display:none}           /* e o símbolo do avião também */
   body.artilheiro #adiLona{display:none}
@@ -129,10 +132,9 @@
      algarismo monoespaçado dentro. Três números soltos no fundo pareciam
      legenda de aplicativo; assim eles pertencem ao mesmo painel. */
   .placar{display:flex;gap:10px;font-variant-numeric:tabular-nums}
-  /* `> div`, e não `div`: o seletor largo pegava também o rótulo e o valor lá
-     dentro, e cada janela virou três janelas encaixadas */
-  .placar > div{text-align:center;background:#04070a;border:1px solid #6b737e;
-              border-radius:4px;padding:3px 9px 4px;min-width:58px}
+  /* e o placar perde a caixa também: três molduras para três números curtos
+     eram três molduras a mais */
+  .placar > div{text-align:center;padding:2px 8px 3px;min-width:56px}
   .placar .rot{font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;color:#8fa3c8;font-weight:700}
   .placar .val{font-size:19px;font-weight:800;font-family:ui-monospace,"SF Mono",monospace;color:#e8f0fa}
   .linha{display:flex;gap:10px;width:100%;max-width:300px}
@@ -212,25 +214,28 @@
      tudo, coladas na caixa. Assim a mesma regra serve para a barra que sobe
      (celular deitado) e para a que anda de lado (em pé), sem tocar no JS que
      decide o eixo. */
-  /* a moldura é a mesma das telas da cabine e do KC-390: liga CLARA por fora,
-     fio escuro no rebaixo e vidro preto dentro. O aro escuro que eu tinha
-     posto antes era de caixa militar dos anos 90. */
-  .motor{position:relative;border-radius:5px;
-         border:2px solid #13161a;background:#04070a;
-         box-shadow:0 0 0 5px #6b737e, 0 0 0 7px #343941,
-                    inset 0 1px 0 rgba(255,255,255,.14);
+  /* A MANETE E O NITRO, NA MESMA DIETA. Saíram a moldura de liga, o rebaixo
+     e as LISTRAS de segmento. O segmento tinha uma razão — deixa contar em vez
+     de comparar comprimento — mas três coisas cheias de detalhe na mesma tela
+     somam em barulho, e num controle o que importa é ver de relance com o
+     polegar em cima. Coluna lisa, fio na borda, algarismo grande. */
+  .motor{position:relative;border-radius:6px;
+         border:1px solid rgba(226,236,248,.16);background:#04070a;
+         box-shadow:0 10px 26px rgba(0,0,0,.45);
          user-select:none;-webkit-user-select:none;touch-action:none}
-  .motor::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
-         background:repeating-linear-gradient(90deg,transparent 0 7px,#04070a 7px 10px)}
-  body.paisagem .motor::after{
-         background:repeating-linear-gradient(0deg,transparent 0 7px,#04070a 7px 10px)}
   #acel{width:100%;max-width:340px;height:74px;overflow:hidden;cursor:ns-resize}
   /* a mesma barra serve de pé (deitado, tira alta) e deitada (em pé, tira
      baixa e larga): quem escolhe o eixo é o JS, olhando a forma da tira */
   /* verde no acelerador, azul no nitro: de relance dá para saber qual é qual
      sem ler nada */
+  /* ENCHIMENTO FRACO E UM FIO ACESO NO TOPO. Sem as listras, a coluna cheia
+     virou um bloco de verde neon do tamanho do polegar — chamava mais atenção
+     que a bola de horizonte, que é o instrumento. Numa fita de motor moderna
+     quem marca o valor é a LINHA no alto do enchimento, não a massa de cor:
+     a massa só diz "mais ou menos por aqui". O fio de cima é desenhado pelo
+     JS, que já sabe se a coluna sobe ou anda de lado. */
   #acelBarra{position:absolute;left:0;bottom:0;width:100%;height:67%;
-             background:#2ec46b;pointer-events:none}
+             background:rgba(63,224,112,.26);pointer-events:none}
   /* os números em monoespaçado: algarismo de tela de avião não dança de
      largura quando troca de 99 para 100 */
   #acelNum{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;
@@ -241,16 +246,18 @@
   #acelRot{position:absolute;left:0;right:0;bottom:4px;text-align:center;font-size:8.5px;
            letter-spacing:1.4px;color:#dbe6f5;font-weight:700;pointer-events:none;z-index:2;
            text-shadow:0 0 4px #000,0 1px 3px #000}
-  #acel.mexendo{border-color:#5cf09a}
+  #acel.mexendo{border-color:rgba(92,240,154,.8)}
 
   #nitro{width:100%;max-width:340px;height:74px;overflow:hidden;cursor:pointer;
          display:flex;align-items:center;justify-content:center}
   #nitro b{position:relative;z-index:2;font:800 15px/1 ui-monospace,"SF Mono",monospace;
            letter-spacing:2.5px;color:#cfeeff;text-shadow:0 0 6px #000,0 2px 8px #000}
   #nitroCarga{position:absolute;left:0;bottom:0;top:0;width:var(--carga,100%);
-              background:#63d8ff;pointer-events:none;transition:width .12s linear}
-  #nitro.ligado{border-color:#63d8ff;
-                box-shadow:0 0 0 5px #6b737e, 0 0 0 7px #343941, 0 0 20px rgba(99,216,255,.55)}
+              background:rgba(99,216,255,.24);pointer-events:none;
+              border-right:2px solid rgba(99,216,255,.9);
+              transition:width .12s linear}
+  body.paisagem #nitroCarga{border-right:0;border-top:2px solid rgba(99,216,255,.9)}
+  #nitro.ligado{border-color:rgba(99,216,255,.85);box-shadow:0 0 18px rgba(99,216,255,.4)}
   #nitro.ligado b{color:#fff}
   #nitro.vazio{opacity:.45}
   #nitro.vazio b{color:#ff9a9a}
@@ -1048,10 +1055,10 @@ const ADI = {
     const g = c.getContext('2d');
     g.setTransform(px/L, 0, 0, px/L, 0, 0);
     const M = L/2, grau = d*0.0155;               // pixels por grau de arfagem
-    g.fillStyle = '#3a86cf'; g.fillRect(0, 0, L, M);          // o céu
-    g.fillStyle = '#7b5730'; g.fillRect(0, M, L, M);          // e a terra
+    g.fillStyle = '#2b5c88'; g.fillRect(0, 0, L, M);          // o céu
+    g.fillStyle = '#5c422a'; g.fillRect(0, M, L, M);          // e a terra
     const cu = g.createLinearGradient(0, M - d*0.5, 0, M);
-    cu.addColorStop(0, 'rgba(255,255,255,0)'); cu.addColorStop(1, 'rgba(190,225,255,.35)');
+    cu.addColorStop(0, 'rgba(255,255,255,0)'); cu.addColorStop(1, 'rgba(170,210,245,.20)');
     g.fillStyle = cu; g.fillRect(0, M - d*0.5, L, d*0.5);
     g.fillStyle = 'rgba(255,255,255,.95)'; g.fillRect(0, M - 1, L, 2);   // o horizonte
     /* A ESCADA: traço comprido a cada 10°, curto a cada 5°, número nas pontas
@@ -1059,17 +1066,21 @@ const ADI = {
        sabe, de relance e de cabeça para baixo, para que lado é o chão. */
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.font = '700 ' + Math.max(7, d*0.046).toFixed(1) + 'px ui-monospace, monospace';
-    for (let a = -90; a <= 90; a += 5){
+    /* DE DEZ EM DEZ, e não de cinco em cinco. Os degraus de 5° dobravam o
+       número de traços na bola e não acrescentavam leitura nenhuma num disco
+       do tamanho de uma moeda — eram textura, não informação. Traço curto
+       pelo mesmo motivo: escada comprida briga com o arco de inclinação. */
+    for (let a = -60; a <= 60; a += 10){
       if (a === 0) continue;
-      const y = M - a*grau, comp = a % 10 === 0 ? d*0.17 : d*0.085;
-      g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = a % 10 === 0 ? 2 : 1.4;
-      g.setLineDash(a < 0 ? [4, 4] : []);
+      const y = M - a*grau, comp = d*0.125;
+      g.strokeStyle = 'rgba(240,246,252,.85)'; g.lineWidth = 1.6;
+      g.setLineDash(a < 0 ? [5, 5] : []);
       g.beginPath(); g.moveTo(M - comp, y); g.lineTo(M + comp, y); g.stroke();
       g.setLineDash([]);
-      if (a % 10 === 0){
-        g.fillStyle = 'rgba(255,255,255,.92)';
-        g.fillText(String(Math.abs(a)), M - comp - d*0.048, y);
-        g.fillText(String(Math.abs(a)), M + comp + d*0.048, y);
+      if (Math.abs(a) % 20 === 0){          // número só de vinte em vinte
+        g.fillStyle = 'rgba(240,246,252,.85)';
+        g.fillText(String(Math.abs(a)), M - comp - d*0.045, y);
+        g.fillText(String(Math.abs(a)), M + comp + d*0.045, y);
       }
     }
     this._bola = c; this._bolaLado = L;
@@ -1099,10 +1110,10 @@ const ADI = {
 
     /* O ARCO DE INCLINAÇÃO, parado na borda: 10, 20, 30, 45 e 60 graus, com o
        triângulo cheio no zero. É contra ele que corre o ponteiro. */
-    c.strokeStyle = 'rgba(255,255,255,.9)'; c.fillStyle = 'rgba(255,255,255,.9)';
+    c.strokeStyle = 'rgba(240,246,252,.8)'; c.fillStyle = 'rgba(240,246,252,.8)';
     for (const a of [-60,-45,-30,-20,-10, 10, 20, 30, 45, 60]){
-      const t = (a - 90)*Math.PI/180, comp = (a % 30 === 0 || a === 45) ? R*0.115 : R*0.065;
-      c.lineWidth = (a % 30 === 0 || a === 45) ? 2 : 1.4;
+      const t = (a - 90)*Math.PI/180, comp = (a % 30 === 0 || a === 45) ? R*0.10 : R*0.055;
+      c.lineWidth = (a % 30 === 0 || a === 45) ? 1.8 : 1.2;
       c.beginPath();
       c.moveTo(M + Math.cos(t)*R*0.93, M + Math.sin(t)*R*0.93);
       c.lineTo(M + Math.cos(t)*(R*0.93 - comp), M + Math.sin(t)*(R*0.93 - comp));
@@ -1156,16 +1167,21 @@ const ADI = {
        redondo o canto não existe; o que existe é a corda do círculo naquela
        altura, e é dentro dela que o número tem de caber. A janela preta
        também não é enfeite: sem ela o algarismo branco some no céu claro. */
+    /* SEM CAIXA PRETA. Eram quatro molduras num disco do tamanho de uma
+       moeda, e elas pesavam mais do que os números que carregavam. Sombra
+       dura no lugar: lê igual sobre o céu e sobre a terra e não desenha nada.
+       O que continua valendo é a posição: dentro da CORDA do círculo naquela
+       altura, que é o erro que cortou a altitude de 1840 m em "284". */
     c.font = '700 ' + Math.max(8, d*0.058).toFixed(1) + 'px ui-monospace, monospace';
     c.textBaseline = 'middle';
     const janela = (txt, cor, dir, cima) => {
-      const py = cima ? d*0.17 : d - d*0.17;
-      const lg = c.measureText(txt).width, ah = d*0.085;
-      const px = dir > 0 ? d*0.80 - lg : d*0.20;
-      c.fillStyle = 'rgba(4,8,12,.78)';
-      c.fillRect(px - d*0.018, py - ah/2, lg + d*0.036, ah);
+      const py = cima ? d*0.155 : d - d*0.155;
+      const lg = c.measureText(txt).width;
+      c.save();
+      c.shadowColor = 'rgba(0,0,0,.9)'; c.shadowBlur = 3;
       c.fillStyle = cor; c.textAlign = 'left';
-      c.fillText(txt, px, py);
+      c.fillText(txt, dir > 0 ? d*0.82 - lg : d*0.18, py);
+      c.restore();
     };
     if (vivo){
       janela(Math.round(Atitude.V) + ' m/s', '#cfe0f5', -1, true);
