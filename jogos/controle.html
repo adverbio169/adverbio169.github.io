@@ -103,9 +103,9 @@
   #horizonte{--d:min(72vw,46vh,300px);width:var(--d);height:var(--d);flex-shrink:0;
              border-radius:50%;overflow:hidden;position:relative;
              background:#04070a;
-             border:2px solid #3d444c;
-             box-shadow:0 0 0 7px #262b31, 0 0 0 8px #14171b,
-                        inset 0 1px 0 rgba(255,255,255,.14), 0 18px 44px rgba(0,0,0,.55)}
+             border:2px solid #13161a;
+             box-shadow:0 0 0 7px #6b737e, 0 0 0 9px #343941,
+                        inset 0 1px 0 rgba(255,255,255,.16), 0 18px 44px rgba(0,0,0,.55)}
   #ceu{display:none}            /* o gradiente saiu: a bola agora é desenhada */
   #mira{display:none}           /* e o símbolo do avião também */
   body.artilheiro #adiLona{display:none}
@@ -131,7 +131,7 @@
   .placar{display:flex;gap:10px;font-variant-numeric:tabular-nums}
   /* `> div`, e não `div`: o seletor largo pegava também o rótulo e o valor lá
      dentro, e cada janela virou três janelas encaixadas */
-  .placar > div{text-align:center;background:#04070a;border:1px solid #3d444c;
+  .placar > div{text-align:center;background:#04070a;border:1px solid #6b737e;
               border-radius:4px;padding:3px 9px 4px;min-width:58px}
   .placar .rot{font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;color:#8fa3c8;font-weight:700}
   .placar .val{font-size:19px;font-weight:800;font-family:ui-monospace,"SF Mono",monospace;color:#e8f0fa}
@@ -212,10 +212,13 @@
      tudo, coladas na caixa. Assim a mesma regra serve para a barra que sobe
      (celular deitado) e para a que anda de lado (em pé), sem tocar no JS que
      decide o eixo. */
+  /* a moldura é a mesma das telas da cabine e do KC-390: liga CLARA por fora,
+     fio escuro no rebaixo e vidro preto dentro. O aro escuro que eu tinha
+     posto antes era de caixa militar dos anos 90. */
   .motor{position:relative;border-radius:5px;
-         border:2px solid #3d444c;background:#04070a;
-         box-shadow:0 0 0 5px #262b31, 0 0 0 6px #14171b,
-                    inset 0 1px 0 rgba(255,255,255,.12);
+         border:2px solid #13161a;background:#04070a;
+         box-shadow:0 0 0 5px #6b737e, 0 0 0 7px #343941,
+                    inset 0 1px 0 rgba(255,255,255,.14);
          user-select:none;-webkit-user-select:none;touch-action:none}
   .motor::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
          background:repeating-linear-gradient(90deg,transparent 0 7px,#04070a 7px 10px)}
@@ -247,7 +250,7 @@
   #nitroCarga{position:absolute;left:0;bottom:0;top:0;width:var(--carga,100%);
               background:#63d8ff;pointer-events:none;transition:width .12s linear}
   #nitro.ligado{border-color:#63d8ff;
-                box-shadow:0 0 0 5px #262b31, 0 0 0 6px #14171b, 0 0 20px rgba(99,216,255,.5)}
+                box-shadow:0 0 0 5px #6b737e, 0 0 0 7px #343941, 0 0 20px rgba(99,216,255,.55)}
   #nitro.ligado b{color:#fff}
   #nitro.vazio{opacity:.45}
   #nitro.vazio b{color:#ff9a9a}
@@ -1053,8 +1056,8 @@ const ADI = {
     const g = c.getContext('2d');
     g.setTransform(px/L, 0, 0, px/L, 0, 0);
     const M = L/2, grau = d*0.0155;               // pixels por grau de arfagem
-    g.fillStyle = '#2f77c9'; g.fillRect(0, 0, L, M);          // o céu
-    g.fillStyle = '#6b4a27'; g.fillRect(0, M, L, M);          // e a terra
+    g.fillStyle = '#3a86cf'; g.fillRect(0, 0, L, M);          // o céu
+    g.fillStyle = '#7b5730'; g.fillRect(0, M, L, M);          // e a terra
     const cu = g.createLinearGradient(0, M - d*0.5, 0, M);
     cu.addColorStop(0, 'rgba(255,255,255,0)'); cu.addColorStop(1, 'rgba(190,225,255,.35)');
     g.fillStyle = cu; g.fillRect(0, M - d*0.5, L, d*0.5);

@@ -14781,22 +14781,6 @@ function bussola(y){
   h2.restore(); h2.textAlign = 'left';
 }
 
-/* As réguas do motor da cabine também são desenhadas na lona. Como a fita da
-   altura, elas precisam poder DIZER onde estão, senão o mapinha — que só sabe
-   de elementos do documento — se planta em cima delas. Foi o que aconteceu. */
-function reguasOnde(){
-  /* a tela do motor sai do MENOR lado: num celular deitado é a altura que
-     aperta, e um painel medido pela largura sairia por baixo */
-  const w = Math.max(104, Math.min(W*0.155, H*0.30));
-  const h = Math.max(40, Math.min(w*0.42, H*0.115));
-  const x = Math.max(10, W*0.052), y = H*0.615;
-  /* o bloco de G mora logo acima, na mesma coluna: é a leitura que se procura
-     junto com a potência quando se está manobrando */
-  const gh = Math.max(30, H*0.072);
-  return { x, y, w, h, gh, gy: y - gh - h*0.18,
-           topo: y - gh - h*0.18, alt: gh + h*0.18 + h };
-}
-
 /* --- A FITA DA ALTURA --------------------------------------------------------
    "O HUD de altura pode ser no mesmo estilo do HUD de lateralidade, só que
    vertical."
@@ -14955,45 +14939,18 @@ function radarOnde(){
   const agora = performance.now();
   if (_radar !== undefined && agora - _radarQuando < 500) return _radar;
   _radarQuando = agora;
-
-  const obst = [];
-  /* a lista dos comandos de dedo era escrita um a um — e o botão DEFESA, que
-     nasceu depois, não estava nela: o disco foi desenhado por baixo dele. Uma
-     lista de nomes que precisa ser lembrada a cada botão novo é um defeito à
-     espera; agora vale a família inteira (`#dedos > *`), e o que aparecer
-     amanhã já entra na conta sozinho. */
-  for (const el of document.querySelectorAll(
-        '.painel, .bt, #convite, #dedos > *')){
-    if (getComputedStyle(el).display === 'none') continue;
-    const q = el.getBoundingClientRect();
-    if (q.width > 0 && q.height > 0) obst.push(q);
-  }
-  /* a fita da altura é desenhada na lona, não é elemento nenhum do documento —
-     então ela precisa entrar na lista à mão, senão o disco passa por cima */
-  const fa = fitaAlturaOnde();
-  if (fa) obst.push({ left: fa.cx - fa.larg/2 - 30, right: fa.cx + fa.larg/2 + 44,
-                      top: fa.cy - fa.meia - 10, bottom: fa.cy + fa.meia + 34 });
+  const obst = obstaculosDoHUD();
+  /* o PFD escolhe primeiro e o MFD desvia dele: entre dois instrumentos que
+     disputam a mesma tela, quem manda é o primário */
   if (cockpit){
-    const g = reguasOnde();
-    obst.push({ left: g.x - 10, right: g.x + g.w + 10,
-                top: g.topo - 10, bottom: g.y + g.h + 10 });
+    const p = pfdOnde();
+    if (p) obst.push({ left: p.x - 10, right: p.x + p.w + 10,
+                       top: p.y - 10, bottom: p.y + p.h + 10 });
   }
-  /* O MFD É QUADRADO, e a prova de encosto tem de ser quadrado contra
-     retângulo. Enquanto ele era um disco isto era distância a um ponto; com a
-     tela retangular, a mesma conta deixaria os quatro cantos por cima dos
-     painéis — e canto de MFD é justamente onde ficam os dados escritos. */
-  const encosta = (q, cx, cy, r) => !(cx + r <= q.left || q.right <= cx - r ||
-                                      cy + r <= q.top  || q.bottom <= cy - r);
-  /* Só encolher no canto não resolve: o canto é justamente onde os painéis
-     moram, e o disco encolhia até 40 sem nunca sair de dentro deles. Ele tem
-     de DESLIZAR pela borda — de baixo para cima, que é onde um radar se
-     espera — até achar a faixa livre. Encolher é o último recurso, não o
-     primeiro. */
-  /* E nem a borda basta: no modo de dedo as tiras do acelerador e do nitro
-     ocupam os dois lados de cima a baixo, então NENHUMA posição encostada na
-     borda fica livre — num celular o disco simplesmente não aparecia. A busca
-     entra para dentro também, de fora para o meio, ficando o mais longe do
-     centro que der (o meio da tela é por onde se olha para voar). */
+  /* A TELA É QUADRADA e a prova de encosto é retângulo contra retângulo.
+     Enquanto era um disco isto era distância a um ponto; com a tela
+     retangular, a mesma conta deixaria os quatro cantos por cima dos painéis
+     — e canto de tela é justamente onde ficam os dados escritos. */
   const m = 12, rMax = Math.max(44, Math.min(W, H) * 0.115);
   for (let r = rMax; r >= 34; r -= 4){
     const dentro = [];
@@ -15004,7 +14961,7 @@ function radarOnde(){
     for (const cx of dentro){
       if (cx - r < 0 || cx + r > W) continue;
       for (let cy = H - m - r; cy >= m + r; cy -= 8){    // subindo do rodapé
-        if (obst.some(q => encosta(q, cx, cy, r))) continue;
+        if (obst.some(q => bateCaixa(q, cx - r, cy - r, r*2, r*2))) continue;
         _radar = { cx, cy, r };
         return _radar;
       }
@@ -15014,54 +14971,49 @@ function radarOnde(){
   return null;
 }
 /* a arrumação mudou: esquece o que estava decorado */
-addEventListener('resize', () => { _radarQuando = 0; });
+addEventListener('resize', () => { _radarQuando = 0; _pfdQuando = 0; });
 /* trocar cabine/vista de fora muda o que está desenhado na lona */
-function esqueceRadar(){ _radarQuando = 0; }
+function esqueceRadar(){ _radarQuando = 0; _pfdQuando = 0; }
 
 /* =============================================================================
-   O PAINEL DE VIDRO
+   O PAINEL, AGORA COPIADO DO KC-390
 
-   "nosso avião é um jato, então as coisas têm que ser de avião moderno. esses
-   instrumentos parecem de avião velho."
+   "achei feio. faz o seguinte, pega o painel do KC 390."
 
-   Estavam mesmo, e o erro foi meu: eu li "instrumentos reais" e desenhei
-   RELÓGIO DE PONTEIRO — aro de alumínio, parafuso, agulha, vidro com reflexo.
-   Aquilo é um instrumento real, só que de 1960. Um caça de quinta geração não
-   tem nenhum. O painel dele é VIDRO: três ou quatro telas pretas com desenho
-   vetorial fino por cima, e mais nada.
+   Fui pesquisar, e a distância entre o que eu tinha desenhado e o painel do
+   Embraer é grande — e é ela que explica o "feio".
 
-   O que muda, concretamente, e por quê:
+   O KC-390 tem CINCO TELAS DE 15 POLEGADAS EM PAISAGEM, da família Pro Line
+   Fusion da Collins, com dois HUD e visão sintética. O que eu tinha feito era
+   um MFD militar dos anos 90: caixa preta QUADRADA, moldura grossa e vinte
+   teclinhas em volta. As teclinhas são a diferença mais visível, e o motivo
+   delas some no Fusion: aquele painel é TÁTIL, "com telas intuitivas parecidas
+   com as de um telefone". Tela tátil não precisa de fileira de botões, então a
+   moldura fica FINA e a imagem ocupa quase o vidro inteiro. Era disso que
+   vinha o aperto do meu desenho: eu estava gastando um quinto da tela com
+   botões que o avião não tem.
 
-     · SAI O ARO REDONDO, ENTRA A MOLDURA RETANGULAR com as teclas nas quatro
-       bordas. Aquelas teclinhas não são enfeite: são os botões de opção, e é
-       por elas que a mesma tela vira radar, mapa, armamento ou motor. É a peça
-       que mais grita "tela de caça moderno", porque nenhuma outra coisa no
-       mundo tem esse formato.
-     · SAI A AGULHA, ENTRA O NÚMERO. Ponteiro existe porque um mecanismo de
-       molas não sabe escrever. Onde há tela, a leitura é digital e o
-       analógico vira uma FITA ou uma barra de segmentos ao lado do número —
-       que é como se mostra tendência sem gastar a área toda.
-     · SAI O VERDE FÓSFORO, ENTRA O VETOR FINO. Tubo de fósforo é dos anos 70.
-       Tela ativa desenha linha fina e clara, em cores separadas por função:
-       branco/verde para o que é meu, âmbar para atenção, vermelho para
-       ameaça, ciano para navegação.
-     · SAI A VARREDURA QUE RODA. Radar de antena giratória varre; radar de
-       antena eletrônica não tem o que girar, e a tela dele não tem aquele
-       rastro. Tirar foi a mudança mais dolorida — é a imagem mais conhecida
-       de "radar" que existe — e é justamente por ser a mais conhecida que ela
-       datava o painel inteiro.
-     · E O G SAI DO PAINEL E VAI PARA O HUD. Num caça moderno o fator de carga
-       é um número no canto esquerdo do vidro de frente, junto com o pico do
-       voo. Ninguém tira o olho do alvo para procurar um mostrador de carga.
+   O arranjo do PFD também é fixo e eu não estava seguindo: é o "T" — atitude
+   no meio, FITA DE VELOCIDADE À ESQUERDA, FITA DE ALTITUDE À DIREITA com a
+   razão de subida colada nela, e o RUMO EMBAIXO. Não é gosto de fabricante; é
+   a arrumação que a aviação inteira usa desde que existe tela, e é por isso
+   que qualquer piloto lê um painel que nunca viu.
 
-   O que NÃO muda é a regra de custo: a moldura, as teclas e a escala são
-   imagem parada, então são pintadas uma vez numa lona à parte e daí em diante
-   são uma cópia. Só o que se mexe é redesenhado.
+   E as cores são as do padrão, não as que eu escolhi: céu azul e chão TERRA na
+   bola de atitude, branco para escala e leitura, VERDE para o que está normal,
+   ÂMBAR para atenção, VERMELHO para limite, MAGENTA para o que a navegação
+   pediu. Os meus verdes-fósforo em fundo preto eram de tubo de raios catódicos.
+
+   Fontes:
+     https://embraer.com/defense-security-air/kc-390-millennium/en/
+     https://www.flightglobal.com/embraer-selects-pro-line-fusion-for-kc-390-cockpit/99722.article
+     https://breakingdefense.com/2025/09/next-gen-kc-390-millennium-expands-multimission-options-for-air-forces/
    ========================================================================== */
-const MFD_MOLD = '#262b31', MFD_MOLD_ALTO = '#3d444c', MFD_MOLD_BAIXO = '#14171b';
-const MFD_TELA = '#04070a';
-const MFD_VERDE = '#5cf09a', MFD_CIANO = '#63d8ff', MFD_AMBAR = '#ffc046',
-      MFD_BRANCO = '#e8f0fa', MFD_VERM = '#ff6a58';
+const PFD_CEU_A = '#1a5ba8', PFD_CEU_B = '#57a5e4';
+const PFD_CHAO_A = '#8d6437', PFD_CHAO_B = '#402c14';
+const PFD_FITA = 'rgba(20,26,32,.70)';
+const PFD_BRANCO = '#f2f6fb', PFD_MAGENTA = '#ff63e0', PFD_VERDE = '#3fe070',
+      PFD_AMBAR = '#ffc23a', PFD_VERM = '#ff4f3d', PFD_CIANO = '#63d8ff';
 function angInst(grau){ return (grau - 90) * Math.PI/180; }
 function pontoInst(cx, cy, r, grau){
   const a = angInst(grau);
@@ -15076,7 +15028,7 @@ function cantoInst(c, x, y, w, h, r){
    redesenha sozinho e nada fica esticado */
 const _facesInst = new Map();
 function faceInst(chave, larg, alt, pinta){
-  const pw = Math.max(24, Math.round(larg*dpr)), ph = Math.max(24, Math.round(alt*dpr));
+  const pw = Math.max(16, Math.round(larg*dpr)), ph = Math.max(16, Math.round(alt*dpr));
   const k = chave + '|' + pw + 'x' + ph;
   let c = _facesInst.get(k);
   if (!c){
@@ -15088,94 +15040,393 @@ function faceInst(chave, larg, alt, pinta){
     _facesInst.set(k, c);
     /* a tela muda de tamanho enquanto se arrasta a janela e cada largura vira
        uma lona: sem teto isto viraria um vazamento de memória lento */
-    if (_facesInst.size > 20) _facesInst.delete(_facesInst.keys().next().value);
+    if (_facesInst.size > 24) _facesInst.delete(_facesInst.keys().next().value);
   }
   return c;
 }
 
-/* --- A MOLDURA DE UM MFD ----------------------------------------------------
-   Quadro de liga escura, tela preta afundada e as teclas de opção nas bordas.
-   `teclas` diz quantas em cada lado — cinco em cima e embaixo, cinco de cada
-   lado é o arranjo de vinte que se vê na maioria das telas de caça. */
-function molduraMFD(c, w, h, borda, teclas){
-  const g = c.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, MFD_MOLD_ALTO); g.addColorStop(0.18, MFD_MOLD);
-  g.addColorStop(1, MFD_MOLD_BAIXO);
-  cantoInst(c, 0, 0, w, h, borda*0.55); c.fillStyle = g; c.fill();
-  // a tela, afundada: a linha clara em cima do rebaixo é o que dá profundidade
-  cantoInst(c, borda, borda, w - borda*2, h - borda*2, borda*0.22);
-  c.fillStyle = 'rgba(0,0,0,.65)'; c.fill();
-  cantoInst(c, borda, borda, w - borda*2, h - borda*2, borda*0.22);
-  c.fillStyle = MFD_TELA; c.fill();
-  // as teclas de opção
-  const tk = (x, y, tw, th) => {
-    cantoInst(c, x, y, tw, th, Math.min(tw, th)*0.3);
-    c.fillStyle = '#464d56'; c.fill();
-    cantoInst(c, x, y, tw, th*0.5, Math.min(tw, th)*0.3);
-    c.fillStyle = 'rgba(255,255,255,.10)'; c.fill();
-  };
-  const n = teclas || 5;
-  const tw = (w - borda*2)/(n*2.1), th = borda*0.42;
-  for (let i = 0; i < n; i++){
-    const x = borda + (w - borda*2)*(i + 0.5)/n - tw/2;
-    tk(x, borda*0.28, tw, th); tk(x, h - borda*0.28 - th, tw, th);
-  }
-  const vh = (h - borda*2)/(n*2.1), vw = borda*0.42;
-  for (let i = 0; i < n; i++){
-    const y = borda + (h - borda*2)*(i + 0.5)/n - vh/2;
-    tk(borda*0.28, y, vw, vh); tk(w - borda*0.28 - vw, y, vw, vh);
-  }
+/* --- A MOLDURA DE UMA TELA DO FUSION ----------------------------------------
+   Fina, de liga clara, com o rebaixo escuro entre o metal e o vidro. A
+   grossura é 3,5% do menor lado — no MFD militar que eu tinha feito era 17%,
+   e era aí que moravam os vinte botões. */
+function molduraTela(c, w, h, b){
+  const g = c.createLinearGradient(0, 0, w*0.35, h);
+  g.addColorStop(0, '#a8b0ba'); g.addColorStop(0.42, '#6b737e'); g.addColorStop(1, '#343941');
+  cantoInst(c, 0, 0, w, h, b*1.6); c.fillStyle = g; c.fill();
+  cantoInst(c, b*0.42, b*0.42, w - b*0.84, h - b*0.84, b*1.1);
+  c.fillStyle = '#13161a'; c.fill();
+  cantoInst(c, b, b, w - b*2, h - b*2, b*0.5);
+  c.fillStyle = '#04070a'; c.fill();
+}
+/* a caixa de leitura: retângulo preto de fio branco, que é como toda leitura
+   corrente aparece numa fita de PFD */
+function caixaLeitura(c, x, y, w, h, cor){
+  /* OPACA, e isto não é detalhe: com 8% de transparência o número que a fita
+     desenha por baixo vazava, e a velocidade aparecia escrita duas vezes, uma
+     fantasma ao lado da outra. Caixa de leitura de PFD mascara a fita. */
+  c.fillStyle = '#04070a'; c.fillRect(x, y, w, h);
+  c.strokeStyle = cor || PFD_BRANCO; c.lineWidth = 1.2;
+  c.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
 }
 
-/* --- A PÁGINA DE SITUAÇÃO (HSD) ---------------------------------------------
-   Este é o radar, agora como o que ele é num caça moderno: uma PÁGINA de uma
-   tela multifunção. Rosa de rumos fina, anéis de alcance tracejados, o avião
-   no meio, e os dados escritos nos quatro cantos da tela em vez de espalhados
-   pelo desenho — porque nas bordas eles não tapam nada e é lá que a vista
-   procura.
 
-   Sem varredura. Doeu tirar, porque a cunha girando é a imagem que todo mundo
-   reconhece como "radar" — e foi por isso mesmo que ela tinha de sair: só há
-   rastro girando onde há ANTENA girando. Esta é a tela do radar do jogo, que é
-   instantâneo, e mostrar um feixe varrendo seria desenhar uma peça que o avião
-   não tem.
+/* --- ONDE AS TELAS CABEM ----------------------------------------------------
+   A busca é a mesma de sempre, e continua sendo busca pelo mesmo motivo de
+   três tentativas atrás: eu decidindo de antemão onde há espaço, numa tela
+   cujo conteúdo muda com o modo, com o tamanho e com o que o avião está
+   fazendo, dá errado todas as vezes. A tela sabe melhor do que eu.
+
+   O que mudou é que agora são DUAS telas e há uma ordem entre elas: o PFD
+   escolhe primeiro, porque é o instrumento primário, e o MFD escolhe depois
+   desviando dele. */
+function obstaculosDoHUD(){
+  const obst = [];
+  for (const el of document.querySelectorAll('.painel, .bt, #convite, #dedos > *')){
+    if (getComputedStyle(el).display === 'none') continue;
+    const q = el.getBoundingClientRect();
+    if (q.width > 0 && q.height > 0) obst.push(q);
+  }
+  const fa = fitaAlturaOnde();
+  if (fa) obst.push({ left: fa.cx - fa.larg/2 - 30, right: fa.cx + fa.larg/2 + 44,
+                      top: fa.cy - fa.meia - 10, bottom: fa.cy + fa.meia + 34 });
+  return obst;
+}
+const bateCaixa = (q, x, y, w, h) => !(x + w <= q.left || q.right <= x ||
+                                       y + h <= q.top  || q.bottom <= y);
+/* procura um retângulo livre de proporção `prop`, começando grande e
+   encolhendo, deslizando de baixo para cima e de fora para dentro */
+function procuraCaixa(obst, propor, lMax, lMin, ladoPref){
+  const m = 12;
+  for (let w = lMax; w >= lMin; w -= 8){
+    const h = w*propor;
+    if (h > H - m*2) continue;
+    const colunas = [];
+    for (let k = 0; k <= 5; k++){
+      if (ladoPref >= 0) colunas.push(m + k*w*0.34);
+      if (ladoPref <= 0) colunas.push(W - m - w - k*w*0.34);
+    }
+    for (const x of colunas){
+      if (x < 0 || x + w > W) continue;
+      for (let y = H - m - h; y >= m; y -= 8){
+        if (obst.some(q => bateCaixa(q, x, y, w, h))) continue;
+        return { x, y, w, h };
+      }
+    }
+  }
+  return null;
+}
+let _pfd = null, _pfdQuando = 0;
+function pfdOnde(){
+  const agora = performance.now();
+  if (_pfd !== undefined && agora - _pfdQuando < 500) return _pfd;
+  _pfdQuando = agora;
+  /* 0,66 de proporção é a de uma tela de painel em paisagem; a largura vai de
+     um quarto da tela até o mínimo em que as fitas ainda se leem */
+  const lMax = Math.max(190, Math.min(W*0.27, H*0.52));
+  _pfd = procuraCaixa(obstaculosDoHUD(), 0.70, lMax, 168, 1);
+  return _pfd;
+}
+
+/* --- O PFD --------------------------------------------------------------- */
+function desenhaPFD(){
+  const o = pfdOnde();
+  if (!o) return;
+  const { x, y, w, h } = o;
+  const b = Math.max(3, Math.min(w, h)*0.035);
+  h2.drawImage(faceInst('pfd-moldura', w, h, (c, ww, hh) =>
+    molduraTela(c, ww, hh, Math.max(3, Math.min(ww, hh)*0.035))), x, y, w, h);
+
+  // a área de vidro, e dentro dela o "T"
+  const vx = x + b, vy = y + b, vw = w - b*2, vh = h - b*2;
+  /* A FITA PRECISA CABER O NÚMERO. Com 15,5% da largura, a altitude de 5.300
+     metros saía escrita "530" — o quarto algarismo caía fora do recorte. Fita
+     de PFD é larga porque o número é o que ela existe para mostrar. */
+  const fw = vw*0.175;
+  const ax = vx + fw, aw = vw - fw*2 - vw*0.085;  // a janela de atitude
+  const ah = vh*0.82;
+  const f1 = Math.max(6.5, vh*0.058);        // o corpo de letra da tela
+
+  /* ---- A BOLA DE ATITUDE ---- */
+  h2.save();
+  h2.beginPath(); h2.rect(ax, vy, aw, ah); h2.clip();
+  const rol = inclinacao, arf = arfagem*180/Math.PI;
+  /* 2,2% da altura por grau abre a janela para uns 22° para cada lado, que é
+     o que um PFD mostra. Com 3% ela mostrava 16°, e a bola ficava tão ampliada
+     que dois graus de nariz já enchiam a tela de marrom. */
+  const grauPx = ah*0.022;
+  const cxA = ax + aw/2, cyA = vy + ah*0.50;
+  h2.save();
+  h2.translate(cxA, cyA);
+  h2.rotate(-rol*Math.PI/180);
+  h2.translate(0, arf*grauPx);
+  const R = Math.hypot(aw, ah);              // cobre a janela em qualquer giro
+  const gc = h2.createLinearGradient(0, -R, 0, 0);
+  gc.addColorStop(0, PFD_CEU_A); gc.addColorStop(1, PFD_CEU_B);
+  h2.fillStyle = gc; h2.fillRect(-R, -R, R*2, R);
+  const gt = h2.createLinearGradient(0, 0, 0, R);
+  gt.addColorStop(0, PFD_CHAO_A); gt.addColorStop(1, PFD_CHAO_B);
+  h2.fillStyle = gt; h2.fillRect(-R, 0, R*2, R);
+  h2.fillStyle = PFD_BRANCO; h2.fillRect(-R, -1, R*2, 2);        // o horizonte
+  /* A ESCADA: risco a cada 5°, comprido e numerado a cada 10, tracejado
+     abaixo do horizonte — é assim que se sabe para que lado é o chão sem ler
+     nada, e vale justamente quando se está de cabeça para baixo. */
+  h2.font = '700 ' + (f1*0.92).toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'center'; h2.textBaseline = 'middle';
+  for (let a = -90; a <= 90; a += 5){
+    if (!a) continue;
+    const yy = a*grauPx, comp = a % 10 === 0 ? aw*0.17 : aw*0.085;
+    if (Math.abs(yy) > ah*0.95) continue;
+    h2.strokeStyle = PFD_BRANCO; h2.lineWidth = a % 10 === 0 ? 1.8 : 1.2;
+    h2.setLineDash(a > 0 ? [4, 4] : []);
+    h2.beginPath(); h2.moveTo(-comp, yy); h2.lineTo(comp, yy); h2.stroke();
+    h2.setLineDash([]);
+    if (a % 10 === 0){
+      h2.fillStyle = PFD_BRANCO;
+      h2.fillText(String(Math.abs(a)), -comp - f1*0.85, yy);
+      h2.fillText(String(Math.abs(a)),  comp + f1*0.85, yy);
+    }
+  }
+  h2.restore();
+
+  /* ---- O ARCO DE INCLINAÇÃO, parado no alto da janela ----
+     COM CONTORNO ESCURO. A escada de arfagem e o arco são os dois traço
+     branco fino na mesma região da tela, e sem o contorno eles se misturavam
+     — o ponteiro de inclinação sumia no meio dos degraus, que é justamente a
+     leitura que o arco existe para dar. Um fio preto por baixo separa os dois
+     planos e não custa nada. */
+  const rArc = ah*0.42;
+  const marcas = (cor, esp) => {
+    h2.strokeStyle = cor;
+    for (const a of [-60,-45,-30,-20,-10,10,20,30,45,60]){
+      const t = (a - 90)*Math.PI/180, comp = (a % 30 === 0 || a === 45) ? rArc*0.16 : rArc*0.09;
+      h2.lineWidth = ((a % 30 === 0 || a === 45) ? 1.8 : 1.2) + esp;
+      h2.beginPath();
+      h2.moveTo(cxA + Math.cos(t)*rArc, cyA + Math.sin(t)*rArc);
+      h2.lineTo(cxA + Math.cos(t)*(rArc - comp), cyA + Math.sin(t)*(rArc - comp));
+      h2.stroke();
+    }
+  };
+  marcas('rgba(0,0,0,.55)', 2.4);
+  marcas(PFD_BRANCO, 0);
+  const zero = (cor, d) => {
+    h2.fillStyle = cor;
+    h2.beginPath();
+    h2.moveTo(cxA, cyA - rArc - d); h2.lineTo(cxA - rArc*0.055 - d, cyA - rArc*0.87 + d);
+    h2.lineTo(cxA + rArc*0.055 + d, cyA - rArc*0.87 + d); h2.closePath(); h2.fill();
+  };
+  zero('rgba(0,0,0,.55)', 1.6); zero(PFD_BRANCO, 0);
+  // o ponteiro, que corre contra o arco
+  h2.save();
+  h2.translate(cxA, cyA); h2.rotate(-rol*Math.PI/180);
+  const seta = (cor, d) => {
+    h2.fillStyle = cor;
+    h2.beginPath();
+    h2.moveTo(0, -rArc*0.845 - d); h2.lineTo(-rArc*0.062 - d, -rArc*0.715 + d);
+    h2.lineTo(rArc*0.062 + d, -rArc*0.715 + d); h2.closePath(); h2.fill();
+  };
+  seta('rgba(0,0,0,.6)', 1.8);
+  seta(Math.abs(rol) > 60 ? PFD_AMBAR : PFD_BRANCO, 0);
+  h2.restore();
+  h2.restore();
+
+  /* ---- O SÍMBOLO DO AVIÃO, fixo, com contorno preto por baixo ---- */
+  const asa = aw*0.20, deg = ah*0.05;
+  const simbolo = (cor, esp) => {
+    h2.strokeStyle = cor; h2.lineWidth = esp; h2.lineJoin = 'round';
+    h2.beginPath();
+    h2.moveTo(cxA - asa, cyA); h2.lineTo(cxA - asa*0.40, cyA);
+    h2.lineTo(cxA - asa*0.40, cyA + deg);
+    h2.moveTo(cxA + asa, cyA); h2.lineTo(cxA + asa*0.40, cyA);
+    h2.lineTo(cxA + asa*0.40, cyA + deg);
+    h2.moveTo(cxA - asa*0.075, cyA); h2.lineTo(cxA + asa*0.075, cyA);
+    h2.stroke();
+  };
+  simbolo('rgba(0,0,0,.6)', Math.max(3.4, ah*0.030));
+  simbolo(PFD_AMBAR, Math.max(1.8, ah*0.016));
+
+  /* ---- A FITA DE VELOCIDADE, à esquerda ---------------------------------
+     Com a FAIXA VERMELHA DO ESTOL desenhada na própria fita, abaixo da
+     velocidade mínima. É a coisa mais útil que uma fita de velocidade faz:
+     mostra o limite no mesmo lugar em que mostra onde se está, então "quanto
+     falta" se lê sem conta nenhuma. E ela anda sozinha com o flape, porque a
+     velocidade mínima do jogo depende do flape. */
+  const vel = voo/METRO, vMin = velMin()/METRO;
+  const JAN_V = 40;                          // metros por segundo visíveis
+  h2.fillStyle = PFD_FITA; h2.fillRect(vx, vy, fw, ah);
+  h2.save();
+  h2.beginPath(); h2.rect(vx, vy, fw, ah); h2.clip();
+  const yDeV = v => vy + ah/2 - (v - vel)/JAN_V*ah;
+  h2.fillStyle = 'rgba(200,40,30,.55)';
+  h2.fillRect(vx + fw*0.72, yDeV(vMin), fw*0.28, Math.max(0, vy + ah - yDeV(vMin)));
+  h2.font = '700 ' + f1.toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'right'; h2.textBaseline = 'middle';
+  for (let v = Math.floor((vel - JAN_V/2)/5)*5; v <= vel + JAN_V/2; v += 5){
+    if (v < 0) continue;
+    const yy = yDeV(v), grande = v % 10 === 0;
+    h2.strokeStyle = PFD_BRANCO; h2.lineWidth = 1.2;
+    h2.beginPath();
+    h2.moveTo(vx + fw*(grande ? 0.56 : 0.66), yy); h2.lineTo(vx + fw*0.72, yy); h2.stroke();
+    if (grande){ h2.fillStyle = PFD_BRANCO; h2.fillText(String(v), vx + fw*0.50, yy); }
+  }
+  h2.restore();
+  const cvh = f1*1.85, cvw = fw*1.06;
+  caixaLeitura(h2, vx - 1, vy + ah/2 - cvh/2, cvw, cvh, vel < vMin ? PFD_VERM : PFD_BRANCO);
+  h2.font = '800 ' + (f1*1.22).toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'right'; h2.fillStyle = vel < vMin ? PFD_VERM : PFD_BRANCO;
+  h2.fillText(String(Math.round(vel)), vx + cvw - f1*0.35, vy + ah/2);
+
+  /* ---- A FITA DE ALTITUDE, à direita, e a razão de subida colada nela ---- */
+  const alt = (aviaoY - CHAO)/METRO, JAN_A = 400;
+  const tx = ax + aw, tw = fw;
+  h2.fillStyle = PFD_FITA; h2.fillRect(tx, vy, tw, ah);
+  h2.save();
+  h2.beginPath(); h2.rect(tx, vy, tw, ah); h2.clip();
+  const yDeA = a => vy + ah/2 - (a - alt)/JAN_A*ah;
+  // o chão, em âmbar: é o limite que mata, e ele tem de saltar na fita
+  const yChao = yDeA(0);
+  h2.fillStyle = 'rgba(200,40,30,.5)';
+  h2.fillRect(tx, yChao, tw*0.30, Math.max(0, vy + ah - yChao));
+  h2.font = '700 ' + f1.toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'left'; h2.textBaseline = 'middle';
+  for (let a = Math.floor((alt - JAN_A/2)/50)*50; a <= alt + JAN_A/2; a += 50){
+    if (a < 0) continue;
+    const yy = yDeA(a), grande = a % 100 === 0;
+    h2.strokeStyle = PFD_BRANCO; h2.lineWidth = 1.2;
+    h2.beginPath();
+    h2.moveTo(tx + tw*0.30, yy); h2.lineTo(tx + tw*(grande ? 0.38 : 0.33), yy); h2.stroke();
+    /* o número BEM longe do risco: colado, o traço lia-se como sinal de menos
+       e a altitude de 300 m aparecia na tela como "−300" */
+    if (grande){ h2.fillStyle = PFD_BRANCO;
+      h2.font = '700 ' + (f1*0.88).toFixed(1) + 'px system-ui, sans-serif';
+      h2.fillText(String(a), tx + tw*0.46, yy); }
+  }
+  h2.restore();
+  caixaLeitura(h2, tx + 1, vy + ah/2 - cvh/2, cvw, cvh, alt < 40 ? PFD_AMBAR : PFD_BRANCO);
+  h2.font = '800 ' + (f1*1.22).toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'left'; h2.fillStyle = alt < 40 ? PFD_AMBAR : PFD_BRANCO;
+  h2.fillText(String(Math.round(alt)), tx + f1*0.40, vy + ah/2);
+
+  /* A RAZÃO DE SUBIDA, colada na fita de altitude. A escala é COMPRIMIDA nas
+     pontas (expoente 0,65) como a dos aparelhos de verdade: perto do zero ela
+     é fina, porque é ali que se pilota, e as descidas grandes cabem no mesmo
+     espaço sem sair da tela. */
+  const sx = vx + vw - vw*0.085, sw = vw*0.085, vsi = subida/METRO;
+  h2.fillStyle = PFD_FITA; h2.fillRect(sx, vy, sw, ah);
+  /* O FUNDO DA ESCALA É 60 m/s, e não 20. Vinte é a escala de um avião de
+     transporte; este sobe a mais de cem, e com o fundo em vinte a agulha
+     vivia encostada no topo, que é o mesmo que não ter agulha. */
+  const VSI_FUNDO = 60;
+  const yDeVsi = m => vy + ah/2
+        - Math.sign(m)*Math.pow(Math.min(1, Math.abs(m)/VSI_FUNDO), 0.65)*ah*0.44;
+  h2.strokeStyle = 'rgba(242,246,251,.6)'; h2.lineWidth = 1;
+  h2.font = '700 ' + (f1*0.78).toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'left'; h2.textBaseline = 'middle';
+  for (const m of [-60,-30,-10,10,30,60]){
+    const yy = yDeVsi(m);
+    h2.beginPath();
+    h2.moveTo(sx, yy); h2.lineTo(sx + sw*(m % 10 === 0 ? 0.42 : 0.26), yy); h2.stroke();
+    if (Math.abs(m) === 60 || Math.abs(m) === 30){
+      h2.fillStyle = 'rgba(242,246,251,.6)';
+      h2.fillText(String(Math.abs(m)), sx + sw*0.48, yy);
+    }
+  }
+  const yV = yDeVsi(vsi);
+  h2.strokeStyle = PFD_VERDE; h2.lineWidth = 2.2;
+  h2.beginPath(); h2.moveTo(sx, vy + ah/2); h2.lineTo(sx + sw*0.85, yV); h2.stroke();
+  h2.beginPath();
+  h2.moveTo(sx + sw*0.85, yV); h2.lineTo(sx + sw*0.62, yV - sw*0.16);
+  h2.lineTo(sx + sw*0.62, yV + sw*0.16); h2.closePath();
+  h2.fillStyle = PFD_VERDE; h2.fill();
+
+  /* ---- A FITA DE RUMO, embaixo ---- */
+  const hy = vy + ah, hh = vh - ah;
+  h2.fillStyle = PFD_FITA; h2.fillRect(ax, hy, aw, hh);
+  h2.save();
+  h2.beginPath(); h2.rect(ax, hy, aw, hh); h2.clip();
+  const gRumo = ((rumo*180/Math.PI) % 360 + 360) % 360, JAN_R = 70;
+  h2.font = '700 ' + f1.toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'center'; h2.textBaseline = 'top';
+  for (let g = Math.floor((gRumo - JAN_R/2)/5)*5; g <= gRumo + JAN_R/2; g += 5){
+    const xx = cxA + (g - gRumo)/JAN_R*aw;
+    const gg = ((g % 360) + 360) % 360, grande = gg % 10 === 0;
+    h2.strokeStyle = PFD_BRANCO; h2.lineWidth = 1.2;
+    h2.beginPath();
+    h2.moveTo(xx, hy); h2.lineTo(xx, hy + hh*(grande ? 0.34 : 0.20)); h2.stroke();
+    if (gg % 30 === 0){
+      h2.fillStyle = PFD_BRANCO;
+      h2.fillText(gg === 0 ? 'N' : gg === 90 ? 'L' : gg === 180 ? 'S' : gg === 270 ? 'O'
+                  : String(gg/10), xx, hy + hh*0.38);
+    }
+  }
+  h2.restore();
+  const crw = f1*3.0, crh = hh*0.56;
+  caixaLeitura(h2, cxA - crw/2, hy - crh*0.28, crw, crh);
+  h2.font = '800 ' + (f1*1.12).toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'center'; h2.textBaseline = 'middle';
+  h2.fillStyle = PFD_BRANCO;
+  h2.fillText(String(Math.round(gRumo)).padStart(3, '0'), cxA, hy - crh*0.28 + crh*0.55);
+
+  /* ---- O FATOR DE CARGA, no canto de baixo da janela de atitude ----
+     Num caça ele está no HUD; aqui está nos dois, que é o que acontece num
+     avião com PFD e HUD — a mesma leitura no vidro de frente e na tela. */
+  const gq = Math.abs(cargaG);
+  h2.font = '800 ' + (f1*1.15).toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
+  h2.save();
+  h2.shadowColor = 'rgba(0,0,0,.75)'; h2.shadowBlur = 3;   // ele mora no marrom
+  h2.fillStyle = gq > 7.5 ? PFD_VERM : gq > 5.5 ? PFD_AMBAR : PFD_VERDE;
+  h2.fillText(cargaG.toFixed(1) + 'G', ax + f1*0.5, vy + ah - f1*1.5);
+  h2.font = '700 ' + (f1*0.85).toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = 'rgba(242,246,251,.85)';
+  h2.fillText('MX ' + gMax.toFixed(1), ax + f1*0.5, vy + ah - f1*0.45);
+  h2.restore();
+  /* trem e flape NÃO entram aqui. Eu os tinha posto no canto de baixo da
+     janela e eles caíam justamente em cima dos degraus de 20° da escada —
+     e os dois já estão escritos na caixa de velocidade, que é onde se olha
+     para pousar. Instrumento cheio é instrumento que não se lê. */
+  h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
+}
+
+/* --- O MFD: A PÁGINA DE MAPA ------------------------------------------------
+   A segunda tela. Mapa redondo de 360° com o avião no meio, e uma COLUNA DE
+   DADOS na direita com o motor — que é como uma página de mapa do Fusion se
+   arruma: o desenho ocupa a tela e os números ficam na beirada.
+
+   Redondo e centrado, e não em arco. O Fusion tem os dois modos e o arco é o
+   mais usado em linha, mas arco não mostra o que está ATRÁS — e num jogo em
+   que se leva míssil pelas costas, esconder metade do céu para ficar mais
+   bonito seria trocar o instrumento pela foto dele.
+
+   Sem varredura girando: rastro girando existe onde há antena girando.
    -------------------------------------------------------------------------- */
 function desenhaRadar(){
   const onde = radarOnde();
   if (!onde) return;
-  const { cx, cy, r } = onde;                 // r = meio-lado do MFD quadrado
-  const L = r*2, borda = r*0.17;
-  const rTela = r - borda;                    // meio-lado da tela preta
-  const rRosa = rTela*0.90, rS = rTela*0.78;  // a rosa e o alcance útil
+  const { cx: qcx, cy: qcy, r } = onde;       // r = meio-lado da tela quadrada
+  const L = r*2, b = Math.max(3, L*0.035);
+  const vx = qcx - r + b, vy = qcy - r + b, vw = L - b*2, vh = L - b*2;
+  const colw = vw*0.30;                       // a coluna de dados, à direita
+  const mw = vw - colw;                       // e o mapa, no que sobra
+  const cx = vx + mw/2, cy = vy + vh/2;
+  const rRosa = Math.min(mw, vh)*0.47, rS = rRosa*0.90;
+  const f1 = Math.max(6, vh*0.072);
 
-  h2.drawImage(faceInst('mfd-hsd', L, L, (c, w) => {
-    const R = w/2, b = w*0.085, kt = R - b, kr = kt*0.90;
-    molduraMFD(c, w, w, b, 5);
-    c.save();
-    c.beginPath(); c.arc(R, R, kr, 0, 7); c.clip();
-    for (let n = 1; n <= 3; n++){             // os anéis, tracejados
-      c.beginPath(); c.arc(R, R, kt*0.78*n/3, 0, 7);
-      c.setLineDash([2.5, 4]);
-      c.strokeStyle = 'rgba(99,216,255,' + (n === 3 ? '.42)' : '.26)');
-      c.lineWidth = 1; c.stroke();
-    }
-    c.setLineDash([]);
-    c.restore();
-    /* a rosa: risco fino a cada 10°, comprido a cada 30°. Ela NÃO gira nesta
-       lona — a lona é a parte parada; quem gira é desenhado por cima. */
-    c.beginPath(); c.arc(R, R, kr, 0, 7);
-    c.strokeStyle = 'rgba(99,216,255,.30)'; c.lineWidth = 1; c.stroke();
-    // o cursor de proa: o triângulo fixo no alto, contra o qual a rosa corre
-    c.beginPath();
-    c.moveTo(R, R - kr - w*0.006); c.lineTo(R - w*0.022, R - kr - w*0.042);
-    c.lineTo(R + w*0.022, R - kr - w*0.042); c.closePath();
-    c.fillStyle = MFD_BRANCO; c.fill();
-  }), cx - r, cy - r, L, L);
+  h2.drawImage(faceInst('mfd-moldura', L, L, (c, ww) =>
+    molduraTela(c, ww, ww, Math.max(3, ww*0.035))), qcx - r, qcy - r, L, L);
+
+  // os anéis, finos e tracejados, e a cruz de referência
+  h2.save();
+  h2.strokeStyle = 'rgba(242,246,251,.22)'; h2.lineWidth = 1;
+  h2.setLineDash([2, 4]);
+  for (let n = 1; n <= 3; n++){
+    h2.beginPath(); h2.arc(cx, cy, rS*n/3, 0, 7); h2.stroke();
+  }
+  h2.setLineDash([]);
+  h2.restore();
 
   const rv = rumoVisto();
-
   /* A ROSA DE RUMOS, girando com a proa: numa lona só dela, porque são trinta
-     e seis riscos e oito palavras que não mudam nunca — só rodam. */
+     e seis riscos e doze números que não mudam nunca — só rodam. */
   h2.save();
   h2.translate(cx, cy); h2.rotate(-rv);
   h2.drawImage(faceInst('mfd-rosa', rRosa*2, rRosa*2, (c, w) => {
@@ -15184,25 +15435,30 @@ function desenhaRadar(){
     for (let g = 0; g < 360; g += 10){
       const grande = g % 30 === 0;
       const [x0, y0] = pontoInst(R, R, R, g);
-      const [x1, y1] = pontoInst(R, R, R - R*(grande ? 0.11 : 0.06), g);
+      const [x1, y1] = pontoInst(R, R, R - R*(grande ? 0.13 : 0.07), g);
       c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1);
-      c.strokeStyle = 'rgba(99,216,255,' + (grande ? '.85)' : '.38)');
+      c.strokeStyle = 'rgba(242,246,251,' + (grande ? '.85)' : '.40)');
       c.lineWidth = grande ? 1.5 : 1; c.stroke();
     }
-    c.font = '700 ' + Math.max(7, R*0.17).toFixed(1) + 'px ui-monospace, monospace';
-    const ROSA = ['N','03','06','L','12','15','S','21','24','O','30','33'];
+    c.font = '700 ' + Math.max(6.5, R*0.19).toFixed(1) + 'px system-ui, sans-serif';
+    const ROSA = ['N','3','6','L','12','15','S','21','24','O','30','33'];
     for (let k = 0; k < 12; k++){
-      const [tx, ty] = pontoInst(R, R, R*0.78, k*30);
+      const [tx, ty] = pontoInst(R, R, R*0.76, k*30);
       c.save(); c.translate(tx, ty); c.rotate(k*30*Math.PI/180);
-      c.fillStyle = k % 3 === 0 ? MFD_BRANCO : 'rgba(99,216,255,.75)';
+      c.fillStyle = k % 3 === 0 ? '#f2f6fb' : 'rgba(242,246,251,.7)';
       c.fillText(ROSA[k], 0, 0); c.restore();
     }
   }), -rRosa, -rRosa, rRosa*2, rRosa*2);
   h2.restore();
+  // o cursor de proa, parado no alto, contra o qual a rosa corre
+  h2.fillStyle = PFD_BRANCO;
+  h2.beginPath();
+  h2.moveTo(cx, cy - rRosa); h2.lineTo(cx - rRosa*0.07, cy - rRosa*1.10);
+  h2.lineTo(cx + rRosa*0.07, cy - rRosa*1.10); h2.closePath(); h2.fill();
 
   h2.save();
-  h2.beginPath(); h2.arc(cx, cy, rS*1.06, 0, 7);
-  h2.clip();                                      // o que voa mora dentro da rosa
+  h2.beginPath(); h2.arc(cx, cy, rS*1.04, 0, 7);
+  h2.clip();                                      // o que voa mora no mapa
 
   const esc = rS / RADAR_KM;
   /* de um ponto do mundo para a tela: o ângulo é o mesmo que a bússola usa
@@ -15214,25 +15470,28 @@ function desenhaRadar(){
     return { x: cx + Math.sin(a)*d*esc, y: cy - Math.cos(a)*d*esc, d };
   };
 
-  // as pistas, em ciano de navegação, com a cabeceira marcada
-  h2.strokeStyle = MFD_CIANO; h2.lineWidth = Math.max(1.6, r*0.035);
+  // as pistas em MAGENTA: é a cor do que a navegação aponta, e a pista é
+  // exatamente isso — o lugar para onde se está sempre podendo voltar
+  h2.strokeStyle = PFD_MAGENTA; h2.lineWidth = Math.max(1.8, r*0.04);
+  h2.lineCap = 'round';
   for (const P of PISTAS){
     const s2 = Math.sin(P.rumo), c2 = Math.cos(P.rumo);
     const a = poe(P.cx - s2*P.meiaC, P.cz - c2*P.meiaC);
-    const b = poe(P.cx + s2*P.meiaC, P.cz + c2*P.meiaC);
-    if (Math.min(a.d, b.d) > RADAR_KM*1.4) continue;
-    h2.beginPath(); h2.moveTo(a.x, a.y); h2.lineTo(b.x, b.y); h2.stroke();
+    const bb = poe(P.cx + s2*P.meiaC, P.cz + c2*P.meiaC);
+    if (Math.min(a.d, bb.d) > RADAR_KM*1.4) continue;
+    h2.beginPath(); h2.moveTo(a.x, a.y); h2.lineTo(bb.x, bb.y); h2.stroke();
   }
+  h2.lineCap = 'butt';
 
-  /* os alvos que faltam: o QUADRADINHO VAZADO é a marca de "contato conhecido"
-     nas telas de verdade — cheio quer dizer outra coisa (é o hostil) */
-  h2.strokeStyle = MFD_AMBAR; h2.lineWidth = 1.4;
+  /* os alvos que faltam: QUADRADO VAZADO, que é a marca de contato conhecido.
+     Cheio quer dizer outra coisa — é o hostil, logo abaixo. */
+  h2.strokeStyle = PFD_CIANO; h2.lineWidth = 1.4;
   for (const a of alvos){
     if (!a.vivo) continue;      // o campo é `vivo`; `destruido` não existe e o
                                 // radar mostrava alvo já derrubado como se faltasse
     const q = poe(a.x, a.z);
     if (q.d > RADAR_KM) continue;
-    const t = Math.max(2.4, r*0.045);
+    const t = Math.max(2.2, r*0.042);
     h2.strokeRect(q.x - t, q.y - t, t*2, t*2);
   }
 
@@ -15246,43 +15505,71 @@ function desenhaRadar(){
       const ang = Math.atan2(q.y - cy, q.x - cx);
       px = cx + Math.cos(ang)*rS; py = cy + Math.sin(ang)*rS;
     }
-    const t = Math.max(2.6, r*(fora ? 0.038 : 0.055));
+    const t = Math.max(2.4, r*(fora ? 0.036 : 0.052));
     h2.beginPath();
     h2.moveTo(px, py - t); h2.lineTo(px + t, py); h2.lineTo(px, py + t); h2.lineTo(px - t, py);
     h2.closePath();
-    h2.fillStyle = MFD_VERM; h2.globalAlpha = fora ? 0.62 : 1; h2.fill();
+    h2.fillStyle = PFD_VERM; h2.globalAlpha = fora ? 0.6 : 1; h2.fill();
     h2.globalAlpha = 1;
   }
   h2.restore();
 
-  // o avião: contorno branco, sempre no meio e sempre apontando para cima
-  h2.strokeStyle = MFD_BRANCO; h2.lineWidth = 1.6;
+  // o avião, sempre no meio e sempre apontando para cima
+  h2.strokeStyle = PFD_BRANCO; h2.lineWidth = 1.5;
   h2.beginPath();
-  h2.moveTo(cx, cy - r*0.13); h2.lineTo(cx - r*0.085, cy + r*0.09);
-  h2.lineTo(cx, cy + r*0.04); h2.lineTo(cx + r*0.085, cy + r*0.09);
+  h2.moveTo(cx, cy - rS*0.17); h2.lineTo(cx - rS*0.11, cy + rS*0.12);
+  h2.lineTo(cx, cy + rS*0.05); h2.lineTo(cx + rS*0.11, cy + rS*0.12);
   h2.closePath(); h2.stroke();
 
-  /* OS DADOS NOS CANTOS DA TELA, que é onde eles moram numa tela de verdade:
-     a proa em cima, o nome da página e o alcance embaixo. Espalhados pelo
-     meio eles tapariam justamente o que se foi olhar. */
-  const f1 = Math.max(7, r*0.125);
-  h2.font = '700 ' + f1.toFixed(1) + 'px ui-monospace, monospace';
+  /* ---- A COLUNA DE DADOS, na direita ------------------------------------
+     O motor mora aqui agora. Duas fitas verticais com o algarismo em cima,
+     que é como uma tela de vidro mostra empuxo: a fita dá a tendência de
+     relance e o número dá o valor exato, sem precisar de nenhum dos dois
+     fazer o trabalho do outro. */
+  const kx = vx + mw, kw = colw;
+  h2.font = '700 ' + (f1*0.82).toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'center'; h2.textBaseline = 'middle';
+  const pot = turbinando ? 100 : Math.max(0, Math.min(100, motor*100));
+  const barras = [
+    { rot:'N1',  v: pot,        txt: turbinando ? 'A/B' : String(Math.round(pot)),
+      cor: turbinando ? PFD_AMBAR : PFD_VERDE },
+    { rot:'NIT', v: nitroCarga, txt: String(Math.round(nitroCarga)),
+      cor: nitroCarga < 20 ? PFD_VERM : PFD_CIANO }
+  ];
+  barras.forEach((q, k) => {
+    const bx = kx + kw*(0.28 + k*0.44), bw = kw*0.15;
+    const by = vy + vh*0.22, bh = vh*0.54;
+    h2.fillStyle = 'rgba(242,246,251,.13)'; h2.fillRect(bx, by, bw, bh);
+    const f = Math.max(0, Math.min(1, q.v/100));
+    h2.fillStyle = q.cor; h2.fillRect(bx, by + bh*(1 - f), bw, bh*f);
+    h2.strokeStyle = 'rgba(242,246,251,.45)'; h2.lineWidth = 1;
+    h2.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+    for (let t = 1; t < 4; t++){                 // a escala gravada ao lado
+      const ty = by + bh*t/4;
+      h2.beginPath(); h2.moveTo(bx + bw, ty); h2.lineTo(bx + bw + kw*0.05, ty); h2.stroke();
+    }
+    h2.fillStyle = 'rgba(242,246,251,.72)';
+    h2.fillText(q.rot, bx + bw/2, by - f1*0.75);
+    h2.font = '800 ' + (f1*0.98).toFixed(1) + 'px ui-monospace, monospace';
+    h2.fillStyle = q.cor;
+    h2.fillText(q.txt, bx + bw/2, by + bh + f1*0.85);
+    h2.font = '700 ' + (f1*0.82).toFixed(1) + 'px system-ui, sans-serif';
+  });
+
+  /* ---- OS DADOS NOS CANTOS DA TELA, que é onde eles moram numa de verdade:
+     espalhados pelo meio tapariam justamente o que se foi olhar. */
   h2.textBaseline = 'middle';
-  const dentro = r - borda - f1*0.55;
+  h2.font = '700 ' + f1.toFixed(1) + 'px system-ui, sans-serif';
   h2.textAlign = 'left';
-  h2.fillStyle = MFD_VERDE;
-  h2.fillText('HSD', cx - dentro, cy - dentro + f1*0.2);
+  h2.fillStyle = PFD_CIANO;
+  h2.fillText('MAPA', vx + f1*0.4, vy + f1*0.8);
   h2.textAlign = 'right';
-  h2.fillStyle = MFD_BRANCO;
-  h2.fillText(String((Math.round(rv*180/Math.PI) % 360 + 360) % 360).padStart(3, '0'),
-              cx + dentro, cy - dentro + f1*0.2);
+  h2.fillStyle = 'rgba(242,246,251,.8)';
+  h2.fillText(Math.round(RADAR_KM/METRO/100)/10 + ' km', vx + mw - f1*0.4, vy + f1*0.8);
   h2.textAlign = 'left';
-  h2.fillStyle = 'rgba(99,216,255,.85)';
-  h2.fillText(Math.round(RADAR_KM/METRO/100)/10 + 'km', cx - dentro, cy + dentro - f1*0.2);
-  h2.textAlign = 'right';
   const faltam = alvos.filter(a => a.vivo).length;
-  h2.fillStyle = faltam ? MFD_AMBAR : MFD_VERDE;
-  h2.fillText(faltam ? 'TGT ' + faltam : 'CLR', cx + dentro, cy + dentro - f1*0.2);
+  h2.fillStyle = faltam ? PFD_CIANO : PFD_VERDE;
+  h2.fillText(faltam ? 'ALVOS ' + faltam : 'LIMPO', vx + f1*0.4, vy + vh - f1*0.8);
   h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
 }
 
@@ -15491,96 +15778,17 @@ function desenhaHUD(){
     }
     h2.textAlign = 'left';
 
-    /* --- O G NO HUD E A TELA DO MOTOR -------------------------------------
-       Duas leituras, dois lugares, e a escolha de cada lugar é do manual e não
-       minha:
+    /* --- O PFD ------------------------------------------------------------
+       Aqui moravam o algarismo do G solto no vidro e uma tela de motor com
+       barras de segmento. Os dois foram para dentro do painel: o G para a
+       janela de atitude (e continua no HUD, que é o que acontece num avião
+       que tem os dois), o motor para a coluna de dados do MFD.
 
-       O FATOR DE CARGA vai no HUD, em algarismo, no canto de cima à esquerda,
-       com o pico do voo logo abaixo. É onde ele está num caça moderno, e a
-       razão é prática: quem está puxando não pode tirar o olho do alvo para
-       procurar um mostrador. Ele é grande, é branco, e fica âmbar e depois
-       vermelho conforme encosta no limite — a cor faz o trabalho que a faixa
-       colorida fazia no relógio de ponteiro.
-
-       O MOTOR vai numa TELA, com barra de segmentos e número ao lado. Segmento
-       em vez de barra contínua não é estilo: é o jeito de uma tela mostrar
-       tendência com a mesma leitura em qualquer tamanho, e é o que se vê em
-       qualquer painel de vidro.
-
-       Os dois são do VIDRO do avião: a foto com a cabeça a 35° mostrou o HUD
-       inteiro escorrendo e as réguas antigas ficando para trás, sozinhas. */
+       O PFD é do VIDRO do avião, como todo o resto do painel: a foto com a
+       cabeça a 35° mostrou o HUD inteiro escorrendo e as réguas antigas
+       ficando para trás, sozinhas na tela. */
     presoNoAviao();
-    const I = reguasOnde();
-
-    // --- O FATOR DE CARGA ------------------------------------------------
-    const gAlto = Math.abs(cargaG) > 7.5, gMedio = Math.abs(cargaG) > 5.5;
-    const fG = Math.max(15, I.gh*0.62);
-    h2.font = '800 ' + fG.toFixed(1) + 'px ui-monospace, monospace';
-    h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
-    h2.fillStyle = gAlto ? MFD_VERM : gMedio ? MFD_AMBAR : 'rgba(150,255,190,.95)';
-    h2.fillText(cargaG.toFixed(1), I.x, I.gy + fG);
-    /* o pico e o vale EMPILHADOS. Lado a lado eles se atropelavam: em fonte
-       monoespaçada "MAX 1.0" mede sete caracteres, e sete caracteres são mais
-       largos do que o vão que eu tinha reservado. */
-    const fG2 = Math.max(8, I.gh*0.26);
-    h2.font = '700 ' + fG2.toFixed(1) + 'px ui-monospace, monospace';
-    h2.fillStyle = 'rgba(150,255,190,.72)';
-    h2.fillText('G', I.x + fG*2.0, I.gy + fG);
-    h2.fillText('MAX ' + gMax.toFixed(1), I.x, I.gy + fG + fG2*1.15);
-    h2.fillText('MIN ' + gMin.toFixed(1), I.x, I.gy + fG + fG2*2.35);
-
-    // --- A TELA DO MOTOR --------------------------------------------------
-    const bE = I.h*0.13;
-    h2.drawImage(faceInst('mfd-eng', I.w, I.h, (c, w, hh) => {
-      molduraMFD(c, w, hh, bE, 3);
-      const b = bE, fl = Math.max(6, hh*0.155);
-      c.font = '700 ' + fl.toFixed(1) + 'px ui-monospace, monospace';
-      c.textBaseline = 'middle'; c.textAlign = 'left';
-      c.fillStyle = 'rgba(232,240,250,.62)';
-      c.fillText('ENG', b*1.5, b + (hh - b*2)*0.28);
-      c.fillText('NIT', b*1.5, b + (hh - b*2)*0.72);
-      /* a escala gravada embaixo da barra: sem ela o segmento diz "quanto"
-         e não diz "quanto falta", que é a pergunta de verdade */
-      const x0 = b*1.5 + fl*2.6, x1 = w - b*1.5 - fl*2.6;
-      for (let k = 0; k <= 4; k++){
-        const gx = x0 + (x1 - x0)*k/4;
-        const gy = b + (hh - b*2)*0.28 + hh*0.115;
-        c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx, gy + hh*(k % 2 ? 0.035 : 0.06));
-        c.strokeStyle = 'rgba(232,240,250,.30)'; c.lineWidth = 1; c.stroke();
-      }
-    }), I.x, I.y, I.w, I.h);
-
-    /* A BARRA DE SEGMENTOS, ao vivo. Vinte casas: menos que isso a leitura
-       fica grossa demais para mostrar a manete andando, mais que isso os
-       segmentos somem num celular. */
-    const fl = Math.max(6, I.h*0.155);
-    const bx0 = I.x + bE*1.5 + fl*2.6, bx1 = I.x + I.w - bE*1.5 - fl*2.6;
-    const fita = (linha, frac, cor, aceso) => {
-      const by = I.y + bE + (I.h - bE*2)*linha, bh = Math.max(4, I.h*0.13);
-      const N = 20, vg = (bx1 - bx0)/N, sw = vg*0.72;
-      const ate = Math.round(Math.max(0, Math.min(1, frac))*N);
-      for (let k = 0; k < N; k++){
-        h2.fillStyle = k < ate ? cor : 'rgba(232,240,250,.13)';
-        h2.fillRect(bx0 + k*vg, by - bh/2, sw, bh);
-      }
-      if (aceso){                        // o contorno que pisca quando está em uso
-        h2.strokeStyle = cor; h2.lineWidth = 1;
-        h2.strokeRect(bx0 - 2, by - bh/2 - 2, bx1 - bx0 + 3, bh + 4);
-      }
-    };
-    const pot = turbinando ? 100 : Math.max(0, Math.min(100, motor*100));
-    fita(0.28, pot/100, turbinando ? MFD_AMBAR : MFD_VERDE, turbinando);
-    fita(0.72, nitroCarga/100, nitroCarga < 20 ? MFD_VERM : MFD_CIANO,
-         nitroBotao && nitroCarga > 0);
-    h2.font = '800 ' + Math.max(8, I.h*0.20).toFixed(1) + 'px ui-monospace, monospace';
-    h2.textAlign = 'right'; h2.textBaseline = 'middle';
-    h2.fillStyle = turbinando ? MFD_AMBAR : MFD_BRANCO;
-    h2.fillText(turbinando ? 'A/B' : String(Math.round(pot)),
-                I.x + I.w - bE*1.5, I.y + bE + (I.h - bE*2)*0.28);
-    h2.fillStyle = nitroCarga < 20 ? MFD_VERM : MFD_BRANCO;
-    h2.fillText(String(Math.round(nitroCarga)), I.x + I.w - bE*1.5,
-                I.y + bE + (I.h - bE*2)*0.72);
-    h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
+    desenhaPFD();
     presoNaTela();      // fecha o vidro AQUI: o que vem depois já vem projetado
 
   }

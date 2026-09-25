@@ -5840,3 +5840,81 @@ justamente para se distinguir do céu com sol batendo na tela.
   alto. Numa escala de 270° a volta quase fecha e não sobra meio. Instrumento
   de verdade varre 240° e usa o vão de baixo para a serigrafia — o vão não é
   estética, é o único pedaço que a escala não usa.
+
+
+## O painel do KC-390 (e por que o meu estava feio)
+
+"achei feio. faz o seguinte, pega o painel do KC 390."
+
+Fui pesquisar antes de desenhar, e a distância entre o que eu tinha feito e o
+painel do Embraer explica o "feio" inteiro.
+
+O **KC-390 Millennium** tem **cinco telas de 15 polegadas em paisagem**, da
+família **Pro Line Fusion** da Collins, com dois HUD e visão sintética. O que
+eu tinha entregue era um MFD militar dos anos 90: caixa preta **quadrada**,
+moldura grossa e **vinte teclinhas** em volta.
+
+As teclinhas são a diferença mais visível, e o motivo delas some no Fusion:
+aquele painel é **tátil** — "telas intuitivas parecidas com as de um telefone".
+Tela tátil não precisa de fileira de botões, então a moldura fica **fina** e a
+imagem ocupa quase o vidro inteiro. Era daí que vinha o aperto do meu desenho:
+eu estava gastando um quinto da tela com botões que o avião não tem.
+
+O arranjo do PFD também é fixo, e eu não estava seguindo. É o **"T"**:
+
+    [ fita de        [  ATITUDE  ]        fita de ] [ razão ]
+    [ velocidade ]   [           ]   [ altitude  ] [ de subida ]
+                     [   RUMO    ]
+
+Não é gosto de fabricante — é a arrumação que a aviação inteira usa desde que
+existe tela, e é por isso que um piloto lê um painel que nunca viu.
+
+E as cores são as do padrão, não as que eu escolhi: céu azul e chão **terra**
+na bola, branco para escala e leitura, **verde** normal, **âmbar** atenção,
+**vermelho** limite, **magenta** para o que a navegação aponta. Os meus
+verdes-fósforo em fundo preto eram de tubo de raios catódicos.
+
+### O que ficou
+
+- **PFD** com o T completo, escada de arfagem tracejada abaixo do horizonte,
+  arco e ponteiro de inclinação, símbolo do avião em âmbar com contorno preto,
+  faixa vermelha do estol desenhada na própria fita de velocidade (e ela anda
+  com o flape, porque a velocidade mínima do jogo depende do flape), chão
+  marcado em vermelho na fita de altitude, e o G no canto.
+- **MFD** com o mapa redondo de 360° e uma coluna de dados na direita com o
+  motor. Redondo e centrado, e não em arco: o Fusion tem os dois modos e o arco
+  é o mais usado em linha, mas arco não mostra o que está **atrás** — e num
+  jogo em que se leva míssil pelas costas, esconder metade do céu para ficar
+  mais bonito seria trocar o instrumento pela foto dele.
+- A busca de lugar continua sendo busca, pelo mesmo motivo de sempre. O que
+  mudou é que agora há **ordem**: o PFD escolhe primeiro por ser o primário, e
+  o MFD escolhe depois desviando dele.
+
+### Erros medidos nesta rodada
+
+- A altitude de 5.300 m saía escrita **"530"**: com a fita a 15,5% da largura,
+  o quarto algarismo caía fora do recorte. Fita de PFD é larga porque o número
+  é o que ela existe para mostrar.
+- A caixa de leitura estava com 8% de transparência e o número da fita vazava
+  por trás — a velocidade aparecia **escrita duas vezes**, uma fantasma ao lado
+  da outra. Caixa de leitura mascara a fita, e é opaca.
+- A janela de atitude abria só **16°** para cada lado: dois graus de nariz já
+  enchiam a tela de marrom. 22° é o que um PFD mostra.
+- A escala de razão de subida ia até 20 m/s. Este avião sobe a mais de cem, e a
+  agulha vivia encostada no topo. Fundo de escala 60, com as pontas comprimidas
+  como nos aparelhos de verdade.
+- O risco da fita de altitude estava colado no número e lia-se como **sinal de
+  menos**: 300 m aparecia como "−300".
+- Trem e flape, que eu tinha posto no canto da janela de atitude, caíam em cima
+  dos degraus de 20° da escada — e já estão escritos na caixa de velocidade.
+- A escada e o arco de inclinação são os dois traço branco fino na mesma região,
+  e o ponteiro sumia no meio dos degraus. Um fio preto por baixo separa os dois
+  planos e não custa nada.
+
+Custo medido: **0,32 ms por quadro** de HUD na cabine, com as três lonas
+guardadas — o orçamento do quadro inteiro a 60 fps é 16,7 ms.
+
+Fontes:
+[Embraer — KC-390 Millennium](https://embraer.com/defense-security-air/kc-390-millennium/en/) ·
+[FlightGlobal — Embraer selects Pro Line Fusion for KC-390 cockpit](https://www.flightglobal.com/embraer-selects-pro-line-fusion-for-kc-390-cockpit/99722.article) ·
+[Breaking Defense — Next-gen KC-390 Millennium](https://breakingdefense.com/2025/09/next-gen-kc-390-millennium-expands-multimission-options-for-air-forces/)
