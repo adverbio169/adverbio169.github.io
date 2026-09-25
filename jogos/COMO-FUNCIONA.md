@@ -6033,3 +6033,44 @@ cima à esquerda — que ficou vazio quando as caixas viraram páginas.
 medir as telas (que são desenhadas na lona e por isso entram na lista à mão) e a
 página MISSÃO. Um teste que continua verde medindo coisa que não existe mais é
 pior do que teste nenhum.
+
+### As páginas de verdade (depois de pesquisar o painel do KC-390)
+
+"agora que temos dois painéis multiuso, quero algo moderno igual do KC-390.
+pesquisa os painéis dele."
+
+A pesquisa devolveu um conjunto de páginas que **não é** o que eu tinha
+inventado. O Pro Line Fusion do KC-390 tem, além do mapa e das cartas:
+
+- **Sinóticos** — um **esquema do próprio avião**, com o sistema desenhado:
+  combustível nos tanques, comandos de voo, elétrico. Verde é normal, âmbar é
+  atenção. Eu tinha feito a versão pobre disso: uma lista de barras.
+- **EICAS** — os parâmetros do motor **mais uma lista de mensagens escritas**,
+  vermelho para o que exige ação agora, âmbar para atenção. O jogo já tinha
+  todos esses estados; faltava um lugar onde eles ficassem escritos em vez de só
+  acenderem um som ou uma borda.
+- **Lista de verificação eletrônica**, ligada ao EICAS — que no jogo são os
+  objetivos, e por isso viraram uma página de itens com ✔ e ○.
+
+Então as páginas passaram a ser **SINÓT · MOTOR · MAPA · ARMAS · OBJET**, e a
+página VOO saiu: velocidade, altitude, rumo e razão de subida já estão no HUD, e
+uma tela que repete o vidro da frente é uma tela desperdiçada.
+
+A diferença do sinótico não é enfeite. Numa lista, "FUSEL 62" é um número que se
+lê e se traduz. No sinótico a asa fica âmbar, e não há tradução nenhuma entre
+ver e entender.
+
+### Duas telas nunca na mesma página
+
+"não tem a mínima lógica poder colocar os dois painéis com a mesma informação."
+
+Não tem mesmo: com duas telas, duplicar é jogar uma fora. Girar com `Q`/`E`
+**pula** a página que a outra está mostrando — cinco páginas viram quatro
+escolhas em cada tela e não há como cair na repetição, nem de propósito. E tocar
+numa aba que a outra tela já ocupa **troca as duas**, porque pedir isso não é
+erro do jogador: é vontade de ver as duas invertidas.
+
+Fontes:
+[Collins — Pro Line Fusion (EICAS, sinópticos e listas de verificação)](https://www.rtx.com/collinsaerospace/what-we-do/industries/business-aviation/flight-deck/pro-line-fusion) ·
+[SKYbrary — Multifunction Display](https://skybrary.aero/articles/multifunction-display-mfd) ·
+[Embraer — KC-390 Millennium](https://embraer.com/defense-security-air/kc-390-millennium/en/)

@@ -8374,14 +8374,21 @@ function faceInst(chave, larg, alt, pinta){
   return c;
 }
 
-const MFD_PAGS = ['MOTOR', 'MAPA', 'ARMAS', 'MISSÃO', 'VOO'];
+/* AS PÁGINAS, agora as do avião de verdade. A pesquisa do painel do KC-390
+   devolveu um conjunto que não é o que eu tinha inventado: SINÓTICO (o esquema
+   do avião), EICAS (motor MAIS a lista de alertas escritos), MAPA, e a LISTA DE
+   VERIFICAÇÃO, que no jogo são os objetivos. A página VOO saiu: velocidade,
+   altitude, rumo e razão de subida já estão no HUD, e uma tela que repete o
+   vidro da frente é uma tela desperdiçada — que é exatamente a crítica que o
+   usuário fez às duas telas mostrando a mesma coisa. */
+const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'ARMAS', 'OBJET'];
 const MFD_TELA = '#070b0f', MFD_FIO = 'rgba(226,236,248,';
 const MFD_CIANO = '#63d8ff', MFD_VERDE = '#3fe070', MFD_AMBAR = '#ffc046',
       MFD_VERM = '#ff6a58', MFD_CLARO = '#e2ecf8', MFD_ROT = '#8fa3b8',
       MFD_FRACO = '#6d8095';
 /* a esquerda começa no motor e a direita no mapa: é a dupla que serve para
    quase tudo, e quem quiser outra coisa gira em duas teclas */
-let mfdPag = [0, 1];
+let mfdPag = [0, 2];   // sinótico à esquerda, mapa à direita
 
 function mfdQuantas(){ return (W < 900 || H < 500) ? 1 : 2; }
 /* --- ONDE AS TELAS FICAM ----------------------------------------------------
@@ -8441,9 +8448,21 @@ function radarOnde(){
   return null;
 }
 function esqueceRadar(){ /* nada a decorar: o lugar das telas é fixo */ }
+/* DUAS TELAS NUNCA NA MESMA PÁGINA. "não tem a mínima lógica poder colocar os
+   dois painéis com a mesma informação" — e não tem mesmo: com duas telas,
+   duplicar é jogar uma fora. Girar PULA a página que a outra está mostrando,
+   então as cinco páginas viram quatro escolhas em cada tela e nunca há como
+   cair na repetição, nem de propósito. */
 function mfdGira(k, d){
   if (!mfdOnde(k)) k = 1;                 // em tela pequena só existe a direita
-  mfdPag[k] = (mfdPag[k] + (d || 1) + MFD_PAGS.length) % MFD_PAGS.length;
+  const outra = mfdQuantas() > 1 ? mfdPag[1 - k] : -1;
+  const passo = d || 1;
+  let p = mfdPag[k];
+  for (let i = 0; i < MFD_PAGS.length; i++){
+    p = (p + passo + MFD_PAGS.length) % MFD_PAGS.length;
+    if (p !== outra) break;
+  }
+  mfdPag[k] = p;
 }
 
 /* as medidas de dentro de uma tela, num lugar só: cabeçalho, corpo e abas */
@@ -8497,22 +8516,29 @@ function mfdPaginaMotor(o, m){
   mfdLinha(o, m, 3, 'NITRO', String(Math.round(nitroCarga)),
            nitroCarga < 20 ? MFD_VERM : MFD_CLARO, nitroCarga/100,
            nitroCarga < 20 ? MFD_VERM : MFD_CIANO);
-  /* a linha de configuração, que é a que se olha para pousar */
-  const y = m.corpoY + m.corpoH*5.1/6, x = o.x + m.pad, w = o.w - m.pad*2;
+  /* A LISTA DE ALERTAS, embaixo dos parâmetros: é assim que um EICAS se
+     arruma, e trem e flape saíram daqui porque estão desenhados no sinótico,
+     que é a página ao lado. */
+  const x = o.x + m.pad, w = o.w - m.pad*2;
+  const y0 = m.corpoY + m.corpoH*0.70;
   h2.strokeStyle = MFD_FIO + '.12)'; h2.lineWidth = 1;
-  h2.beginPath(); h2.moveTo(x, y - m.corpoH*0.10); h2.lineTo(x + w, y - m.corpoH*0.10); h2.stroke();
+  h2.beginPath(); h2.moveTo(x, y0); h2.lineTo(x + w, y0); h2.stroke();
+  const A = mfdAlertas();
   h2.textBaseline = 'middle'; h2.textAlign = 'left';
-  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
-  h2.fillStyle = MFD_ROT; h2.fillText('TREM', x, y);
-  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
-  h2.fillStyle = trem ? MFD_VERDE : MFD_AMBAR;
-  h2.fillText(trem ? 'FORA' : 'DENTRO', x + w*0.24, y);
-  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
-  h2.fillStyle = MFD_ROT; h2.fillText('FLAPE', x + w*0.62, y);
-  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
-  h2.textAlign = 'right'; h2.fillStyle = flap ? MFD_VERDE : MFD_CLARO;
-  h2.fillText(String(flap), x + w, y);
-  mfdTeclas(o, m, 'W/S · SHIFT · G · F');
+  h2.font = '800 ' + (m.f*1.02).toFixed(1) + 'px ui-monospace, monospace';
+  if (!A.length){
+    h2.fillStyle = MFD_VERDE;
+    h2.fillText('SEM ALERTAS', x, y0 + m.corpoH*0.13);
+  } else for (let i = 0; i < Math.min(2, A.length); i++){
+    h2.fillStyle = A[i][1];
+    h2.fillText(A[i][0], x, y0 + m.corpoH*(0.13 + i*0.15));
+  }
+  if (A.length > 2){
+    h2.textAlign = 'right'; h2.fillStyle = MFD_ROT;
+    h2.fillText('+' + (A.length - 2), x + w, y0 + m.corpoH*0.28);
+    h2.textAlign = 'left';
+  }
+  mfdTeclas(o, m, 'W/S · SHIFT');
 }
 /* AS TECLAS ESCRITAS NA PÁGINA. A legenda morava no rótulo das caixas de HTML
    ("Potência (W/S · Shift nitro)") e teria sumido com elas. Um rodapé apagado
@@ -8524,6 +8550,139 @@ function mfdTeclas(o, m, txt){
   h2.fillStyle = 'rgba(109,128,149,.75)';
   h2.fillText(txt, o.x + o.w - m.pad, o.y + o.h - m.abas - m.corpoH*0.055);
   h2.textBaseline = 'middle';
+}
+
+/* --- PÁGINA SINÓTICO: o avião desenhado por cima -----------------------------
+   Esta é a página que faltava, e ela veio da pesquisa. Num painel de vidro
+   moderno o estado dos sistemas não é uma lista de barras — é um SINÓTICO: um
+   esquema do próprio avião, visto de cima, com o combustível dentro das asas,
+   o trem desenhado embaixo de cada perna e os flapes defletidos no bordo de
+   fuga. Verde é normal, âmbar é atenção, vermelho é limite.
+
+   A diferença não é enfeite. Numa lista, "FUSEL 62" é um número que se lê e se
+   traduz. No sinótico, a asa esquerda fica âmbar — e não há tradução nenhuma
+   entre ver e entender. É por isso que todo avião com tela tem esta página.
+
+   Fontes: as páginas de sinótico do Pro Line Fusion (combustível, elétrico,
+   comandos de voo) e a convenção verde/âmbar de estado de sistema.
+   -------------------------------------------------------------------------- */
+function mfdPaginaSinoptico(o, m){
+  const cx = o.x + o.w*0.50, cy = m.corpoY + m.corpoH*0.46;
+  const L = Math.min(o.w*0.50, m.corpoH*1.10);     // envergadura desenhada
+  const pv = Math.max(0, Math.min(100, vida));
+  const pc = Math.max(0, Math.min(100, combustivel));
+  const corEstado = v => v < 30 ? MFD_VERM : v < 65 ? MFD_AMBAR : MFD_VERDE;
+  const linha = corEstado(pv);
+
+  h2.save();
+  h2.translate(cx, cy);
+  h2.lineJoin = 'round'; h2.lineCap = 'round';
+
+  // a silhueta: fuselagem, asas em delta, empenas
+  h2.beginPath();
+  h2.moveTo(0, -L*0.46);                                   // o bico
+  h2.lineTo(L*0.05, -L*0.32); h2.lineTo(L*0.05, L*0.02);
+  h2.lineTo(L*0.48, L*0.22);  h2.lineTo(L*0.48, L*0.28);   // asa direita
+  h2.lineTo(L*0.07, L*0.26);
+  h2.lineTo(L*0.07, L*0.36);
+  h2.lineTo(L*0.20, L*0.44);  h2.lineTo(L*0.20, L*0.48);   // estabilizador direito
+  h2.lineTo(L*0.045, L*0.46); h2.lineTo(0, L*0.50);
+  h2.lineTo(-L*0.045, L*0.46); h2.lineTo(-L*0.20, L*0.48);
+  h2.lineTo(-L*0.20, L*0.44); h2.lineTo(-L*0.07, L*0.36);
+  h2.lineTo(-L*0.07, L*0.26);
+  h2.lineTo(-L*0.48, L*0.28); h2.lineTo(-L*0.48, L*0.22);  // asa esquerda
+  h2.lineTo(-L*0.05, L*0.02); h2.lineTo(-L*0.05, -L*0.32);
+  h2.closePath();
+  h2.fillStyle = 'rgba(226,236,248,.045)'; h2.fill();       // um véu, para ler como peça
+  h2.strokeStyle = linha; h2.lineWidth = Math.max(1.2, L*0.013);
+  h2.stroke();
+
+  /* O COMBUSTÍVEL DENTRO DAS ASAS. Uma caixa por asa, cheia de baixo para
+     cima — e as duas com o mesmo nível, porque o jogo tem um tanque só; fingir
+     dois independentes seria desenhar um sistema que o avião não tem. */
+  for (const lado of [-1, 1]){
+    const tx = lado > 0 ? L*0.16 : -L*0.40, tw = L*0.24;
+    const ty = L*0.095, th = L*0.125;
+    h2.strokeStyle = MFD_FIO + '.30)'; h2.lineWidth = 1;
+    h2.strokeRect(tx, ty, tw, th);
+    h2.fillStyle = pc < 20 ? 'rgba(255,106,88,.6)' : pc < 45 ? 'rgba(255,192,70,.55)'
+                                                    : 'rgba(63,224,112,.5)';
+    h2.fillRect(tx + 1, ty + th*(1 - pc/100) + 1, tw - 2, Math.max(0, th*(pc/100) - 2));
+  }
+
+  /* OS FLAPES, desenhados DEFLETIDOS atrás do bordo de fuga: o traço afasta-se
+     da asa conforme o flape desce. A página mostra a peça na posição em que ela
+     está, que é a razão de existir um sinótico. */
+  for (const lado of [-1, 1]){
+    const x0 = lado*L*0.10, x1 = lado*L*0.30;
+    const y = L*0.265 + L*0.035*flap;
+    h2.strokeStyle = flap ? MFD_VERDE : MFD_FIO + '.40)';
+    h2.lineWidth = Math.max(1.8, L*0.020);
+    h2.beginPath(); h2.moveTo(x0, y); h2.lineTo(x1, y + L*0.012*flap); h2.stroke();
+  }
+
+  /* O TREM: três pernas. Cheio e verde quando está fora, contorno apagado
+     quando recolhido — a mesma leitura da luz verde do painel de verdade. */
+  const perna = (px, py) => {
+    const r = Math.max(2, L*0.028);
+    h2.beginPath(); h2.arc(px, py, r, 0, 7);
+    if (trem){ h2.fillStyle = MFD_VERDE; h2.fill(); }
+    else { h2.strokeStyle = MFD_FIO + '.40)'; h2.lineWidth = 1.2; h2.stroke(); }
+  };
+  perna(0, -L*0.20);
+  perna(-L*0.115, L*0.13);
+  perna(L*0.115, L*0.13);
+  h2.restore();
+
+  // e os números, nas laterais da figura
+  h2.textBaseline = 'middle';
+  const rot = (px, py, r2, v, cor) => {
+    h2.font = '700 ' + (m.f*0.92).toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'left'; h2.fillStyle = MFD_ROT; h2.fillText(r2, px, py);
+    h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+    h2.fillStyle = cor || MFD_CLARO;
+    h2.fillText(v, px, py + m.fv*1.05);
+  };
+  rot(o.x + m.pad, m.corpoY + m.corpoH*0.16, 'COMB', Math.round(pc) + '%',
+      pc < 20 ? MFD_VERM : MFD_CLARO);
+  rot(o.x + m.pad, m.corpoY + m.corpoH*0.62, 'FUSEL', Math.round(pv) + '%', corEstado(pv));
+  h2.textAlign = 'right';
+  const dir = o.x + o.w - m.pad;
+  h2.font = '700 ' + (m.f*0.92).toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = MFD_ROT; h2.fillText('TREM', dir, m.corpoY + m.corpoH*0.16);
+  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = trem ? MFD_VERDE : MFD_FIO + '.55)';
+  h2.fillText(trem ? 'FORA' : 'DENTRO', dir, m.corpoY + m.corpoH*0.16 + m.fv*1.05);
+  h2.font = '700 ' + (m.f*0.92).toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = MFD_ROT; h2.fillText('FLAPE', dir, m.corpoY + m.corpoH*0.62);
+  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = flap ? MFD_VERDE : MFD_CLARO;
+  h2.fillText(String(flap), dir, m.corpoY + m.corpoH*0.62 + m.fv*1.05);
+  h2.textAlign = 'left';
+  mfdTeclas(o, m, 'G · F');
+}
+
+/* --- A LISTA DE ALERTAS (CAS) -----------------------------------------------
+   O outro achado da pesquisa: num painel de vidro a leitura do motor vem
+   acompanhada de uma LISTA DE MENSAGENS — vermelho para o que exige ação
+   agora, âmbar para atenção — e é essa lista que diz o que está errado, em
+   palavras, sem que se tenha de deduzir de um número.
+
+   O jogo já tinha todos estes estados; o que faltava era um lugar onde eles
+   ficassem ESCRITOS em vez de só acenderem um som ou uma borda. */
+function mfdAlertas(){
+  const L = [];
+  const alt = (aviaoY - CHAO)/METRO;
+  if (!noChao && voo < velMin())      L.push(['ESTOL', MFD_VERM]);
+  if (travadoPor.size)                L.push(['MÍSSIL · TRAVADO', MFD_VERM]);
+  if (vida < 30)                      L.push(['FUSELAGEM CRÍTICA', MFD_VERM]);
+  if (!noChao && alt < 60 && subida < 0) L.push(['TERRENO', MFD_VERM]);
+  if (combustivel < 20)               L.push(['COMBUSTÍVEL BAIXO', MFD_AMBAR]);
+  if (Math.abs(cargaG) > 7.5)         L.push(['CARGA ALTA', MFD_AMBAR]);
+  if (trem && voo/METRO > 150)        L.push(['TREM · VELOCIDADE', MFD_AMBAR]);
+  if (nitroCarga < 20)                L.push(['NITRO BAIXO', MFD_AMBAR]);
+  if (!munInfinita && municao[arma] === 0) L.push(['SEM MUNIÇÃO', MFD_AMBAR]);
+  return L;
 }
 
 function mfdPaginaMapa(o, m){
@@ -8720,20 +8879,6 @@ function mfdPaginaMissao(o, m){
   h2.textBaseline = 'middle';
 }
 
-function mfdPaginaVoo(o, m){
-  const alt = Math.round((aviaoY - CHAO)/METRO);
-  const vsi = Math.round(subida/METRO);
-  const gq = Math.abs(cargaG);
-  mfdLinha(o, m, 0, 'VEL',    Math.round(voo/METRO) + '',
-           voo < velMin() ? MFD_VERM : MFD_CLARO);
-  mfdLinha(o, m, 1, 'ALT',    alt + '', alt < 40 ? MFD_AMBAR : MFD_CLARO);
-  mfdLinha(o, m, 2, 'RUMO',   String((Math.round(rumo*180/Math.PI) % 360 + 360) % 360).padStart(3, '0'));
-  mfdLinha(o, m, 3, 'SUBIDA', (vsi >= 0 ? '+' : '') + vsi);
-  mfdLinha(o, m, 4, 'CARGA',  cargaG.toFixed(1) + 'G',
-           gq > 7.5 ? MFD_VERM : gq > 5.5 ? MFD_AMBAR : MFD_VERDE);
-  mfdLinha(o, m, 5, 'PICO',   gMax.toFixed(1) + 'G', MFD_FRACO);
-}
-
 /* --- UMA TELA INTEIRA ---------------------------------------------------- */
 function desenhaMFD(k){
   const o = mfdOnde(k);
@@ -8763,11 +8908,11 @@ function desenhaMFD(k){
   h2.textAlign = 'right'; h2.fillStyle = MFD_FRACO;
   h2.fillText('TELA ' + (k + 1) + ' · ' + (k ? 'E' : 'Q'), o.x + o.w - m.pad, o.y + m.cab*0.62);
 
-  if (nome === 'MOTOR')  mfdPaginaMotor(o, m);
-  if (nome === 'MAPA')   mfdPaginaMapa(o, m);
-  if (nome === 'ARMAS')  mfdPaginaArmas(o, m);
-  if (nome === 'MISSÃO') mfdPaginaMissao(o, m);
-  if (nome === 'VOO')    mfdPaginaVoo(o, m);
+  if (nome === 'SINÓT') mfdPaginaSinoptico(o, m);
+  if (nome === 'MOTOR') mfdPaginaMotor(o, m);
+  if (nome === 'MAPA')  mfdPaginaMapa(o, m);
+  if (nome === 'ARMAS') mfdPaginaArmas(o, m);
+  if (nome === 'OBJET') mfdPaginaMissao(o, m);
 
   /* AS ABAS. São a peça que diz "esta tela tem outras páginas" — sem elas
      ninguém descobre que existe tecla nenhuma. */
@@ -9794,8 +9939,13 @@ function mfdToque(px, py){
     const m = mfdMedidas(o);
     const ay = o.y + o.h - m.abas;
     if (px < o.x || px > o.x + o.w || py < ay || py > o.y + o.h) continue;
-    mfdPag[k] = Math.max(0, Math.min(MFD_PAGS.length - 1,
-                Math.floor((px - o.x)/(o.w/MFD_PAGS.length))));
+    const p = Math.max(0, Math.min(MFD_PAGS.length - 1,
+              Math.floor((px - o.x)/(o.w/MFD_PAGS.length))));
+    /* pedir a página que a OUTRA tela mostra não é erro do jogador: é vontade
+       de ver as duas trocadas. Então elas trocam, em vez de a segunda ficar
+       repetida ou o toque ser ignorado. */
+    if (mfdQuantas() > 1 && mfdPag[1 - k] === p) mfdPag[1 - k] = mfdPag[k];
+    mfdPag[k] = p;
     try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
     return true;
   }
