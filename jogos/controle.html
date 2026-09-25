@@ -128,6 +128,31 @@
      da mesma coisa na mesma tela é ruído, e avião nenhum tem régua de leme no
      painel. */
   #lemeTira{display:none}
+  /* A TELA DO PAINEL: vidro escuro, fio de luz na borda, e tamanho que sai do
+     MENOR lado — num celular deitado é a altura que aperta. */
+  #painelTela{position:relative;background:#070b0f;border:1px solid rgba(226,236,248,.18);
+              border-radius:6px;box-shadow:0 10px 26px rgba(0,0,0,.45);
+              width:min(62vw,330px);height:min(30vh,132px);flex-shrink:0;
+              touch-action:none;user-select:none;-webkit-user-select:none}
+  body.artilheiro #painelTela{display:none}
+  /* DEITADO, A TELA FICA AO LADO DO HORIZONTE, não embaixo dele. Embaixo
+     sobravam noventa pixels entre a bola e o seletor de arma — e uma página de
+     seis linhas mais a fileira de abas não cabe em noventa pixels; a primeira
+     tentativa saiu cortada pelo rodapé.
+
+     Ao lado cabe: entre a tira do nitro e o botão de FOGO há setecentos pixels
+     de largura livres num iPhone deitado, e a bola sozinha usava duzentos. */
+  /* A LARGURA DA TELA RESPEITA O FOGO. Com largura fixa em 38% ela cabia num
+     iPhone deitado e ENTRAVA no botão de FOGO num iPhone pequeno — a prova de
+     sobreposição pegou. Agora a terceira opção do `min` é o espaço que
+     realmente sobra: da direita da bola até a esquerda do FOGO, menos o vão. */
+  body.paisagem{--adi:min(30vw,46vh,180px);--col:min(13vw,58px);--fogo:min(27vw,132px);
+                --telaX:calc(8px + var(--col) + 12px + var(--adi) + 12px)}
+  body.paisagem #painelTela{position:fixed;left:var(--telaX);
+              top:46%;transform:translateY(-50%);
+              width:min(38vw, 300px,
+                    calc(100vw - 18px - var(--col) - var(--fogo) - 10px - var(--telaX)));
+              height:var(--adi)}
   /* o placar em JANELAS, como as do EADI: caixa preta, moldura fina e o
      algarismo monoespaçado dentro. Três números soltos no fundo pareciam
      legenda de aplicativo; assim eles pertencem ao mesmo painel. */
@@ -285,13 +310,13 @@ body.paisagem #controle.ver,
   body.paisagem #telaControle.ver{display:block;padding:0}
   body.paisagem #controle.ver > *,
   body.paisagem #telaControle.ver > *{position:absolute}
-  body.paisagem #horizonte{left:50%;top:44%;transform:translate(-50%,-50%);
-               --d:min(30vw,56vh,190px);width:var(--d);height:var(--d)}
+  /* a bola sai do meio e encosta na coluna da esquerda: o meio agora é da
+     tela, e as duas juntas formam a linha de instrumentos */
+  body.paisagem #horizonte{left:calc(8px + var(--col) + 12px);top:46%;
+               transform:translateY(-50%);
+               --d:var(--adi);width:var(--d);height:var(--d)}
   body.paisagem #estadoRede{top:8px;left:50%;transform:translateX(-50%);width:auto;max-width:40vw}
   body.paisagem #posto{top:8px;right:calc(10px + env(safe-area-inset-right));padding:5px 10px;font-size:10.5px;letter-spacing:1.5px}
-  body.paisagem #lemeTira{top:calc(44% + min(15vw,28vh,95px) + 6px);left:50%;transform:translateX(-50%);
-            width:min(30vw,190px);height:12px}
-  body.paisagem .placar{top:calc(44% + min(15vw,28vh,95px) + 26px);left:50%;transform:translateX(-50%);gap:16px}
   body.paisagem .placar .val2{font-size:16px}
   body.paisagem #giroLinha{bottom:8px;left:50%;transform:translateX(-50%);font-size:11px}
   /* polegar esquerdo */
@@ -409,7 +434,12 @@ body.paisagem #controle.ver,
   <div id="horizonte"><div id="ceu"></div><div id="gradeTorre"></div>
        <div id="alvoTorre"></div><div id="mira"></div></div>
   <div id="lemeTira"><i id="lemeBarra"></i><span>LEME</span></div>
-  <div class="placar">
+  <!-- A TERCEIRA JANELA. Aqui ficavam três números soltos (distância,
+       combustível, atraso); agora fica a tela, que mostra as seis páginas e
+       arrasta para o lado. O atraso da rede foi para o canto do estado, que é
+       onde se olha quando se desconfia da ligação. -->
+  <div id="painelTela"></div>
+  <div class="placar" style="display:none">
     <div><div class="rot">Distância</div><div class="val" id="pDist">0</div></div>
     <div><div class="rot">Combustível</div><div class="val" id="pComb">&ndash;</div></div>
     <div><div class="rot">Atraso</div><div class="val" id="pMs">&ndash;</div></div>
@@ -726,9 +756,14 @@ function conectar(codigo){
       if (!d || !d.t) return;
       if (d.t === 'papel'){ assumePosto(d.p, d.n); return; }
       if (d.t === 'tremer'){ Tremor.recebe(d); return; }
-      if (d.t === 'at'){ Atitude.recebe(d); return; }   // atitude: o canal rápido
+      if (d.t === 'at'){ Atitude.recebe(d);
+        /* a velocidade, a altura e o G chegam pelo canal rápido; as páginas
+           VOO e MAPA leem os mesmos campos, então elas os recebem daqui */
+        Painel.dado.v = d.v; Painel.dado.a = d.a; Painel.dado.g = d.g; Painel.dado.h = d.h;
+        return; }
       if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
       if (d.t === 'estado'){
+        Painel.recebe(d);
         $('pDist').textContent = d.dist;
         if (d.arma && window.armaDeFora) window.armaDeFora(d.arma, d.mun);
         $('pComb').textContent = d.jogando ? d.comb + '%' : '–';
@@ -942,7 +977,12 @@ setInterval(mandaEixos, 100);          // batimento, para a mão parada
 setInterval(() => {
   if (!conn || !conn.open) return;
   conn.send({ t: 'ping', at: Date.now() });
-  $('pMs').textContent = latencia == null ? '–' : latencia + ' ms';
+  /* o atraso morava numa das três caixas do placar, que saíram; ele vira um
+     rabicho da etiqueta de estado da rede, que é justamente onde se olha
+     quando se desconfia da ligação */
+  const pms = $('pMs'); if (pms) pms.textContent = latencia == null ? '–' : latencia + ' ms';
+  const et = $('estadoRedeTxt');
+  if (et && conn && conn.open) et.textContent = 'na TV · ' + (latencia == null ? '–' : latencia + ' ms');
   if (ultimoPong && Date.now() - ultimoPong > 4000) estadoRede('nao', 'a TV parou de responder');
 }, 1000);
 
@@ -1214,6 +1254,341 @@ const ADI = {
   }
 };
 
+/* =============================================================================
+   O CELULAR É A TERCEIRA JANELA
+
+   "um dos painéis fica no celular. aí posso mudar o painel do celular
+   arrastando para o lado, e ele muda as outras duas telas do monitor. como se
+   fossem 3 painéis interligados."
+
+   As páginas são uma FITA e as telas são três janelas consecutivas sobre ela.
+   Este arquivo desenha a janela 0 — a que está na mão — e é dela que sai o
+   gesto: arrastar para o lado desliza a fita, o celular avisa a TV, e as três
+   andam juntas.
+
+   O que NÃO está aqui, de propósito: as contas. Os alertas, os objetivos e
+   tudo o mais chegam prontos no pacote de estado. Recalcular a mesma regra em
+   dois arquivos é a receita de os dois desandarem no primeiro dia em que um
+   deles muda.
+   ========================================================================== */
+const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'ARMAS', 'OBJET', 'VOO'];
+const MFD_CIANO = '#63d8ff', MFD_VERDE = '#3fe070', MFD_AMBAR = '#ffc046',
+      MFD_VERM = '#ff6a58', MFD_CLARO = '#e2ecf8', MFD_ROT = '#8fa3b8',
+      MFD_FRACO = '#6d8095', MFD_FIO = 'rgba(226,236,248,';
+
+const Painel = {
+  carro: 0, dado: {}, lona: null, cx: null, w: 0, h: 0, desl: 0,
+  recebe(d){
+    this.dado = d;
+    if (typeof d.carro === 'number' && !this.arrastando) this.carro = d.carro;
+  },
+  rola(n){
+    this.carro = ((this.carro + n) % MFD_PAGS.length + MFD_PAGS.length) % MFD_PAGS.length;
+    enviaCtl({ t:'pag', c: this.carro });
+    try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
+  },
+  prepara(){
+    const el = document.getElementById('painelTela');
+    if (!el) return null;
+    if (!this.lona){
+      const c = document.createElement('canvas');
+      c.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+      el.appendChild(c); this.lona = c; this.cx = c.getContext('2d');
+    }
+    const q = this.lona.getBoundingClientRect();
+    const w = Math.max(80, Math.round(q.width)), h = Math.max(60, Math.round(q.height));
+    const r = Math.min(window.devicePixelRatio || 1, 2);
+    if (this.w !== w || this.h !== h || this.lona.width !== Math.round(w*r)){
+      this.w = w; this.h = h;
+      this.lona.width = Math.round(w*r); this.lona.height = Math.round(h*r);
+      this.cx.setTransform(r, 0, 0, r, 0, 0);
+    }
+    return { w, h };
+  },
+  pinta(){
+    const t = this.prepara();
+    if (!t) return;
+    const c = this.cx, W = t.w, H = t.h, d = this.dado;
+    const abas = Math.max(18, H*0.155), cab = Math.max(14, H*0.115);
+    const pad = Math.max(8, W*0.035);
+    const m = { pad, cab, abas, corpoY: cab, corpoH: H - cab - abas,
+                f: Math.max(9, H*0.078), fv: Math.max(11, H*0.105), W, H };
+    c.clearRect(0, 0, W, H);
+    c.fillStyle = '#070b0f'; c.fillRect(0, 0, W, H);
+
+    const nome = MFD_PAGS[this.carro];
+    c.textBaseline = 'middle'; c.textAlign = 'left';
+    c.font = '800 ' + Math.max(9, cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
+    c.fillStyle = MFD_CIANO; c.fillText(nome, pad, cab*0.60);
+    c.font = '700 ' + Math.max(8, cab*0.40).toFixed(1) + 'px ui-monospace, monospace';
+    c.textAlign = 'right'; c.fillStyle = MFD_FRACO;
+    c.fillText('‹ arraste ›', W - pad, cab*0.60);
+
+    if (!d.jogando && !d.vel){ this.vazio(c, m); }
+    else if (nome === 'SINÓT') this.sinoptico(c, m, d);
+    else if (nome === 'MOTOR') this.motor(c, m, d);
+    else if (nome === 'MAPA')  this.mapa(c, m, d);
+    else if (nome === 'ARMAS') this.armas(c, m, d);
+    else if (nome === 'OBJET') this.objetivos(c, m, d);
+    else if (nome === 'VOO')   this.voo(c, m, d);
+
+    /* AS ABAS mostram as SEIS páginas e marcam as três que estão abertas: a
+       desta tela cheia, as duas da TV com um fio embaixo. Ver onde as outras
+       duas estão é o que faz a fita parecer uma fita, e não um sorteio. */
+    const ay = H - abas, aw = W/MFD_PAGS.length;
+    c.strokeStyle = MFD_FIO + '.14)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(0, ay + 0.5); c.lineTo(W, ay + 0.5); c.stroke();
+    c.textAlign = 'center';
+    c.font = '700 ' + Math.max(7, abas*0.40).toFixed(1) + 'px system-ui, sans-serif';
+    const naTv = [(this.carro + 1) % MFD_PAGS.length, (this.carro + 2) % MFD_PAGS.length];
+    MFD_PAGS.forEach((p, i) => {
+      const ax = i*aw;
+      if (i === this.carro){ c.fillStyle = MFD_CIANO; c.fillRect(ax, ay + 1, aw, abas - 1); }
+      else if (naTv.indexOf(i) >= 0){
+        c.fillStyle = 'rgba(99,216,255,.6)'; c.fillRect(ax + aw*0.2, H - 2.5, aw*0.6, 2.5);
+      }
+      c.fillStyle = i === this.carro ? '#05080b' : MFD_FRACO;
+      c.fillText(p, ax + aw/2, ay + abas*0.52);
+    });
+  },
+  vazio(c, m){
+    c.textAlign = 'center'; c.fillStyle = MFD_FRACO;
+    c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    c.fillText('SEM DADOS DA TV', m.W/2, m.corpoY + m.corpoH/2);
+    c.textAlign = 'left';
+  },
+  /* as peças, iguais às da TV */
+  linha(c, m, i, n, rot, val, cor, frac, corBar){
+    const y = m.corpoY + m.corpoH*(i + 0.5)/n;
+    const x = m.pad, w = m.W - m.pad*2;
+    c.textBaseline = 'middle';
+    c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    c.textAlign = 'left'; c.fillStyle = MFD_ROT; c.fillText(rot, x, y);
+    if (frac !== undefined){
+      const bx = x + w*0.30, bw = w*0.42, bh = Math.max(4, m.corpoH*0.06);
+      c.fillStyle = 'rgba(226,236,248,.12)'; c.fillRect(bx, y - bh/2, bw, bh);
+      c.fillStyle = corBar || MFD_VERDE;
+      c.fillRect(bx, y - bh/2, bw*Math.max(0, Math.min(1, frac)), bh);
+    }
+    c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+    c.textAlign = 'right'; c.fillStyle = cor || MFD_CLARO; c.fillText(val, x + w, y);
+  },
+  motor(c, m, d){
+    const pc = d.comb || 0, pv = d.vida === undefined ? 100 : d.vida;
+    const pot = d.turbo ? 100 : (d.pot || 0);
+    this.linha(c, m, 0, 5, 'COMB', String(Math.round(pc)), pc < 20 ? MFD_VERM : MFD_CLARO,
+               pc/100, pc < 20 ? MFD_VERM : pc < 45 ? MFD_AMBAR : MFD_VERDE);
+    this.linha(c, m, 1, 5, 'FUSEL', String(Math.round(pv)), pv < 30 ? MFD_VERM : MFD_CLARO,
+               pv/100, pv < 30 ? MFD_VERM : pv < 65 ? MFD_AMBAR : MFD_VERDE);
+    this.linha(c, m, 2, 5, 'POT', d.turbo ? 'A/B' : String(pot),
+               d.turbo ? MFD_AMBAR : MFD_CLARO, pot/100, d.turbo ? MFD_AMBAR : MFD_VERDE);
+    this.linha(c, m, 3, 5, 'NITRO', String(Math.round(d.nit || 0)),
+               (d.nit||0) < 20 ? MFD_VERM : MFD_CLARO, (d.nit||0)/100,
+               (d.nit||0) < 20 ? MFD_VERM : MFD_CIANO);
+    const A = d.alertas || [];
+    const y = m.corpoY + m.corpoH*0.84;
+    c.textAlign = 'left'; c.textBaseline = 'middle';
+    c.font = '800 ' + (m.f*1.02).toFixed(1) + 'px ui-monospace, monospace';
+    c.fillStyle = A.length ? (A[0][1] === 2 ? MFD_VERM : MFD_AMBAR) : MFD_VERDE;
+    c.fillText(A.length ? A[0][0] : 'SEM ALERTAS', m.pad, y);
+    if (A.length > 1){
+      c.textAlign = 'right'; c.fillStyle = MFD_ROT;
+      c.fillText('+' + (A.length - 1), m.W - m.pad, y); c.textAlign = 'left';
+    }
+  },
+  voo(c, m, d){
+    const g = d.g === undefined ? 1 : d.g, gq = Math.abs(g);
+    this.linha(c, m, 0, 6, 'VEL', String(Math.round(d.v || 0)), d.estol ? MFD_VERM : MFD_CLARO);
+    this.linha(c, m, 1, 6, 'ALT', String(Math.round(d.a || 0)), (d.a||0) < 40 ? MFD_AMBAR : MFD_CLARO);
+    this.linha(c, m, 2, 6, 'RUMO', String(Math.round(d.rumo || d.h || 0)).padStart(3, '0'));
+    this.linha(c, m, 3, 6, 'SUBIDA', ((d.subida||0) >= 0 ? '+' : '') + Math.round(d.subida||0));
+    this.linha(c, m, 4, 6, 'CARGA', g.toFixed(1) + 'G',
+               gq > 7.5 ? MFD_VERM : gq > 5.5 ? MFD_AMBAR : MFD_VERDE);
+    this.linha(c, m, 5, 6, 'PICO', (d.gmax === undefined ? g : d.gmax).toFixed(1) + 'G', MFD_FRACO);
+  },
+  armas(c, m, d){
+    const x = m.pad, w = m.W - m.pad*2;
+    const NOMES = { bomba:'NUCLEAR', missil:'MÍSSIL', metralha:'METRALHADORA' };
+    const CORES = { bomba:'#ffc24d', missil:'#ff7a4d', metralha:'#ffe98a' };
+    c.textBaseline = 'middle'; c.textAlign = 'left';
+    c.font = '800 ' + (m.fv*1.25).toFixed(1) + 'px system-ui, sans-serif';
+    c.fillStyle = CORES[d.arma] || MFD_CLARO;
+    c.fillText(NOMES[d.arma] || (d.arma || '—'), x, m.corpoY + m.corpoH*0.15);
+    let i = 0;
+    for (const k in NOMES){
+      const y = m.corpoY + m.corpoH*(0.38 + i*0.17);
+      const atual = k === d.arma;
+      c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+      c.textAlign = 'left'; c.fillStyle = atual ? MFD_CLARO : MFD_ROT;
+      c.fillText((atual ? '▸ ' : '  ') + NOMES[k], x, y);
+      c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+      c.textAlign = 'right'; c.fillStyle = atual ? CORES[k] : MFD_ROT;
+      c.fillText(d.muns ? String(d.muns[k]) : '∞', x + w, y);
+      i++;
+    }
+    const y2 = m.corpoY + m.corpoH*0.90;
+    c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    c.textAlign = 'left'; c.fillStyle = MFD_ROT; c.fillText('CHAMAS', x, y2);
+    c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+    c.fillStyle = d.chamas ? MFD_CLARO : MFD_VERM;
+    c.fillText(String(d.chamas === undefined ? '—' : d.chamas), x + w*0.36, y2);
+    c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    c.fillStyle = MFD_ROT; c.fillText('TRAVA', x + w*0.55, y2);
+    c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+    c.textAlign = 'right';
+    c.fillStyle = d.trava === 2 ? MFD_VERDE : d.trava === 1 ? MFD_AMBAR : MFD_FRACO;
+    c.fillText(d.trava === 2 ? 'TRAVADO' : d.trava === 1 ? 'BUSCA' : 'LIVRE', x + w, y2);
+    c.textAlign = 'left';
+  },
+  objetivos(c, m, d){
+    const x = m.pad, w = m.W - m.pad*2;
+    const L = (d.objs || []).slice().sort((a, b) => a[0] - b[0]);
+    const feitos = (d.objs || []).filter(o => o[0]).length;
+    /* o contador cola no NOME da página, à esquerda: no canto direito ele caía
+       em cima do "‹ arraste ›", que o cabeçalho já escreve ali */
+    c.textBaseline = 'middle'; c.textAlign = 'left';
+    c.font = '800 ' + Math.max(9, m.cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
+    const lgNome = c.measureText('OBJET').width;
+    c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    c.fillStyle = MFD_CIANO;
+    c.fillText(feitos + '/' + (d.objs || []).length, m.pad + lgNome + m.f*0.6, m.cab*0.60);
+    const n = Math.min(5, L.length);
+    for (let i = 0; i < n; i++){
+      const y = m.corpoY + m.corpoH*(0.10 + i*0.155);
+      c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+      c.textAlign = 'left'; c.fillStyle = L[i][0] ? MFD_VERDE : MFD_ROT;
+      c.fillText((L[i][0] ? '✔ ' : '○ ') + String(L[i][1]).toUpperCase().slice(0, 18), x, y);
+      if (L[i][2]){
+        c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+        c.textAlign = 'right'; c.fillStyle = L[i][0] ? MFD_VERDE : MFD_CLARO;
+        c.fillText(String(L[i][2]), x + w, y);
+      }
+    }
+    const y2 = m.corpoY + m.corpoH*0.90;
+    c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    c.textAlign = 'left'; c.fillStyle = MFD_ROT; c.fillText('PTS', x, y2);
+    c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+    c.fillStyle = MFD_CLARO; c.fillText(String(Math.round(d.pontos || 0)), x + w*0.18, y2);
+    c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    c.fillStyle = MFD_ROT; c.fillText('DIST', x + w*0.50, y2);
+    c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+    c.textAlign = 'right'; c.fillStyle = MFD_CLARO;
+    c.fillText((d.dist || 0) + 'm', x + w, y2);
+    c.textAlign = 'left';
+  },
+  mapa(c, m, d){
+    /* o celular não tem a lista de alvos nem as posições: o mapa desenhável é
+       da TV. Aqui a página vira o RESUMO do que o mapa diz, que é o que cabe
+       numa janela deste tamanho e o que se pergunta a ele. */
+    this.linha(c, m, 0, 4, 'ALVOS', (d.falta === undefined ? '—' : d.falta) + '',
+               d.falta ? MFD_AMBAR : MFD_VERDE);
+    this.linha(c, m, 1, 4, 'HOSTIL', String(d.hostis || 0), d.hostis ? MFD_VERM : MFD_FRACO);
+    this.linha(c, m, 2, 4, 'RUMO', String(Math.round(d.rumo || d.h || 0)).padStart(3, '0'));
+    this.linha(c, m, 3, 4, 'DIST', (d.dist || 0) + 'm');
+  },
+  sinoptico(c, m, d){
+    const cx = m.W*0.50, cy = m.corpoY + m.corpoH*0.48;
+    const L = Math.min(m.W*0.46, m.corpoH*1.05);
+    const pv = d.vida === undefined ? 100 : d.vida, pc = d.comb || 0;
+    const cor = pv < 30 ? MFD_VERM : pv < 65 ? MFD_AMBAR : MFD_VERDE;
+    c.save(); c.translate(cx, cy); c.lineJoin = 'round';
+    c.beginPath();
+    c.moveTo(0, -L*0.46);
+    c.lineTo(L*0.05, -L*0.32); c.lineTo(L*0.05, L*0.02);
+    c.lineTo(L*0.48, L*0.22);  c.lineTo(L*0.48, L*0.28);
+    c.lineTo(L*0.07, L*0.26);  c.lineTo(L*0.07, L*0.36);
+    c.lineTo(L*0.20, L*0.44);  c.lineTo(L*0.20, L*0.48);
+    c.lineTo(L*0.045, L*0.46); c.lineTo(0, L*0.50);
+    c.lineTo(-L*0.045, L*0.46); c.lineTo(-L*0.20, L*0.48);
+    c.lineTo(-L*0.20, L*0.44); c.lineTo(-L*0.07, L*0.36);
+    c.lineTo(-L*0.07, L*0.26); c.lineTo(-L*0.48, L*0.28);
+    c.lineTo(-L*0.48, L*0.22); c.lineTo(-L*0.05, L*0.02);
+    c.lineTo(-L*0.05, -L*0.32);
+    c.closePath();
+    c.fillStyle = 'rgba(226,236,248,.045)'; c.fill();
+    c.strokeStyle = cor; c.lineWidth = Math.max(1.2, L*0.013); c.stroke();
+    for (const lado of [-1, 1]){
+      const tx = lado > 0 ? L*0.16 : -L*0.40, tw = L*0.24, ty = L*0.095, th = L*0.125;
+      c.strokeStyle = MFD_FIO + '.30)'; c.lineWidth = 1; c.strokeRect(tx, ty, tw, th);
+      c.fillStyle = pc < 20 ? 'rgba(255,106,88,.6)' : pc < 45 ? 'rgba(255,192,70,.55)'
+                                                     : 'rgba(63,224,112,.5)';
+      c.fillRect(tx + 1, ty + th*(1 - pc/100) + 1, tw - 2, Math.max(0, th*(pc/100) - 2));
+    }
+    const fl = d.flap || 0;
+    for (const lado of [-1, 1]){
+      c.strokeStyle = fl ? MFD_VERDE : MFD_FIO + '.40)';
+      c.lineWidth = Math.max(1.8, L*0.020);
+      c.beginPath();
+      c.moveTo(lado*L*0.10, L*0.265 + L*0.035*fl);
+      c.lineTo(lado*L*0.30, L*0.27 + L*0.035*fl); c.stroke();
+    }
+    const perna = (px, py) => {
+      const r = Math.max(2, L*0.028);
+      c.beginPath(); c.arc(px, py, r, 0, 7);
+      if (d.trem){ c.fillStyle = MFD_VERDE; c.fill(); }
+      else { c.strokeStyle = MFD_FIO + '.40)'; c.lineWidth = 1.2; c.stroke(); }
+    };
+    perna(0, -L*0.20); perna(-L*0.115, L*0.13); perna(L*0.115, L*0.13);
+    c.restore();
+    c.textBaseline = 'middle';
+    const par = (px, py, r2, v, cc, dir) => {
+      c.textAlign = dir;
+      c.font = '700 ' + (m.f*0.92).toFixed(1) + 'px ui-monospace, monospace';
+      c.fillStyle = MFD_ROT; c.fillText(r2, px, py);
+      c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+      c.fillStyle = cc || MFD_CLARO; c.fillText(v, px, py + m.fv*1.05);
+    };
+    par(m.pad, m.corpoY + m.corpoH*0.16, 'COMB', Math.round(pc) + '%',
+        pc < 20 ? MFD_VERM : MFD_CLARO, 'left');
+    par(m.pad, m.corpoY + m.corpoH*0.62, 'FUSEL', Math.round(pv) + '%', cor, 'left');
+    par(m.W - m.pad, m.corpoY + m.corpoH*0.16, 'TREM', d.trem ? 'FORA' : 'DENTRO',
+        d.trem ? MFD_VERDE : MFD_FIO + '.55)', 'right');
+    par(m.W - m.pad, m.corpoY + m.corpoH*0.62, 'FLAPE', String(fl),
+        fl ? MFD_VERDE : MFD_CLARO, 'right');
+    c.textAlign = 'left';
+  }
+};
+
+/* --- O GESTO ----------------------------------------------------------------
+   Arrastar de lado rola a fita. O limiar é de um quinto da largura da tela e
+   NÃO de um número de pixels: num celular pequeno, trinta pixels são um gesto;
+   num tablet, são um tremor de mão.
+
+   E ele solta o evento (`preventDefault`) para o arrasto não virar rolagem da
+   página nem comando de voo — o painel fica por cima do resto e o que acontece
+   dentro dele é dele. */
+(function gestoDoPainel(){
+  const el = document.getElementById('painelTela');
+  if (!el) return;
+  let x0 = null, y0 = null, usou = false;
+  el.addEventListener('touchstart', e => {
+    if (!e.touches[0]) return;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; usou = false;
+    Painel.arrastando = true;
+  }, {passive:true});
+  el.addEventListener('touchmove', e => {
+    if (x0 === null || usou || !e.touches[0]) return;
+    const dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
+    if (Math.abs(dy) > Math.abs(dx)) return;          // arrasto vertical não é meu
+    e.preventDefault();
+    if (Math.abs(dx) > el.clientWidth*0.20){
+      Painel.rola(dx < 0 ? 1 : -1);                   // puxar para a esquerda avança
+      usou = true;
+    }
+  }, {passive:false});
+  const solta = () => { x0 = null; Painel.arrastando = false; };
+  el.addEventListener('touchend', solta);
+  el.addEventListener('touchcancel', solta);
+  /* e tocar numa aba leva direto: quem vê seis abas tenta tocar nelas */
+  el.addEventListener('click', e => {
+    const q = el.getBoundingClientRect();
+    const abas = Math.max(18, q.height*0.155);
+    if (e.clientY < q.bottom - abas) return;
+    const i = Math.floor((e.clientX - q.left)/(q.width/MFD_PAGS.length));
+    Painel.rola(i - Painel.carro);
+  });
+})();
+
 // horizonte artificial (piloto) ou mira da torre (artilheiro)
 (function anima(){
   const v = Controle.volante, m = Controle.manche;
@@ -1223,6 +1598,7 @@ const ADI = {
     $('alvoTorre').style.transform = 'translate(' + (x*120).toFixed(1) + '%,' + (-y*120).toFixed(1) + '%)';
   } else {
     ADI.pinta();
+    Painel.pinta();
   }
   const lb = $('lemeBarra');
   if (lb){

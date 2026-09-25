@@ -6074,3 +6074,57 @@ Fontes:
 [Collins — Pro Line Fusion (EICAS, sinópticos e listas de verificação)](https://www.rtx.com/collinsaerospace/what-we-do/industries/business-aviation/flight-deck/pro-line-fusion) ·
 [SKYbrary — Multifunction Display](https://skybrary.aero/articles/multifunction-display-mfd) ·
 [Embraer — KC-390 Millennium](https://embraer.com/defense-security-air/kc-390-millennium/en/)
+
+## O carrossel de três janelas
+
+"um dos painéis fica no celular. aí posso mudar o painel do celular arrastando
+para o lado, e ele muda as outras duas telas do monitor. como se fossem 3
+painéis interligados, aí vou passando, rolando, e vai aparecendo os painéis
+rolando."
+
+Ficou claro, e é melhor do que o que eu tinha feito. Eu tinha duas telas
+**independentes**, cada uma com a sua página, e uma regra emendada para impedir
+que as duas caíssem na mesma. Isso é dois botões e uma proibição.
+
+O que ele descreveu é **uma coisa só**: as páginas são uma **fita**, e as telas
+são **três janelas consecutivas** sobre ela. Arrastar no celular desliza a fita,
+e as três andam juntas. Consequências, todas boas:
+
+- não existe mais como duas janelas mostrarem a mesma página — três
+  consecutivas de seis são sempre distintas **por construção**, e a regra
+  emendada some;
+- o celular deixa de ser um controle que também mostra coisas e vira a
+  **terceira tela do avião**;
+- e há um gesto só para tudo: rolar. Sem decorar qual tecla é de qual tela.
+
+A janela 0 é o celular, a 1 é a tela da esquerda, a 2 é a da direita — a ordem
+em que elas estão diante do piloto, da mais perto para a mais longe. E as abas
+do celular marcam com um fio ciano onde as **outras duas** estão, para a fita
+parecer uma fita e não um sorteio.
+
+A página **VOO voltou**. Eu a tinha tirado por repetir o HUD; no celular não há
+HUD nenhum, e lá ela é a única fonte de velocidade e altitude. Com seis páginas
+e três janelas sobram três escondidas — que é o que dá sentido a rolar.
+
+### O que o celular NÃO calcula
+
+Os alertas, os objetivos, a munição de cada arma e o resto chegam **prontos** no
+pacote de estado, calculados na TV. Recalcular a mesma regra em dois arquivos é
+a receita de os dois desandarem no primeiro dia em que um deles muda. O canal
+rápido (16 Hz) continua só com a atitude, que é a única coisa que precisa dessa
+taxa; tudo o mais vai no pacote de 4 Hz, e nenhum desses números muda depressa o
+bastante para incomodar.
+
+### Erros medidos
+
+- Cortei o HTML do placar por posição de texto e deixei um `</div>` sobrando: o
+  `#telaControle` fechou cedo, o modo deitado parou de valer e a tela inteira se
+  empilhou.
+- Pus a tela **embaixo** do horizonte. Sobravam noventa pixels entre a bola e o
+  seletor de arma, e uma página de seis linhas mais a fileira de abas não cabe
+  em noventa pixels — saiu cortada pelo rodapé. Foi para o lado, onde há
+  setecentos pixels livres entre a tira do nitro e o FOGO.
+- E com largura fixa em 38% ela cabia num iPhone deitado e **entrava no botão de
+  FOGO** num iPhone pequeno. A largura passou a ser o espaço que realmente
+  sobra, medido em `calc`, e a prova de sobreposição ficou verde nos quatro
+  tamanhos.
