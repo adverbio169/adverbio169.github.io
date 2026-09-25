@@ -96,17 +96,19 @@
   #telaControle.ver{display:flex}
   /* flex-shrink:0 e o limite em vh: sem isso, com o celular deitado o círculo era
      esmagado pela coluna e virava uma elipse */
+  /* A MOLDURA DO EADI. O disco antigo tinha aro branco translúcido e sombra
+     de cartão; esta é a caixa de uma tela: liga escura, tela preta afundada e
+     um fio claro no alto, que é o que dá relevo sem custar imagem. O miolo é
+     uma lona, e quem desenha é o `ADI`. */
   #horizonte{--d:min(72vw,46vh,300px);width:var(--d);height:var(--d);flex-shrink:0;
              border-radius:50%;overflow:hidden;position:relative;
-             border:3px solid rgba(255,255,255,.18);box-shadow:0 0 0 8px rgba(255,255,255,.04),0 20px 50px rgba(0,0,0,.5);
-             background:#2f6a3f}
-  #ceu{position:absolute;left:-50%;top:-50%;width:200%;height:200%;
-       background:linear-gradient(#0e2a5c 0%,#3d7cc0 45%,#a9cbe8 50%,#2f6a3f 50%,#245532 100%);
-       transform-origin:center;will-change:transform}
-  #mira{position:absolute;inset:0;pointer-events:none}
-  #mira:before{content:"";position:absolute;left:18%;right:18%;top:50%;height:3px;margin-top:-1px;background:#ffc24d;
-               border-radius:2px;clip-path:polygon(0 0,36% 0,36% 100%,0 100%,0 0,64% 0,100% 0,100% 100%,64% 100%,64% 0)}
-  #mira:after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#ffc24d}
+             background:#04070a;
+             border:2px solid #3d444c;
+             box-shadow:0 0 0 7px #262b31, 0 0 0 8px #14171b,
+                        inset 0 1px 0 rgba(255,255,255,.14), 0 18px 44px rgba(0,0,0,.55)}
+  #ceu{display:none}            /* o gradiente saiu: a bola agora é desenhada */
+  #mira{display:none}           /* e o símbolo do avião também */
+  body.artilheiro #adiLona{display:none}
   /* o leme, mostrado: sem ver, não dá para saber se o apontar está pegando */
   #lemeTira{position:relative;width:min(56vw,240px);height:14px;border-radius:99px;
             background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);overflow:hidden}
@@ -116,11 +118,23 @@
   #lemeTira span{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-start;
             padding-left:7px;font:800 8px/1 inherit;letter-spacing:2px;color:#8fa3c8;
             text-shadow:0 1px 3px #000;pointer-events:none}
-  body.artilheiro #lemeTira{display:none}
-  .placar{display:flex;gap:18px;font-variant-numeric:tabular-nums}
-  .placar div{text-align:center}
-  .placar .rot{font-size:9.5px;letter-spacing:1.6px;text-transform:uppercase;color:#8fa3c8;font-weight:700}
-  .placar .val{font-size:22px;font-weight:800}
+  /* A TIRA DO LEME SAI DE CENA. Ela existia porque "sem ver, não dá para saber
+     se o apontar está pegando" — e isso continua valendo; o que mudou é que
+     agora quem mostra é a BOLA DE DERRAPAGEM colada no ponteiro de inclinação
+     do EADI, que é o instrumento de verdade para essa pergunta. Duas leituras
+     da mesma coisa na mesma tela é ruído, e avião nenhum tem régua de leme no
+     painel. */
+  #lemeTira{display:none}
+  /* o placar em JANELAS, como as do EADI: caixa preta, moldura fina e o
+     algarismo monoespaçado dentro. Três números soltos no fundo pareciam
+     legenda de aplicativo; assim eles pertencem ao mesmo painel. */
+  .placar{display:flex;gap:10px;font-variant-numeric:tabular-nums}
+  /* `> div`, e não `div`: o seletor largo pegava também o rótulo e o valor lá
+     dentro, e cada janela virou três janelas encaixadas */
+  .placar > div{text-align:center;background:#04070a;border:1px solid #3d444c;
+              border-radius:4px;padding:3px 9px 4px;min-width:58px}
+  .placar .rot{font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;color:#8fa3c8;font-weight:700}
+  .placar .val{font-size:19px;font-weight:800;font-family:ui-monospace,"SF Mono",monospace;color:#e8f0fa}
   .linha{display:flex;gap:10px;width:100%;max-width:300px}
   .linha .bt{flex:1}
   #dica{font-size:12px;color:#7d8cab;text-align:center;max-width:36ch;line-height:1.5}
@@ -184,30 +198,56 @@
      e a potência vai junto. A cada 10% ele dá um toque no vibrador, para
      ajustar a potência de olho na tela grande, sem olhar o celular.
      -------------------------------------------------------------------- */
-  .motor{position:relative;border-radius:14px;border:1px solid rgba(255,255,255,.16);
-         background:rgba(255,255,255,.06);user-select:none;-webkit-user-select:none;touch-action:none}
+  /* --- A MANETE E O NITRO, NA MESMA LINGUAGEM DAS TELAS -------------------
+     Eram duas tiras de aplicativo: cantos bem redondos, fundo leitoso e um
+     gradiente macio subindo. Viraram o que são num painel de vidro: caixa de
+     liga escura, tela preta afundada e uma coluna de SEGMENTOS.
+
+     O segmento é o detalhe que faz a diferença, e não é estilo: barra contínua
+     obriga a comparar comprimentos, segmento deixa CONTAR — "faltam três" — e
+     continua legível com o polegar em cima e o celular tremendo. É por isso que
+     todo painel de vidro mostra empuxo assim.
+
+     O truque de desenho é que as listras não estão na barra, estão POR CIMA de
+     tudo, coladas na caixa. Assim a mesma regra serve para a barra que sobe
+     (celular deitado) e para a que anda de lado (em pé), sem tocar no JS que
+     decide o eixo. */
+  .motor{position:relative;border-radius:5px;
+         border:2px solid #3d444c;background:#04070a;
+         box-shadow:0 0 0 5px #262b31, 0 0 0 6px #14171b,
+                    inset 0 1px 0 rgba(255,255,255,.12);
+         user-select:none;-webkit-user-select:none;touch-action:none}
+  .motor::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
+         background:repeating-linear-gradient(90deg,transparent 0 7px,#04070a 7px 10px)}
+  body.paisagem .motor::after{
+         background:repeating-linear-gradient(0deg,transparent 0 7px,#04070a 7px 10px)}
   #acel{width:100%;max-width:340px;height:74px;overflow:hidden;cursor:ns-resize}
   /* a mesma barra serve de pé (deitado, tira alta) e deitada (em pé, tira
      baixa e larga): quem escolhe o eixo é o JS, olhando a forma da tira */
   /* verde no acelerador, azul no nitro: de relance dá para saber qual é qual
      sem ler nada */
   #acelBarra{position:absolute;left:0;bottom:0;width:100%;height:67%;
-             background:linear-gradient(0deg,rgba(94,255,154,.26),rgba(94,255,154,.5));
-             pointer-events:none}
+             background:#2ec46b;pointer-events:none}
+  /* os números em monoespaçado: algarismo de tela de avião não dança de
+     largura quando troca de 99 para 100 */
   #acelNum{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;
-           font:900 20px/1 inherit;color:#e6fff0;text-shadow:0 2px 8px #000;pointer-events:none}
-  #acelRot{position:absolute;left:0;right:0;bottom:4px;text-align:center;font-size:9.5px;
-           letter-spacing:2px;color:#7e93b4;font-weight:700;pointer-events:none}
-  #acel.mexendo{border-color:#5eff9a}
+           font:800 19px/1 ui-monospace,"SF Mono",monospace;color:#e8f0fa;
+           text-shadow:0 0 6px #000,0 2px 8px #000;pointer-events:none;z-index:2}
+  /* o rótulo mora EM CIMA da coluna cheia: sem a sombra escura ele sumia no
+     verde assim que a manete passava de uns oitenta por cento */
+  #acelRot{position:absolute;left:0;right:0;bottom:4px;text-align:center;font-size:8.5px;
+           letter-spacing:1.4px;color:#dbe6f5;font-weight:700;pointer-events:none;z-index:2;
+           text-shadow:0 0 4px #000,0 1px 3px #000}
+  #acel.mexendo{border-color:#5cf09a}
 
   #nitro{width:100%;max-width:340px;height:74px;overflow:hidden;cursor:pointer;
          display:flex;align-items:center;justify-content:center}
-  #nitro b{position:relative;z-index:2;font:900 17px/1 inherit;letter-spacing:3px;color:#bfe6ff;
-           text-shadow:0 2px 8px #000}
+  #nitro b{position:relative;z-index:2;font:800 15px/1 ui-monospace,"SF Mono",monospace;
+           letter-spacing:2.5px;color:#cfeeff;text-shadow:0 0 6px #000,0 2px 8px #000}
   #nitroCarga{position:absolute;left:0;bottom:0;top:0;width:var(--carga,100%);
-              background:linear-gradient(90deg,rgba(92,200,255,.45),rgba(140,230,255,.28));
-              pointer-events:none;transition:width .12s linear}
-  #nitro.ligado{border-color:#7fd8ff;box-shadow:0 0 0 2px rgba(127,216,255,.35),0 0 22px rgba(127,216,255,.45)}
+              background:#63d8ff;pointer-events:none;transition:width .12s linear}
+  #nitro.ligado{border-color:#63d8ff;
+                box-shadow:0 0 0 5px #262b31, 0 0 0 6px #14171b, 0 0 20px rgba(99,216,255,.5)}
   #nitro.ligado b{color:#fff}
   #nitro.vazio{opacity:.45}
   #nitro.vazio b{color:#ff9a9a}
@@ -676,6 +716,7 @@ function conectar(codigo){
       if (!d || !d.t) return;
       if (d.t === 'papel'){ assumePosto(d.p, d.n); return; }
       if (d.t === 'tremer'){ Tremor.recebe(d); return; }
+      if (d.t === 'at'){ Atitude.recebe(d); return; }   // atitude: o canal rápido
       if (d.t === 'pong'){ latencia = Date.now() - d.at; ultimoPong = Date.now(); }
       if (d.t === 'estado'){
         $('pDist').textContent = d.dist;
@@ -917,6 +958,243 @@ function assumePosto(p, quantos){
 }
 assumePosto('piloto', 1);
 
+/* =============================================================================
+   O EADI DO CONTROLE
+
+   "inclusive no controle (celular) tem que ser instrumentações que simulem
+   aviação mesmo" — e, logo depois, "nosso avião é um jato, então as coisas têm
+   que ser de avião moderno".
+
+   O que havia aqui era um disco com uma metade azul e outra verde, girando com
+   o volante e subindo com o dedo. Duas coisas erradas nele, e a segunda é a
+   grave:
+
+     1. NÃO ERA UM INSTRUMENTO, era um gradiente. Faltava tudo o que faz uma
+        bola de horizonte servir para alguma coisa: escada de arfagem com os
+        números, arco de inclinação, ponteiro de inclinação, símbolo do avião,
+        bola de derrapagem.
+     2. NÃO MOSTRAVA A ATITUDE, mostrava o MANCHE. Girava com o comando, não
+        com o avião. Enquanto o comando e a atitude andam juntos ninguém nota;
+        na hora em que deixam de andar — que é exatamente a hora em que se
+        precisa de um horizonte — o desenho estava dizendo a coisa errada.
+
+   Agora ele recebe a atitude de verdade da TV, dezesseis vezes por segundo, e
+   desenha o que um EADI moderno desenha. Sem atitude chegando (antes de
+   conectar, ou se a ligação cair) ele volta a mostrar o manche e DIZ isso, com
+   a tarja OFF atravessada — que é o que uma tela de verdade faz quando perde
+   a fonte de dados. Instrumento que continua desenhando um horizonte bonito
+   sem saber de nada é pior do que instrumento nenhum.
+
+   As cores são as do padrão: céu azul, chão marrom-terra, escada branca,
+   avião âmbar. Verde-grama para o chão é coisa de brinquedo — no EADI o chão é
+   terra, e a razão é que ele tem de se distinguir do céu num relance mesmo com
+   sol batendo na tela.
+   ========================================================================== */
+const Atitude = {
+  tem: false, quando: 0,
+  r: 0, p: 0, h: 0, a: 0, v: 0, g: 1,          // o alvo, como chegou
+  R: 0, P: 0, H: 0, A: 0, V: 0, G: 1,          // e o alisado, que é o desenhado
+  recebe(d){
+    this.r = d.r || 0; this.p = d.p || 0; this.h = d.h || 0;
+    this.a = d.a || 0; this.v = d.v || 0; this.g = d.g === undefined ? 1 : d.g;
+    this.quando = Date.now(); this.tem = true;
+  },
+  /* ALISAR É OBRIGATÓRIO, não é capricho. Os pacotes chegam a dezesseis por
+     segundo e a tela desenha a sessenta: sem interpolação a bola anda em
+     degraus de quatro quadros, que é exatamente o defeito que faz um horizonte
+     parecer de papelão. O rumo é alisado pela DIFERENÇA CURTA, senão passar de
+     359 para 001 faz a rosa dar a volta inteira ao contrário. */
+  passo(){
+    const vivo = this.tem && Date.now() - this.quando < 1600;
+    if (!vivo){ this.tem = false; return false; }
+    const k = 0.22;
+    this.R += (this.r - this.R)*k;
+    this.P += (this.p - this.P)*k;
+    let dh = ((this.h - this.H) % 360 + 540) % 360 - 180;
+    this.H = (this.H + dh*k + 360) % 360;
+    this.A += (this.a - this.A)*k;
+    this.V += (this.v - this.V)*k;
+    this.G += (this.g - this.G)*k;
+    return true;
+  }
+};
+
+const ADI = {
+  lona: null, cx: null, lado: 0,
+  prepara(){
+    const el = document.getElementById('horizonte');
+    if (!el) return null;
+    if (!this.lona){
+      const c = document.createElement('canvas');
+      c.id = 'adiLona';
+      c.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+      el.appendChild(c);
+      this.lona = c; this.cx = c.getContext('2d');
+    }
+    const q = this.lona.getBoundingClientRect();
+    const d = Math.max(60, Math.round(Math.min(q.width, q.height)));
+    const px = Math.round(d * Math.min(window.devicePixelRatio || 1, 2));
+    if (this.lado !== d || this.lona.width !== px){
+      this.lado = d; this.lona.width = this.lona.height = px;
+      this.cx.setTransform(px/d, 0, 0, px/d, 0, 0);
+    }
+    return d;
+  },
+  /* a escada e o arco de inclinação não mudam nunca: guardados numa lona à
+     parte, a bola só é rodada e o arco só é copiado. Num celular isso importa:
+     são quarenta traços e vinte números por quadro, a sessenta por segundo. */
+  _bola: null, _bolaLado: 0,
+  bola(d){
+    const L = Math.round(d*2.2);                 // folga para girar sem cortar
+    if (this._bola && this._bolaLado === L) return this._bola;
+    const px = Math.round(L * Math.min(window.devicePixelRatio || 1, 2));
+    const c = document.createElement('canvas');
+    c.width = c.height = px;
+    const g = c.getContext('2d');
+    g.setTransform(px/L, 0, 0, px/L, 0, 0);
+    const M = L/2, grau = d*0.0155;               // pixels por grau de arfagem
+    g.fillStyle = '#2f77c9'; g.fillRect(0, 0, L, M);          // o céu
+    g.fillStyle = '#6b4a27'; g.fillRect(0, M, L, M);          // e a terra
+    const cu = g.createLinearGradient(0, M - d*0.5, 0, M);
+    cu.addColorStop(0, 'rgba(255,255,255,0)'); cu.addColorStop(1, 'rgba(190,225,255,.35)');
+    g.fillStyle = cu; g.fillRect(0, M - d*0.5, L, d*0.5);
+    g.fillStyle = 'rgba(255,255,255,.95)'; g.fillRect(0, M - 1, L, 2);   // o horizonte
+    /* A ESCADA: traço comprido a cada 10°, curto a cada 5°, número nas pontas
+       dos compridos. Abaixo do horizonte ela é tracejada — é assim que se
+       sabe, de relance e de cabeça para baixo, para que lado é o chão. */
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '700 ' + Math.max(7, d*0.046).toFixed(1) + 'px ui-monospace, monospace';
+    for (let a = -90; a <= 90; a += 5){
+      if (a === 0) continue;
+      const y = M - a*grau, comp = a % 10 === 0 ? d*0.17 : d*0.085;
+      g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = a % 10 === 0 ? 2 : 1.4;
+      g.setLineDash(a < 0 ? [4, 4] : []);
+      g.beginPath(); g.moveTo(M - comp, y); g.lineTo(M + comp, y); g.stroke();
+      g.setLineDash([]);
+      if (a % 10 === 0){
+        g.fillStyle = 'rgba(255,255,255,.92)';
+        g.fillText(String(Math.abs(a)), M - comp - d*0.048, y);
+        g.fillText(String(Math.abs(a)), M + comp + d*0.048, y);
+      }
+    }
+    this._bola = c; this._bolaLado = L;
+    return c;
+  },
+  pinta(){
+    const d = this.prepara();
+    if (!d) return;
+    const c = this.cx, M = d/2, R = d/2;
+    const vivo = Atitude.passo();
+    /* sem atitude chegando, a bola volta a mostrar o manche — e a tarja OFF
+       diz que é isso que está acontecendo */
+    const rol = vivo ? Atitude.R : -(Controle.volante || 0);
+    const arf = vivo ? Atitude.P : -(Controle.manche || 0)*0.5;
+
+    c.clearRect(0, 0, d, d);
+    c.save();
+    c.beginPath(); c.arc(M, M, R*0.995, 0, 7); c.clip();
+
+    // A BOLA: gira com a inclinação e escorrega com a arfagem
+    c.save();
+    c.translate(M, M); c.rotate(-rol*Math.PI/180);
+    c.translate(0, arf*d*0.0155);
+    const b = this.bola(d), BL = this._bolaLado;
+    c.drawImage(b, -BL/2, -BL/2, BL, BL);
+    c.restore();
+
+    /* O ARCO DE INCLINAÇÃO, parado na borda: 10, 20, 30, 45 e 60 graus, com o
+       triângulo cheio no zero. É contra ele que corre o ponteiro. */
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.fillStyle = 'rgba(255,255,255,.9)';
+    for (const a of [-60,-45,-30,-20,-10, 10, 20, 30, 45, 60]){
+      const t = (a - 90)*Math.PI/180, comp = (a % 30 === 0 || a === 45) ? R*0.115 : R*0.065;
+      c.lineWidth = (a % 30 === 0 || a === 45) ? 2 : 1.4;
+      c.beginPath();
+      c.moveTo(M + Math.cos(t)*R*0.93, M + Math.sin(t)*R*0.93);
+      c.lineTo(M + Math.cos(t)*(R*0.93 - comp), M + Math.sin(t)*(R*0.93 - comp));
+      c.stroke();
+    }
+    c.beginPath();                                  // o zero: triângulo cheio
+    c.moveTo(M, M - R*0.93); c.lineTo(M - R*0.05, M - R*0.80);
+    c.lineTo(M + R*0.05, M - R*0.80); c.closePath(); c.fill();
+
+    // O PONTEIRO DE INCLINAÇÃO e, colada nele, a BOLA DE DERRAPAGEM (o leme)
+    c.save();
+    c.translate(M, M); c.rotate(-rol*Math.PI/180);
+    c.fillStyle = rol > 60 || rol < -60 ? '#ff7a5c' : '#ffc24d';
+    c.beginPath();
+    c.moveTo(0, -R*0.79); c.lineTo(-R*0.048, -R*0.68); c.lineTo(R*0.048, -R*0.68);
+    c.closePath(); c.fill();
+    /* A BOLA DE DERRAPAGEM, agora o único mostrador do leme. Duas marcas de
+       referência e o bloco correndo entre elas — "chute a bola" é a frase que
+       todo instrutor diz apontando exatamente para isto. */
+    const lm = Math.max(-1, Math.min(1, Controle.leme || 0));
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1.2;
+    for (const lado of [-1, 1]){
+      c.beginPath();
+      c.moveTo(lado*R*0.075, -R*0.665); c.lineTo(lado*R*0.075, -R*0.600);
+      c.stroke();
+    }
+    c.fillStyle = Math.abs(lm) > 0.6 ? '#ff7a5c' : '#ffc24d';
+    c.fillRect(-R*0.052 + lm*R*0.125, -R*0.660, R*0.104, R*0.050);
+    c.restore();
+    c.restore();
+
+    /* O SÍMBOLO DO AVIÃO, fixo no meio: duas asas com o degrau para baixo e o
+       ponto no centro. É o desenho do EADI moderno, e o contorno preto por
+       baixo é o que o mantém legível tanto no céu quanto na terra. */
+    const asa = R*0.34, alt = R*0.10;
+    const risca = (cor, esp) => {
+      c.strokeStyle = cor; c.lineWidth = esp; c.lineJoin = 'round';
+      c.beginPath();
+      c.moveTo(M - asa, M); c.lineTo(M - asa*0.42, M); c.lineTo(M - asa*0.42, M + alt);
+      c.moveTo(M + asa, M); c.lineTo(M + asa*0.42, M); c.lineTo(M + asa*0.42, M + alt);
+      c.stroke();
+      c.beginPath(); c.arc(M, M, R*0.028, 0, 7); c.strokeStyle = cor; c.stroke();
+    };
+    risca('rgba(0,0,0,.55)', R*0.055);
+    risca('#ffc24d', R*0.030);
+
+    /* OS NÚMEROS, EM JANELAS PRETAS E DENTRO DO CÍRCULO.
+       A primeira versão os pôs nos cantos do QUADRADO, a 7% da borda — e a
+       tela é REDONDA, então os quatro caíram fora do vidro e ficaram cortados
+       pelo recorte: a altitude de 1840 m aparecia como "284". Num mostrador
+       redondo o canto não existe; o que existe é a corda do círculo naquela
+       altura, e é dentro dela que o número tem de caber. A janela preta
+       também não é enfeite: sem ela o algarismo branco some no céu claro. */
+    c.font = '700 ' + Math.max(8, d*0.058).toFixed(1) + 'px ui-monospace, monospace';
+    c.textBaseline = 'middle';
+    const janela = (txt, cor, dir, cima) => {
+      const py = cima ? d*0.17 : d - d*0.17;
+      const lg = c.measureText(txt).width, ah = d*0.085;
+      const px = dir > 0 ? d*0.80 - lg : d*0.20;
+      c.fillStyle = 'rgba(4,8,12,.78)';
+      c.fillRect(px - d*0.018, py - ah/2, lg + d*0.036, ah);
+      c.fillStyle = cor; c.textAlign = 'left';
+      c.fillText(txt, px, py);
+    };
+    if (vivo){
+      janela(Math.round(Atitude.V) + ' m/s', '#cfe0f5', -1, true);
+      janela(Math.round(Atitude.A) + ' m',   '#cfe0f5',  1, true);
+      const gq = Math.abs(Atitude.G);
+      janela(Atitude.G.toFixed(1) + 'G',
+             gq > 7.5 ? '#ff6a58' : gq > 5.5 ? '#ffc046' : '#8fe6b4', -1, false);
+      janela(String(Math.round(Atitude.H)).padStart(3, '0') + '\u00b0', '#cfe0f5', 1, false);
+    } else {
+      /* a tarja fica ABAIXO do meio: em cima do meio ela tapava o símbolo do
+         avião, e tapar o símbolo é apagar a única referência que sobra */
+      c.textAlign = 'center';
+      c.save();
+      c.translate(M, M + R*0.44); c.rotate(-0.34);
+      c.fillStyle = 'rgba(255,106,88,.93)';
+      c.fillRect(-R*0.46, -R*0.14, R*0.92, R*0.28);
+      c.fillStyle = '#12161c';
+      c.font = '800 ' + Math.max(9, d*0.085).toFixed(1) + 'px system-ui, sans-serif';
+      c.fillText('ADI  OFF', 0, R*0.010);
+      c.restore();
+    }
+  }
+};
+
 // horizonte artificial (piloto) ou mira da torre (artilheiro)
 (function anima(){
   const v = Controle.volante, m = Controle.manche;
@@ -925,7 +1203,7 @@ assumePosto('piloto', 1);
     const y = Math.max(-1, Math.min(1, m/(CONE*0.7)));
     $('alvoTorre').style.transform = 'translate(' + (x*120).toFixed(1) + '%,' + (-y*120).toFixed(1) + '%)';
   } else {
-    $('ceu').style.transform = 'rotate(' + (-v) + 'deg) translateY(' + (m * 1.4) + '%)';
+    ADI.pinta();
   }
   const lb = $('lemeBarra');
   if (lb){

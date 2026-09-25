@@ -7854,6 +7854,8 @@ let vida=100;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
 let subida = 0;            // metros por segundo para cima, alisado, para o altímetro
+/* o fator de carga e as duas agulhas de memória do acelerômetro */
+let cargaG = 1, gMax = 1, gMin = 1, _fAnt = null;
 let jogando=false, caindo=false, giroQueda=0, vq=0, motivoQueda='';
 let cockpit=false, infinito=true, munInfinita=true, qualidade=2;
 /* a torre do copiloto: desvio da mira em relação ao nariz, dentro de um cone */
@@ -13931,6 +13933,89 @@ function atualiza(dt){
      troca 60 vezes por segundo. */
   subida += (eixoF.y*voo - subida) * Math.min(1, dt*2.5);
 
+  /* --- O FATOR DE CARGA, que é o número que o HUD mostra --------------------
+     "na cabine os mostradores, força, radar..." — antes de desenhar o
+     instrumento é preciso ter o NÚMERO, e o número tem de sair da física.
+
+     A DEFINIÇÃO é de manual e não tem escolha nenhuma. Com `ĉ` o teto do avião:
+
+         a = n·g·ĉ − g·ŷ        (o que a asa faz, menos o peso)
+         n = (a·ĉ)/g + ĉ.y
+
+     A primeira parcela é a manobra — a aceleração do vetor de voo projetada no
+     eixo do teto, que é o único eixo em que a asa puxa. A segunda é o peso:
+     nivelado a asa segura 1 g; de faca não segura nada (ĉ.y = 0); de barriga
+     para cima segura −1.
+
+     ATÉ AQUI TUDO CERTO. O QUE EU ERREI FOI O `g`.
+
+     Pus 196, que é 9,8 m/s² na escala do jogo (um metro vale vinte), e escrevi
+     no comentário que a curva nivelada devolveria 1/cos φ, como no manual.
+     Medido, não devolvia coisa nenhuma parecida:
+
+         reto e nivelado                1,0 g      (certo)
+         MANETE CHEIA, MANCHE NO FUNDO   26 g      (!!)
+         banco 60° com o manche solto   0,5 g
+
+     Vinte e seis. E não é defeito da conta — é que a conta está certa e o
+     MODELO DE VOO não é newtoniano. O avião do jogo arfa a 1,5 rad/s, que são
+     86 graus por segundo, a 170 m/s de velocidade. Um avião de verdade que
+     girasse o vetor de voo assim estaria mesmo a 26 g, e estaria em pedaços.
+     A taxa é de propósito: é ela que faz o jogo ser jogável no teclado. Mas
+     com a referência de 9,8 o mostrador encostava no batente no instante em
+     que se tocava no manche, e mostrador que vive no batente não mostra nada.
+
+     ENTÃO A REFERÊNCIA É A DO JOGO, e é escolhida por uma âncora só: MANCHE NO
+     FUNDO, EM VELOCIDADE DE CRUZEIRO, DÁ 9 g — que é o limite estrutural de um
+     caça de verdade. Daí para frente tudo sai da mesma conta e nada mais é
+     escolhido:
+
+         640 = (VOO_BASE × TAXA_ARF) / 8         (os 8 g de manobra + 1 do peso)
+
+     Medido depois, com a referência nova (média de um segundo, salvo onde diz
+     pico), e é este quadro que vale como prova e não o que eu esperava:
+
+         reto e nivelado, manche solto        1,00 g
+         puxada cheia de cruzeiro, PICO       9,28 g   <- a âncora, conferida
+         curva de 60° puxando                 9,51 g
+         curva de 80° puxando                11,26 g   <- passou do limite
+         looping inteiro (média da volta)     2,76 g
+         banco de 60° com o manche solto      0,50 g
+
+     E é justamente o quadro que se quer que a pessoa aprenda a ler:
+
+       · a puxada cheia encosta nos 9 g e fica vermelha — o limite é o mesmo
+         de um caça de verdade, e agora ele quer dizer alguma coisa;
+       · puxar o mesmo tanto MAIS RÁPIDO carrega MAIS: a curva de 80° passa de
+         11 g porque o vetor de voo gira mais depressa. Aliviar o manche é a
+         resposta, e é a resposta certa também no avião de verdade;
+       · inclinar e SOLTAR mostra MENOS de 1 g. Parece errado e não é: é o
+         "aliviado" de que todo piloto fala — a asa com o vetor de sustentação
+         deitado está trabalhando menos do que o peso do avião;
+       · e reto e nivelado dá 1,00 exato, que é a prova de que a conta não
+         ganhou nenhum enfeite pelo caminho.
+
+     As duas AGULHAS DE MEMÓRIA — o pico e o vale do voo — existem pelo mesmo
+     motivo que existem no acelerômetro de verdade: ninguém consegue ler o
+     número no instante em que puxa, e o que interessa depois é quanto se
+     tirou do avião.
+     ---------------------------------------------------------------------- */
+  const G_JOGO = 640;      // ver a âncora dos 9 g logo acima
+  if (_fAnt && dt > 0.0005){
+    const ax = (eixoF.x - _fAnt.x)/dt*voo,
+          ay = (eixoF.y - _fAnt.y)/dt*voo,
+          az = (eixoF.z - _fAnt.z)/dt*voo;
+    const bruto = (ax*eixoC.x + ay*eixoC.y + az*eixoC.z)/G_JOGO + eixoC.y;
+    /* alisado com a mesma constante da razão de subida: agulha de instrumento
+       tem inércia, e sem ela o ponteiro vira um borrão */
+    cargaG += (Math.max(-5, Math.min(12, bruto)) - cargaG) * Math.min(1, dt*6);
+  } else cargaG += (eixoC.y - cargaG) * Math.min(1, dt*6);
+  _fAnt = { x: eixoF.x, y: eixoF.y, z: eixoF.z };
+  if (jogando && !caindo){
+    if (cargaG > gMax) gMax = cargaG;
+    if (cargaG < gMin) gMin = cargaG;
+  }
+
   const fora = Math.max(Math.abs(aviaoX), Math.abs(aviaoZ));
   if (fora > MAPA){
     aviaoX = Math.max(-MAPA, Math.min(MAPA, aviaoX));
@@ -14700,9 +14785,16 @@ function bussola(y){
    altura, elas precisam poder DIZER onde estão, senão o mapinha — que só sabe
    de elementos do documento — se planta em cima delas. Foi o que aconteceu. */
 function reguasOnde(){
-  const bh = Math.max(8, H*0.018), cor = Math.max(10, H*0.021);
-  return { bx: W*0.075, bw: Math.max(62, W*0.12), bh, cor,
-           passo: bh + cor + Math.max(9, H*0.016), topo: H*0.63 };
+  /* a tela do motor sai do MENOR lado: num celular deitado é a altura que
+     aperta, e um painel medido pela largura sairia por baixo */
+  const w = Math.max(104, Math.min(W*0.155, H*0.30));
+  const h = Math.max(40, Math.min(w*0.42, H*0.115));
+  const x = Math.max(10, W*0.052), y = H*0.615;
+  /* o bloco de G mora logo acima, na mesma coluna: é a leitura que se procura
+     junto com a potência quando se está manobrando */
+  const gh = Math.max(30, H*0.072);
+  return { x, y, w, h, gh, gy: y - gh - h*0.18,
+           topo: y - gh - h*0.18, alt: gh + h*0.18 + h };
 }
 
 /* --- A FITA DA ALTURA --------------------------------------------------------
@@ -14883,14 +14975,15 @@ function radarOnde(){
                       top: fa.cy - fa.meia - 10, bottom: fa.cy + fa.meia + 34 });
   if (cockpit){
     const g = reguasOnde();
-    obst.push({ left: g.bx - 12, right: g.bx + g.bw + 14,
-                top: g.topo - g.cor - 10, bottom: g.topo + g.passo*2 + 8 });
+    obst.push({ left: g.x - 10, right: g.x + g.w + 10,
+                top: g.topo - 10, bottom: g.y + g.h + 10 });
   }
-  const encosta = (q, cx, cy, r) => {
-    const px = Math.max(q.left, Math.min(cx, q.right));
-    const py = Math.max(q.top,  Math.min(cy, q.bottom));
-    return Math.hypot(cx-px, cy-py) < r;
-  };
+  /* O MFD É QUADRADO, e a prova de encosto tem de ser quadrado contra
+     retângulo. Enquanto ele era um disco isto era distância a um ponto; com a
+     tela retangular, a mesma conta deixaria os quatro cantos por cima dos
+     painéis — e canto de MFD é justamente onde ficam os dados escritos. */
+  const encosta = (q, cx, cy, r) => !(cx + r <= q.left || q.right <= cx - r ||
+                                      cy + r <= q.top  || q.bottom <= cy - r);
   /* Só encolher no canto não resolve: o canto é justamente onde os painéis
      moram, e o disco encolhia até 40 sem nunca sair de dentro deles. Ele tem
      de DESLIZAR pela borda — de baixo para cima, que é onde um radar se
@@ -14901,8 +14994,8 @@ function radarOnde(){
      borda fica livre — num celular o disco simplesmente não aparecia. A busca
      entra para dentro também, de fora para o meio, ficando o mais longe do
      centro que der (o meio da tela é por onde se olha para voar). */
-  const m = 12, rMax = Math.max(46, Math.min(W, H) * 0.115);
-  for (let r = rMax; r >= 40; r -= 4){
+  const m = 12, rMax = Math.max(44, Math.min(W, H) * 0.115);
+  for (let r = rMax; r >= 34; r -= 4){
     const dentro = [];
     for (let k = 0; k <= 7; k++){                        // 0 = colado na borda
       dentro.push(m + r + k*r*0.55);                     // vindo da esquerda
@@ -14925,19 +15018,194 @@ addEventListener('resize', () => { _radarQuando = 0; });
 /* trocar cabine/vista de fora muda o que está desenhado na lona */
 function esqueceRadar(){ _radarQuando = 0; }
 
+/* =============================================================================
+   O PAINEL DE VIDRO
+
+   "nosso avião é um jato, então as coisas têm que ser de avião moderno. esses
+   instrumentos parecem de avião velho."
+
+   Estavam mesmo, e o erro foi meu: eu li "instrumentos reais" e desenhei
+   RELÓGIO DE PONTEIRO — aro de alumínio, parafuso, agulha, vidro com reflexo.
+   Aquilo é um instrumento real, só que de 1960. Um caça de quinta geração não
+   tem nenhum. O painel dele é VIDRO: três ou quatro telas pretas com desenho
+   vetorial fino por cima, e mais nada.
+
+   O que muda, concretamente, e por quê:
+
+     · SAI O ARO REDONDO, ENTRA A MOLDURA RETANGULAR com as teclas nas quatro
+       bordas. Aquelas teclinhas não são enfeite: são os botões de opção, e é
+       por elas que a mesma tela vira radar, mapa, armamento ou motor. É a peça
+       que mais grita "tela de caça moderno", porque nenhuma outra coisa no
+       mundo tem esse formato.
+     · SAI A AGULHA, ENTRA O NÚMERO. Ponteiro existe porque um mecanismo de
+       molas não sabe escrever. Onde há tela, a leitura é digital e o
+       analógico vira uma FITA ou uma barra de segmentos ao lado do número —
+       que é como se mostra tendência sem gastar a área toda.
+     · SAI O VERDE FÓSFORO, ENTRA O VETOR FINO. Tubo de fósforo é dos anos 70.
+       Tela ativa desenha linha fina e clara, em cores separadas por função:
+       branco/verde para o que é meu, âmbar para atenção, vermelho para
+       ameaça, ciano para navegação.
+     · SAI A VARREDURA QUE RODA. Radar de antena giratória varre; radar de
+       antena eletrônica não tem o que girar, e a tela dele não tem aquele
+       rastro. Tirar foi a mudança mais dolorida — é a imagem mais conhecida
+       de "radar" que existe — e é justamente por ser a mais conhecida que ela
+       datava o painel inteiro.
+     · E O G SAI DO PAINEL E VAI PARA O HUD. Num caça moderno o fator de carga
+       é um número no canto esquerdo do vidro de frente, junto com o pico do
+       voo. Ninguém tira o olho do alvo para procurar um mostrador de carga.
+
+   O que NÃO muda é a regra de custo: a moldura, as teclas e a escala são
+   imagem parada, então são pintadas uma vez numa lona à parte e daí em diante
+   são uma cópia. Só o que se mexe é redesenhado.
+   ========================================================================== */
+const MFD_MOLD = '#262b31', MFD_MOLD_ALTO = '#3d444c', MFD_MOLD_BAIXO = '#14171b';
+const MFD_TELA = '#04070a';
+const MFD_VERDE = '#5cf09a', MFD_CIANO = '#63d8ff', MFD_AMBAR = '#ffc046',
+      MFD_BRANCO = '#e8f0fa', MFD_VERM = '#ff6a58';
+function angInst(grau){ return (grau - 90) * Math.PI/180; }
+function pontoInst(cx, cy, r, grau){
+  const a = angInst(grau);
+  return [cx + Math.cos(a)*r, cy + Math.sin(a)*r];
+}
+function cantoInst(c, x, y, w, h, r){
+  if (c.roundRect){ c.beginPath(); c.roundRect(x, y, w, h, r); }
+  else { c.beginPath(); c.rect(x, y, w, h); }
+}
+
+/* a lona guardada de uma face: a chave inclui o tamanho, então mudar a janela
+   redesenha sozinho e nada fica esticado */
+const _facesInst = new Map();
+function faceInst(chave, larg, alt, pinta){
+  const pw = Math.max(24, Math.round(larg*dpr)), ph = Math.max(24, Math.round(alt*dpr));
+  const k = chave + '|' + pw + 'x' + ph;
+  let c = _facesInst.get(k);
+  if (!c){
+    c = document.createElement('canvas');
+    c.width = pw; c.height = ph;
+    const g = c.getContext('2d');
+    g.setTransform(pw/larg, 0, 0, ph/alt, 0, 0);
+    pinta(g, larg, alt);
+    _facesInst.set(k, c);
+    /* a tela muda de tamanho enquanto se arrasta a janela e cada largura vira
+       uma lona: sem teto isto viraria um vazamento de memória lento */
+    if (_facesInst.size > 20) _facesInst.delete(_facesInst.keys().next().value);
+  }
+  return c;
+}
+
+/* --- A MOLDURA DE UM MFD ----------------------------------------------------
+   Quadro de liga escura, tela preta afundada e as teclas de opção nas bordas.
+   `teclas` diz quantas em cada lado — cinco em cima e embaixo, cinco de cada
+   lado é o arranjo de vinte que se vê na maioria das telas de caça. */
+function molduraMFD(c, w, h, borda, teclas){
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, MFD_MOLD_ALTO); g.addColorStop(0.18, MFD_MOLD);
+  g.addColorStop(1, MFD_MOLD_BAIXO);
+  cantoInst(c, 0, 0, w, h, borda*0.55); c.fillStyle = g; c.fill();
+  // a tela, afundada: a linha clara em cima do rebaixo é o que dá profundidade
+  cantoInst(c, borda, borda, w - borda*2, h - borda*2, borda*0.22);
+  c.fillStyle = 'rgba(0,0,0,.65)'; c.fill();
+  cantoInst(c, borda, borda, w - borda*2, h - borda*2, borda*0.22);
+  c.fillStyle = MFD_TELA; c.fill();
+  // as teclas de opção
+  const tk = (x, y, tw, th) => {
+    cantoInst(c, x, y, tw, th, Math.min(tw, th)*0.3);
+    c.fillStyle = '#464d56'; c.fill();
+    cantoInst(c, x, y, tw, th*0.5, Math.min(tw, th)*0.3);
+    c.fillStyle = 'rgba(255,255,255,.10)'; c.fill();
+  };
+  const n = teclas || 5;
+  const tw = (w - borda*2)/(n*2.1), th = borda*0.42;
+  for (let i = 0; i < n; i++){
+    const x = borda + (w - borda*2)*(i + 0.5)/n - tw/2;
+    tk(x, borda*0.28, tw, th); tk(x, h - borda*0.28 - th, tw, th);
+  }
+  const vh = (h - borda*2)/(n*2.1), vw = borda*0.42;
+  for (let i = 0; i < n; i++){
+    const y = borda + (h - borda*2)*(i + 0.5)/n - vh/2;
+    tk(borda*0.28, y, vw, vh); tk(w - borda*0.28 - vw, y, vw, vh);
+  }
+}
+
+/* --- A PÁGINA DE SITUAÇÃO (HSD) ---------------------------------------------
+   Este é o radar, agora como o que ele é num caça moderno: uma PÁGINA de uma
+   tela multifunção. Rosa de rumos fina, anéis de alcance tracejados, o avião
+   no meio, e os dados escritos nos quatro cantos da tela em vez de espalhados
+   pelo desenho — porque nas bordas eles não tapam nada e é lá que a vista
+   procura.
+
+   Sem varredura. Doeu tirar, porque a cunha girando é a imagem que todo mundo
+   reconhece como "radar" — e foi por isso mesmo que ela tinha de sair: só há
+   rastro girando onde há ANTENA girando. Esta é a tela do radar do jogo, que é
+   instantâneo, e mostrar um feixe varrendo seria desenhar uma peça que o avião
+   não tem.
+   -------------------------------------------------------------------------- */
 function desenhaRadar(){
   const onde = radarOnde();
   if (!onde) return;
-  const { cx, cy, r } = onde;
+  const { cx, cy, r } = onde;                 // r = meio-lado do MFD quadrado
+  const L = r*2, borda = r*0.17;
+  const rTela = r - borda;                    // meio-lado da tela preta
+  const rRosa = rTela*0.90, rS = rTela*0.78;  // a rosa e o alcance útil
+
+  h2.drawImage(faceInst('mfd-hsd', L, L, (c, w) => {
+    const R = w/2, b = w*0.085, kt = R - b, kr = kt*0.90;
+    molduraMFD(c, w, w, b, 5);
+    c.save();
+    c.beginPath(); c.arc(R, R, kr, 0, 7); c.clip();
+    for (let n = 1; n <= 3; n++){             // os anéis, tracejados
+      c.beginPath(); c.arc(R, R, kt*0.78*n/3, 0, 7);
+      c.setLineDash([2.5, 4]);
+      c.strokeStyle = 'rgba(99,216,255,' + (n === 3 ? '.42)' : '.26)');
+      c.lineWidth = 1; c.stroke();
+    }
+    c.setLineDash([]);
+    c.restore();
+    /* a rosa: risco fino a cada 10°, comprido a cada 30°. Ela NÃO gira nesta
+       lona — a lona é a parte parada; quem gira é desenhado por cima. */
+    c.beginPath(); c.arc(R, R, kr, 0, 7);
+    c.strokeStyle = 'rgba(99,216,255,.30)'; c.lineWidth = 1; c.stroke();
+    // o cursor de proa: o triângulo fixo no alto, contra o qual a rosa corre
+    c.beginPath();
+    c.moveTo(R, R - kr - w*0.006); c.lineTo(R - w*0.022, R - kr - w*0.042);
+    c.lineTo(R + w*0.022, R - kr - w*0.042); c.closePath();
+    c.fillStyle = MFD_BRANCO; c.fill();
+  }), cx - r, cy - r, L, L);
+
+  const rv = rumoVisto();
+
+  /* A ROSA DE RUMOS, girando com a proa: numa lona só dela, porque são trinta
+     e seis riscos e oito palavras que não mudam nunca — só rodam. */
+  h2.save();
+  h2.translate(cx, cy); h2.rotate(-rv);
+  h2.drawImage(faceInst('mfd-rosa', rRosa*2, rRosa*2, (c, w) => {
+    const R = w/2;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    for (let g = 0; g < 360; g += 10){
+      const grande = g % 30 === 0;
+      const [x0, y0] = pontoInst(R, R, R, g);
+      const [x1, y1] = pontoInst(R, R, R - R*(grande ? 0.11 : 0.06), g);
+      c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1);
+      c.strokeStyle = 'rgba(99,216,255,' + (grande ? '.85)' : '.38)');
+      c.lineWidth = grande ? 1.5 : 1; c.stroke();
+    }
+    c.font = '700 ' + Math.max(7, R*0.17).toFixed(1) + 'px ui-monospace, monospace';
+    const ROSA = ['N','03','06','L','12','15','S','21','24','O','30','33'];
+    for (let k = 0; k < 12; k++){
+      const [tx, ty] = pontoInst(R, R, R*0.78, k*30);
+      c.save(); c.translate(tx, ty); c.rotate(k*30*Math.PI/180);
+      c.fillStyle = k % 3 === 0 ? MFD_BRANCO : 'rgba(99,216,255,.75)';
+      c.fillText(ROSA[k], 0, 0); c.restore();
+    }
+  }), -rRosa, -rRosa, rRosa*2, rRosa*2);
+  h2.restore();
 
   h2.save();
-  h2.beginPath(); h2.arc(cx, cy, r, 0, 7);
-  h2.fillStyle = 'rgba(8,12,26,.62)'; h2.fill();
-  h2.clip();                                      // tudo o que segue mora no disco
+  h2.beginPath(); h2.arc(cx, cy, rS*1.06, 0, 7);
+  h2.clip();                                      // o que voa mora dentro da rosa
 
-  const esc = r / RADAR_KM;
-  const rv = rumoVisto();
-  /* de um ponto do mundo para o disco: o ângulo é o mesmo que a bússola usa
+  const esc = rS / RADAR_KM;
+  /* de um ponto do mundo para a tela: o ângulo é o mesmo que a bússola usa
      para achar o alvo, e aqui ele vira posição em vez de seta */
   const poe = (x, z) => {
     const dx = x - aviaoX, dz = z - aviaoZ;
@@ -14946,22 +15214,29 @@ function desenhaRadar(){
     return { x: cx + Math.sin(a)*d*esc, y: cy - Math.cos(a)*d*esc, d };
   };
 
-  // a pista: a coisa que mais se procura quando se está perdido
-  const p0 = poe(0, PISTA_Z0), p1 = poe(0, PISTA_Z1);
-  h2.strokeStyle = 'rgba(150,170,200,.75)'; h2.lineWidth = Math.max(2, r*0.055);
-  h2.beginPath(); h2.moveTo(p0.x, p0.y); h2.lineTo(p1.x, p1.y); h2.stroke();
+  // as pistas, em ciano de navegação, com a cabeceira marcada
+  h2.strokeStyle = MFD_CIANO; h2.lineWidth = Math.max(1.6, r*0.035);
+  for (const P of PISTAS){
+    const s2 = Math.sin(P.rumo), c2 = Math.cos(P.rumo);
+    const a = poe(P.cx - s2*P.meiaC, P.cz - c2*P.meiaC);
+    const b = poe(P.cx + s2*P.meiaC, P.cz + c2*P.meiaC);
+    if (Math.min(a.d, b.d) > RADAR_KM*1.4) continue;
+    h2.beginPath(); h2.moveTo(a.x, a.y); h2.lineTo(b.x, b.y); h2.stroke();
+  }
 
-  // os alvos que faltam
-  h2.fillStyle = 'rgba(255,196,90,.9)';
+  /* os alvos que faltam: o QUADRADINHO VAZADO é a marca de "contato conhecido"
+     nas telas de verdade — cheio quer dizer outra coisa (é o hostil) */
+  h2.strokeStyle = MFD_AMBAR; h2.lineWidth = 1.4;
   for (const a of alvos){
     if (!a.vivo) continue;      // o campo é `vivo`; `destruido` não existe e o
                                 // radar mostrava alvo já derrubado como se faltasse
     const q = poe(a.x, a.z);
     if (q.d > RADAR_KM) continue;
-    h2.fillRect(q.x-2, q.y-2, 4, 4);
+    const t = Math.max(2.4, r*0.045);
+    h2.strokeRect(q.x - t, q.y - t, t*2, t*2);
   }
 
-  // os outros aviões, e os de fora do alcance encostados na borda
+  // os outros aviões: losango cheio, e os de fora do alcance na borda
   for (const o of Batalha.outros.values()){
     if (o.vivo === false) continue;
     const q = poe(o.x, o.z);
@@ -14969,37 +15244,46 @@ function desenhaRadar(){
     let px = q.x, py = q.y;
     if (fora){
       const ang = Math.atan2(q.y - cy, q.x - cx);
-      px = cx + Math.cos(ang)*(r-4); py = cy + Math.sin(ang)*(r-4);
+      px = cx + Math.cos(ang)*rS; py = cy + Math.sin(ang)*rS;
     }
-    h2.fillStyle = fora ? 'rgba(255,120,100,.75)' : 'rgba(255,90,70,.95)';
-    h2.beginPath(); h2.arc(px, py, fora ? 2.6 : 4.2, 0, 7); h2.fill();
+    const t = Math.max(2.6, r*(fora ? 0.038 : 0.055));
+    h2.beginPath();
+    h2.moveTo(px, py - t); h2.lineTo(px + t, py); h2.lineTo(px, py + t); h2.lineTo(px - t, py);
+    h2.closePath();
+    h2.fillStyle = MFD_VERM; h2.globalAlpha = fora ? 0.62 : 1; h2.fill();
+    h2.globalAlpha = 1;
   }
-
-  // o norte, passeando pela borda
-  h2.strokeStyle = 'rgba(120,200,255,.9)'; h2.lineWidth = 2;
-  h2.beginPath();
-  h2.moveTo(cx + Math.sin(-rv)*(r-2),  cy - Math.cos(-rv)*(r-2));
-  h2.lineTo(cx + Math.sin(-rv)*(r-9),  cy - Math.cos(-rv)*(r-9));
-  h2.stroke();
-
   h2.restore();
 
-  // a borda e o anel do meio-alcance, por cima do recorte
-  h2.strokeStyle = 'rgba(255,255,255,.22)'; h2.lineWidth = 1.4;
-  h2.beginPath(); h2.arc(cx, cy, r, 0, 7); h2.stroke();
-  h2.beginPath(); h2.arc(cx, cy, r*0.5, 0, 7); h2.stroke();
-
-  // e o avião, sempre no meio e sempre apontando para cima
-  h2.fillStyle = 'rgba(150,255,190,.95)';
+  // o avião: contorno branco, sempre no meio e sempre apontando para cima
+  h2.strokeStyle = MFD_BRANCO; h2.lineWidth = 1.6;
   h2.beginPath();
-  h2.moveTo(cx, cy - 7); h2.lineTo(cx - 5, cy + 5); h2.lineTo(cx + 5, cy + 5);
-  h2.closePath(); h2.fill();
+  h2.moveTo(cx, cy - r*0.13); h2.lineTo(cx - r*0.085, cy + r*0.09);
+  h2.lineTo(cx, cy + r*0.04); h2.lineTo(cx + r*0.085, cy + r*0.09);
+  h2.closePath(); h2.stroke();
 
-  /* a etiqueta do alcance por DENTRO da borda: embaixo do disco ela caía atrás
-     da caixa da velocidade e não se lia nunca */
-  h2.font = '700 ' + Math.max(8, r*0.16).toFixed(0) + 'px system-ui, sans-serif';
-  h2.textAlign = 'center'; h2.fillStyle = 'rgba(190,205,230,.6)';
-  h2.fillText(Math.round(RADAR_KM/METRO/100)/10 + ' km', cx, cy + r - Math.max(5, r*0.10));
+  /* OS DADOS NOS CANTOS DA TELA, que é onde eles moram numa tela de verdade:
+     a proa em cima, o nome da página e o alcance embaixo. Espalhados pelo
+     meio eles tapariam justamente o que se foi olhar. */
+  const f1 = Math.max(7, r*0.125);
+  h2.font = '700 ' + f1.toFixed(1) + 'px ui-monospace, monospace';
+  h2.textBaseline = 'middle';
+  const dentro = r - borda - f1*0.55;
+  h2.textAlign = 'left';
+  h2.fillStyle = MFD_VERDE;
+  h2.fillText('HSD', cx - dentro, cy - dentro + f1*0.2);
+  h2.textAlign = 'right';
+  h2.fillStyle = MFD_BRANCO;
+  h2.fillText(String((Math.round(rv*180/Math.PI) % 360 + 360) % 360).padStart(3, '0'),
+              cx + dentro, cy - dentro + f1*0.2);
+  h2.textAlign = 'left';
+  h2.fillStyle = 'rgba(99,216,255,.85)';
+  h2.fillText(Math.round(RADAR_KM/METRO/100)/10 + 'km', cx - dentro, cy + dentro - f1*0.2);
+  h2.textAlign = 'right';
+  const faltam = alvos.filter(a => a.vivo).length;
+  h2.fillStyle = faltam ? MFD_AMBAR : MFD_VERDE;
+  h2.fillText(faltam ? 'TGT ' + faltam : 'CLR', cx + dentro, cy + dentro - f1*0.2);
+  h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
 }
 
 /* =============================================================================
@@ -15207,30 +15491,96 @@ function desenhaHUD(){
     }
     h2.textAlign = 'left';
 
-    /* as duas réguas do motor, na mesma tinta verde do resto do HUD: a de
-       cima é o acelerador, a de baixo é a carga do nitro. Ficam na canhoto
-       da tela, onde não atrapalham a mira.
+    /* --- O G NO HUD E A TELA DO MOTOR -------------------------------------
+       Duas leituras, dois lugares, e a escolha de cada lugar é do manual e não
+       minha:
 
-       São instrumentos de cabine, então também são do vidro: a foto com a
-       cabeça a 35° mostrou o HUD inteiro escorrendo e estas duas ficando
-       para trás, sozinhas na tela. */
+       O FATOR DE CARGA vai no HUD, em algarismo, no canto de cima à esquerda,
+       com o pico do voo logo abaixo. É onde ele está num caça moderno, e a
+       razão é prática: quem está puxando não pode tirar o olho do alvo para
+       procurar um mostrador. Ele é grande, é branco, e fica âmbar e depois
+       vermelho conforme encosta no limite — a cor faz o trabalho que a faixa
+       colorida fazia no relógio de ponteiro.
+
+       O MOTOR vai numa TELA, com barra de segmentos e número ao lado. Segmento
+       em vez de barra contínua não é estilo: é o jeito de uma tela mostrar
+       tendência com a mesma leitura em qualquer tamanho, e é o que se vê em
+       qualquer painel de vidro.
+
+       Os dois são do VIDRO do avião: a foto com a cabeça a 35° mostrou o HUD
+       inteiro escorrendo e as réguas antigas ficando para trás, sozinhas. */
     presoNoAviao();
-    const { bx, bw, bh, cor, passo, topo } = reguasOnde();
-    // um vidro escuro atrás, senão o verde some em cima da cidade branca
-    h2.fillStyle = 'rgba(4,10,14,.42)';
-    h2.fillRect(bx - 9, topo - cor - 8, bw + 20, passo*2 + 6);
-    h2.font = '700 ' + cor.toFixed(0) + 'px ui-monospace, monospace';
-    h2.textBaseline = 'alphabetic';
-    const regua = (rot, frac, aceso, i) => {
-      const by = topo + i*passo;
-      h2.fillStyle = aceso ? 'rgba(190,255,240,.98)' : 'rgba(120,255,170,.92)';
-      h2.fillText(rot, bx, by - 4);
-      h2.strokeStyle = 'rgba(120,255,170,.6)'; h2.lineWidth = 1.4;
-      h2.strokeRect(bx + 0.5, by + 0.5, bw, bh);
-      h2.fillRect(bx + 2, by + 2, Math.max(0, (bw - 3)*Math.max(0, Math.min(1, frac))), bh - 3);
+    const I = reguasOnde();
+
+    // --- O FATOR DE CARGA ------------------------------------------------
+    const gAlto = Math.abs(cargaG) > 7.5, gMedio = Math.abs(cargaG) > 5.5;
+    const fG = Math.max(15, I.gh*0.62);
+    h2.font = '800 ' + fG.toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
+    h2.fillStyle = gAlto ? MFD_VERM : gMedio ? MFD_AMBAR : 'rgba(150,255,190,.95)';
+    h2.fillText(cargaG.toFixed(1), I.x, I.gy + fG);
+    /* o pico e o vale EMPILHADOS. Lado a lado eles se atropelavam: em fonte
+       monoespaçada "MAX 1.0" mede sete caracteres, e sete caracteres são mais
+       largos do que o vão que eu tinha reservado. */
+    const fG2 = Math.max(8, I.gh*0.26);
+    h2.font = '700 ' + fG2.toFixed(1) + 'px ui-monospace, monospace';
+    h2.fillStyle = 'rgba(150,255,190,.72)';
+    h2.fillText('G', I.x + fG*2.0, I.gy + fG);
+    h2.fillText('MAX ' + gMax.toFixed(1), I.x, I.gy + fG + fG2*1.15);
+    h2.fillText('MIN ' + gMin.toFixed(1), I.x, I.gy + fG + fG2*2.35);
+
+    // --- A TELA DO MOTOR --------------------------------------------------
+    const bE = I.h*0.13;
+    h2.drawImage(faceInst('mfd-eng', I.w, I.h, (c, w, hh) => {
+      molduraMFD(c, w, hh, bE, 3);
+      const b = bE, fl = Math.max(6, hh*0.155);
+      c.font = '700 ' + fl.toFixed(1) + 'px ui-monospace, monospace';
+      c.textBaseline = 'middle'; c.textAlign = 'left';
+      c.fillStyle = 'rgba(232,240,250,.62)';
+      c.fillText('ENG', b*1.5, b + (hh - b*2)*0.28);
+      c.fillText('NIT', b*1.5, b + (hh - b*2)*0.72);
+      /* a escala gravada embaixo da barra: sem ela o segmento diz "quanto"
+         e não diz "quanto falta", que é a pergunta de verdade */
+      const x0 = b*1.5 + fl*2.6, x1 = w - b*1.5 - fl*2.6;
+      for (let k = 0; k <= 4; k++){
+        const gx = x0 + (x1 - x0)*k/4;
+        const gy = b + (hh - b*2)*0.28 + hh*0.115;
+        c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx, gy + hh*(k % 2 ? 0.035 : 0.06));
+        c.strokeStyle = 'rgba(232,240,250,.30)'; c.lineWidth = 1; c.stroke();
+      }
+    }), I.x, I.y, I.w, I.h);
+
+    /* A BARRA DE SEGMENTOS, ao vivo. Vinte casas: menos que isso a leitura
+       fica grossa demais para mostrar a manete andando, mais que isso os
+       segmentos somem num celular. */
+    const fl = Math.max(6, I.h*0.155);
+    const bx0 = I.x + bE*1.5 + fl*2.6, bx1 = I.x + I.w - bE*1.5 - fl*2.6;
+    const fita = (linha, frac, cor, aceso) => {
+      const by = I.y + bE + (I.h - bE*2)*linha, bh = Math.max(4, I.h*0.13);
+      const N = 20, vg = (bx1 - bx0)/N, sw = vg*0.72;
+      const ate = Math.round(Math.max(0, Math.min(1, frac))*N);
+      for (let k = 0; k < N; k++){
+        h2.fillStyle = k < ate ? cor : 'rgba(232,240,250,.13)';
+        h2.fillRect(bx0 + k*vg, by - bh/2, sw, bh);
+      }
+      if (aceso){                        // o contorno que pisca quando está em uso
+        h2.strokeStyle = cor; h2.lineWidth = 1;
+        h2.strokeRect(bx0 - 2, by - bh/2 - 2, bx1 - bx0 + 3, bh + 4);
+      }
     };
-    regua(turbinando ? 'PWR  MAX' : 'PWR  ' + Math.round(motor*100), turbinando ? 1 : motor, turbinando, 0);
-    regua('NIT  ' + Math.round(nitroCarga), nitroCarga/100, nitroBotao && nitroCarga > 0, 1);
+    const pot = turbinando ? 100 : Math.max(0, Math.min(100, motor*100));
+    fita(0.28, pot/100, turbinando ? MFD_AMBAR : MFD_VERDE, turbinando);
+    fita(0.72, nitroCarga/100, nitroCarga < 20 ? MFD_VERM : MFD_CIANO,
+         nitroBotao && nitroCarga > 0);
+    h2.font = '800 ' + Math.max(8, I.h*0.20).toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'right'; h2.textBaseline = 'middle';
+    h2.fillStyle = turbinando ? MFD_AMBAR : MFD_BRANCO;
+    h2.fillText(turbinando ? 'A/B' : String(Math.round(pot)),
+                I.x + I.w - bE*1.5, I.y + bE + (I.h - bE*2)*0.28);
+    h2.fillStyle = nitroCarga < 20 ? MFD_VERM : MFD_BRANCO;
+    h2.fillText(String(Math.round(nitroCarga)), I.x + I.w - bE*1.5,
+                I.y + bE + (I.h - bE*2)*0.72);
+    h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
     presoNaTela();      // fecha o vidro AQUI: o que vem depois já vem projetado
 
   }
@@ -16132,6 +16482,7 @@ function reinicia(){
   camPos.set(aviaoX - eixoF.x*CAMD, aviaoY + 210, aviaoZ - eixoF.z*CAMD);
   if (Missoes) Missoes.zera();
   turbo = 0; combustivel = 100; distancia = 0; subida = 0;
+  cargaG = 1; gMax = 1; gMin = 1; _fAnt = null;   // zera as agulhas de memória do G
   nitroCarga = 100; nitroBotao = false; turbinando = false;
   avisouEstol = 0; pousos = 0; vida = VIDA_CHEIA;
   if (estolando){ estolando = false; somEstol(false); }
@@ -17028,6 +17379,37 @@ function retoma(){
 }
 setInterval(() => Tripulacao.varre(), 1000);
 setInterval(() => { if (Tripulacao.membros.length) mandaEstado(); }, 250);
+
+/* --- A ATITUDE, num canal rápido e à parte ----------------------------------
+   "inclusive no controle (celular) tem que ser instrumentações que simulem
+   aviação mesmo."
+
+   O celular desenhava um "horizonte" que na verdade mostrava a POSIÇÃO DO
+   MANCHE: ele girava com o volante e subia com o dedo. Como retorno de
+   comando funcionava; como instrumento era uma mentira, porque atitude é o
+   que o avião ESTÁ fazendo e não o que se pediu — a diferença entre as duas
+   coisas é o voo inteiro.
+
+   Para o celular poder mostrar atitude de verdade ele precisa RECEBER a
+   atitude, e o pacote de estado que já existia vai a quatro por segundo: bom
+   para o combustível, impossível para uma bola de horizonte, que a essa taxa
+   anda aos pulos. Então a atitude vai num pacote próprio, curto e rápido —
+   seis números a dezesseis por segundo, o que dá algo como um kilobyte e meio
+   por segundo num canal que já carrega som e tremor.
+
+   Nomes de campo de uma letra não é economia de avarento: numa ligação de
+   celular esse pacote é o que tem de chegar sempre, e cada byte a menos é uma
+   chance a menos de ele chegar atrasado. */
+function mandaAtitude(){
+  Tripulacao.envia({ t:'at',
+    r: Math.round(inclinacao*10)/10,                 // inclinação, graus
+    p: Math.round(arfagem*180/Math.PI*10)/10,        // arfagem, graus
+    h: Math.round(((rumo*180/Math.PI) % 360 + 360) % 360),
+    a: Math.round((aviaoY - CHAO)/METRO),            // altura, metros
+    v: Math.round(voo/METRO),                        // velocidade
+    g: Math.round(cargaG*10)/10 });
+}
+setInterval(() => { if (Tripulacao.membros.length && jogando) mandaAtitude(); }, 62);
 setInterval(() => {
   if (jogando && !pausado && Controle.modo === 'sensor' && Tripulacao.membros.length &&
       Date.now() - (Controle.ultimo||0) > 2000) pausa();

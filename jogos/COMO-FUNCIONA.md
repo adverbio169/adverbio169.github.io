@@ -5719,3 +5719,124 @@ parede da vizinha.
 O padrão se repete pela enésima vez neste projeto: **toda reclamação visual do
 usuário era um bug medível, não uma questão de gosto**. "Ficou feio" quer
 quase sempre dizer "há um sinal trocado aí".
+
+## O painel de vidro (e o relógio de ponteiro que veio antes)
+
+"na cabine os mostradores, força, radar, tem que ter imagem próximas dos
+instrumentos reais." Depois: "inclusive no controle (celular) tem que ser
+instrumentações que simulem aviação mesmo." E, quando eu entreguei a primeira
+versão: "nosso avião é um jato, então as coisas têm que ser de avião moderno.
+esses instrumentos parecem de avião velho."
+
+As três mensagens são uma correção em degraus, e a do meio é a que eu errei.
+
+**O que havia.** Duas barras verdes chapadas escritas PWR e NIT, um disco cinza
+translúcido fazendo as vezes de radar, e — no celular — um círculo com metade
+azul e metade verde que girava com o volante.
+
+**O que eu fiz primeiro, e por que estava errado.** Li "instrumentos reais" e
+desenhei relógio de ponteiro: aro de alumínio com quatro parafusos, mostrador
+preto, arcos verde/amarelo/vermelho, agulha com cauda e cubo, reflexo de vidro.
+Cada uma dessas cinco coisas é real e cada uma tem função. Só que o conjunto é
+um painel de 1960, e o avião do jogo é um caça de quinta geração, que não tem
+nenhum instrumento redondo. A crítica foi certeira: eu tinha acertado o
+adjetivo ("real") e errado a época.
+
+**O que ficou.** Painel de vidro.
+
+- **Sai o aro redondo, entra a moldura de MFD** com as vinte teclas de opção
+  nas quatro bordas. Aquelas teclinhas são a peça que mais grita "caça
+  moderno", porque nenhuma outra coisa no mundo tem esse formato — e elas são
+  o que faz a mesma tela virar radar, mapa, motor ou armamento.
+- **Sai a agulha, entra o número com barra de segmentos.** Ponteiro existe
+  porque um mecanismo de molas não sabe escrever. Onde há tela, a leitura é
+  digital, e o analógico vira segmentos ao lado — que é como uma tela mostra
+  tendência sem gastar a área toda, e é contável com o polegar em cima.
+- **Sai a varredura giratória do radar.** Foi a mais dolorida: é a imagem que
+  todo mundo reconhece como "radar". Só que rastro girando existe onde há
+  ANTENA girando; uma antena eletrônica não tem o que girar e a tela dela não
+  tem aquilo. Justamente por ser a imagem mais conhecida é que ela datava o
+  painel inteiro.
+- **O G sai do painel e vai para o HUD**, em algarismo, no canto esquerdo, com
+  o pico e o vale do voo embaixo. É onde ele está num caça moderno, e por um
+  motivo prático: quem está puxando não tira o olho do alvo para procurar
+  mostrador de carga.
+
+### O número por baixo: o fator de carga
+
+O acelerômetro não existia, e antes do desenho vinha a conta. O fator de carga
+é quanto a asa está segurando, em múltiplos do peso:
+
+    n = (aceleração do vetor de voo, na direção do teto)/g + teto.y
+
+A primeira parcela é a manobra, a segunda é o peso. A definição é de manual e
+não tem escolha nenhuma.
+
+**O que eu errei foi o `g`.** Pus 196 — 9,8 m/s² na escala do jogo — e escrevi
+no comentário que a curva nivelada devolveria 1/cos φ, como no manual. Fui
+medir e não devolvia nada parecido: manche no fundo dava **26 g**.
+
+Não é defeito da conta. A conta está certa e o modelo de voo é que não é
+newtoniano: o avião arfa a 86 graus por segundo a 170 m/s, e um avião de
+verdade que girasse o vetor de voo assim estaria mesmo a 26 g — e em pedaços.
+A taxa é de propósito, é ela que faz o jogo ser jogável no teclado. Mas com a
+referência de 9,8 o mostrador vivia no batente, e mostrador no batente não
+mostra nada.
+
+Então a referência é a do jogo, escolhida por uma âncora só: **manche no fundo,
+em cruzeiro, dá 9 g** — o limite estrutural de um caça de verdade. Daí sai
+`640 = (VOO_BASE × TAXA_ARF)/8` e nada mais é escolhido. Medido depois:
+
+| situação | g |
+|---|---|
+| reto e nivelado, manche solto | 1,00 |
+| puxada cheia de cruzeiro (pico) | **9,28** ← a âncora, conferida |
+| curva de 60° puxando | 9,51 |
+| curva de 80° puxando | 11,26 (passou do limite) |
+| looping inteiro (média) | 2,76 |
+| banco de 60° com o manche solto | 0,50 |
+
+A última linha parece errada e não é: é o "aliviado" — a asa com o vetor de
+sustentação deitado trabalha menos do que o peso do avião. E a penúltima é a
+lição que o instrumento existe para dar: puxar o mesmo tanto mais rápido
+carrega mais, e a resposta é aliviar o manche.
+
+### O celular: o horizonte que mentia
+
+O pior defeito dos três estava aqui, e não era estético. O "horizonte" do
+controle girava com o VOLANTE e subia com o DEDO: mostrava o comando, não a
+atitude. Enquanto os dois andam juntos ninguém nota; na hora em que deixam de
+andar — que é exatamente a hora em que se precisa de um horizonte — o desenho
+estava dizendo a coisa errada.
+
+Agora a TV manda a atitude num canal próprio. O pacote de estado que já existia
+vai a quatro por segundo: bom para combustível, impossível para uma bola de
+horizonte, que a essa taxa anda aos pulos. O novo vai a dezesseis por segundo
+com seis números de nome curto, e o celular interpola entre eles.
+
+E quando não chega nada, o EADI **não desenha um horizonte bonito**: ele baixa a
+tarja `ADI OFF` e volta a mostrar o manche. Instrumento que continua desenhando
+sem saber de nada é pior do que instrumento nenhum.
+
+O resto do EADI é o do padrão: escada de arfagem com número, tracejada abaixo
+do horizonte (é assim que se sabe para que lado é o chão estando de cabeça para
+baixo), arco de inclinação com o ponteiro, bola de derrapagem colada nele — que
+aposentou a régua de LEME, porque avião nenhum tem régua de leme no painel — e
+chão MARROM, não verde: verde-grama é brinquedo, e no EADI o chão é terra
+justamente para se distinguir do céu com sol batendo na tela.
+
+### Erros medidos pelo caminho
+
+- Os números dos cantos do EADI foram postos a 7% da borda do QUADRADO. A tela
+  é REDONDA: os quatro caíram fora do vidro e o recorte cortou. A altitude de
+  1840 m aparecia como "284".
+- Os anéis de alcance do radar saíram rotulados "0, 1, 1": eu tinha dividido
+  por mil um alcance que inteiro dá 1,3 km. Numerar três anéis num disco de
+  sessenta pixels não ia caber de jeito nenhum — e a convenção de escrever o
+  alcance uma vez só, que eu não estava seguindo, existe exatamente por isso.
+- `.placar div` pegou também o rótulo e o valor dentro de cada caixa, e cada
+  janela virou três janelas encaixadas. `> div`.
+- Na versão de ponteiro, o nome do mostrador ficava por cima dos números do
+  alto. Numa escala de 270° a volta quase fecha e não sobra meio. Instrumento
+  de verdade varre 240° e usa o vão de baixo para a serigrafia — o vão não é
+  estética, é o único pedaço que a escala não usa.
