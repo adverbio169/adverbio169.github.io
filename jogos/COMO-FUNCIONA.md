@@ -6710,3 +6710,125 @@ distância cai por segundo) não é um dado do jogo, é uma derivada — e deriv
 sem memória não existe, então a página guarda a distância do quadro anterior.
 Se a distância não estiver caindo, não há tempo nenhum para mostrar, e a
 resposta honesta é o alcance da arma, não um número inventado.
+
+# A sortida: a preparação que faltava
+
+> "Ficou meio confuso ... subi ... e já tava na bala ... achei estranho ...
+> acho que tem que ter uma preparação ... tipo escolher missões ... defesa
+> aérea ... bombardeiro ... infiltração ... não posso simplesmente decolar e
+> já pegar bala."
+
+Duas coisas diferentes vieram nessa frase, e as duas eram verdade.
+
+## Primeira: sem escolha, não há motivo
+
+O caça que aparecia no primeiro minuto não estava ali **por algo** — estava
+ali porque o relógio bateu. Isso não é hostilidade, é clima. E contra o clima
+não se faz plano nenhum: ou ele passa, ou molha.
+
+Escolher a sortida antes de decolar faz o mesmo avião, no mesmo mapa, virar
+quatro partidas diferentes — sem uma linha de cenário novo. Muda **o que conta
+como vitória** e muda **de onde vem o perigo**:
+
+| Sortida | Objetivos | Quem chama os caças |
+|---|---|---|
+| **PATRULHA** | os seis de sempre | ninguém — céu limpo |
+| **DEFESA AÉREA** | abater 4 caças, voltar e pousar | subir acima de 350 m |
+| **BOMBARDEIO** | destruir 8 alvos, voltar e pousar | a 3ª explosão no chão |
+| **INFILTRAÇÃO** | 18 s baixo sobre PORTO ALTO, voltar | passar de 320 m |
+
+Repare no que o gatilho faz: em três das quatro, **quem chama o combate é o
+jogador**, e ele sabe disso antes de decolar. Perigo com causa é perigo que se
+pode evitar, adiar ou provocar de propósito — e essa é a diferença entre
+combate e sorteio. Na infiltração o gatilho é o erro do próprio jogador, o que
+transforma "voar baixo" de enfeite em técnica.
+
+## Segunda: combate não começa na decolagem
+
+Em lugar nenhum do mundo. Decola-se, junta-se altura, vai-se para a área, e
+**só então** há contato. O código velho punha `_nascer = 6` dentro de
+`limpa()` e não perguntava mais nada: seis segundos depois de nascer na
+cabeceira já havia caça a caminho, com o jogador ainda de trem de pouso para
+fora. Daí a sortida ter fases, e a fase ser a resposta para uma pergunta só —
+*posso ser atacado agora?*
+
+```
+SOLO      na pista, antes de decolar      não
+TRÂNSITO  no ar, indo para a área         não
+ALERTA    a área respondeu, o rádio diz   ainda não — está contando
+QUENTE    daqui para frente               sim
+```
+
+O **ALERTA** é a peça que faltava. Entre "o céu está limpo" e "tem um caça em
+cima de você" tem que existir uma frase, e é ela que dá tempo de largar a
+manete, olhar o radar e escolher o que fazer. Doze segundos: é pouco no
+relógio e é muito na cadeira.
+
+Há ainda um **piso de tempo de voo** (15 a 30 s conforme a sortida) que corre
+antes de qualquer gatilho ser sequer testado. É esse piso que garante, por
+construção, que decolar nunca é pegar bala.
+
+Quem enche a cota de inimigos passou a ser `Sortida.alerta()`. O
+`Inimigos.passo` faz três perguntas antes de deixar nascer alguém — modo
+ligado, sortida quente, ainda há cota — e qualquer "não" deixa o céu limpo,
+que é o estado normal de um céu.
+
+## A fase tem que estar escrita
+
+Nada disso serve se o jogador não puder ver em que pé está. A página **OBJET**
+perdeu uma linha de objetivo (eram cinco, são quatro) e ganhou a linha da
+sortida: o nome do voo à esquerda, a fase à direita, e embaixo, miúdo, o que
+falta para o contato — a mesma coisa que um controlador diria pelo rádio.
+
+## O teto do avião é 585 m
+
+Escrevi os gatilhos em 1 200 m e 700 m, que são alturas de caça de verdade. O
+avião deste jogo tem `TETO = 11000` em unidades de mundo, e altura em metros é
+`(y − CHAO)/METRO` — ou seja, **585 m no máximo**. Os dois gatilhos eram
+inalcançáveis: a defesa aérea nunca teria contato, e a infiltração nunca
+seria descoberta. Recalibrados para 350 m e 320 m, dentro do envelope que o
+avião tem.
+
+O mesmo erro já estava no jogo antes de mim: o objetivo `porto` pedia "abaixo
+de 900 m", que é **sempre verdade**, e mostrava uma dica acima de 1800 m que
+nunca apareceu na vida. "Sobrevoar baixo" era só sobrevoar. Agora são 300 m, e
+a dica tem quando sair.
+
+## Três defeitos que o teste pegou
+
+**A designação sobrevivia à morte.** "Eu fiz uma consignação de alvo. E morri.
+Ao nascer, o alvo ainda estava consignado." `reinicia()` limpava os inimigos e
+não limpava `alvoDes`: nascia-se de novo com o computador de bordo lembrando
+de uma vida que não era mais aquela. Uma linha.
+
+**A cota podia esvaziar sem combate.** Um caça que nasce a 30 km e desaparece
+a 72 km sem ser abatido gastava uma das quatro vidas da sortida. Quatro
+desistências e "abater 4 caças" virava impossível, com o céu vazio e nenhuma
+explicação na tela. Quem sai de cena volta para a fila.
+
+**O corte de 17 letras.** "Voltar e pousar numa pista" saía como "VOLTAR E
+POUSAR N". O `slice(0, 17)` era um chute de largura: numa tela estreita corta
+cedo demais, numa larga sobra espaço vazio, e em nenhuma das duas o número de
+letras tem relação com o que cabe. Agora mede-se o que sobra depois do
+contador da direita — é a terceira vez neste projeto que `measureText`
+substitui um palpite, e as três vezes o palpite estava errado.
+
+## O controle também precisa saber a fase
+
+O celular-controle desenha a própria página de objetivos, com os dados que a
+TV manda. Ele recebia a lista de objetivos e mais nada — e a fase é justamente
+o que diz se dá para largar a manete e olhar o radar. Agora o pacote lento
+leva `sor`: nome, fase, cor e a ordem do rádio, e o painel dele desenha a
+mesma linha da tela do jogo.
+
+Ao desenhar essa linha lá, apareceram **três textos escritos um por cima do
+outro** na mesma página — dois deles de antes desta mudança:
+
+- `DEFESA AÉREA` por cima de `CONTATO EM 9 s`. A fase é o dado, o nome é o
+  rótulo: mede-se a fase e o nome fica com o que sobrar.
+- `OBJET0/2` — o contador colado no nome da página.
+- `DIST24800m` — o rótulo estava fixo em 50% da largura, e o número cresceu.
+
+O padrão é sempre o mesmo, e é a quarta vez: onde havia um número mágico
+(`slice(0,17)`, `w*0.50`, `m.f*0.6`), havia um encostão esperando um valor
+maior. Mede-se o que está do lado e posiciona-se a partir dele.

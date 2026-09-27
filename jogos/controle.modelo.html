@@ -1330,6 +1330,14 @@ const MFD_CIANO = '#63d8ff', MFD_VERDE = '#3fe070', MFD_AMBAR = '#ffc046',
       MFD_VERM = '#ff6a58', MFD_CLARO = '#e2ecf8', MFD_ROT = '#8fa3b8',
       MFD_FRACO = '#6d8095', MFD_FIO = 'rgba(226,236,248,';
 
+/* corta na largura que o texto TEM, não no número de letras que alguém achou
+   que caberia — o mesmo ajudante que existe do lado do jogo */
+function corta(c, txt, larg){
+  if (c.measureText(txt).width <= larg) return txt;
+  let t = txt;
+  while (t.length > 1 && c.measureText(t + '…').width > larg) t = t.slice(0, -1);
+  return t + '…';
+}
 const Painel = {
   carro: 0, dado: {}, lona: null, cx: null, w: 0, h: 0, desl: 0,
   encolhido: false, abasAltura: 0, alcaAltura: 14,
@@ -1614,17 +1622,60 @@ const Painel = {
     const lgNome = c.measureText('OBJET').width;
     c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
     c.fillStyle = MFD_CIANO;
-    c.fillText(feitos + '/' + (d.objs || []).length, m.pad + lgNome + m.f*0.6, m.cab*0.60);
-    const n = Math.min(5, L.length);
+    c.fillText(feitos + '/' + (d.objs || []).length, m.pad + lgNome + m.f*1.3, m.cab*0.60);
+    /* quatro linhas de objetivo, e a quinta é da SORTIDA — igual à tela do
+       jogo, porque as duas respondem à mesma pergunta: posso levar tiro
+       agora? */
+    const n = Math.min(4, L.length);
     for (let i = 0; i < n; i++){
       const y = m.corpoY + m.corpoH*(0.10 + i*0.155);
-      c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
-      c.textAlign = 'left'; c.fillStyle = L[i][0] ? MFD_VERDE : MFD_ROT;
-      c.fillText((L[i][0] ? '✔ ' : '○ ') + String(L[i][1]).toUpperCase().slice(0, 18), x, y);
+      let prog = '';
       if (L[i][2]){
         c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+        prog = String(L[i][2]);
+      }
+      const larProg = prog ? c.measureText(prog).width + m.f*0.9 : 0;
+      c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+      c.textAlign = 'left'; c.fillStyle = L[i][0] ? MFD_VERDE : MFD_ROT;
+      c.fillText(corta(c, (L[i][0] ? '✔ ' : '○ ') + String(L[i][1]).toUpperCase(),
+                       w - larProg), x, y);
+      if (prog){
+        c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
         c.textAlign = 'right'; c.fillStyle = L[i][0] ? MFD_VERDE : MFD_CLARO;
-        c.fillText(String(L[i][2]), x + w, y);
+        c.fillText(prog, x + w, y);
+      }
+    }
+    if (d.sor){
+      const CORES = [MFD_VERDE, MFD_AMBAR, MFD_MAG, MFD_VERM];
+      const yS = m.corpoY + m.corpoH*(0.10 + n*0.155 + 0.02);
+      c.strokeStyle = 'rgba(99,216,255,.10)'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(x, yS - m.corpoH*0.08); c.lineTo(x + w, yS - m.corpoH*0.08); c.stroke();
+      /* a fase manda: ela é o dado, o nome da sortida é o rótulo. Mede-se a
+         fase primeiro e o nome fica com o que sobrar — sem isto "DEFESA
+         AÉREA" e "CONTATO EM 9 s" se escrevem um por cima do outro. */
+      c.font = '800 ' + (m.f*0.94).toFixed(1) + 'px ui-monospace, monospace';
+      const larFase = c.measureText(d.sor[1]).width;
+      c.font = '800 ' + (m.f*0.88).toFixed(1) + 'px system-ui, sans-serif';
+      c.textAlign = 'left'; c.fillStyle = MFD_FRACO;
+      c.fillText(corta(c, d.sor[0], w - larFase - m.f*0.8), x, yS);
+      c.font = '800 ' + (m.f*0.94).toFixed(1) + 'px ui-monospace, monospace';
+      c.textAlign = 'right'; c.fillStyle = CORES[d.sor[2]] || MFD_FRACO;
+      if (d.sor[2] >= 2) this.aceso(c, CORES[d.sor[2]], m.f*0.9);
+      c.fillText(d.sor[1], x + w, yS);
+      this.apaga(c);
+      if (d.sor[3]){
+        c.font = '700 ' + (m.f*0.74).toFixed(1) + 'px system-ui, sans-serif';
+        c.textAlign = 'left'; c.fillStyle = MFD_ROT;
+        const pal = String(d.sor[3]).toUpperCase().split(' ');
+        let ln = '', li = 0;
+        for (let i = 0; i <= pal.length; i++){
+          const tent = ln ? ln + ' ' + pal[i] : pal[i];
+          if (i === pal.length || c.measureText(tent).width > w){
+            c.fillText(ln, x, yS + m.corpoH*(0.09 + li*0.08));
+            ln = pal[i] || ''; li++;
+            if (li > 1) break;
+          } else ln = tent;
+        }
       }
     }
     const y2 = m.corpoY + m.corpoH*0.90;
@@ -1632,11 +1683,18 @@ const Painel = {
     c.textAlign = 'left'; c.fillStyle = MFD_ROT; c.fillText('PTS', x, y2);
     c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
     c.fillStyle = MFD_CLARO; c.fillText(String(Math.round(d.pontos || 0)), x + w*0.18, y2);
+    /* o rótulo se encosta no número quando o número cresce: 24800m não cabia
+       entre 50% da largura e a borda, e saía "DIST24800m". Mede-se o número e
+       o rótulo recua o quanto for preciso. */
+    const vDist = (d.dist || 0) + 'm';
+    c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+    const larDist = c.measureText(vDist).width;
     c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
-    c.fillStyle = MFD_ROT; c.fillText('DIST', x + w*0.50, y2);
+    c.fillStyle = MFD_ROT;
+    c.fillText('DIST', Math.max(x + w*0.42, x + w - larDist - c.measureText('DIST').width - m.f*0.8), y2);
     c.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
     c.textAlign = 'right'; c.fillStyle = MFD_CLARO;
-    c.fillText((d.dist || 0) + 'm', x + w, y2);
+    c.fillText(vDist, x + w, y2);
     c.textAlign = 'left';
   },
   mapa(c, m, d){
