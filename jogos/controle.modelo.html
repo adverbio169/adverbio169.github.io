@@ -130,9 +130,9 @@
   #lemeTira{display:none}
   /* A TELA DO PAINEL: vidro escuro, fio de luz na borda, e tamanho que sai do
      MENOR lado — num celular deitado é a altura que aperta. */
-  #painelTela{position:relative;background:#070b0f;border:1px solid rgba(226,236,248,.18);
-              border-radius:6px;box-shadow:0 10px 26px rgba(0,0,0,.45);
-              width:min(62vw,330px);height:min(30vh,132px);flex-shrink:0;
+  #painelTela{position:relative;background:transparent;border:0;
+              box-shadow:0 10px 26px rgba(0,0,0,.45);
+              width:min(74vw,360px);height:min(36vh,190px);flex-shrink:0;
               touch-action:none;user-select:none;-webkit-user-select:none}
   body.artilheiro #painelTela{display:none}
   /* DEITADO, A TELA FICA AO LADO DO HORIZONTE, não embaixo dele. Embaixo
@@ -146,13 +146,31 @@
      iPhone deitado e ENTRAVA no botão de FOGO num iPhone pequeno — a prova de
      sobreposição pegou. Agora a terceira opção do `min` é o espaço que
      realmente sobra: da direita da bola até a esquerda do FOGO, menos o vão. */
+  /* O VÃO DA ESQUERDA NÃO É SÓ A BOLA. Ele é o MAIOR entre a bola do
+     horizonte e o seletor de arma, que fica embaixo dela e é mais largo
+     (190px fixos). Medindo só pela bola, num aparelho pequeno o painel
+     começava três pixels dentro do seletor — a prova de sobreposição pegou. */
   body.paisagem{--adi:min(30vw,46vh,180px);--col:min(13vw,58px);--fogo:min(27vw,132px);
-                --telaX:calc(8px + var(--col) + 12px + var(--adi) + 12px)}
-  body.paisagem #painelTela{position:fixed;left:var(--telaX);
-              top:46%;transform:translateY(-50%);
-              width:min(38vw, 300px,
-                    calc(100vw - 18px - var(--col) - var(--fogo) - 10px - var(--telaX)));
-              height:var(--adi)}
+                --telaX:calc(76px + max(var(--adi), 190px) + 12px)}
+  /* E ELA CRESCE ATÉ ONDE HÁ CHÃO. "aumenta mais o painel no celular e o
+     celular tem que ser o painel de instrumento do avião. gostei do desenho
+     do avião mas pode explorar bem o espaço."
+
+     Estava certo: a tela era um retângulo de 300x179 no meio de um aparelho
+     de 844x390, e abaixo dela havia 120 pixels de preto sem nada, e acima
+     outros 40. Medido em três aparelhos (scratchpad/ctlmede.js), o que
+     realmente está ocupado é: a coluna do nitro à esquerda, a bola do
+     horizonte, o seletor de arma embaixo À ESQUERDA (nunca passa de x=266),
+     o FOGO à direita e a coluna do acelerador na borda. O miolo da direita,
+     do topo ao rodapé, está livre.
+
+     Então a tela toma esse miolo inteiro: começa logo abaixo dos botões do
+     cabeçalho, desce até a margem de baixo, e para onde o FOGO começa. Num
+     iPhone deitado isso é 359x330 no lugar de 300x179 — pouco mais que o
+     DOBRO de área. */
+  body.paisagem #painelTela{position:fixed;left:var(--telaX);top:58px;transform:none;
+              height:calc(100vh - 68px);height:calc(100dvh - 68px);
+              width:calc(100vw - var(--col) - var(--fogo) - 26px - var(--telaX))}
   /* o placar em JANELAS, como as do EADI: caixa preta, moldura fina e o
      algarismo monoespaçado dentro. Três números soltos no fundo pareciam
      legenda de aplicativo; assim eles pertencem ao mesmo painel. */
@@ -315,10 +333,26 @@ body.paisagem #controle.ver,
   body.paisagem #horizonte{left:calc(8px + var(--col) + 12px);top:46%;
                transform:translateY(-50%);
                --d:var(--adi);width:var(--d);height:var(--d)}
-  body.paisagem #estadoRede{top:8px;left:50%;transform:translateX(-50%);width:auto;max-width:40vw}
+  /* O AVISO DA REDE SAI DO MEIO. O meio do cabeçalho passou a ser da linha do
+     giro; e o aviso, que às vezes é uma frase inteira ("sala 4821 não
+     encontrada…"), atropelava os botões. Encostado no PILOTO, com reticências
+     quando não couber, ele para de brigar por espaço. */
+  body.paisagem #estadoRede{top:8px;right:calc(78px + env(safe-area-inset-right));left:auto;
+             transform:none;width:auto;max-width:34vw;white-space:nowrap;
+             overflow:hidden;text-overflow:ellipsis}
   body.paisagem #posto{top:8px;right:calc(10px + env(safe-area-inset-right));padding:5px 10px;font-size:10.5px;letter-spacing:1.5px}
   body.paisagem .placar .val2{font-size:16px}
-  body.paisagem #giroLinha{bottom:8px;left:50%;transform:translateX(-50%);font-size:11px}
+  /* A LINHA DO GIRO SOBE PARA O CABEÇALHO. Ela morava no rodapé do meio —
+     que agora é painel. Em cima, à direita dos botões de começar e calibrar,
+     há uma faixa livre de ponta a ponta e ninguém a usava. */
+  body.paisagem #giroLinha{top:10px;bottom:auto;left:180px;right:auto;transform:none;
+                           font-size:0;justify-content:flex-start;flex-wrap:nowrap;
+                           max-width:calc(100vw - 180px - 34vw - 92px);overflow:hidden}
+  /* DEITADO, "asas: niveladas" SAI e ficam só os dois botões. O texto dizia o
+     que a bola do horizonte já mostra — ela É a resposta para "as asas estão
+     niveladas?" — e num aparelho pequeno era ele que empurrava o botão
+     "cabine" para fora da faixa. Em pé, onde não há bola, o texto fica. */
+  body.paisagem #giroLinha button{font-size:12px}
   /* polegar esquerdo */
   body.paisagem .armas{left:calc(10px + env(safe-area-inset-left));bottom:calc(10px + env(safe-area-inset-bottom));
            width:min(34vw,190px);max-width:none;height:min(21vw,96px)}
@@ -1264,6 +1298,7 @@ const ADI = {
    deles muda.
    ========================================================================== */
 const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'ARMAS', 'OBJET', 'VOO'];
+const MFD_CURTO = ['SIN', 'MOT', 'MAP', 'ARM', 'OBJ', 'VOO'];
 const MFD_CIANO = '#63d8ff', MFD_VERDE = '#3fe070', MFD_AMBAR = '#ffc046',
       MFD_VERM = '#ff6a58', MFD_CLARO = '#e2ecf8', MFD_ROT = '#8fa3b8',
       MFD_FRACO = '#6d8095', MFD_FIO = 'rgba(226,236,248,';
@@ -1301,20 +1336,37 @@ const Painel = {
     const t = this.prepara();
     if (!t) return;
     const c = this.cx, W = t.w, H = t.h, d = this.dado;
-    const abas = Math.max(18, H*0.155), cab = Math.max(14, H*0.115);
-    const pad = Math.max(8, W*0.035);
+    /* AS MEDIDAS SAEM DO MENOR LADO. A tela cresceu e ficou quase quadrada num
+       aparelho grande e estreita e alta num pequeno; com a letra presa só na
+       ALTURA, o painel do aparelho pequeno ficava com número de 23px numa
+       coluna de 188px e o valor batia no rótulo. Amarrando nos dois, a página
+       é a mesma em qualquer aparelho, só que maior ou menor. */
+    const abas = Math.max(24, Math.min(H*0.145, 46));
+    const cab  = Math.max(16, Math.min(H*0.105, 32));
+    const pad  = Math.max(9, Math.min(W*0.045, 22));
+    const f    = Math.max(9, Math.min(H*0.072, W*0.062));
     const m = { pad, cab, abas, corpoY: cab, corpoH: H - cab - abas,
-                f: Math.max(9, H*0.078), fv: Math.max(11, H*0.105), W, H };
+                f, fv: f*1.35, W, H };
     c.clearRect(0, 0, W, H);
-    c.fillStyle = '#070b0f'; c.fillRect(0, 0, W, H);
+    this.vidro(c, m);
 
     const nome = MFD_PAGS[this.carro];
     c.textBaseline = 'middle'; c.textAlign = 'left';
-    c.font = '800 ' + Math.max(9, cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
-    c.fillStyle = MFD_CIANO; c.fillText(nome, pad, cab*0.60);
-    c.font = '700 ' + Math.max(8, cab*0.40).toFixed(1) + 'px ui-monospace, monospace';
-    c.textAlign = 'right'; c.fillStyle = MFD_FRACO;
-    c.fillText('‹ arraste ›', W - pad, cab*0.60);
+    const bh = Math.max(2, cab*0.34);
+    c.fillStyle = MFD_CIANO; c.fillRect(pad*0.45, cab*0.60 - bh/2, Math.max(2, cab*0.11), bh);
+    c.font = '800 ' + Math.max(10, cab*0.54).toFixed(1) + 'px system-ui, sans-serif';
+    c.fillStyle = MFD_CIANO; this.aceso(c, MFD_CIANO, cab*0.32);
+    c.fillText(nome, pad + cab*0.32, cab*0.60); this.apaga(c);
+    /* o "arraste" só cabe quando cabe: numa tela estreita ele encostava no
+       nome da página e as duas legendas viravam uma linha só de ruído */
+    if (W > 240){
+      c.font = '700 ' + Math.max(8, cab*0.40).toFixed(1) + 'px ui-monospace, monospace';
+      c.textAlign = 'right'; c.fillStyle = MFD_FRACO;
+      c.fillText('‹ arraste ›', W - pad, cab*0.60);
+    }
+
+    /* o conteúdo pinta aceso, igual ao da TV: um save só para a página toda */
+    c.save(); this.aceso(c, 'rgba(120,225,255,.42)', Math.max(3, H*0.016));
 
     if (!d.jogando && !d.vel){ this.vazio(c, m); }
     else if (nome === 'SINÓT') this.sinoptico(c, m, d);
@@ -1323,6 +1375,7 @@ const Painel = {
     else if (nome === 'ARMAS') this.armas(c, m, d);
     else if (nome === 'OBJET') this.objetivos(c, m, d);
     else if (nome === 'VOO')   this.voo(c, m, d);
+    c.restore();
 
     /* AS ABAS mostram as SEIS páginas e marcam as três que estão abertas: a
        desta tela cheia, as duas da TV com um fio embaixo. Ver onde as outras
@@ -1331,17 +1384,62 @@ const Painel = {
     c.strokeStyle = MFD_FIO + '.14)'; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, ay + 0.5); c.lineTo(W, ay + 0.5); c.stroke();
     c.textAlign = 'center';
-    c.font = '700 ' + Math.max(7, abas*0.40).toFixed(1) + 'px system-ui, sans-serif';
+    c.font = '700 ' + Math.max(8, Math.min(abas*0.36, W*0.038)).toFixed(1) + 'px system-ui, sans-serif';
     const naTv = [(this.carro + 1) % MFD_PAGS.length, (this.carro + 2) % MFD_PAGS.length];
+    const gr = Math.max(2, abas*0.12);
     MFD_PAGS.forEach((p, i) => {
       const ax = i*aw;
-      if (i === this.carro){ c.fillStyle = MFD_CIANO; c.fillRect(ax, ay + 1, aw, abas - 1); }
-      else if (naTv.indexOf(i) >= 0){
-        c.fillStyle = 'rgba(99,216,255,.6)'; c.fillRect(ax + aw*0.2, H - 2.5, aw*0.6, 2.5);
+      if (i === this.carro){
+        this.aceso(c, MFD_CIANO, abas*0.34);
+        c.fillStyle = 'rgba(99,216,255,.13)'; c.fillRect(ax, ay + 1, aw, abas - 1);
+        c.fillStyle = MFD_CIANO; c.fillRect(ax + aw*0.10, H - gr, aw*0.80, gr);
+      } else if (naTv.indexOf(i) >= 0){
+        c.fillStyle = 'rgba(99,216,255,.55)'; c.fillRect(ax + aw*0.22, H - gr, aw*0.56, gr*0.6);
       }
-      c.fillStyle = i === this.carro ? '#05080b' : MFD_FRACO;
-      c.fillText(p, ax + aw/2, ay + abas*0.52);
+      c.fillStyle = i === this.carro ? MFD_CIANO : MFD_FRACO;
+      c.fillText(aw < 46 ? MFD_CURTO[i] : p, ax + aw/2, ay + abas*0.48);
+      this.apaga(c);
     });
+  },
+  /* --- o vidro, o mesmo da TV ------------------------------------------- */
+  aceso(c, cor, forca){ c.shadowColor = cor; c.shadowBlur = forca; },
+  apaga(c){ c.shadowColor = 'transparent'; c.shadowBlur = 0; },
+  riscos(c){
+    if (this._risco) return this._risco;
+    const l = document.createElement('canvas'); l.width = 1; l.height = 3;
+    const x = l.getContext('2d');
+    x.fillStyle = 'rgba(150,225,255,.07)'; x.fillRect(0, 0, 1, 1);
+    this._risco = c.createPattern(l, 'repeat');
+    return this._risco;
+  },
+  vidro(c, m){
+    const W = m.W, H = m.H, r = Math.max(3, H*0.018);
+    c.save();
+    if (c.roundRect){ c.beginPath(); c.roundRect(0, 0, W, H, r); } else { c.beginPath(); c.rect(0, 0, W, H); }
+    c.clip();
+    c.fillStyle = 'rgba(4,14,21,.92)'; c.fillRect(0, 0, W, H);
+    c.fillStyle = 'rgba(2,9,14,.45)';
+    c.fillRect(0, 0, W, m.cab); c.fillRect(0, H - m.abas, W, m.abas);
+    c.fillStyle = this.riscos(c); c.fillRect(0, 0, W, H);
+    const bri = c.createLinearGradient(0, 0, 0, H*0.26);
+    bri.addColorStop(0, 'rgba(180,235,255,.07)'); bri.addColorStop(1, 'rgba(180,235,255,0)');
+    c.fillStyle = bri; c.fillRect(0, 0, W, H*0.26);
+    c.restore();
+    if (c.roundRect){ c.beginPath(); c.roundRect(0.5, 0.5, W - 1, H - 1, r); }
+    else { c.beginPath(); c.rect(0.5, 0.5, W - 1, H - 1); }
+    c.strokeStyle = 'rgba(99,216,255,.30)'; c.lineWidth = 1; c.stroke();
+    /* AS ESQUADRIAS: quatro cantos em L acesos, como a mira do Ace Combat. O
+       olho fecha o retângulo sozinho e a tela deixa de ser uma caixa. */
+    const b = Math.max(12, Math.min(W, H)*0.15), e = Math.max(1.8, H*0.012);
+    c.save(); c.strokeStyle = MFD_CIANO; c.lineWidth = e; c.lineCap = 'butt';
+    this.aceso(c, MFD_CIANO, Math.max(5, H*0.055));
+    const P = [[0,0,1,1],[W,0,-1,1],[0,H,1,-1],[W,H,-1,-1]];
+    c.beginPath();
+    for (let i = 0; i < 4; i++){
+      const q = P[i], qx = q[0] + q[2]*e/2, qy = q[1] + q[3]*e/2;
+      c.moveTo(q[0] + q[2]*b, qy); c.lineTo(qx, qy); c.lineTo(qx, q[1] + q[3]*b);
+    }
+    c.stroke(); c.restore();
   },
   vazio(c, m){
     c.textAlign = 'center'; c.fillStyle = MFD_FRACO;
@@ -1469,9 +1567,118 @@ const Painel = {
     c.textAlign = 'left';
   },
   mapa(c, m, d){
-    /* o celular não tem a lista de alvos nem as posições: o mapa desenhável é
-       da TV. Aqui a página vira o RESUMO do que o mapa diz, que é o que cabe
-       numa janela deste tamanho e o que se pergunta a ele. */
+    /* O RADAR DE VERDADE. Antes esta página era um resumo de quatro linhas,
+       porque o celular não recebia posição nenhuma. Agora a TV manda os
+       contatos já em coordenadas de radar (nariz para cima, alcance em
+       centésimos), e aqui é só plotar: disco, rosa, pista, alvos, hostis.
+
+       Quando o pacote não traz contatos — TV antiga, jogo parado — cai no
+       resumo de antes, que continua servindo. */
+    const M = d.mapa;
+    if (!M) return this.mapaResumo(c, m, d);
+    /* DUAS ARRUMAÇÕES, porque a tela muda de forma conforme o aparelho. Numa
+       larga, o disco fica à esquerda e os números numa coluna ao lado — que é
+       como está na TV. Numa estreita e alta (aparelho pequeno deitado), não
+       cabem lado a lado: o disco sobe e os números viram uma fileira embaixo.
+       A conta é uma só: a coluna precisa de uns 150 px para "PISTA  840m"
+       caber sem um número entrar no outro, e foi exatamente isso que entrou
+       na primeira versão. */
+    const larg = m.W - m.pad*2;
+    const emColuna = larg >= 300;
+    const disco = emColuna ? Math.min(m.corpoH*0.94, larg*0.48)
+                           : Math.min(m.corpoH*0.72, larg*0.94);
+    const R = disco/2;
+    const cx = emColuna ? m.pad + R + larg*0.02 : m.W/2;
+    const cy = m.corpoY + (emColuna ? m.corpoH*0.50 : R + m.corpoH*0.03);
+    const rv = (d.rumo || 0)*Math.PI/180;
+    /* onde o disco ficou, para quem pergunta de fora (o teste do radar mede
+       daqui; medir do centro da TELA dá errado, porque na arrumação larga o
+       disco está à esquerda e a coluna de números à direita) */
+    this.disco = { cx, cy, r: R };
+
+    c.save();
+    c.beginPath(); c.arc(cx, cy, R, 0, 7);
+    c.fillStyle = 'rgba(2,10,16,.55)'; c.fill();
+    c.strokeStyle = 'rgba(99,216,255,.35)'; c.lineWidth = 1.2; c.stroke();
+    c.beginPath(); c.arc(cx, cy, R*0.5, 0, 7);
+    c.strokeStyle = MFD_FIO + '.13)'; c.lineWidth = 1; c.stroke();
+
+    // a rosa gira com o rumo; o nariz é sempre para cima
+    c.save(); c.translate(cx, cy); c.rotate(-rv);
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    for (let g = 0; g < 360; g += 30){
+      const a2 = g*Math.PI/180, s2 = Math.sin(a2), c2 = -Math.cos(a2);
+      c.beginPath();
+      c.moveTo(s2*R*0.93, c2*R*0.93); c.lineTo(s2*R*0.82, c2*R*0.82);
+      c.strokeStyle = MFD_FIO + (g % 90 === 0 ? '.55)' : '.22)');
+      c.lineWidth = 1; c.stroke();
+    }
+    c.font = '600 ' + Math.max(7, R*0.16).toFixed(1) + 'px system-ui, sans-serif';
+    ['N','L','S','O'].forEach((letra, k) => {
+      const a2 = k*90*Math.PI/180, s2 = Math.sin(a2), c2 = -Math.cos(a2);
+      c.save(); c.translate(s2*R*0.70, c2*R*0.70); c.rotate(k*90*Math.PI/180);
+      c.fillStyle = MFD_FIO + '.58)'; c.fillText(letra, 0, 0); c.restore();
+    });
+    c.restore();
+
+    c.beginPath(); c.arc(cx, cy, R*0.99, 0, 7); c.clip();
+    const px = v => cx + v/100*R, py = v => cy + v/100*R;
+    if (M.p){
+      c.strokeStyle = 'rgba(120,170,215,.85)';
+      c.lineWidth = Math.max(1.6, R*0.07); c.lineCap = 'round';
+      c.beginPath(); c.moveTo(px(M.p[0]), py(M.p[1])); c.lineTo(px(M.p[2]), py(M.p[3]));
+      c.stroke(); c.lineCap = 'butt';
+    }
+    for (const q of (M.c || [])){
+      const x = px(q[0]), y = py(q[1]);
+      if (q[2] === 1){
+        c.fillStyle = MFD_AMBAR;
+        c.beginPath(); c.arc(x, y, Math.max(1.8, R*0.045), 0, 7); c.fill();
+      } else {
+        const t = Math.max(2.4, R*(q[2] === 3 ? 0.055 : 0.075));
+        c.beginPath();
+        c.moveTo(x, y - t); c.lineTo(x + t, y); c.lineTo(x, y + t); c.lineTo(x - t, y);
+        c.closePath();
+        c.fillStyle = MFD_VERM; c.globalAlpha = q[2] === 3 ? 0.55 : 1; c.fill();
+        c.globalAlpha = 1;
+      }
+    }
+    c.restore();
+    // o nosso avião, no centro
+    c.strokeStyle = MFD_CLARO; c.lineWidth = Math.max(1.3, R*0.035);
+    c.beginPath();
+    c.moveTo(cx - R*0.15, cy + R*0.15); c.lineTo(cx, cy - R*0.19);
+    c.lineTo(cx + R*0.15, cy + R*0.15); c.stroke();
+
+    // os dados: coluna ao lado do disco, ou fileira embaixo dele
+    const colX = cx + R + larg*0.05, colW = m.W - m.pad - colX;
+    const fr = emColuna ? Math.min(m.f*0.92, colW*0.155) : Math.min(m.f*0.85, larg*0.055);
+    const fv = emColuna ? Math.min(m.fv*0.92, colW*0.195) : Math.min(m.fv*0.85, larg*0.070);
+    const put = (i, rot, val, cor) => {
+      c.textBaseline = 'middle';
+      c.font = '700 ' + fr.toFixed(1) + 'px ui-monospace, monospace';
+      c.fillStyle = MFD_ROT;
+      if (emColuna){
+        const y = m.corpoY + m.corpoH*(i + 0.6)/4.4;
+        c.textAlign = 'left'; c.fillText(rot, colX, y);
+        c.font = '800 ' + fv.toFixed(1) + 'px ui-monospace, monospace';
+        c.textAlign = 'right'; c.fillStyle = cor || MFD_CLARO; c.fillText(val, m.W - m.pad, y);
+      } else {
+        const cw = larg/4, x = m.pad + cw*(i + 0.5);
+        const y = m.corpoY + m.corpoH*0.88;
+        c.textAlign = 'center'; c.fillText(rot, x, y - fv*0.72);
+        c.font = '800 ' + fv.toFixed(1) + 'px ui-monospace, monospace';
+        c.fillStyle = cor || MFD_CLARO; c.fillText(val, x, y + fr*0.62);
+      }
+    };
+    put(0, 'ALVOS', String(d.falta === undefined ? '—' : d.falta),
+        d.falta ? MFD_AMBAR : MFD_VERDE);
+    put(1, 'HOSTIL', String(d.hostis || 0), d.hostis ? MFD_VERM : MFD_FRACO);
+    put(2, 'PISTA', M.dp === null || M.dp === undefined ? '—' : M.dp + 'm');
+    put(3, 'ALC', M.alc ? (Math.round(M.alc/100)/10 + 'km') : '—', MFD_FRACO);
+    c.textAlign = 'left';
+  },
+  mapaResumo(c, m, d){
     this.linha(c, m, 0, 4, 'ALVOS', (d.falta === undefined ? '—' : d.falta) + '',
                d.falta ? MFD_AMBAR : MFD_VERDE);
     this.linha(c, m, 1, 4, 'HOSTIL', String(d.hostis || 0), d.hostis ? MFD_VERM : MFD_FRACO);

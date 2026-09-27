@@ -11256,7 +11256,20 @@ function baqueVisual(qual){
   if (f >= pulso){ pulso = f; pulsoCor = b[1]; }
 }
 let camPos = new THREE.Vector3(), camF={x:0,y:0,z:1}, camC={x:0,y:1,z:0}, camD={x:1,y:0,z:0};
-const CAMD = 620;
+/* O ENQUADRAMENTO DA CÂMERA DE FORA
+
+   "a visão do avião também fica um pouco à frente do nosso, os motores ficam
+   bem vistos, diferente do nosso que o motor já fica é fora da tela."
+
+   É a câmera de perseguição do Ace Combat: ela fica mais atrás e mais alta, e
+   com isso a CÉLULA INTEIRA cabe no quadro — as duas tubeiras acesas no meio
+   da imagem, que é metade da graça de voar um jato em terceira pessoa. A
+   nossa estava colada: 620 atrás, 210 acima. Nessa distância a cauda come o
+   rodapé e o fogo das turbinas sai pela borda.
+
+   Os dois números abaixo são medidos, não chutados — ver a régua em
+   COMO-FUNCIONA. */
+let CAMD = 820, CAM_CIMA = 270, CAM_INCL = 3*Math.PI/180;
 
 function giraPar(u, v, ang){
   const c = Math.cos(ang), s = Math.sin(ang);
@@ -11631,12 +11644,40 @@ function poeCamera(dt){
     camC = vnorm(vsub(camC, vmul(camF, vponto(camC, camF))));
     if (!isFinite(camC.x)) camC = {x:0,y:1,z:0};
     camD = vcruz(camC, camF);
-    const alvo = new THREE.Vector3(aviaoX - eixoF.x*CAMD + eixoC.x*210,
-                                   aviaoY - eixoF.y*CAMD + eixoC.y*210,
-                                   aviaoZ - eixoF.z*CAMD + eixoC.z*210);
+    const alvo = new THREE.Vector3(aviaoX - eixoF.x*CAMD + eixoC.x*CAM_CIMA,
+                                   aviaoY - eixoF.y*CAMD + eixoC.y*CAM_CIMA,
+                                   aviaoZ - eixoF.z*CAMD + eixoC.z*CAM_CIMA);
     camPos.lerp(alvo, Math.min(1, dt*12));
   }
-  const vista = olhaComACabeca();
+  /* A INCLINAÇÃO. A câmera de fora estava OLHANDO PARALELA ao nariz, com o
+     olho 300 acima do avião. Isso joga o avião para baixo por um ângulo
+     atan(cima/atrás) inteiro — a 620/210 dava 18,7°, que num campo de 58°
+     coloca a célula a 80% da altura da tela: em qualquer puxada ela sai pelo
+     rodapé, e é isso que ele viu ("o motor já fica é fora da tela").
+
+     Agora são 820 atrás, 270 acima e 3° de olhar abaixado. Medido com a
+     régua (scratchpad/regua.js e puxada.js), que projeta os vértices da
+     célula na tela e diz onde ela cai:
+
+       620 / 210 / 0°  → célula de 30% da largura, rodapé em 83%
+       820 / 270 / 3°  → célula de 25% da largura, rodapé em 78%
+       880 / 300 / 6,5°→ célula de 23% da largura, rodapé em 71% (alto demais)
+
+     Os 3° de inclinação não são enfeite: sem eles o avião fica pendurado no
+     rodapé e some na primeira puxada; com 6,5° ele sobe ao meio da tela e
+     deixa de parecer que você vai atrás dele. 78% é onde o Ace Combat põe o
+     dele, com as duas tubeiras inteiras e sobra de céu embaixo.
+
+     Entra AQUI, depois do estado, pela mesma razão que o giro da cabeça: se
+     eu girasse o `camF` guardado, o ângulo entraria na perseguição e se
+     somaria a cada quadro (a realimentação descrita acima). */
+  let vista = olhaComACabeca();
+  if (!cockpit && CAM_INCL){
+    const r = giraPar(vista.F, vista.C, -CAM_INCL);
+    const F = vnorm(r[0]);
+    const C = vnorm(vsub(r[1], vmul(F, vponto(r[1], F))));
+    if (isFinite(F.x) && isFinite(C.x)) vista = { F, C, D: vcruz(C, F) };
+  }
   /* o sacolejo entra DEPOIS da posição calculada: a câmera continua
      perseguindo o avião direitinho, só que com a mão tremendo */
   const tr = Math.max(sacudida, sacudidaFixa);
@@ -14917,7 +14958,32 @@ function faceInst(chave, larg, alt, pinta){
    vidro da frente é uma tela desperdiçada — que é exatamente a crítica que o
    usuário fez às duas telas mostrando a mesma coisa. */
 const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'ARMAS', 'OBJET', 'VOO'];
+/* e o nome curto, para quando a aba não tiver largura: seis palavras de cinco
+   letras numa fita de 180 px ficam encostadas uma na outra e viram uma tarja */
+const MFD_CURTO = ['SIN', 'MOT', 'MAP', 'ARM', 'OBJ', 'VOO'];
 const MFD_TELA = '#070b0f', MFD_FIO = 'rgba(226,236,248,';
+/* O VIDRO, E POR QUE ELE DEIXOU DE SER PRETO
+
+   "olha o jogo Ace Combat, podemos fazer algo nesse sentido, das telas
+   multitarefas, ao invés de ser preto."
+
+   Está certo, e o motivo é de cabine, não de gosto. Uma tela de caça não é uma
+   janela para o nada: é uma placa de vidro acesa dentro de uma cabine cheia de
+   luz. Preto sólido recorta um buraco retangular no céu e o olho lê aquilo
+   como um adesivo colado no monitor — fora do mundo. Translúcido não: o céu
+   continua atrás, a tela fica DENTRO da cena, e a informação flutua.
+
+   O que o Ace Combat faz, olhando a imagem que ele mandou:
+     · o fundo é escuro mas se enxerga o céu através dele;
+     · a borda não é um fio fraco em volta de tudo — são ESQUADRIAS de luz nos
+       quatro cantos, que dão o retângulo sem fechá-lo;
+     · o traço brilha (glow), como fósforo aceso, não como tinta;
+     · a lista de armas nem caixa tem: é texto solto sobre o céu;
+     · nada de bloco sólido com letra preta dentro: a aba ativa é a que ACENDE.
+
+   Então: fundo em `MFD_VIDRO` (translúcido), esquadria acesa, e o retângulo
+   inteiro só como um fio fraco para o olho fechar a forma sozinho. */
+const MFD_VIDRO = 'rgba(4,14,21,.70)';
 const MFD_CIANO = '#63d8ff', MFD_VERDE = '#3fe070', MFD_AMBAR = '#ffc046',
       MFD_VERM = '#ff6a58', MFD_CLARO = '#e2ecf8', MFD_ROT = '#8fa3b8',
       MFD_FRACO = '#6d8095';
@@ -15316,7 +15382,9 @@ function mfdPaginaMapa(o, m){
     h2.beginPath();
     h2.moveTo(px, py - t); h2.lineTo(px + t, py); h2.lineTo(px, py + t); h2.lineTo(px - t, py);
     h2.closePath();
-    h2.fillStyle = MFD_VERM; h2.globalAlpha = fora ? 0.55 : 1; h2.fill();
+    /* o contato encostado no aro fica mais apagado, mas não tanto quanto
+       antes: sobre vidro translúcido 55% já era quase nada */
+    h2.fillStyle = MFD_VERM; h2.globalAlpha = fora ? 0.72 : 1; h2.fill();
     h2.globalAlpha = 1;
   }
   h2.restore();
@@ -15453,6 +15521,69 @@ function mfdPaginaVoo(o, m){
   mfdLinha(o, m, 5, 'PICO',   gMax.toFixed(1) + 'G', MFD_FRACO);
 }
 
+/* --- O VIDRO: as peças que fazem a tela parecer acesa --------------------- */
+
+/* O FÓSFORO. Um traço de fósforo não é tinta: ele espalha luz em volta. Duas
+   linhas de canvas resolvem — e como só o uso em borda, cabeçalho e aba ativa
+   (umas dez chamadas por tela, não uma por dado), não custa quadro. */
+function mfdAceso(c, cor, forca){ c.shadowColor = cor; c.shadowBlur = forca; }
+function mfdApaga(c){ c.shadowColor = 'transparent'; c.shadowBlur = 0; }
+
+/* AS ESQUADRIAS. Quatro cantos em "L" acesos. O olho fecha o retângulo
+   sozinho — é por isso que a mira de alvo do Ace Combat são só quatro cantos e
+   mesmo assim se lê como um quadrado. Dá a moldura sem construir a parede. */
+function mfdEsquadria(c, x, y, w, h, cor, forca){
+  const b = Math.max(10, Math.min(w, h)*0.17), e = Math.max(1.8, h*0.016);
+  c.save();
+  c.strokeStyle = cor; c.lineWidth = e; c.lineCap = 'butt'; c.lineJoin = 'miter';
+  mfdAceso(c, cor, forca);
+  const P = [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]];
+  c.beginPath();
+  for (let i = 0; i < 4; i++){
+    const q = P[i], qx = q[0] + q[2]*e/2, qy = q[1] + q[3]*e/2;
+    c.moveTo(q[0] + q[2]*b, qy); c.lineTo(qx, qy); c.lineTo(qx, q[1] + q[3]*b);
+  }
+  c.stroke(); c.restore();
+}
+
+/* AS LINHAS DE VARREDURA. Um tubo aceso tem linha; sem elas o retângulo é um
+   retângulo. Vem de uma lona de 1x3 repetida: custo zero por quadro. */
+let _mfdRisco = null;
+function mfdRiscos(c){
+  if (_mfdRisco) return _mfdRisco;
+  const l = document.createElement('canvas'); l.width = 1; l.height = 3;
+  const x = l.getContext('2d');
+  x.fillStyle = 'rgba(150,225,255,.07)'; x.fillRect(0, 0, 1, 1);
+  _mfdRisco = c.createPattern(l, 'repeat');
+  return _mfdRisco;
+}
+
+/* O VIDRO INTEIRO. Translúcido — o céu passa por trás, que é o pedido. Mas o
+   rodapé das abas e a faixa do cabeçalho ganham um dedo a mais de escuro:
+   letra pequena sobre nuvem branca precisa de chão. */
+function mfdVidro(c, x, y, w, h, m){
+  c.save();
+  c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = h*0.07; c.shadowOffsetY = 2;
+  cantoInst(c, x, y, w, h, Math.max(2, h*0.018));
+  c.fillStyle = MFD_VIDRO; c.fill();
+  c.restore();
+
+  c.save();
+  cantoInst(c, x, y, w, h, Math.max(2, h*0.018)); c.clip();
+  c.fillStyle = 'rgba(4,14,20,.34)';
+  c.fillRect(x, y, w, m.cab);
+  c.fillRect(x, y + h - m.abas, w, m.abas);
+  c.fillStyle = mfdRiscos(c); c.fillRect(x, y, w, h);
+  const bri = c.createLinearGradient(0, y, 0, y + h*0.26);
+  bri.addColorStop(0, 'rgba(180,235,255,.07)'); bri.addColorStop(1, 'rgba(180,235,255,0)');
+  c.fillStyle = bri; c.fillRect(x, y, w, h*0.26);
+  c.restore();
+
+  cantoInst(c, x + 0.5, y + 0.5, w - 1, h - 1, Math.max(2, h*0.018));
+  c.strokeStyle = 'rgba(99,216,255,.30)'; c.lineWidth = 1; c.stroke();
+  mfdEsquadria(c, x, y, w, h, MFD_CIANO, Math.max(5, h*0.07));
+}
+
 /* --- UMA TELA INTEIRA ---------------------------------------------------- */
 function desenhaMFD(k){
   const o = mfdOnde(k);
@@ -15460,34 +15591,38 @@ function desenhaMFD(k){
   const m = mfdMedidas(o);
   const nome = MFD_PAGS[mfdPagDe(k + 1)];   // janela 0 é o celular
 
-  // a caixa: vidro escuro, um fio de luz na borda e um sopro de reflexo
-  h2.save();
-  h2.shadowColor = 'rgba(0,0,0,.5)'; h2.shadowBlur = o.h*0.10; h2.shadowOffsetY = 2;
-  cantoInst(h2, o.x, o.y, o.w, o.h, Math.max(2, o.h*0.022));
-  h2.fillStyle = MFD_TELA; h2.fill();
-  h2.restore();
-  h2.save();
-  cantoInst(h2, o.x, o.y, o.w, o.h, Math.max(2, o.h*0.022)); h2.clip();
-  const bri = h2.createLinearGradient(0, o.y, 0, o.y + o.h*0.28);
-  bri.addColorStop(0, 'rgba(255,255,255,.05)'); bri.addColorStop(1, 'rgba(255,255,255,0)');
-  h2.fillStyle = bri; h2.fillRect(o.x, o.y, o.w, o.h*0.28);
-  h2.restore();
+  // o vidro
+  mfdVidro(h2, o.x, o.y, o.w, o.h, m);
 
-  // o cabeçalho
+  // o cabeçalho, com a barrinha acesa que marca a tela
+  const cy = o.y + m.cab*0.62, bh = Math.max(2, m.cab*0.30);
+  h2.fillStyle = MFD_CIANO; h2.globalAlpha = 0.9;
+  h2.fillRect(o.x + m.pad*0.45, cy - bh/2, Math.max(2, m.cab*0.10), bh);
+  h2.globalAlpha = 1;
   h2.textBaseline = 'middle';
   h2.font = '800 ' + Math.max(7, m.cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
   h2.textAlign = 'left'; h2.fillStyle = MFD_CIANO;
-  h2.fillText(nome, o.x + m.pad, o.y + m.cab*0.62);
+  mfdAceso(h2, MFD_CIANO, m.cab*0.30);
+  h2.fillText(nome, o.x + m.pad + m.cab*0.30, cy);
+  mfdApaga(h2);
   h2.font = '700 ' + Math.max(6, m.cab*0.44).toFixed(1) + 'px ui-monospace, monospace';
   h2.textAlign = 'right'; h2.fillStyle = MFD_FRACO;
-  h2.fillText('TELA ' + (k + 1) + ' · ' + (k ? 'E' : 'Q'), o.x + o.w - m.pad, o.y + m.cab*0.62);
+  h2.fillText('TELA ' + (k + 1) + ' · ' + (k ? 'E' : 'Q'), o.x + o.w - m.pad, cy);
 
+  /* O CONTEÚDO PINTA ACESO. Todo traço da página ganha um halo da cor do
+     próprio vidro — é o que faz a informação parecer emitida pela tela e não
+     impressa nela. Vai aqui, num save só, para não repetir em cada peça; e
+     recortado na moldura, que agora é translúcida e mostraria o vazamento. */
+  h2.save();
+  cantoInst(h2, o.x, o.y, o.w, o.h, Math.max(2, o.h*0.018)); h2.clip();
+  mfdAceso(h2, 'rgba(120,225,255,.42)', Math.max(3, o.h*0.020));
   if (nome === 'SINÓT') mfdPaginaSinoptico(o, m);
   if (nome === 'MOTOR') mfdPaginaMotor(o, m);
   if (nome === 'MAPA')  mfdPaginaMapa(o, m);
   if (nome === 'ARMAS') mfdPaginaArmas(o, m);
   if (nome === 'OBJET') mfdPaginaMissao(o, m);
   if (nome === 'VOO')   mfdPaginaVoo(o, m);
+  h2.restore();
 
   /* AS ABAS. São a peça que diz "esta tela tem outras páginas" — sem elas
      ninguém descobre que existe tecla nenhuma. */
@@ -15498,9 +15633,17 @@ function desenhaMFD(k){
   h2.font = '700 ' + Math.max(6, m.abas*0.42).toFixed(1) + 'px system-ui, sans-serif';
   MFD_PAGS.forEach((p, i) => {
     const ax = o.x + i*aw, on = i === mfdPagDe(k + 1);
-    if (on){ h2.fillStyle = MFD_CIANO; h2.fillRect(ax, ay + 1, aw, m.abas - 1); }
-    h2.fillStyle = on ? '#05080b' : MFD_FRACO;
-    h2.fillText(p, ax + aw/2, ay + m.abas*0.56);
+    p = aw < 46 ? MFD_CURTO[i] : p;
+    if (on){
+      mfdAceso(h2, MFD_CIANO, m.abas*0.36);
+      h2.fillStyle = 'rgba(99,216,255,.13)'; h2.fillRect(ax, ay + 1, aw, m.abas - 1);
+      h2.fillStyle = MFD_CIANO;
+      h2.fillRect(ax + aw*0.10, o.y + o.h - Math.max(2, m.abas*0.14),
+                  aw*0.80, Math.max(2, m.abas*0.14));
+    }
+    h2.fillStyle = on ? MFD_CIANO : MFD_FRACO;
+    h2.fillText(p, ax + aw/2, ay + m.abas*0.50);
+    mfdApaga(h2);
   });
   h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
 }
@@ -16626,7 +16769,7 @@ function reinicia(){
   eixoC = {x:0,y:1,z:0}; eixoD = vcruz(eixoC, eixoF);
   endireitaEixos();
   camF = {x:eixoF.x,y:0,z:eixoF.z}; camC = {x:0,y:1,z:0}; camD = {x:eixoD.x,y:0,z:eixoD.z};
-  camPos.set(aviaoX - eixoF.x*CAMD, aviaoY + 210, aviaoZ - eixoF.z*CAMD);
+  camPos.set(aviaoX - eixoF.x*CAMD, aviaoY + CAM_CIMA, aviaoZ - eixoF.z*CAMD);
   if (Missoes) Missoes.zera();
   turbo = 0; combustivel = 100; distancia = 0; subida = 0;
   cargaG = 1; gMax = 1; gMin = 1; _fAnt = null;   // zera as agulhas de memória do G
@@ -17526,7 +17669,65 @@ function mandaEstado(){
     subida: Math.round(subida/METRO), gmax: Math.round(gMax*10)/10,
     objs: (Missoes && Missoes.lista) ? Missoes.lista()
             .map(o2 => [o2.feito ? 1 : 0, o2.txt, o2.progresso || '']) : [],
-    alertas: mfdAlertas().map(a => [a[0], a[1] === MFD_VERM ? 2 : 1]) });
+    alertas: mfdAlertas().map(a => [a[0], a[1] === MFD_VERM ? 2 : 1]),
+    mapa: contatosDoRadar() });
+}
+/* OS CONTATOS, PARA O RADAR DO CELULAR
+
+   A página MAPA do celular era um resumo de quatro linhas — "ALVOS 26,
+   HOSTIL 1" — porque o celular nunca recebeu POSIÇÃO nenhuma: o mapa
+   desenhável era da TV. Com a tela do aparelho agora do tamanho de um painel
+   de verdade, o que falta ali não é espaço, é dado.
+
+   Então vai o dado, já mastigado: cada contato em coordenadas de RADAR, com o
+   nariz para cima e o alcance normalizado em centésimos (-100 a 100). O
+   celular só plota; não precisa saber onde é o norte do mundo, nem a escala,
+   nem a posição do avião. Arredondado a inteiro, dez contatos custam uns
+   cento e vinte bytes, quatro vezes por segundo — nada perto dos dezesseis
+   pacotes de atitude.
+
+   Tipos: 1 alvo, 2 hostil dentro do alcance, 3 hostil encostado no aro. */
+function contatosDoRadar(){
+  if (!jogando) return null;
+  const rv = rumoVisto(), esc = 100/RADAR_KM, C = [];
+  const poe = (x, z) => {
+    const dx = x - aviaoX, dz = z - aviaoZ, d = Math.hypot(dx, dz);
+    const a = Math.atan2(-dx, dz) - rv;
+    return { x: Math.sin(a)*d*esc, y: -Math.cos(a)*d*esc, d };
+  };
+  let perto = null, dPista = Infinity;
+  for (const P of PISTAS){
+    const dp = Math.hypot(P.cx - aviaoX, P.cz - aviaoZ);
+    if (dp < dPista){ dPista = dp; perto = P; }
+  }
+  let pista = null;
+  if (perto && dPista < RADAR_KM*1.4){
+    const s2 = Math.sin(perto.rumo), c2 = Math.cos(perto.rumo);
+    const a = poe(perto.cx - s2*perto.meiaC, perto.cz - c2*perto.meiaC);
+    const b = poe(perto.cx + s2*perto.meiaC, perto.cz + c2*perto.meiaC);
+    pista = [Math.round(a.x), Math.round(a.y), Math.round(b.x), Math.round(b.y)];
+  }
+  /* os mais PERTO primeiro, e corta em doze: um radar cheio de pontinhos não
+     informa nada, e o pacote não pode crescer sem fim */
+  const cand = [];
+  for (const a of alvos){
+    if (!a.vivo) continue;
+    const q = poe(a.x, a.z);
+    if (q.d > RADAR_KM) continue;
+    cand.push([q.d, Math.round(q.x), Math.round(q.y), 1]);
+  }
+  for (const p2 of Batalha.outros.values()){
+    if (p2.vivo === false) continue;
+    const q = poe(p2.x, p2.z);
+    if (q.d > RADAR_KM){
+      const ang = Math.atan2(q.y, q.x);
+      cand.push([q.d, Math.round(Math.cos(ang)*100), Math.round(Math.sin(ang)*100), 3]);
+    } else cand.push([q.d, Math.round(q.x), Math.round(q.y), 2]);
+  }
+  cand.sort((u, v) => u[0] - v[0]);
+  for (let i = 0; i < Math.min(12, cand.length); i++) C.push(cand[i].slice(1));
+  return { c: C, p: pista, dp: isFinite(dPista) ? Math.round(dPista/METRO) : null,
+           alc: Math.round(RADAR_KM/METRO) };
 }
 function pausa(){
   if (!jogando || pausado) return;

@@ -6128,3 +6128,120 @@ bastante para incomodar.
   FOGO** num iPhone pequeno. A largura passou a ser o espaço que realmente
   sobra, medido em `calc`, e a prova de sobreposição ficou verde nos quatro
   tamanhos.
+
+## As telas deixam de ser pretas — o vidro do Ace Combat
+
+> "olha o jogo Ace Combat, podemos fazer algo nesse sentido. das telas
+> multitarefas, ao invés de ser preto."
+
+A referência é boa e o motivo é de cabine, não de gosto. Uma tela de caça não é
+uma janela para o nada: é uma placa de vidro **acesa** dentro de uma cabine
+cheia de luz. Preto sólido recorta um buraco retangular no céu, e o olho lê
+aquilo como um adesivo colado no monitor — fora do mundo. Translúcido não: o
+céu continua atrás, a tela fica DENTRO da cena e a informação flutua.
+
+Olhando a imagem que ele mandou, o que o jogo faz é isto, e foi isto que
+entrou:
+
+| No Ace Combat | O que virou aqui |
+|---|---|
+| fundo escuro mas vazado | `MFD_VIDRO`, `rgba(4,14,21,.70)` — o chão passa por trás |
+| borda que não fecha o retângulo | **esquadrias**: quatro cantos em "L" acesos (`mfdEsquadria`) |
+| traço que brilha como fósforo | `shadowColor`/`shadowBlur` da própria cor (`mfdAceso`) |
+| tela de tubo, com linha | padrão de 1×3 repetido, uma lona só, custo zero por quadro |
+| nada de bloco sólido com letra preta | a aba ativa **acende**: letra ciana, fundo a 13% e uma barra embaixo |
+
+O conteúdo da página inteira pinta aceso num `save()` só — um halo ciano de
+42% em tudo o que a página desenha. É o que faz a informação parecer **emitida**
+pela tela em vez de impressa nela, e como é um `save` por janela (e não um por
+peça), não pesa no quadro.
+
+A faixa do cabeçalho e o rodapé das abas levam um dedo a mais de escuro por
+cima do vidro: letra pequena sobre nuvem branca precisa de chão.
+
+O mesmo vidro está nas **três** janelas — as duas da TV e a do celular —
+porque elas são a mesma fita de páginas e têm de parecer o mesmo aparelho.
+
+## A câmera de fora: o avião inteiro no quadro
+
+> "a visão do avião também fica um pouco à frente do nosso, os motores ficam
+> bem vistos. diferente do nosso que o motor já fica é fora da tela."
+
+A câmera estava a 620 atrás e 210 acima, **olhando paralela ao nariz**. Esse
+paralelo é o defeito: com o olho 210 acima, o avião cai no quadro por um ângulo
+`atan(210/620) = 18,7°` inteiro, que num campo de 58° o joga para 83% da altura
+da tela. Ali ele vive pendurado no rodapé.
+
+A régua (`scratchpad/regua.js`, `puxada.js`) projeta os vértices da célula — só
+a célula: o fogo das turbinas é aditivo e infla qualquer caixa — e diz onde ela
+cai na tela:
+
+| atrás / acima / inclinação | largura da célula | rodapé |
+|---|---|---|
+| 620 / 210 / 0° | 30% | 83% |
+| **820 / 270 / 3°** | **25%** | **78%** |
+| 880 / 300 / 6,5° | 23% | 71% (alto demais: parece que você vai atrás dele) |
+
+Ficou em 820 / 270 / 3°. A inclinação entra **depois** do estado da câmera,
+pela mesma razão que o giro da cabeça: girar o `camF` guardado mete o ângulo
+dentro da perseguição e ele se soma a cada quadro — é a realimentação descrita
+lá em cima, que já custou uma câmera girada nove vezes mais do que devia.
+
+## O celular vira o painel de instrumentos
+
+> "aumenta mais o painel no celular e o celular tem que ser o painel de
+> instrumento do avião. gostei do desenho do avião mas pode explorar bem o
+> espaço."
+
+Estava certo: a tela era um retângulo de 300×179 no meio de um aparelho de
+844×390, com 120 pixels de preto embaixo e 40 em cima sem nada. Medindo os três
+tamanhos (`scratchpad/ctlmede.js`), o que realmente está ocupado é a coluna do
+nitro, a bola do horizonte, o seletor de arma (embaixo **à esquerda**, nunca
+passa de x=266), o FOGO e a coluna do acelerador. O miolo da direita, do topo
+ao rodapé, estava vazio.
+
+Agora a tela toma esse miolo inteiro: **359×330** no lugar de 300×179, pouco
+mais que o dobro de área. Três coisas tiveram de sair da frente:
+
+- a **linha do giro** ("asas: niveladas / zerar aqui / cabine") subiu para o
+  cabeçalho, e deitado perdeu o texto: a bola do horizonte É a resposta para
+  "as asas estão niveladas?", e era o texto que empurrava o botão "cabine"
+  para fora da faixa num aparelho pequeno;
+- o **aviso da rede** saiu do meio e encostou no PILOTO, com reticências —
+  ele às vezes é uma frase inteira ("sala 4821 não encontrada…");
+- o vão da esquerda passou a medir pelo **maior** entre a bola e o seletor de
+  arma (190 px fixos). Medindo só pela bola, num aparelho pequeno o painel
+  começava três pixels dentro do seletor.
+
+A prova de sobreposição (`scratchpad/vagoscel.js`) fica verde nos três
+tamanhos, inclusive com a mensagem de erro mais longa no cabeçalho.
+
+### E o mapa virou radar
+
+A página MAPA do celular era um resumo de quatro linhas — "ALVOS 26, HOSTIL 1"
+— porque o celular nunca recebeu posição nenhuma: o mapa desenhável era da TV.
+Com a tela do tamanho de um painel de verdade, o que faltava ali não era
+espaço, era dado.
+
+Então vai o dado, já mastigado (`contatosDoRadar`): cada contato em coordenadas
+de **radar**, nariz para cima, alcance normalizado em centésimos. O celular só
+plota — não precisa saber onde é o norte do mundo, nem a escala, nem a posição
+do avião. Doze contatos, os mais perto primeiro, arredondados a inteiro: uns
+cento e vinte bytes quatro vezes por segundo, nada perto dos dezesseis pacotes
+de atitude. Sem contatos no pacote (TV antiga, jogo parado) a página cai no
+resumo de antes.
+
+### Erros medidos nesta rodada
+
+- **Coluna de dados atropelada.** "PISTA" e "840m" dividiam 118 px e se
+  escreviam um por cima do outro. O disco encolheu para 48% da largura e a
+  fonte da coluna passou a sair da largura DELA, não da altura da tela.
+- **Duas arrumações, não uma.** Num aparelho pequeno deitado a tela fica
+  estreita e alta e o disco não cabe ao lado dos números: abaixo de 300 px de
+  corpo o disco sobe e os números viram uma fileira embaixo.
+- **Abas viravam tarja.** Seis palavras de cinco letras numa fita de 173 px
+  ficam encostadas. Abaixo de 46 px por aba entram os nomes curtos
+  (SIN/MOT/MAP/ARM/OBJ/VOO), na TV e no celular.
+- **A letra saía da altura.** Com a tela quase quadrada num aparelho grande e
+  estreita num pequeno, amarrar a fonte só na altura dava número de 23 px numa
+  coluna de 188. Agora sai do menor lado.
