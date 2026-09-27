@@ -246,13 +246,11 @@
   /* O TREM E O FLAPE VIRARAM TECLAS DE BORDA DO PAINEL — e só voltam a ser
      botões quando o painel está RECOLHIDO. Some a tela, voltam os botões:
      ninguém pode ficar sem trem por ter encolhido o painel na hora errada. */
-  body.dedos #dTrem,body.dedos #dFlap,body.dedos #dZerar,body.dedos #btVisao{display:none}
-  body.dedos.painelFechado #dTrem,body.dedos.painelFechado #dFlap,
-  body.dedos.painelFechado #dZerar{display:inline-block}
-  body.dedos.painelFechado #btVisao{display:block}
-  /* só a QUALIDADE fica em cima o tempo todo: escolhe-se uma vez antes de
-     decolar, e não vale gastar borda de painel com ela */
-  body.dedos #btQual{left:calc(10px + env(safe-area-inset-left))}
+  /* só o TREM e o FLAPE saem daqui: eles viraram teclas de borda do painel e
+     só voltam a ser botões quando o painel está RECOLHIDO. O CALIBRAR e a
+     VISÃO ficam em cima o tempo todo — testado, e é como ele preferiu. */
+  body.dedos #dTrem,body.dedos #dFlap{display:none}
+  body.dedos.painelFechado #dTrem,body.dedos.painelFechado #dFlap{display:inline-block}
   body.dedos #convite{display:none}
   /* As tiras laterais ocupam a borda inteira, e os painéis de canto ficavam
      por baixo delas. Com os botões na tela, tudo recua a largura da tira. */
@@ -9221,45 +9219,32 @@ function mfdPaginaVoo(o, m){
    ========================================================================== */
 function mfdTemTeclas(){ return document.body.classList.contains('dedos'); }
 function mfdLarguraTeclas(o){
-  return mfdTemTeclas() && !mfdEncolhido ? Math.max(52, Math.min(o.w*0.155, 84)) : 0;
+  return mfdTemTeclas() && !mfdEncolhido ? Math.max(54, Math.min(o.w*0.20, 96)) : 0;
 }
-/* a área que sobra para a PÁGINA, depois das teclas DOS DOIS LADOS. Quem
-   desenha e quem mede o radar leem daqui, senão o disco é calculado num lugar
-   e pintado em outro — erro que já aconteceu nesta mesma tela. */
+/* a área que sobra para a PÁGINA, depois das teclas. Quem desenha e quem mede
+   o radar leem daqui, senão o disco é calculado num lugar e pintado em outro
+   — erro que já aconteceu nesta mesma tela. */
 function mfdAreaPagina(o){
   const b = mfdLarguraTeclas(o);
-  return b ? { x: o.x + b, y: o.y, w: o.w - b*2, h: o.h } : o;
+  return b ? { x: o.x + b, y: o.y, w: o.w - b, h: o.h } : o;
 }
-/* AS DUAS COLUNAS, E POR QUE SÃO DUAS
+/* UMA COLUNA SÓ, E O CALIBRAR FORA
 
-   "quando eu tenho que acionar os botões lá em cima, eu tenho que
-   praticamente soltar os controles."
+   Cheguei a pôr uma segunda coluna à direita, com visão e calibrar, depois de
+   ele dizer que os botões de cima obrigavam a soltar o controle. Testou e
+   preferiu como estava: "deixa como estava mesmo, lá fora o calibrar."
 
-   Essa é uma observação de ergonomia, não de gosto, e ela manda mais do que
-   qualquer arrumação bonita: deitado, o polegar mora nos CANTOS DE BAIXO. Um
-   botão na faixa de cima obriga a largar o aparelho — e largar o aparelho,
-   num jogo em que o aparelho É o manche, é entregar o avião.
-
-   O painel já está onde os polegares alcançam. Então as duas bordas dele
-   viram teclas: à ESQUERDA o que é de voar (trem, flape), à DIREITA o que é
-   de olhar (visão, calibrar). Cada polegar chega na sua sem soltar nada.
-
-   Em cima fica só a QUALIDADE, que se escolhe uma vez antes de decolar e
-   nunca mais. */
-function mfdListaTeclas(lado){
-  if (lado === 'esq') return [
+   Fica o registro do porquê da volta, que não é capricho: a segunda coluna
+   custava 84 px dos dois lados e espremia a página no meio — o disco do radar
+   e o desenho do sinóptico ficavam pequenos. Trem e flape são os dois que se
+   usam com o avião no ar; visão e calibrar se tocam entre uma coisa e outra,
+   e para esses a faixa de cima serve. */
+function mfdListaTeclas(){
+  return [
     { rot: 'TREM', val: trem ? 'FORA' : 'DENTRO', on: trem,
       fn: () => { mexeTrem(); tremeAqui(35); } },
     { rot: 'FLAPE', val: String(flap), on: flap > 0,
       fn: () => { mexeFlap(); tremeAqui([18, 40, 18]); } }
-  ];
-  return [
-    { rot: 'VISÃO', val: cockpit ? 'CABINE' : 'FORA', on: cockpit,
-      fn: () => { cockpit = !cockpit; esqueceRadar(); tremeAqui(25); } },
-    { rot: null, val: 'CALIBRAR', on: false,
-      fn: () => { Controle.calibrar();
-                  if (Cabeca.ligada) Cabeca.centraliza();
-                  mostraAviso('CALIBRADO', '#7fd8ff', 700); tremeAqui(25); } }
   ];
 }
 /* AS ZONAS DE TOQUE DE UMA PÁGINA
@@ -9292,8 +9277,7 @@ function mfdDesenhaTeclas(o, m){
   _mfdTeclasZona = null;
   if (!bw) return;
   _mfdTeclasZona = [];
-  mfdColunaTeclas(o.x, o, m, bw, mfdListaTeclas('esq'));
-  mfdColunaTeclas(o.x + o.w - bw, o, m, bw, mfdListaTeclas('dir'));
+  mfdColunaTeclas(o.x, o, m, bw, mfdListaTeclas());
 }
 function mfdColunaTeclas(x0col, o, m, bw, T){
   const y0 = m.corpoY, alt = m.corpoH/T.length;

@@ -6550,33 +6550,20 @@ caixa de toque nenhuma, porque lá o desenho é só informação.
 As teclas de borda **continuam**: o sinóptico é uma das sete páginas, e o trem
 não pode depender de qual página está aberta.
 
-### As duas bordas, e por que a faixa de cima esvaziou
+### A segunda coluna foi testada e voltou atrás
 
-> "quando eu tenho que acionar os botões lá em cima, eu tenho que
-> praticamente soltar os controles."
+Depois de ele dizer que os botões de cima obrigavam a soltar o controle, pus
+uma **segunda coluna** de teclas à direita do painel, com visão e calibrar.
+Ele testou e preferiu como estava: *"deixa como estava mesmo, lá fora o
+calibrar."*
 
-Essa é a observação que manda mais do que qualquer arrumação bonita, e eu
-tinha errado nela: deitado, o polegar mora nos **cantos de baixo**. Um botão
-na faixa de cima obriga a largar o aparelho — e largar o aparelho, num jogo
-em que o aparelho **é** o manche, é entregar o avião.
+Fica o registro do que a volta corrigiu, que não é capricho: duas colunas
+custavam a largura delas **dos dois lados** e espremiam a página no meio — o
+disco do radar e o desenho do sinóptico encolhiam junto. Trem e flape são os
+dois que se acionam com o avião no ar; visão e calibrar se tocam entre uma
+coisa e outra, e para esses a faixa de cima serve.
 
-O painel já está onde os polegares alcançam. Então as **duas** bordas dele
-viraram teclas:
-
-| borda | teclas | por quê |
-|---|---|---|
-| esquerda | TREM · FLAPE | o que é de **voar**, no polegar que já mora ali |
-| direita | VISÃO · CALIBRAR | o que é de **olhar**, no outro polegar |
-
-Em cima ficou só a **qualidade**, que se escolhe uma vez antes de decolar.
-
-A tecla de AÇÃO (calibrar) não tem estado a mostrar, então é só o nome, no
-meio e maior; a tecla de ESTADO tem rótulo em cima e valor embaixo. A forma
-diz se aquilo **liga** algo ou **faz** algo.
-
-E a letra encolhe até caber: "CABINE" e "CALIBRAR" têm oito caracteres e
-estouravam a tecla. Adivinhar o tamanho pela contagem de letras é o mesmo
-chute que já encostou as abas umas nas outras — mede-se com `measureText`.
-
-A regra do buraco continua valendo, agora para os quatro: painel recolhido,
-os quatro botões voltam para cima.
+O que **ficou** da tentativa: a letra da tecla agora é medida com
+`measureText` e encolhe até caber. "CABINE" e "CALIBRAR" estouravam a tecla, e
+adivinhar tamanho pela contagem de letras é o mesmo chute que já encostou as
+abas umas nas outras nesta mesma sessão.
