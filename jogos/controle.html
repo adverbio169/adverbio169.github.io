@@ -1873,8 +1873,16 @@ const Painel = {
     c.save();
     c.beginPath(); c.rect(r.x, r.y, r.w, r.h); c.clip();
     c.translate(r.x, r.y);
+    /* A JANELA DIZ ONDE ELA COMEÇA. O desenho roda com a origem transladada —
+       é o que deixa as oito páginas escreverem como se a tela começasse em
+       (0,0) — mas o que elas GUARDAM (o disco do radar, por exemplo) só serve
+       a quem está fora, e fora a origem é outra. Guardar em coordenada de
+       janela é o mesmo erro que já fez o radar ser calculado num lugar e
+       pintado noutro. */
+    this._offX = r.x; this._offY = r.y;
     this.cabecalhoPag(c, m, d, fmt);
     this.corpoPag(c, m, d, fmt);
+    this._offX = 0; this._offY = 0;
     c.restore();
   },
   corpoPag(c, m, d, fmt){
@@ -2252,7 +2260,7 @@ const Painel = {
     /* onde o disco ficou, para quem pergunta de fora (o teste do radar mede
        daqui; medir do centro da TELA dá errado, porque na arrumação larga o
        disco está à esquerda e a coluna de números à direita) */
-    this.disco = { cx, cy, r: R };
+    this.disco = { cx: cx + (this._offX || 0), cy: cy + (this._offY || 0), r: R };
 
     c.save();
     c.beginPath(); c.arc(cx, cy, R, 0, 7);
@@ -2351,7 +2359,7 @@ const Painel = {
     const R = disco/2;
     const cx = emColuna ? m.pad + R : m.W/2;
     const cy = m.corpoY + (emColuna ? m.corpoH*0.50 : R + m.corpoH*0.03);
-    this.disco = { cx, cy, r: R };
+    this.disco = { cx: cx + (this._offX || 0), cy: cy + (this._offY || 0), r: R };
     this.tatPontos = [];
 
     c.beginPath(); c.arc(cx, cy, R, 0, 7);

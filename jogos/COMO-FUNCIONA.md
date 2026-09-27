@@ -7305,3 +7305,41 @@ Três coisas foram acrescentadas, e nenhuma é um texto de ajuda:
   formato"*. Ela some na primeira troca de formato e não volta — depois disso
   a pessoa já sabe, e aviso que não some vira mobília. A faixa sai da
   geometria junto, então a janela recupera os 16 px.
+
+# Um leia-me, porque a conversa some
+
+Ele pediu: *"grava tudo no leia-me"*. O `COMO-FUNCIONA.md` tem sete mil linhas
+e é o diário do raciocínio — serve para entender **por que** cada coisa é como
+é, e não para consultar enquanto se joga. Então nasceu o
+[`LEIA-ME.md`](LEIA-ME.md): o que existe, como montar, como testar, os
+comandos, as missões, os números do envelope e o que está em aberto.
+
+## E ele já pagou por si na primeira hora
+
+Escrevendo a tabela dos números do envelope, escrevi *"alcance do radar:
+26 km"*. A constante se chama `RADAR_KM` e vale 26000 — mas 26000 são
+**unidades de mundo**, e o alcance real é **1 300 m**. Eu li o nome e acreditei
+nele.
+
+É o **quarto** erro de unidade deste projeto e o primeiro causado por um
+**nome**. Os outros três foram alturas escritas com números de avião de verdade
+num avião de teto 585 m. A regra que sai daqui: **unidade no nome ou unidade
+nenhuma** — meio-termo engana mais do que nada. A constante virou `RADAR_ALC`,
+com o valor em metros escrito ao lado, e o nome velho ficou como apelido para
+não quebrar as catorze referências.
+
+## E o teste que já estava vermelho antes
+
+Escrever o leia-me obrigou a rodar a suíte inteira, e `radarpac.js` reprovou —
+**sem relação com a mudança do momento**. Ele lia `Painel.disco`, a geometria
+do disco do radar que a página guarda, e sondava pixels naquelas coordenadas.
+
+Desde que cada janela do painel passou a ser desenhada com a origem
+transladada, `disco` estava sendo guardado em coordenada **de janela**. Nada em
+produção o lia, então não havia defeito vivo — havia uma geometria no espaço
+errado esperando o primeiro leitor. Agora ela sai somada ao deslocamento da
+janela, que é a única coordenada útil para quem está de fora.
+
+Vale reparar em como ele apareceu: não foi revisão, foi **rodar tudo por outro
+motivo**. Suíte que só roda quando se mexe na área da mudança não pega dívida
+de coordenada.

@@ -8474,7 +8474,13 @@ function fitaAltura(){
       adversário porque ele está a 30 km é justamente esconder a informação de
       que ele existe e de que lado ele vem.
    ========================================================================== */
-const RADAR_KM = 26000;                 // o mesmo alcance do buscador do míssil
+/* O ALCANCE DO RADAR, EM UNIDADES DE MUNDO. Chamava-se `RADAR_KM`, e o
+   sufixo mentia: 26000 unidades sao 1300 METROS, 1,3 km. Eu mesmo li o nome
+   e escrevi "26 km" num documento de referencia — o quarto erro de unidade
+   deste projeto, e o primeiro causado por um NOME. Unidade no nome ou
+   unidade nenhuma; meio-termo engana. */
+const RADAR_ALC = 26000;                // 1300 m — o mesmo alcance do buscador do míssil
+const RADAR_KM = RADAR_ALC;             // nome velho, mantido para não quebrar nada
 /* =============================================================================
    AS TELAS MULTIFUNÇÃO
 
