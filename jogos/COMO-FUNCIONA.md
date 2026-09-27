@@ -6943,3 +6943,132 @@ já **mostra** o checklist TREM / FLAPE / VEL; o passo natural, se o atrito
 aparecer voando, é fazer esses três itens responderem ao dedo — mesma ideia do
 desenho da asa, na página onde ela importa, sem voltar a ter botão em todo
 lugar.
+
+# A aproximação se carrega, não acontece
+
+> "Sobre a tela de aproximação eu não entendi. Do nada tem um algo no HUD, mas
+> não escolhi nada. Não dá de escolher o que fazer. Os computadores de voo têm
+> que ser realmente computadores, e servir realmente para algo."
+
+Os três pedaços da frase são o mesmo defeito visto de três lados.
+
+**A cruz aparecia "do nada"** porque o gatilho era geometria: chegue perto de
+uma cabeceira, baixo, e ela nasce na sua frente. Do ponto de vista de quem
+voa, um símbolo apareceu sem ninguém ter pedido — e o que aparece sem ser
+pedido não é informação, é interrupção. Pior: uma cruz que se liga sozinha não
+tem como ser desligada por quem não sabe de onde ela veio.
+
+**Não dava para escolher porque eu escolhia.** `nota = casa*2 − dist/8000`
+elegia a cabeceira mais alinhada e o jogador ficava sabendo depois. Isso não é
+um computador, é um palpite com display.
+
+**E ele quase não servia para nada**: mostrava desvio lateral e rampa, que a
+cruz no vidro já dizia melhor.
+
+## Carregar, e só então guiar
+
+A página tem duas caras, como a OBJET:
+
+- **sem nada carregado**, é a lista das quatro cabeceiras — duas pistas, dois
+  sentidos cada, nomeadas pela proa de pouso como em qualquer aeroporto
+  (`CENTRAL 36`, `CENTRAL 18`, `VALE 09`, `VALE 27`) — com distância, proa, e
+  um `»` na que eu sugeriria. A sugestão virou **sugestão**, marcada na lista,
+  em vez de decisão tomada nas costas de quem voa;
+- **carregada uma**, é a guia.
+
+A cruz do HUD só existe depois de carregada. Deixou de ser uma coisa que
+aparece e passou a ser uma coisa que você ligou — e que se desliga tocando no
+cabeçalho.
+
+## O que um computador sabe e você não
+
+Era a parte que faltava para a página valer a rolagem. Três números novos, e
+nenhum deles está em outro lugar do jogo nem se adivinha olhando pela janela:
+
+- **PROA** — o rumo que leva à cabeceira *daqui*, que não é o rumo da pista
+  enquanto você estiver fora do eixo. É o que se voa para interceptar, e fica
+  verde quando o nariz já está nele.
+- **DESC** — quantos metros por segundo você tem de descer para chegar na
+  rampa, na velocidade de agora. É a conta que o piloto faz de cabeça e erra.
+- **TEMPO** (no cabeçalho) — quanto falta até a cabeceira. É o número que
+  responde "dá tempo de configurar?".
+
+E a peneira do *"já passou dela"* saiu do cálculo: ela servia para **escolher**
+entre quatro, e agora não se escolhe mais nada. Passar da cabeceira é
+justamente a hora em que você precisa ver que passou — o cabeçalho escreve
+`PASSOU` em âmbar.
+
+## Duas distâncias, porque são duas perguntas
+
+`dist` é ao longo do eixo de pouso: é o que falta de final, e fica **negativa**
+quando a cabeceira ficou para trás. Num menu, porém, ninguém pergunta isso —
+pergunta-se "quão longe fica?", e a resposta é a linha reta. A lista mostrava
+`−3,1 km` para `CENTRAL 18`: a resposta certa para a pergunta errada.
+
+## Mais uma condição que não condicionava
+
+A cruz só aparecia com `A.alt < 900`. O teto do avião é 585 m — sempre
+verdadeira. É a **terceira** peneira morta encontrada nesta mesma semana
+(`porto` a 900 m, os gatilhos de sortida a 1 200 m, esta). O padrão é o mesmo:
+números de avião de verdade escritos num avião cujo envelope é outro. Aproveitei
+para subir o alcance da cruz de 3 para 6 km, porque agora ela é pedida: quem
+carregou quer ver a interceptação, não só a final.
+
+## Encolher, não cortar
+
+No celular a fonte é maior, e três textos transbordaram de uma vez:
+`CENTRAL 36` por cima de `20s`, `VEL` por cima de `2040/975`, e o `·VEL` do
+checklist saindo pela borda. Todos pelo mesmo motivo — o corpo da letra vinha
+do tamanho da tela e nunca do espaço que sobrava ao lado.
+
+A correção é um irmão do `corta`: **cortar serve para nome próprio; para um
+número não serve**, porque `20` cortado de `2040` é mentira, não abreviação.
+Então número que não cabe diminui de corpo. `fonteQueCabe` dos dois lados.
+
+## Um teste que media a sorte
+
+`radar.js` verifica que alvos vivos pintam pixels no disco e que alvos
+destruídos não pintam nenhum. Ele passava, mas o número variava: 21, 24, 44,
+45, 47 — e, numa rodada de suíte cheia, **zero**, o que reprova.
+
+Duas causas, as duas de harness:
+
+1. **O laço do jogo continuava rodando.** O teste chamava `comeca()` e não
+   freava o `requestAnimationFrame`. O avião voava durante a medição, então
+   quais alvos caíam dentro do alcance dependia de quanto tempo o navegador
+   tinha levado até ali. Teste que mede um mundo que anda mede o relógio.
+2. **O mapa nasce sorteado.** Mesmo parado, quais alvos ficam perto muda a
+   cada carregamento — e às vezes nenhum fica.
+
+Freado o laço, fixada a posição e plantados dois alvos em coordenadas
+escolhidas, a contagem passou a dar 67, 69, 67, 69. A diferença entre "varia
+entre 0 e 47" e "varia entre 67 e 69" é a diferença entre um teste e um
+palpite: os 2 px que sobram são antisserrilhado, e isso é ruído honesto.
+
+Vale registrar o que **não** fiz: noventa outros arquivos de teste também
+deixam o laço solto. Quase todos fixam a posição logo antes de medir, então o
+avião andar não os afeta. Sair corrigindo os noventa seria trabalho sem
+defeito para consertar.
+
+## A cota que se gastava com um caça que não nasceu
+
+O teste da sortida ficou instável depois destas mudanças, e a instabilidade
+tinha duas causas — uma do teste e **uma de verdade**.
+
+A do teste: o avião sem piloto plana até o chão, e ali `caindo` fica
+verdadeiro, `Sortida.passo` sai cedo e o relógio da sortida congela. Depois,
+com caças no ar, o avião do teste passou a ser **abatido** no meio da
+contagem, o que congelava o mesmo relógio. Segura-se a altura e a vida a cada
+passo: o que se mede é a máquina de fases, não quanto tempo se sobrevive.
+
+A de verdade: `Inimigos.nasce()` desiste calada quando `modeloInimigo` ainda
+não chegou — o modelo 3D carrega assíncrono — e a cota caía assim mesmo. Numa
+defesa aérea que esquentasse cedo, os quatro hostis podiam ser gastos sem
+nenhum aparecer no céu, e "abater 4 caças" ficava impossível com o céu vazio e
+nada na tela explicando. Agora conta-se a lista antes e depois: a cota só cai
+se o nascimento aconteceu, e se não aconteceu tenta-se de novo em um segundo.
+
+Vale reparar em como ele apareceu: o sintoma era `cota 3, nenhum no ar` numa
+rodada de teste — um estado que não podia existir. Contradição em números é a
+maneira mais barata de achar defeito, e é por isso que os testes imprimem o
+estado inteiro quando reprovam, em vez de só "falhou".

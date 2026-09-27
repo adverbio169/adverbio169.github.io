@@ -1330,6 +1330,18 @@ const MFD_CIANO = '#63d8ff', MFD_VERDE = '#3fe070', MFD_AMBAR = '#ffc046',
       MFD_VERM = '#ff6a58', MFD_CLARO = '#e2ecf8', MFD_ROT = '#8fa3b8',
       MFD_FRACO = '#6d8095', MFD_FIO = 'rgba(226,236,248,';
 
+/* ENCOLHE ATÉ CABER. Cortar serve para nome próprio; para um NÚMERO não
+   serve — "20" cortado de "2040" é uma mentira, não uma abreviação. Então
+   número que não cabe diminui de corpo, e só. Devolve a fonte usada. */
+function fonteQueCabe(c, txt, peso, corpo, familia, larg, min){
+  let f = corpo;
+  c.font = peso + ' ' + f.toFixed(1) + 'px ' + familia;
+  while (f > (min || 7) && c.measureText(txt).width > larg){
+    f -= 0.5; c.font = peso + ' ' + f.toFixed(1) + 'px ' + familia;
+  }
+  return f;
+}
+
 /* escreve um texto corrido quebrando nas palavras — o mesmo ajudante que
    existe do lado do jogo */
 function paragrafo(c, txt, x, y, larg, dy, maxLinhas){
@@ -1978,6 +1990,23 @@ const Painel = {
   },
   /* o dedo na página: hoje só a tática quer, e ela manda o índice para a TV */
   tocaPagina(px, py){
+    if (MFD_PAGS[this.carro] === 'APROX'){
+      if (this.apxZonas){
+        for (const z of this.apxZonas){
+          if (py < z.y || py > z.y + z.h) continue;
+          enviaCtl({ t: 'apx', i: z.i });
+          try { navigator.vibrate && navigator.vibrate(14); } catch(e){}
+          return true;
+        }
+        return false;
+      }
+      if (this.apxCab && py >= this.apxCab[0] && py <= this.apxCab[1]){
+        enviaCtl({ t: 'apx', i: null });
+        try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
+        return true;
+      }
+      return false;
+    }
     if (MFD_PAGS[this.carro] === 'OBJET'){
       if (this.sorZonas){
         for (const z of this.sorZonas){
@@ -2011,15 +2040,50 @@ const Painel = {
   /* A APROXIMAÇÃO no celular: a mesma cruz da TV, com os desvios que vieram
      prontos no pacote. O celular não tem as pistas nem a geometria — e não
      precisa: quem sabe onde está a cabeceira é quem desenha o mundo. */
+  /* A LISTA DE CABECEIRAS no celular: aqui, como na tela do jogo, a página
+     sem nada carregado tinha escrito "SEM PISTA" — um estado, não um
+     comando. A lista vem pronta no pacote (o celular não tem as pistas) e
+     ele devolve o ÍNDICE, como faz com o alvo e com a sortida. */
+  aproxLista(c, m, d){
+    const x = m.pad, w = m.W - m.pad*2, L = (d.apx && d.apx.lista) || [];
+    c.textBaseline = 'middle'; c.textAlign = 'left';
+    c.font = '800 ' + Math.max(9, m.cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
+    const lgNome = c.measureText('APROX').width;
+    c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    c.fillStyle = MFD_AMBAR;
+    c.fillText('CARREGAR', m.pad + lgNome + m.f*1.3, m.cab*0.60);
+    /* as duas zonas são exclusivas, e as duas ficam guardadas de um quadro
+       para o outro: zerar a outra aqui é o que impede o dedo de acertar um
+       cabeçalho que já não está na tela */
+    this.apxZonas = []; this.apxCab = null;
+    for (let i = 0; i < L.length; i++){
+      const y = m.corpoY + m.corpoH*(0.12 + i*0.155), alt = m.corpoH*0.145;
+      this.apxZonas.push({ i, y: y - alt/2, h: alt });
+      if (L[i][3]){
+        c.fillStyle = 'rgba(99,216,255,.11)';
+        c.fillRect(m.pad*0.4, y - alt/2, m.W - m.pad*0.8, alt);
+      }
+      c.font = '800 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+      c.textAlign = 'left'; c.fillStyle = L[i][3] ? MFD_CIANO : MFD_ROT;
+      c.fillText((L[i][3] ? '» ' : '  ') + L[i][0], x, y);
+      c.font = '700 ' + (m.f*0.86).toFixed(1) + 'px ui-monospace, monospace';
+      c.textAlign = 'right'; c.fillStyle = MFD_CLARO;
+      c.fillText(L[i][1] > 1500 ? (Math.round(L[i][1]/100)/10 + 'km') : (L[i][1] + 'm'), x + w, y);
+      c.textAlign = 'center'; c.fillStyle = MFD_FRACO;
+      c.fillText(String(L[i][2]).padStart(3, '0'), x + w*0.70, y);
+    }
+    c.font = '800 ' + (m.f*0.72).toFixed(1) + 'px system-ui, sans-serif';
+    c.textAlign = 'center'; c.fillStyle = MFD_ROT;
+    const rod = 'TOQUE PARA CARREGAR · » É A SUGERIDA';
+    c.fillText(c.measureText(rod).width <= w ? rod : 'TOQUE PARA CARREGAR',
+               m.W/2, m.corpoY + m.corpoH*0.95);
+    c.textAlign = 'left';
+  },
   aprox(c, m, d){
     const A = d.apx;
     c.textBaseline = 'middle';
-    if (!A){
-      c.textAlign = 'center'; c.fillStyle = MFD_FRACO;
-      c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
-      c.fillText('SEM PISTA', m.W/2, m.corpoY + m.corpoH*0.5);
-      c.textAlign = 'left'; return;
-    }
+    if (!A || A.lista) return this.aproxLista(c, m, d);
+    this.apxZonas = null;
     const larg = m.W - m.pad*2, emColuna = larg >= 300;
     const lado = emColuna ? Math.min(m.corpoH*0.9, larg*0.44)
                           : Math.min(m.corpoH*0.66, larg*0.8);
@@ -2051,29 +2115,52 @@ const Painel = {
     c.textAlign = 'left';
     c.font = '800 ' + fv.toFixed(1) + 'px system-ui, sans-serif';
     this.aceso(c, MFD_CIANO, fv*0.4); c.fillStyle = MFD_CIANO;
-    c.fillText(A.n + ' ' + String(A.r).padStart(3, '0'),
-               x0, m.corpoY + (emColuna ? m.corpoH*0.14 : m.corpoH*0.74));
+    const yCab = m.corpoY + (emColuna ? m.corpoH*0.12 : m.corpoH*0.74);
+    const tTxt = A.passou ? 'PASSOU' : (A.seg === null ? '--' : A.seg + 's');
+    c.font = '700 ' + (fr*0.92).toFixed(1) + 'px ui-monospace, monospace';
+    const larT = c.measureText(tTxt).width;
+    c.fillStyle = A.passou ? MFD_AMBAR : MFD_CIANO;
+    fonteQueCabe(c, A.n, '800', fv, 'system-ui, sans-serif', x1 - x0 - larT - fr*0.9, 9);
+    c.fillText(A.n, x0, yCab);
     this.apaga(c);
+    c.font = '700 ' + (fr*0.92).toFixed(1) + 'px ui-monospace, monospace';
+    c.textAlign = 'right'; c.fillStyle = MFD_FRACO;
+    c.fillText(tTxt, x1, yCab);
+    /* tocar no cabeçalho descarrega, como na tela do jogo */
+    this.apxCab = [yCab - m.corpoH*0.09, yCab + m.corpoH*0.09];
     if (emColuna){
       const linha = (i, rot, val, cor) => {
-        const y = m.corpoY + m.corpoH*(0.38 + i*0.22);
+        const y = m.corpoY + m.corpoH*(0.28 + i*0.14);
         c.font = '700 ' + fr.toFixed(1) + 'px ui-monospace, monospace';
         c.textAlign = 'left'; c.fillStyle = MFD_ROT; c.fillText(rot, x0, y);
-        c.font = '800 ' + fv.toFixed(1) + 'px ui-monospace, monospace';
+        const larRot = c.measureText(rot).width;
+        /* "VEL" e "2040/975" estavam escritos um por cima do outro: o corpo
+           do valor vinha do tamanho da tela e nunca do espaço que sobrava
+           depois do rótulo */
+        fonteQueCabe(c, val, '800', fv, 'ui-monospace, monospace',
+                     x1 - x0 - larRot - fr*0.8, 8);
         c.textAlign = 'right'; c.fillStyle = cor || MFD_CLARO; c.fillText(val, x1, y);
       };
-      linha(0, 'DIST', A.d > 1500 ? (Math.round(A.d/100)/10 + 'km') : (A.d + 'm'));
-      linha(1, 'RAMPA', (A.v > 0 ? '+' : '') + A.v + 'm', A.rampa ? MFD_VERDE : MFD_CLARO);
-      linha(2, 'VEL', A.vel + '/' + A.va, A.ok[2] ? MFD_VERDE : MFD_AMBAR);
+      linha(0, 'DIST', Math.abs(A.d) > 1500 ? (Math.round(A.d/100)/10 + 'km') : (A.d + 'm'));
+      linha(1, 'PROA', String(A.proa).padStart(3, '0'));
+      linha(2, 'RAMPA', (A.v > 0 ? '+' : '') + A.v + 'm', A.rampa ? MFD_VERDE : MFD_CLARO);
+      linha(3, 'DESC', A.desc === null ? '--'
+            : (A.desc > 0 ? '↓' : '↑') + Math.abs(A.desc).toFixed(1),
+            A.desc === null ? MFD_FRACO : Math.abs(A.desc) > 9 ? MFD_AMBAR : MFD_CLARO);
+      linha(4, 'VEL', A.vel + '/' + A.va, A.ok[2] ? MFD_VERDE : MFD_AMBAR);
     }
-    const y = m.corpoY + m.corpoH*0.95;
-    c.font = '800 ' + (fr*0.98).toFixed(1) + 'px ui-monospace, monospace';
+    const y = m.corpoY + m.corpoH*0.97;
+    /* os três juntos, medidos como um texto só: o último item saía pela
+       borda da tela porque cada um era medido sozinho */
+    const itens = ['TREM', 'FLAPE', 'VEL'].map((t, i) => (A.ok[i] ? '✓' : '·') + t);
+    const fc = fonteQueCabe(c, itens.join('  '), '800', fr*0.98,
+                            'ui-monospace, monospace', x1 - x0, 7);
     c.textAlign = 'left';
     let px = x0;
-    ['TREM', 'FLAPE', 'VEL'].forEach((t, i) => {
+    itens.forEach((t, i) => {
       c.fillStyle = A.ok[i] ? MFD_VERDE : MFD_FRACO;
-      c.fillText((A.ok[i] ? '✓' : '·') + t, px, y);
-      px += c.measureText((A.ok[i] ? '✓' : '·') + t).width + fr*0.7;
+      c.fillText(t, px, y);
+      px += c.measureText(t).width + fc*0.7;
     });
     c.textAlign = 'left';
   },

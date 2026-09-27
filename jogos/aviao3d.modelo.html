@@ -9202,6 +9202,18 @@ function mfdParagrafo(txt, x, y, larg, dy, maxLinhas){
   return n;
 }
 
+/* ENCOLHE ATÉ CABER. Cortar serve para nome próprio; para um NÚMERO não
+   serve — "20" cortado de "2040" é mentira, não abreviação. Então número que
+   não cabe diminui de corpo. Devolve a fonte usada. */
+function mfdFonteQueCabe(txt, peso, corpo, familia, larg, min){
+  let f = corpo;
+  h2.font = peso + ' ' + f.toFixed(1) + 'px ' + familia;
+  while (f > (min || 7) && h2.measureText(txt).width > larg){
+    f -= 0.5; h2.font = peso + ' ' + f.toFixed(1) + 'px ' + familia;
+  }
+  return f;
+}
+
 /* corta um texto na largura que ele TEM, não no número de letras que alguém
    achou que caberia. Supõe a fonte já escolhida no contexto. */
 function mfdCorta(txt, larg){
@@ -9584,14 +9596,93 @@ function mfdTocaTeclas(px, py){
    são a cruz que todo avião de verdade mostra, e cada agulha responde por uma
    pergunta só. */
 const RAMPA = 3*Math.PI/180;
-function aproxDados(){
-  let melhor = null;
-  for (const p of PISTAS){
+/* =============================================================================
+   A APROXIMAÇÃO SE CARREGA, NÃO ACONTECE
+
+   "Sobre a tela de aproximação eu não entendi. Do nada tem um algo no HUD,
+    mas não escolhi nada. Não dá de escolher o que fazer. Os computadores de
+    voo têm que ser realmente computadores, e servir realmente para algo."
+
+   Os três pedaços da frase são o mesmo defeito visto de três lados.
+
+   A cruz aparecia "do nada" porque o gatilho era a geometria: chegue perto de
+   uma cabeceira, baixo, e ela nasce na sua frente. Do ponto de vista de quem
+   voa, um símbolo apareceu sem ninguém ter pedido — e o que aparece sem ser
+   pedido não é informação, é interrupção.
+
+   Não dava para escolher porque EU escolhia: `nota = casa*2 − dist/8000`
+   elegia a cabeceira mais alinhada, e o jogador ficava sabendo depois. Isso
+   não é um computador, é um palpite com display. Um computador de voo é onde
+   se CARREGA a aproximação: você diz para onde vai, e ele responde com o que
+   sabe calcular e você não.
+
+   Então a página tem duas caras, como a OBJET:
+
+     · sem nada carregado, é a LISTA das quatro cabeceiras — duas pistas,
+       dois sentidos cada — com distância, proa e qual delas está pela frente;
+     · carregada uma, é a guia: cruz, rampa, proa a seguir, razão de descida
+       necessária, tempo até a cabeceira e o checklist.
+
+   E a cruz do HUD só existe depois de carregada. Ela deixa de ser uma coisa
+   que aparece e passa a ser uma coisa que você ligou.
+   ========================================================================== */
+let aproxSel = null;            // { i, s } — pista e sentido escolhidos
+
+/* o número da cabeceira é a proa de pouso dividida por dez, como em qualquer
+   aeroporto: proa 090 é a cabeceira 09, proa 360 é a 36 */
+function aproxNumero(rumo){
+  let n = Math.round(rumo/10) % 36; if (n === 0) n = 36;
+  return (n < 10 ? '0' : '') + n;
+}
+/* as quatro cabeceiras, sempre na mesma ordem, medidas de onde eu estou */
+function aproxCabeceiras(){
+  const L = [];
+  for (let i = 0; i < PISTAS.length; i++){
+    const p = PISTAS[i];
     const dx = aviaoX - p.cx, dz = aviaoZ - p.cz;
     const c = Math.cos(p.rumo), sn = Math.sin(p.rumo);
     const aoLongo = dx*sn + dz*c, deTraves = dx*c - dz*sn;
-    /* das duas pontas, a que se pousa indo para onde eu já estou indo */
     for (const s of [1, -1]){
+      const dir = { x: Math.sin(p.rumo)*s, z: Math.cos(p.rumo)*s };
+      const rumoPouso = ((p.rumo*180/Math.PI + (s > 0 ? 0 : 180)) % 360 + 360) % 360;
+      /* DUAS distâncias, e elas respondem a perguntas diferentes.
+         `dist` é ao longo do eixo de pouso: é o que falta de final, e fica
+         NEGATIVA quando a cabeceira ficou para trás — é assim que ela diz
+         "você passou". Num menu, porém, ninguém pergunta isso: pergunta-se
+         "quão longe fica?", e a resposta é a linha reta. Mostrar −3,1 km
+         numa lista de destinos é dar a resposta certa para a pergunta
+         errada. */
+      const cabX = p.cx - Math.sin(p.rumo)*s*p.meiaC;
+      const cabZ = p.cz - Math.cos(p.rumo)*s*p.meiaC;
+      L.push({ i, s, p, nome: p.nome, rumo: rumoPouso, cab: aproxNumero(rumoPouso),
+               dist: (-s*aoLongo - p.meiaC)/METRO,
+               reta: Math.hypot(aviaoX - cabX, aviaoZ - cabZ)/METRO,
+               lat: deTraves*s/METRO,
+               casa: dir.x*eixoF.x + dir.z*eixoF.z });
+    }
+  }
+  return L;
+}
+/* a que EU sugeriria — que agora é sugestão, marcada na lista, e não decisão
+   tomada nas costas de quem voa */
+function aproxSugerida(){
+  let melhor = null;
+  for (const q of aproxCabeceiras()){
+    if (q.dist < -q.p.meiaC*1.2/METRO) continue;
+    const nota = q.casa*2 - q.dist*METRO/8000;
+    if (!melhor || nota > melhor.nota) melhor = { q, nota };
+  }
+  return melhor ? melhor.q : null;
+}
+
+function aproxDados(){
+  if (!aproxSel) return null;          // nada carregado, nada na tela
+  let melhor = null;
+  for (const p of [PISTAS[aproxSel.i]]){
+    const dx = aviaoX - p.cx, dz = aviaoZ - p.cz;
+    const c = Math.cos(p.rumo), sn = Math.sin(p.rumo);
+    const aoLongo = dx*sn + dz*c, deTraves = dx*c - dz*sn;
+    for (const s of [aproxSel.s]){
       const dir = { x: Math.sin(p.rumo)*s, z: Math.cos(p.rumo)*s };
       const casa = dir.x*eixoF.x + dir.z*eixoF.z;          // -1 a 1
       /* A DISTÂNCIA ATÉ A CABECEIRA, e o erro que eu tinha feito aqui.
@@ -9606,7 +9697,10 @@ function aproxDados(){
          nariz virado para longe da pista de casa, o computador mandava para
          um aeroporto a noventa quilômetros em vez de mandar dar meia-volta. */
       const dist = -s*aoLongo - p.meiaC;                   // até a cabeceira
-      if (dist < -p.meiaC*1.2) continue;                   // já passou dela
+      /* a peneira do "já passou dela" saiu daqui: ela servia para ESCOLHER
+         entre quatro, e agora não se escolhe mais nada — quem escolheu foi o
+         piloto, e passar da cabeceira é justamente a hora em que ele precisa
+         ver que passou, para dar a volta. */
       const nota = casa*2 - dist/8000;
       if (!melhor || nota > melhor.nota)
         melhor = { p, s, dist, lat: deTraves*s, nota,
@@ -9623,21 +9717,78 @@ function aproxDados(){
   const lat = melhor.lat/METRO;
   const ideal = Math.max(0, dist)*Math.tan(RAMPA);
   const vAlvo = velMin()*1.25;
+  /* O QUE UM COMPUTADOR SABE E EU NÃO.
+     · PROA: o rumo que leva à cabeceira DAQUI, que não é o rumo da pista
+       enquanto eu estiver fora do eixo — é ele que se voa para interceptar.
+     · DESC: quantos metros por segundo tenho de descer para chegar na rampa,
+       na velocidade de agora. É a conta que o piloto faria de cabeça e erra.
+     · TEMPO: quanto falta, na velocidade de agora.
+     Nenhum dos três está em outro lugar do jogo, e nenhum se adivinha
+     olhando pela janela. É por isto que a página existe. */
+  const pAlvo = { x: melhor.p.cx - Math.sin(melhor.p.rumo)*melhor.s*melhor.p.meiaC,
+                  z: melhor.p.cz - Math.cos(melhor.p.rumo)*melhor.s*melhor.p.meiaC };
+  const proa = ((Math.atan2(pAlvo.x - aviaoX, pAlvo.z - aviaoZ)*180/Math.PI) % 360 + 360) % 360;
+  const vms = voo/METRO;                                  // metros por segundo
+  const seg = (dist > 0 && vms > 1) ? dist/vms : null;
+  const desc = (seg && seg > 2) ? (alt - ideal)/seg : null;
   return { nome: melhor.p.nome, rumo: melhor.rumoPouso,
+           cab: aproxNumero(melhor.rumoPouso), proa, seg, desc,
            dist, lat, alt, vert: alt - ideal, ideal, vAlvo,
+           passou: dist < -melhor.p.meiaC*1.2/METRO,
            ok: { trem: trem, flap: flap > 0, vel: voo < vAlvo*1.18 && voo > velMin() },
            noEixo: Math.abs(lat) < 45, naRampa: Math.abs(alt - ideal) < 18 };
 }
+/* a lista das quatro cabeceiras: a cara da página antes de carregar nada.
+   Antes aqui estava escrito "SEM PISTA", que é um estado, não um comando —
+   dizia o que faltava e não deixava fazer nada a respeito. */
+function mfdAproxLista(o, m){
+  const x = o.x + m.pad, w = o.w - m.pad*2;
+  const L = aproxCabeceiras(), sug = aproxSugerida();
+  h2.textBaseline = 'middle'; h2.textAlign = 'left';
+  h2.font = '800 ' + Math.max(7, m.cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
+  const lgNome = h2.measureText('APROX').width;
+  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = MFD_AMBAR;
+  h2.fillText('CARREGAR', o.x + m.pad + lgNome + m.f*1.3, o.y + m.cab*0.62);
+
+  for (let i = 0; i < L.length; i++){
+    const q = L[i], eSug = sug && sug.i === q.i && sug.s === q.s;
+    const y = m.corpoY + m.corpoH*(0.12 + i*0.155), alt = m.corpoH*0.145;
+    mfdZona(o.x, y - alt/2, o.w, alt, () => {
+      aproxSel = { i: q.i, s: q.s };
+      mostraAviso('APROXIMAÇÃO ' + q.nome + ' ' + q.cab + ' CARREGADA', '#7fd8ff', 2200);
+      bip(720, 0.08, 'square', 0.05);
+    });
+    if (eSug){
+      h2.fillStyle = 'rgba(99,216,255,.11)';
+      h2.fillRect(o.x + m.pad*0.4, y - alt/2, o.w - m.pad*0.8, alt);
+    }
+    h2.font = '800 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'left'; h2.fillStyle = eSug ? MFD_CIANO : MFD_ROT;
+    h2.fillText((eSug ? '» ' : '  ') + q.nome + ' ' + q.cab, x, y);
+    /* a distância à direita, e a proa entre elas: é por estes dois números
+       que se escolhe uma cabeceira, e sem eles a lista seria um menu cego */
+    h2.font = '700 ' + (m.f*0.86).toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'right'; h2.fillStyle = q.dist < 0 ? MFD_FRACO : MFD_CLARO;
+    const dtxt = q.reta > 1500 ? (Math.round(q.reta/100)/10 + 'km')
+                               : (Math.round(q.reta) + 'm');
+    h2.fillText(dtxt, x + w, y);
+    h2.textAlign = 'center'; h2.fillStyle = MFD_FRACO;
+    h2.fillText(String(Math.round(q.rumo)).padStart(3, '0'), x + w*0.70, y);
+  }
+  h2.font = '800 ' + (m.f*0.72).toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'center'; h2.fillStyle = MFD_ROT;
+  const rod = 'TOQUE PARA CARREGAR · » É A SUGERIDA';
+  h2.fillText(h2.measureText(rod).width <= w ? rod : 'TOQUE PARA CARREGAR',
+              x + w/2, m.corpoY + m.corpoH*0.95);
+  h2.textAlign = 'left';
+}
+
 function mfdPaginaAprox(o, m){
   const A = aproxDados();
   const larg = o.w - m.pad*2;
   h2.textBaseline = 'middle';
-  if (!A){
-    h2.textAlign = 'center'; h2.fillStyle = MFD_FRACO;
-    h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
-    h2.fillText('SEM PISTA', o.x + o.w/2, m.corpoY + m.corpoH*0.5);
-    h2.textAlign = 'left'; return;
-  }
+  if (!A) return mfdAproxLista(o, m);
   /* A CRUZ, à esquerda: a agulha vertical é o eixo, a horizontal é a rampa.
      Cada uma mostra PARA ONDE IR, não onde você está — agulha à direita quer
      dizer "vá para a direita", que é como se lê num avião. */
@@ -9667,35 +9818,70 @@ function mfdPaginaAprox(o, m){
   // a coluna: número, e a lista que fica verde sozinha
   const x0 = cx + r + larg*0.06, x1 = o.x + o.w - m.pad;
   const fr = Math.min(m.f*0.92, (x1 - x0)*0.155), fv = Math.min(m.fv*0.95, (x1 - x0)*0.20);
+  /* o tempo até a cabeceira mora no cabeçalho: é o número que responde "dá
+     tempo de configurar?", e ele não cabia numa linha própria. Mede-se ele
+     primeiro, e o nome fica com o que sobrar. */
+  const tTxt = A.passou ? 'PASSOU' : A.seg ? Math.round(A.seg) + 's' : '--';
+  h2.font = '700 ' + (fr*0.92).toFixed(1) + 'px ui-monospace, monospace';
+  const larT = h2.measureText(tTxt).width;
   h2.textAlign = 'left';
-  h2.font = '800 ' + fv.toFixed(1) + 'px system-ui, sans-serif';
-  mfdAceso(h2, MFD_CIANO, fv*0.4); h2.fillStyle = MFD_CIANO;
-  h2.fillText(A.nome + ' ' + String(Math.round(A.rumo)).padStart(3, '0'),
-              x0, m.corpoY + m.corpoH*0.14);
+  mfdAceso(h2, MFD_CIANO, fv*0.4); h2.fillStyle = A.passou ? MFD_AMBAR : MFD_CIANO;
+  mfdFonteQueCabe(A.nome + ' ' + A.cab, '800', fv, 'system-ui, sans-serif',
+                  x1 - x0 - larT - fr*0.9, 8);
+  h2.fillText(A.nome + ' ' + A.cab, x0, m.corpoY + m.corpoH*0.12);
   mfdApaga(h2);
+  h2.font = '700 ' + (fr*0.92).toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'right'; h2.fillStyle = MFD_FRACO;
+  h2.fillText(tTxt, x1, m.corpoY + m.corpoH*0.12);
+  /* tocar no cabeçalho descarrega: é onde está escrito o que foi carregado,
+     e é onde a mão procura para trocar */
+  mfdZona(x0 - m.pad*0.5, m.corpoY, o.x + o.w - x0 + m.pad*0.5, m.corpoH*0.20,
+          () => { aproxSel = null; bip(380, 0.07, 'square', 0.04); });
+  /* CINCO linhas onde havia três: com 0,155 de passo a quinta caía em cima do
+     checklist — dava para ler "VEL" duas vezes, uma por cima da outra. O
+     passo é o vão dividido pelas linhas que existem, não um número herdado de
+     quando elas eram menos. */
   const linha = (i, rot, val, cor) => {
-    const y = m.corpoY + m.corpoH*(0.36 + i*0.21);
+    const y = m.corpoY + m.corpoH*(0.28 + i*0.14);
     h2.font = '700 ' + fr.toFixed(1) + 'px ui-monospace, monospace';
     h2.textAlign = 'left'; h2.fillStyle = MFD_ROT; h2.fillText(rot, x0, y);
-    h2.font = '800 ' + fv.toFixed(1) + 'px ui-monospace, monospace';
+    const larRot = h2.measureText(rot).width;
+    mfdFonteQueCabe(val, '800', fv, 'ui-monospace, monospace',
+                    x1 - x0 - larRot - fr*0.8, 8);
     h2.textAlign = 'right'; h2.fillStyle = cor || MFD_CLARO; h2.fillText(val, x1, y);
   };
   const dm = A.dist;
-  linha(0, 'DIST', dm > 1500 ? (Math.round(dm/100)/10 + 'km') : (Math.round(dm) + 'm'));
-  linha(1, 'RAMPA', (A.vert > 0 ? '+' : '') + Math.round(A.vert) + 'm',
+  linha(0, 'DIST', Math.abs(dm) > 1500 ? (Math.round(dm/100)/10 + 'km')
+                                       : (Math.round(dm) + 'm'));
+  /* PROA é a que leva à cabeceira DAQUI, e fica verde quando o nariz já está
+     nela: é a diferença entre "para onde a pista aponta" e "para onde eu
+     tenho de virar agora", que é o que se quer saber fora do eixo */
+  const dProa = Math.abs(((A.proa - rumo*180/Math.PI) % 360 + 540) % 360 - 180);
+  linha(1, 'PROA', String(Math.round(A.proa)).padStart(3, '0'),
+        dProa < 5 ? MFD_VERDE : dProa > 45 ? MFD_AMBAR : MFD_CLARO);
+  linha(2, 'RAMPA', (A.vert > 0 ? '+' : '') + Math.round(A.vert) + 'm',
         A.naRampa ? MFD_VERDE : Math.abs(A.vert) > 70 ? MFD_AMBAR : MFD_CLARO);
-  linha(2, 'VEL', Math.round(voo) + '/' + Math.round(A.vAlvo),
+  /* DESC: quantos metros por segundo tenho de descer para chegar na rampa na
+     velocidade de agora. É a conta que se faz de cabeça e se erra. */
+  linha(3, 'DESC', A.desc === null ? '--'
+        : (A.desc > 0 ? '↓' : '↑') + Math.abs(A.desc).toFixed(1),
+        A.desc === null ? MFD_FRACO : Math.abs(A.desc) > 9 ? MFD_AMBAR : MFD_CLARO);
+  linha(4, 'VEL', Math.round(voo) + '/' + Math.round(A.vAlvo),
         A.ok.vel ? MFD_VERDE : MFD_AMBAR);
   // o checklist, numa linha só
-  const y = m.corpoY + m.corpoH*0.94;
+  const y = m.corpoY + m.corpoH*0.97;
   h2.font = '800 ' + (fr*0.98).toFixed(1) + 'px ui-monospace, monospace';
   h2.textAlign = 'left';
+  const itens = [['TREM', A.ok.trem], ['FLAPE', A.ok.flap], ['VEL', A.ok.vel]]
+                  .map(([t, bom]) => (bom ? '✓' : '·') + t);
+  const fc = mfdFonteQueCabe(itens.join('  '), '800', fr*0.98,
+                             'ui-monospace, monospace', x1 - x0, 7);
   let px = x0;
-  for (const [txt, bom] of [['TREM', A.ok.trem], ['FLAPE', A.ok.flap], ['VEL', A.ok.vel]]){
-    h2.fillStyle = bom ? MFD_VERDE : MFD_FRACO;
-    h2.fillText((bom ? '✓' : '·') + txt, px, y);
-    px += h2.measureText((bom ? '✓' : '·') + txt).width + fr*0.7;
-  }
+  itens.forEach((t, i) => {
+    h2.fillStyle = [A.ok.trem, A.ok.flap, A.ok.vel][i] ? MFD_VERDE : MFD_FRACO;
+    h2.fillText(t, px, y);
+    px += h2.measureText(t).width + fc*0.7;
+  });
   h2.textAlign = 'left';
 }
 
@@ -10224,10 +10410,12 @@ function desenhaHUD(){
      onde os olhos estão quando se pousa. Ninguém pousa olhando para o
      painel: o painel diz os números, o vidro diz para onde ir.
 
-     Ela aparece SOZINHA quando se está em aproximação (perto da cabeceira,
-     baixo). Não há botão para ligar, porque um piloto em aproximação não tem
-     mão sobrando — e porque uma cruz aparecendo alto no meio do mapa seria
-     lixo na tela.
+     Ela aparece porque VOCÊ CARREGOU uma aproximação na página APROX, e
+     some quando você a descarrega. Antes nascia sozinha — bastava passar
+     perto de uma cabeceira, baixo — e o relato foi exatamente esse: "do nada
+     tem um algo no HUD, mas não escolhi nada". O que aparece sem ser pedido
+     não é informação, é interrupção; e uma cruz que se liga sozinha não tem
+     como ser desligada por quem não sabe de onde ela veio.
 
      E fica FORA do bloco da cabine. Eu a tinha escrito lá dentro, e ela
      simplesmente não existia para quem voa em terceira pessoa — que é como
@@ -10235,7 +10423,11 @@ function desenhaHUD(){
      condições satisfeitas, e foi assim que apareceu. */
   if (jogando && !caindo && !noChao){
     const A = aproxDados();
-    if (A && A.dist > 60 && A.dist < 3000 && A.alt < 900){
+    /* `A.alt < 900` saiu: o teto do avião é 585 m, então essa condição era
+       sempre verdadeira — mais uma peneira que não peneirava nada. E o
+       alcance subiu de 3 para 6 km, porque agora a cruz é pedida: quem
+       carregou a aproximação quer ver a interceptação, não só a final. */
+    if (A && A.dist > 60 && A.dist < 6000){
       presoNoAviao();
       const r = Math.min(W, H)*0.155, cx2 = W/2, cy2 = H*0.53;
       const ex = Math.max(-1, Math.min(1, -A.lat/120));
@@ -11536,6 +11728,7 @@ function reinicia(){
      acabou. Nascer de novo com o alvo velho travado é o computador de bordo
      lembrando de uma vida que não é mais esta. */
   alvoDes = null;
+  aproxSel = null;            // a aproximação carregada era daquele voo
   _tiroAnt = null;
   if (typeof Inimigos !== 'undefined') Inimigos.limpa();
   /* a sortida volta para SOLO: quem morreu no meio do combate não renasce no
@@ -12284,6 +12477,11 @@ const Tripulacao = {
       case 'sor': { const q = SORTIDAS[d.i];
                     if (q && (Sortida.fase === 'solo' || Sortida.fase === 'transito'))
                       escolheSortida(q.id); break; }
+      /* carregar e descarregar a aproximação pelo celular: índice na lista
+         que ele recebeu, ou nulo para descarregar */
+      case 'apx': aproxSel = (d.i === null || d.i === undefined) ? null
+                             : { i: d.i >> 1, s: (d.i & 1) ? -1 : 1 };
+                  break;
       case 'visao': cockpit = !cockpit; esqueceRadar(); break;
       case 'chama': if (m.papel === 'piloto') largaContramedida(); break;
       /* o Zerar do celular zera a mão LÁ e a cabeça AQUI: são dois "retos"
@@ -12496,10 +12694,20 @@ function mandaEstado(){
 function aproxParaOCelular(){
   if (!jogando) return null;
   const A = aproxDados();
-  if (!A) return null;
-  return { n: A.nome, r: Math.round(A.rumo), d: Math.round(A.dist),
+  /* sem nada carregado o celular recebe a LISTA, e não um vazio: lá, como
+     aqui, a página tem de deixar fazer alguma coisa */
+  if (!A){
+    const sug = aproxSugerida();
+    return { lista: aproxCabeceiras().map(q => [q.nome + ' ' + q.cab,
+                      Math.round(q.reta), Math.round(q.rumo),
+                      (sug && sug.i === q.i && sug.s === q.s) ? 1 : 0]) };
+  }
+  return { n: A.nome + ' ' + A.cab, r: Math.round(A.rumo), d: Math.round(A.dist),
            lat: Math.round(A.lat), v: Math.round(A.vert),
            vel: Math.round(voo), va: Math.round(A.vAlvo),
+           proa: Math.round(A.proa), seg: A.seg === null ? null : Math.round(A.seg),
+           desc: A.desc === null ? null : Math.round(A.desc*10)/10,
+           passou: A.passou ? 1 : 0,
            ok: [A.ok.trem ? 1 : 0, A.ok.flap ? 1 : 0, A.ok.vel ? 1 : 0],
            eixo: A.noEixo ? 1 : 0, rampa: A.naRampa ? 1 : 0 };
 }
@@ -12752,8 +12960,21 @@ const Inimigos = {
     if (this.ligados && teto > 0 && this.cota > 0){
       this._nascer -= dt;
       if (this._nascer <= 0 && this.lista.length < Math.min(teto, CACA_MAX)){
-        this.nasce(); this.cota--;
-        this._nascer = 10 + Math.random()*12;
+        /* A COTA SÓ CAI SE ALGUÉM NASCEU DE VERDADE.
+           `nasce()` desiste calada quando `modeloInimigo` ainda não chegou —
+           o modelo 3D carrega assíncrono — e a cota caía assim mesmo. Numa
+           defesa aérea que esquentasse cedo, os quatro hostis podiam ser
+           gastos sem nenhum aparecer no céu, e "abater 4 caças" ficava
+           impossível sem nada na tela explicando. Conta-se a lista antes e
+           depois: é o único jeito de saber se o nascimento aconteceu. */
+        const antes = this.lista.length;
+        this.nasce();
+        if (this.lista.length > antes){
+          this.cota--;
+          this._nascer = 10 + Math.random()*12;
+        } else {
+          this._nascer = 1;        // o modelo ainda vem: tenta de novo já
+        }
       }
     }
     for (let i = this.lista.length - 1; i >= 0; i--){
