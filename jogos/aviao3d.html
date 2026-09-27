@@ -4,7 +4,32 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0b1020">
-<title>Avião 3D &middot; Comissão</title>
+<title>Avião 3D &middot; Lotus Gamers</title>
+<meta name="description" content="Um caça no navegador. O celular é o manche: incline para voar, designe o alvo no radar e o HUD te leva até ele.">
+<!-- A CAPA DE COMPARTILHAMENTO. Sem isto, um link colado no WhatsApp vira uma
+     linha de texto cinza; com isto, vira um cartão com a imagem. As regras que
+     o WhatsApp cobra e que quase todo mundo erra:
+       · og:image tem de ser ABSOLUTO (caminho relativo ele ignora);
+       · a imagem tem de ser leve — esta tem 101 KB, e acima de uns 300 KB
+         o cartão simplesmente não aparece;
+       · e ele guarda o resultado em cache: mudou a capa, muda o nome do
+         arquivo ou o link não atualiza. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Lotus Gamers">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Avião 3D — Lotus Gamers">
+<meta property="og:description" content="Um caça no navegador. O celular é o manche: incline para voar, designe o alvo no radar e o HUD te leva até ele.">
+<meta property="og:url" content="https://adverbio169.github.io/jogos/aviao3d.html">
+<meta property="og:image" content="https://adverbio169.github.io/jogos/capa-aviao3d.jpg">
+<meta property="og:image:secure_url" content="https://adverbio169.github.io/jogos/capa-aviao3d.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Um caça azul sobre a cidade, com o HUD e as telas do painel">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Avião 3D — Lotus Gamers">
+<meta name="twitter:description" content="Um caça no navegador. O celular é o manche: incline para voar, designe o alvo no radar e o HUD te leva até ele.">
+<meta name="twitter:image" content="https://adverbio169.github.io/jogos/capa-aviao3d.jpg">
 <style>
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;overflow:hidden;background:#0b1020;color:#e6edf9;
@@ -355,7 +380,7 @@
   <div id="dCima">
     <button class="dBt vidroP" id="dTrem">TREM ▼</button>
     <button class="dBt vidroP" id="dFlap">FLAPE 0</button>
-    <button class="dBt vidroP" id="dZerar">zerar</button>
+    <button class="dBt vidroP" id="dZerar">CALIBRAR</button>
   </div>
 </div>
 <!-- O iPhone não deixa travar a tela em paisagem (nem `screen.orientation.lock`

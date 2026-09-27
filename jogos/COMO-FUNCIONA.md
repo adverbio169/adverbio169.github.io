@@ -6434,3 +6434,48 @@ E, de quebra, o defeito que motivou tudo: `body.dedos #btVisao` dava `bottom`
 sem tirar o `top:14px` da regra de cima. Com os dois presos e sem altura, o
 botão esticava de uma borda à outra — 46×286 — e era por isso que o olho e a
 qualidade pareciam duas colunas do tamanho do nitro. `top:auto` resolve.
+
+## A capa de compartilhamento
+
+> "ao compartilhar tenha uma imagem bonitinha quando eu compartilhar no
+> WhatsApp. uma capa legal com a Lotus Gamers."
+
+Sem marcação nenhuma, um link colado no WhatsApp vira uma linha de texto
+cinza. Com ela, vira um cartão com imagem. As regras que o WhatsApp cobra e
+que quase todo mundo erra:
+
+- `og:image` tem de ser **absoluto** — caminho relativo ele ignora;
+- a imagem tem de ser **leve**: acima de uns 300 KB o cartão simplesmente não
+  aparece. Esta tem **101 KB** (1200×630, JPEG a 86);
+- e ele **guarda em cache**. Trocou a capa? Troque o nome do arquivo, ou o
+  link continua mostrando a antiga.
+
+A capa é um quadro de jogo de verdade — caça inclinado sobre a cidade, HUD,
+as duas telas e o losango magenta do alvo designado — com o escuro entrando
+**pela esquerda**, que é onde mora o texto: a direita fica com o jogo à
+mostra, que é o que faz alguém querer abrir. As esquadrias nos quatro cantos
+são as mesmas do painel, para o cartão pertencer ao jogo.
+
+Marca **Lotus Gamers** com uma flor de lótus geométrica de cinco pétalas, em
+ciano. Tipografia Saira Condensed 900 no título e Saira no resto —
+**baixadas e servidas do próprio arquivo**, porque o Chromium do contêiner
+não usa o proxy que o `curl` usa e a fonte simplesmente não chegava: a
+primeira versão saiu inteira em Liberation Sans sem avisar.
+
+O endereço no rodapé é `adverbio169.github.io/jogos` — o mesmo host que os
+`og:url`. Vale conferir: o repositório foi renomeado uma vez, e é do nome do
+dono que sai o endereço de um site de usuário no GitHub Pages.
+
+## "Zerar" virou "Calibrar" — mas só o rótulo
+
+> "o zerar é Calibrar, que é calibrar o controle."
+
+Certo: o botão não zera coisa nenhuma, ele diz ao jogo **qual é a sua posição
+de mão parada**. Mudou nos três lugares onde aparece (o botão do controle, o
+botão de dedo no jogo e a dica "calibrar aqui").
+
+O que **não** mudou é a mensagem que viaja no rádio, `t:'zerar'`. É o nome no
+fio entre dois aparelhos, e um celular com a página velha em cache falando
+com uma TV nova precisa continuar se entendendo. Rótulo é para gente, nome de
+mensagem é para máquina — trocar os dois juntos é como se quebra a
+compatibilidade sem perceber.

@@ -519,7 +519,7 @@ body.paisagem #controle.ver,
   <button id="btFogo">FOGO</button>
   <div class="linha">
     <button class="bt pri" id="btComecar">Começar</button>
-    <button class="bt sec" id="btCalibrar">Zerar</button>
+    <button class="bt sec" id="btCalibrar">Calibrar</button>
     <button class="bt sec pouso" id="btTrem">TREM</button>
     <button class="bt sec pouso" id="btFlap">FLAPE</button>
   </div>
@@ -529,7 +529,7 @@ body.paisagem #controle.ver,
   <div id="dica"><b>Girar de lado</b> = aileron, roda as asas (segure inclinado e ele dá a volta inteira).
     <b>Puxar a borda de cima</b> = profundor, levanta o nariz.
     <b>Apontar o aparelho para o lado</b> = leme, chuta o nariz.
-    <b>Zerar</b> torna a posição da sua mão o voo reto.</div>
+    <b>Calibrar</b> torna a posição da sua mão o voo reto.</div>
 </div>
 
 <!-- PeerJS (WebRTC com sinalização), embutido para a página ser um arquivo só -->
@@ -2246,7 +2246,7 @@ function pintaGiro(){
 (function(){
   const b = document.getElementById('btGiro');
   if (!b) return;
-  b.textContent = 'zerar aqui';
+  b.textContent = 'calibrar aqui';
   b.onclick = e => {
     e.preventDefault();
     Controle.calibrar();
@@ -2335,6 +2335,16 @@ function enviaCtl(o){ if (conn && conn.open) conn.send(o); }
   const vis = document.getElementById('btVisaoC');
   if (vis) vis.addEventListener('click', e => { e.preventDefault(); enviaCtl({ t:'visao' }); });
 })();
+
+/* O BOTÃO CHAMA-SE CALIBRAR, A MENSAGEM CONTINUA `zerar`
+
+   "o zerar é Calibrar, que é calibrar o controle." Certo: o botão não zera
+   coisa nenhuma — ele diz ao jogo QUAL é a sua posição de mão parada. Mas o
+   que viaja no rádio (`t:'zerar'`) fica como está de propósito: é o nome no
+   fio entre dois aparelhos, e um celular com a página velha em cache falando
+   com uma TV nova precisa continuar se entendendo. Rótulo é para gente, nome
+   de mensagem é para máquina — e trocar os dois juntos é como se quebra a
+   compatibilidade sem perceber. */
 
 /* --- ACELERADOR e NITRO -----------------------------------------------------
    Pedido: "um acelerador no lado direito do controle, e no lado esquerdo o
