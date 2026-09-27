@@ -15053,7 +15053,32 @@ function mfdVagaNoDedo(){
   _mfdVaga = (w < 150 || h < 88) ? null : { x: x0, y: y1 - h, w, h };
   return _mfdVaga;
 }
+/* RECOLHER A TELA — no celular ela ocupa demais
+
+   "ele ocupa muito a tela. acho que podemos fazer no modo celular ele ser
+   retrátil: se arrastar para baixo ele desce, e arrastar para os lados ele
+   passa."
+
+   Encolhida, sobra a FITA DE ABAS e a alça: ainda dá para trocar de página
+   com o dedo, e o painel não some sem deixar endereço. Vale nas duas telas
+   (aqui e no controle), porque o pedido é o mesmo. */
+let mfdEncolhido = false;
+try { mfdEncolhido = localStorage.getItem('mfdEncolhido') === '1'; } catch(e){}
+function mfdRecolhe(v){
+  v = !!v;
+  if (mfdEncolhido === v) return;
+  mfdEncolhido = v;
+  try { localStorage.setItem('mfdEncolhido', v ? '1' : '0'); } catch(e){}
+  try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
+}
+function mfdAltaEncolhida(o){ return Math.max(30, Math.min(o.h, Math.max(38, o.h*0.24))); }
 function mfdOnde(k){
+  const o = mfdOndeCheio(k);
+  if (!o || !mfdEncolhido) return o;
+  const h = mfdAltaEncolhida(o);
+  return { x: o.x, y: o.y + o.h - h, w: o.w, h };
+}
+function mfdOndeCheio(k){
   if (k === 0 && mfdQuantas() < 2) return null;
   if (document.body.classList.contains('dedos')) return k ? mfdVagaNoDedo() : null;
   /* a largura sai da tela e tem teto: numa tela de computador grande, uma
@@ -15068,6 +15093,7 @@ function mfdOnde(k){
    têm de ler a MESMA resposta — chute escrito na mão não sobrevive a um painel
    que muda de lugar. */
 function radarOnde(){
+  if (mfdEncolhido) return null;      // encolhida não há disco nenhum na tela
   for (let k = 0; k < 2; k++){
     if (MFD_PAGS[mfdPagDe(k + 1)] !== 'MAPA') continue;
     const o = mfdOnde(k);
@@ -15588,11 +15614,28 @@ function mfdVidro(c, x, y, w, h, m){
 function desenhaMFD(k){
   const o = mfdOnde(k);
   if (!o) return;
+
+  /* ENCOLHIDA: só a alça e a fita de abas. */
+  if (mfdEncolhido){
+    const abas = Math.max(16, o.h - 16), alca = o.h - abas;
+    mfdVidro(h2, o.x, o.y, o.w, o.h, { cab: 0, abas });
+    const aw = Math.min(52, o.w*0.20), ah = Math.max(2, alca*0.16);
+    h2.fillStyle = 'rgba(99,216,255,.6)';
+    h2.fillRect(o.x + o.w/2 - aw/2, o.y + alca/2 - ah/2, aw, ah);
+    mfdPintaAbas(o, abas, k);
+    return;
+  }
+
   const m = mfdMedidas(o);
   const nome = MFD_PAGS[mfdPagDe(k + 1)];   // janela 0 é o celular
 
   // o vidro
   mfdVidro(h2, o.x, o.y, o.w, o.h, m);
+
+  /* a alça: é o que diz "dá para arrastar isto para baixo" */
+  { const aw = Math.min(52, o.w*0.20), ah = Math.max(2, m.cab*0.09);
+    h2.fillStyle = 'rgba(99,216,255,.32)';
+    h2.fillRect(o.x + o.w/2 - aw/2, o.y + Math.max(2.5, m.cab*0.16), aw, ah); }
 
   // o cabeçalho, com a barrinha acesa que marca a tela
   const cy = o.y + m.cab*0.62, bh = Math.max(2, m.cab*0.30);
@@ -15626,23 +15669,30 @@ function desenhaMFD(k){
 
   /* AS ABAS. São a peça que diz "esta tela tem outras páginas" — sem elas
      ninguém descobre que existe tecla nenhuma. */
-  const ay = o.y + o.h - m.abas, aw = o.w/MFD_PAGS.length;
+  mfdPintaAbas(o, m.abas, k);
+}
+/* A FITA DE ABAS, que a tela aberta e a encolhida dividem */
+function mfdPintaAbas(o, abas, k){
+  const ay = o.y + o.h - abas, aw = o.w/MFD_PAGS.length;
   h2.strokeStyle = MFD_FIO + '.14)'; h2.lineWidth = 1;
   h2.beginPath(); h2.moveTo(o.x, ay + 0.5); h2.lineTo(o.x + o.w, ay + 0.5); h2.stroke();
   h2.textAlign = 'center'; h2.textBaseline = 'middle';
-  h2.font = '700 ' + Math.max(6, m.abas*0.42).toFixed(1) + 'px system-ui, sans-serif';
+  h2.font = '700 ' + Math.max(6, Math.min(abas*0.42, aw*0.26)).toFixed(1) + 'px system-ui, sans-serif';
   MFD_PAGS.forEach((p, i) => {
     const ax = o.x + i*aw, on = i === mfdPagDe(k + 1);
-    p = aw < 46 ? MFD_CURTO[i] : p;
+    /* nome curto quando o comprido NÃO CABE — medido, não chutado por largura
+       da aba: com a fita alta a letra cresce e "SINÓT" encosta em "MOTOR"
+       numa aba que pela régua antiga era larga o bastante */
+    if (h2.measureText(p).width > aw*0.84) p = MFD_CURTO[i];
     if (on){
-      mfdAceso(h2, MFD_CIANO, m.abas*0.36);
-      h2.fillStyle = 'rgba(99,216,255,.13)'; h2.fillRect(ax, ay + 1, aw, m.abas - 1);
+      mfdAceso(h2, MFD_CIANO, abas*0.36);
+      h2.fillStyle = 'rgba(99,216,255,.13)'; h2.fillRect(ax, ay + 1, aw, abas - 1);
       h2.fillStyle = MFD_CIANO;
-      h2.fillRect(ax + aw*0.10, o.y + o.h - Math.max(2, m.abas*0.14),
-                  aw*0.80, Math.max(2, m.abas*0.14));
+      h2.fillRect(ax + aw*0.10, o.y + o.h - Math.max(2, abas*0.14),
+                  aw*0.80, Math.max(2, abas*0.14));
     }
     h2.fillStyle = on ? MFD_CIANO : MFD_FRACO;
-    h2.fillText(p, ax + aw/2, ay + m.abas*0.50);
+    h2.fillText(p, ax + aw/2, ay + abas*0.50);
     mfdApaga(h2);
   });
   h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
@@ -16650,41 +16700,122 @@ let toqueIni = null;
 
    A prova é geométrica e barata: o toque caiu dentro do retângulo das abas de
    alguma tela? Se caiu, escolhe a página e o evento acaba ali. */
-function mfdToque(px, py){
+/* =============================================================================
+   O DEDO NA TELA DE INSTRUMENTO — E POR QUE ELE NÃO PODE VIRAR TIRO
+
+   "não consegui mudar os painéis arrastando, mas os botões estão funcionando.
+   percebi também que quando aperto no painel o disparo acontece."
+
+   Dois defeitos na mesma linha, e eu tinha consertado no arquivo ERRADO: o
+   arrasto que fiz antes foi no `controle.html`, o celular como CONTROLE de
+   uma TV. Aqui é a outra montagem — o jogo inteiro rodando no celular, com os
+   controles de dedo — e aqui não havia arrasto nenhum.
+
+   1. O TIRO. Nesta tela, toque curto em QUALQUER lugar atira (é de propósito:
+      o polegar não precisa procurar botão). Só que o `mfdToque` antigo só
+      reclamava a FITA DE ABAS; tocar no corpo da tela caía no toque geral e
+      virava tiro. Agora a tela reclama o RETÂNGULO INTEIRO.
+
+   2. O ARRASTO. Pior que não existir: arrastar sobre a tela mexia o `toqueX`
+      e `toqueY`, que são o MANCHE. Ou seja, tentar trocar de página pilotava
+      o avião. Agora o gesto é da tela: de lado rola a fita, para baixo
+      recolhe, para cima abre.
+
+   Os limiares são os mesmos do controle — 12% da largura, metade disso ainda
+   valendo na soltura — porque é o mesmo dedo e a mesma fita.
+   ========================================================================== */
+let mfdGesto = null;
+function mfdLimites(o){
+  return { h: Math.max(28, Math.min(o.w*0.12, 70)),
+           v: Math.max(30, Math.min(o.h*0.30, 80)) };
+}
+function mfdPega(px, py){
   for (let k = 0; k < 2; k++){
     const o = mfdOnde(k);
     if (!o) continue;
-    const m = mfdMedidas(o);
-    const ay = o.y + o.h - m.abas;
-    if (px < o.x || px > o.x + o.w || py < ay || py > o.y + o.h) continue;
-    const p = Math.max(0, Math.min(MFD_PAGS.length - 1,
-              Math.floor((px - o.x)/(o.w/MFD_PAGS.length))));
-    mfdLeva(k + 1, p);
-    try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
+    if (px < o.x || px > o.x + o.w || py < o.y || py > o.y + o.h) continue;
+    mfdGesto = { k, o, x0: px, y0: py, usou: false, mexeu: false };
     return true;
   }
   return false;
 }
+function mfdArrasta(px, py){
+  const g = mfdGesto;
+  if (!g || g.usou) return;
+  const dx = px - g.x0, dy = py - g.y0, L = mfdLimites(g.o);
+  if (Math.abs(dx) > 6 || Math.abs(dy) > 6) g.mexeu = true;
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > L.h){
+    mfdRola(dx < 0 ? 1 : -1); g.usou = true;          // para a esquerda avança
+    try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
+  } else if (dy > Math.abs(dx) && dy > L.v){ mfdRecolhe(true);  g.usou = true; }
+  else if (-dy > Math.abs(dx) && -dy > L.v && mfdEncolhido){ mfdRecolhe(false); g.usou = true; }
+}
+function mfdSolta(px, py){
+  const g = mfdGesto; mfdGesto = null;
+  if (!g || g.usou) return;
+  const L = mfdLimites(g.o);
+  if (px !== undefined){
+    /* o resto do gesto: soltar antes do limiar cheio ainda conta, se passou de
+       metade. Sem isto, arrasto curto não faz NADA e parece tela sem gesto. */
+    const dx = px - g.x0, dy = py - g.y0;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > L.h*0.5){ mfdRola(dx < 0 ? 1 : -1); return; }
+    if (dy > Math.abs(dx) && dy > L.v*0.5){ mfdRecolhe(true); return; }
+    if (-dy > Math.abs(dx) && -dy > L.v*0.5){ mfdRecolhe(false); return; }
+  }
+  if (g.mexeu) return;
+  // toque parado: na fita vai para a aba; fora dela, abre e fecha
+  const o = g.o;
+  const abas = mfdEncolhido ? Math.max(16, o.h - 16) : mfdMedidas(o).abas;
+  if (g.y0 >= o.y + o.h - abas){
+    const p = Math.max(0, Math.min(MFD_PAGS.length - 1,
+              Math.floor((g.x0 - o.x)/(o.w/MFD_PAGS.length))));
+    mfdLeva(g.k + 1, p);
+    try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
+  } else mfdRecolhe(!mfdEncolhido);
+}
 addEventListener('touchstart', e => {
   if (!jogando || !e.touches || !e.touches[0]) return;
-  if (mfdToque(e.touches[0].clientX, e.touches[0].clientY)){ toqueIni = null; return; }
+  if (mfdPega(e.touches[0].clientX, e.touches[0].clientY)){ toqueIni = null; return; }
   usandoToque = Controle.modo !== 'sensor';
   toqueIni = { x:e.touches[0].clientX, y:e.touches[0].clientY, t:Date.now() };
 }, {passive:true});
 addEventListener('touchmove', e => {
-  if (!toqueIni || !usandoToque || !e.touches || !e.touches[0]) return;
+  if (!e.touches || !e.touches[0]) return;
+  if (mfdGesto){ mfdArrasta(e.touches[0].clientX, e.touches[0].clientY); return; }
+  if (!toqueIni || !usandoToque) return;
   toqueX = Math.max(-1, Math.min(1, (e.touches[0].clientX - toqueIni.x)/90));
   toqueY = Math.max(-1, Math.min(1, (toqueIni.y - e.touches[0].clientY)/90));
 }, {passive:true});
-addEventListener('touchend', () => {
-  if (toqueIni && Date.now() - toqueIni.t < 220){ atirando = true; setTimeout(()=>atirando=false, 130); }
+addEventListener('touchend', e => {
+  if (mfdGesto){
+    const t = e.changedTouches && e.changedTouches[0];
+    mfdSolta(t ? t.clientX : undefined, t ? t.clientY : undefined);
+    return;                                   // toque na tela NÃO atira
+  }
+  /* O TIRO SÓ NO FOGO. "então tem que arrumar o disparo só no fogo mesmo."
+
+     O toque curto em qualquer lugar atirava, e era de propósito — mas com o
+     botão FOGO ali na tela isso é um gatilho a mais que ninguém pediu e que
+     dispara sozinho quando o dedo encosta em qualquer coisa. Com os controles
+     de dedo ligados, quem atira é o botão.
+
+     Fica o antigo só para quando NÃO há botão na tela (um aparelho de toque
+     servindo de televisor, sem os controles de dedo): ali o toque curto é o
+     único gatilho que existe, e tirá-lo seria deixar o jogador sem arma. */
+  if (toqueIni && Date.now() - toqueIni.t < 220 &&
+      !(typeof Dedos !== 'undefined' && Dedos.ligado)){
+    atirando = true; setTimeout(()=>atirando=false, 130);
+  }
   toqueIni = null; toqueX = 0; toqueY = 0;
 }, {passive:true});
+addEventListener('touchcancel', () => { if (mfdGesto) mfdSolta(); }, {passive:true});
 
 $('btVisao').onclick = () => { cockpit = !cockpit; esqueceRadar(); };
-/* clicar na aba também troca, no computador: quem vê uma fileira de abas tenta
-   clicar nela antes de procurar a tecla */
-addEventListener('mousedown', e => { if (jogando) mfdToque(e.clientX, e.clientY); });
+/* e o mesmo no computador, com o rato: clicar na aba troca, e arrastar rola —
+   quem vê uma fileira de abas tenta clicar nela antes de procurar a tecla */
+addEventListener('mousedown', e => { if (jogando) mfdPega(e.clientX, e.clientY); });
+addEventListener('mousemove', e => { if (mfdGesto) mfdArrasta(e.clientX, e.clientY); });
+addEventListener('mouseup',   e => { if (mfdGesto) mfdSolta(e.clientX, e.clientY); });
 $('btQual').onclick = () => poeQualidade((qualidade + 2) % 3);
 
 /* --- o botão da cabeça ------------------------------------------------------

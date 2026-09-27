@@ -6303,3 +6303,66 @@ sobra a fita de abas e uma alça. Ainda dá para trocar de página com o dedo e
 o painel não some sem deixar endereço. Para cima ele volta; tocar na alça
 também. Fica guardado no aparelho, porque quem escolheu voar com a tela
 pequena não quer reescolher a cada partida.
+
+## E eu tinha consertado no arquivo errado
+
+> "mas tô falando do modelo onde o celular é o Visor."
+
+São duas montagens diferentes, e eu mexi na que ele não estava usando:
+
+| montagem | arquivo | o que o celular é |
+|---|---|---|
+| celular como controle de uma TV | `controle.html` | manche, gatilho e a terceira tela da fita |
+| **jogo inteiro no celular** | `aviao3d.html`, `body.dedos` | o **visor**: o jogo roda ali, com os controles de dedo |
+
+O arrasto que eu tinha feito era no primeiro. No segundo **não havia arrasto
+nenhum** — só o toque na aba e as teclas Q/E — o que bate exatamente com "não
+consegui mudar os painéis arrastando, mas os botões estão funcionando".
+
+E o disparo tinha uma causa própria, na mesma tela. Ali o **toque curto em
+qualquer lugar atira** (é de propósito: num celular o polegar não deve
+precisar procurar botão). Só que o `mfdToque` antigo reclamava apenas a
+**fita de abas**; tocar no corpo da tela caía no toque geral e virava tiro.
+Pior: *arrastar* sobre ela mexia o `toqueX`/`toqueY`, que são o **manche** —
+tentar trocar de página pilotava o avião.
+
+Agora a tela de instrumento reclama o **retângulo inteiro**: dentro dele o
+dedo é dela (de lado rola a fita, para baixo recolhe, para cima abre, parado
+na fita troca de página, parado fora dela recolhe); fora dele nada mudou, o
+toque continua sendo tiro e manche. Os limiares são os mesmos do controle —
+12% da largura, metade disso ainda valendo na soltura — porque é o mesmo dedo
+e a mesma fita.
+
+### Duas coisas que o teste ensinou
+
+**O tiro dura 130 ms, e ler o estado depois é uma corrida que o teste perde —
+para os dois lados.** Um "não atirou" podia ser só atraso na leitura. Agora
+quem vigia o `atirando` é a própria página, de 8 em 8 ms.
+
+**E não dá para produzir um toque curto daqui.** O disparo por toque exige
+pousar e levantar o dedo em menos de 220 ms; neste contêiner as duas chamadas
+do CDP saem com **2,1 segundos** de intervalo (medido). Então o teste prova o
+que importa e é provável: o **roteamento**. Um toque dentro do retângulo não
+chega ao `toqueIni`; um toque fora chega. O tiro em si continua sendo coisa
+para o dedo dele conferir.
+
+### As abas encostavam de novo
+
+Com a fita recolhida ela fica alta (41 px numa tela de 57), a letra cresce
+junto, e "SINÓT" encostava em "MOTOR" numa aba que pela régua antiga —
+`largura < 46 px` — era larga o bastante. A régua era o chute errado: agora o
+nome curto entra quando o comprido **não cabe**, medido com `measureText` no
+próprio canvas. Vale nas duas telas.
+
+### E o gatilho voltou a ser só o botão
+
+> "então tem que arrumar o disparo só no fogo mesmo."
+
+O toque curto em qualquer lugar atirava, e era de propósito — mas com o botão
+FOGO ali na tela isso é um gatilho a mais que ninguém pediu e que dispara
+quando o dedo encosta em qualquer coisa. Com os controles de dedo ligados,
+agora quem atira é o botão.
+
+O antigo fica só para quando **não há botão na tela** — um aparelho de toque
+servindo de televisor, sem os controles de dedo. Ali o toque curto é o único
+gatilho que existe, e tirá-lo deixaria o jogador sem arma.

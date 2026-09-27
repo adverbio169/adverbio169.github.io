@@ -1449,7 +1449,7 @@ const Painel = {
     c.strokeStyle = MFD_FIO + '.14)'; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, ay + 0.5); c.lineTo(W, ay + 0.5); c.stroke();
     c.textAlign = 'center';
-    c.font = '700 ' + Math.max(8, Math.min(abas*0.36, W*0.038)).toFixed(1) + 'px system-ui, sans-serif';
+    c.font = '700 ' + Math.max(8, Math.min(abas*0.36, aw*0.26)).toFixed(1) + 'px system-ui, sans-serif';
     const naTv = [(this.carro + 1) % MFD_PAGS.length, (this.carro + 2) % MFD_PAGS.length];
     const gr = Math.max(2, abas*0.12);
     MFD_PAGS.forEach((p, i) => {
@@ -1462,7 +1462,8 @@ const Painel = {
         c.fillStyle = 'rgba(99,216,255,.55)'; c.fillRect(ax + aw*0.22, H - gr, aw*0.56, gr*0.6);
       }
       c.fillStyle = i === this.carro ? MFD_CIANO : MFD_FRACO;
-      c.fillText(aw < 46 ? MFD_CURTO[i] : p, ax + aw/2, ay + abas*0.48);
+      // o nome curto entra quando o comprido não cabe, medido no próprio canvas
+      c.fillText(c.measureText(p).width > aw*0.84 ? MFD_CURTO[i] : p, ax + aw/2, ay + abas*0.48);
       this.apaga(c);
     });
     c.textAlign = 'left';
