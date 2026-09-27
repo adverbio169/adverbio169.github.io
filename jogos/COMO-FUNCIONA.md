@@ -6549,3 +6549,34 @@ caixa de toque nenhuma, porque lá o desenho é só informação.
 
 As teclas de borda **continuam**: o sinóptico é uma das sete páginas, e o trem
 não pode depender de qual página está aberta.
+
+### As duas bordas, e por que a faixa de cima esvaziou
+
+> "quando eu tenho que acionar os botões lá em cima, eu tenho que
+> praticamente soltar os controles."
+
+Essa é a observação que manda mais do que qualquer arrumação bonita, e eu
+tinha errado nela: deitado, o polegar mora nos **cantos de baixo**. Um botão
+na faixa de cima obriga a largar o aparelho — e largar o aparelho, num jogo
+em que o aparelho **é** o manche, é entregar o avião.
+
+O painel já está onde os polegares alcançam. Então as **duas** bordas dele
+viraram teclas:
+
+| borda | teclas | por quê |
+|---|---|---|
+| esquerda | TREM · FLAPE | o que é de **voar**, no polegar que já mora ali |
+| direita | VISÃO · CALIBRAR | o que é de **olhar**, no outro polegar |
+
+Em cima ficou só a **qualidade**, que se escolhe uma vez antes de decolar.
+
+A tecla de AÇÃO (calibrar) não tem estado a mostrar, então é só o nome, no
+meio e maior; a tecla de ESTADO tem rótulo em cima e valor embaixo. A forma
+diz se aquilo **liga** algo ou **faz** algo.
+
+E a letra encolhe até caber: "CABINE" e "CALIBRAR" têm oito caracteres e
+estouravam a tecla. Adivinhar o tamanho pela contagem de letras é o mesmo
+chute que já encostou as abas umas nas outras — mede-se com `measureText`.
+
+A regra do buraco continua valendo, agora para os quatro: painel recolhido,
+os quatro botões voltam para cima.

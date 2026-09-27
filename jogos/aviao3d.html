@@ -246,8 +246,13 @@
   /* O TREM E O FLAPE VIRARAM TECLAS DE BORDA DO PAINEL — e só voltam a ser
      botões quando o painel está RECOLHIDO. Some a tela, voltam os botões:
      ninguém pode ficar sem trem por ter encolhido o painel na hora errada. */
-  body.dedos #dTrem,body.dedos #dFlap{display:none}
-  body.dedos.painelFechado #dTrem,body.dedos.painelFechado #dFlap{display:inline-block}
+  body.dedos #dTrem,body.dedos #dFlap,body.dedos #dZerar,body.dedos #btVisao{display:none}
+  body.dedos.painelFechado #dTrem,body.dedos.painelFechado #dFlap,
+  body.dedos.painelFechado #dZerar{display:inline-block}
+  body.dedos.painelFechado #btVisao{display:block}
+  /* só a QUALIDADE fica em cima o tempo todo: escolhe-se uma vez antes de
+     decolar, e não vale gastar borda de painel com ela */
+  body.dedos #btQual{left:calc(10px + env(safe-area-inset-left))}
   body.dedos #convite{display:none}
   /* As tiras laterais ocupam a borda inteira, e os painéis de canto ficavam
      por baixo delas. Com os botões na tela, tudo recua a largura da tira. */
@@ -15751,14 +15756,46 @@ function mfdPaginaVoo(o, m){
    ========================================================================== */
 function mfdTemTeclas(){ return document.body.classList.contains('dedos'); }
 function mfdLarguraTeclas(o){
-  return mfdTemTeclas() && !mfdEncolhido ? Math.max(54, Math.min(o.w*0.20, 96)) : 0;
+  return mfdTemTeclas() && !mfdEncolhido ? Math.max(52, Math.min(o.w*0.155, 84)) : 0;
 }
-/* a área que sobra para a PÁGINA, depois das teclas. Quem desenha e quem
-   mede o radar leem daqui, senão o disco é calculado num lugar e pintado em
-   outro — erro que já aconteceu nesta mesma tela. */
+/* a área que sobra para a PÁGINA, depois das teclas DOS DOIS LADOS. Quem
+   desenha e quem mede o radar leem daqui, senão o disco é calculado num lugar
+   e pintado em outro — erro que já aconteceu nesta mesma tela. */
 function mfdAreaPagina(o){
   const b = mfdLarguraTeclas(o);
-  return b ? { x: o.x + b, y: o.y, w: o.w - b, h: o.h } : o;
+  return b ? { x: o.x + b, y: o.y, w: o.w - b*2, h: o.h } : o;
+}
+/* AS DUAS COLUNAS, E POR QUE SÃO DUAS
+
+   "quando eu tenho que acionar os botões lá em cima, eu tenho que
+   praticamente soltar os controles."
+
+   Essa é uma observação de ergonomia, não de gosto, e ela manda mais do que
+   qualquer arrumação bonita: deitado, o polegar mora nos CANTOS DE BAIXO. Um
+   botão na faixa de cima obriga a largar o aparelho — e largar o aparelho,
+   num jogo em que o aparelho É o manche, é entregar o avião.
+
+   O painel já está onde os polegares alcançam. Então as duas bordas dele
+   viram teclas: à ESQUERDA o que é de voar (trem, flape), à DIREITA o que é
+   de olhar (visão, calibrar). Cada polegar chega na sua sem soltar nada.
+
+   Em cima fica só a QUALIDADE, que se escolhe uma vez antes de decolar e
+   nunca mais. */
+function mfdListaTeclas(lado){
+  if (lado === 'esq') return [
+    { rot: 'TREM', val: trem ? 'FORA' : 'DENTRO', on: trem,
+      fn: () => { mexeTrem(); tremeAqui(35); } },
+    { rot: 'FLAPE', val: String(flap), on: flap > 0,
+      fn: () => { mexeFlap(); tremeAqui([18, 40, 18]); } }
+  ];
+  return [
+    { rot: 'VISÃO', val: cockpit ? 'CABINE' : 'FORA', on: cockpit,
+      fn: () => { cockpit = !cockpit; esqueceRadar(); tremeAqui(25); } },
+    { rot: null, val: 'CALIBRAR', on: false,
+      fn: () => { Controle.calibrar();
+                  if (Cabeca.ligada) Cabeca.centraliza();
+                  mostraAviso('CALIBRADO', '#7fd8ff', 700); tremeAqui(25); } }
+  ];
 }
 /* AS ZONAS DE TOQUE DE UMA PÁGINA
 
@@ -15789,20 +15826,19 @@ function mfdDesenhaTeclas(o, m){
   const bw = mfdLarguraTeclas(o);
   _mfdTeclasZona = null;
   if (!bw) return;
-  const T = [
-    { rot: 'TREM', val: trem ? 'FORA' : 'DENTRO', on: trem,
-      fn: () => { mexeTrem(); tremeAqui(35); } },
-    { rot: 'FLAPE', val: String(flap), on: flap > 0,
-      fn: () => { mexeFlap(); tremeAqui([18, 40, 18]); } }
-  ];
+  _mfdTeclasZona = [];
+  mfdColunaTeclas(o.x, o, m, bw, mfdListaTeclas('esq'));
+  mfdColunaTeclas(o.x + o.w - bw, o, m, bw, mfdListaTeclas('dir'));
+}
+function mfdColunaTeclas(x0col, o, m, bw, T){
   const y0 = m.corpoY, alt = m.corpoH/T.length;
   const pad = Math.max(3, bw*0.06);
-  _mfdTeclasZona = { x: o.x, y: y0, w: bw, h: m.corpoH, n: T.length, T };
+  _mfdTeclasZona.push({ x: x0col, y: y0, w: bw, h: m.corpoH, n: T.length, T });
   h2.save();
   h2.textAlign = 'center'; h2.textBaseline = 'middle';
   T.forEach((t, i) => {
     const y = y0 + i*alt;
-    const x = o.x + pad, w = bw - pad*2, hh = alt - pad*1.6;
+    const x = x0col + pad, w = bw - pad*2, hh = alt - pad*1.6;
     const cor = t.on ? MFD_VERDE : MFD_CIANO;
     cantoInst(h2, x, y + pad*0.8, w, hh, Math.max(2, hh*0.10));
     h2.fillStyle = t.on ? 'rgba(20,64,44,.62)' : 'rgba(8,24,34,.55)';
@@ -15811,23 +15847,40 @@ function mfdDesenhaTeclas(o, m){
     h2.lineWidth = 1; h2.stroke();
     mfdEsquadria(h2, x, y + pad*0.8, w, hh, cor, Math.max(3, hh*0.12));
     const cy = y + pad*0.8 + hh/2;
-    h2.font = '700 ' + Math.max(7, Math.min(hh*0.24, w*0.17)).toFixed(1) + 'px system-ui, sans-serif';
-    h2.fillStyle = MFD_ROT; h2.fillText(t.rot, x + w/2, cy - hh*0.20);
+    /* tecla de ESTADO tem rótulo em cima e valor embaixo; tecla de AÇÃO
+       (calibrar) não tem estado nenhum a mostrar, então é só o nome, no meio
+       e maior — a forma diz se aquilo liga algo ou faz algo */
+    if (t.rot){
+      h2.font = '700 ' + Math.max(7, Math.min(hh*0.24, w*0.17)).toFixed(1) + 'px system-ui, sans-serif';
+      h2.fillStyle = MFD_ROT; h2.fillText(t.rot, x + w/2, cy - hh*0.20);
+    }
     mfdAceso(h2, cor, hh*0.22);
-    h2.font = '800 ' + Math.max(9, Math.min(hh*0.34, w*0.26)).toFixed(1) + 'px system-ui, sans-serif';
-    h2.fillStyle = cor; h2.fillText(t.val, x + w/2, cy + hh*0.16);
+    /* A LETRA ENCOLHE ATÉ CABER. "CABINE" e "CALIBRAR" têm oito caracteres e
+       estouravam a tecla — e adivinhar o tamanho pela contagem de letras é o
+       mesmo chute que já me fez encostar as abas umas nas outras. Mede-se. */
+    let fv = Math.max(9, Math.min(hh*(t.rot ? 0.34 : 0.26), w*(t.rot ? 0.26 : 0.20)));
+    const cabe = w*0.88;
+    h2.font = '800 ' + fv.toFixed(1) + 'px system-ui, sans-serif';
+    const larg = h2.measureText(t.val).width;
+    if (larg > cabe){
+      fv = Math.max(7, fv*cabe/larg);
+      h2.font = '800 ' + fv.toFixed(1) + 'px system-ui, sans-serif';
+    }
+    h2.fillStyle = cor; h2.fillText(t.val, x + w/2, cy + (t.rot ? hh*0.16 : 0));
     mfdApaga(h2);
   });
   h2.restore();
   h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
 }
 function mfdTocaTeclas(px, py){
-  const z = _mfdTeclasZona;
-  if (!z) return false;
-  if (px < z.x || px > z.x + z.w || py < z.y || py > z.y + z.h) return false;
-  const i = Math.max(0, Math.min(z.n - 1, Math.floor((py - z.y)/(z.h/z.n))));
-  z.T[i].fn();
-  return true;
+  if (!_mfdTeclasZona) return false;
+  for (const z of _mfdTeclasZona){
+    if (px < z.x || px > z.x + z.w || py < z.y || py > z.y + z.h) continue;
+    const i = Math.max(0, Math.min(z.n - 1, Math.floor((py - z.y)/(z.h/z.n))));
+    z.T[i].fn();
+    return true;
+  }
+  return false;
 }
 
 /* --- A PÁGINA TÁTICA: o radar em que se TOCA ------------------------------ */
