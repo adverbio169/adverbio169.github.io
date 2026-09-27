@@ -6892,3 +6892,54 @@ do jogo e não cabe no celular, onde a letra é maior; cortado, virava
 `DECOLE …`, que não instrui ninguém. Agora o rodapé **escolhe a frase que
 cabe** em vez de ser truncado — cortar serve para nome próprio, não para
 instrução.
+
+# As teclas de trem e flape moram numa página só
+
+> "Esse botão trem e flape não tem lógica ficar em todas as telas. Deixa só em
+> uma específica."
+
+Não tem mesmo, e o custo era maior do que parecia: a coluna comia **um quinto
+da largura das oito páginas** para falar de duas coisas que dizem respeito a
+uma. O disco do radar, o desenho do sinóptico e a cruz de aproximação eram
+todos desenhados 20% menores por causa de teclas que nada tinham a ver com
+eles. Fora da SINÓT, a página ganhou 75 px de volta — de 301 para 376.
+
+A página é a **SINÓT**, e não por sorteio: é ela que desenha o trem e as asas,
+é nela que o toque no desenho já baixa o trem e move o flape, e é a página de
+sistemas do avião — que é o que trem e flape são. As teclas viram o rótulo do
+que o desenho ao lado mostra.
+
+## Uma função respondia a três perguntas
+
+`mfdTemTeclas()` era `document.body.classList.contains('dedos')`, e estava
+sendo lida com três sentidos diferentes:
+
+1. a largura que sobra para a página;
+2. **se o dedo é que pilota** — é isso que liga as zonas de toque na asa e nas
+   pernas do sinóptico;
+3. se as teclas estão ao lado, e portanto a coluna direita do sinóptico pode
+   falar de potência em vez de repetir trem e flape.
+
+Só 1 e 3 são "esta página tem teclas". Restringir a página sem separar a 2
+teria apagado junto o toque no desenho — o comando que ele mesmo pediu.
+Viraram `mfdTemTeclas(nome)` e `mfdModoDedo()`.
+
+## A caixa da janela passou a saber quem é
+
+"Quanto sobra para a página" passou a depender de **qual** página, e quem
+tinha só a caixa `{x,y,w,h}` não tinha como saber. Passar o nome em cada
+chamada funciona até alguém esquecer — e esquecer não dá erro: dá uma largura
+errada, calada. Foi o que aconteceu com dois testes no primeiro tento.
+
+Então `mfdOnde(k)` devolve `{x,y,w,h,k}`, e `mfdLarguraTeclas` deduz a página
+da própria caixa quando ninguém diz. Os dois testes voltaram a passar **sem
+serem alterados** — que é o sinal de que a correção foi no lugar certo.
+
+## O que isto custa
+
+Numa aproximação você está na página APROX, e é exatamente aí que se baixa o
+trem e se põe flape. Agora isso exige rolar a fita até a SINÓT. A página APROX
+já **mostra** o checklist TREM / FLAPE / VEL; o passo natural, se o atrito
+aparecer voando, é fazer esses três itens responderem ao dedo — mesma ideia do
+desenho da asa, na página onde ela importa, sem voltar a ter botão em todo
+lugar.

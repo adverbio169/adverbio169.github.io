@@ -15242,21 +15242,31 @@ function mfdRecolhe(v){
   try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
 }
 function mfdAltaEncolhida(o){ return Math.max(30, Math.min(o.h, Math.max(38, o.h*0.24))); }
+/* A CAIXA CARREGA O NÚMERO DA JANELA.
+   Desde que a coluna de teclas passou a existir só numa página, "quanto sobra
+   para a página" depende de QUAL página — e quem só tinha a caixa não tinha
+   como saber. Passar o nome em cada chamada funciona até alguém esquecer, e
+   esquecer não dá erro: dá uma largura errada, calada. Com `k` dentro da
+   própria caixa, quem tem a caixa tem a resposta. */
 function mfdOnde(k){
   const o = mfdOndeCheio(k);
   if (!o || !mfdEncolhido) return o;
   const h = mfdAltaEncolhida(o);
-  return { x: o.x, y: o.y + o.h - h, w: o.w, h };
+  return { x: o.x, y: o.y + o.h - h, w: o.w, h, k };
 }
 function mfdOndeCheio(k){
   if (k === 0 && mfdQuantas() < 2) return null;
-  if (document.body.classList.contains('dedos')) return k ? mfdVagaNoDedo() : null;
+  if (document.body.classList.contains('dedos')){
+    if (!k) return null;
+    const v = mfdVagaNoDedo();
+    return v ? { x:v.x, y:v.y, w:v.w, h:v.h, k } : v;
+  }
   /* a largura sai da tela e tem teto: numa tela de computador grande, uma
      tela de instrumento com 30% da largura viraria um televisor */
   const w = Math.max(188, Math.min(W*0.255, 372));
   const h = w*0.655;
   const mx = Math.max(10, W*0.012), my = Math.max(10, H*0.030);
-  return { x: k ? W - mx - w : mx, y: H - my - h, w, h };
+  return { x: k ? W - mx - w : mx, y: H - my - h, w, h, k };
 }
 /* a caixa do mapa, quando alguma tela estiver mostrando a página MAPA. Existe
    porque os testes perguntam onde o radar está, e porque o desenho e o teste
@@ -15268,7 +15278,11 @@ function radarOnde(){
     if (MFD_PAGS[mfdPagDe(k + 1)] !== 'MAPA') continue;
     const o = mfdOnde(k);
     if (!o) continue;
-    const m = mfdMedidas(mfdAreaPagina(o));
+    /* o nome vai explícito: a largura das teclas depende da página, e este
+       aqui é sempre o MAPA — que não as tem. Ler uma variável global de
+       "página atual" daria a resposta da última página DESENHADA, não a
+       desta. */
+    const m = mfdMedidas(mfdAreaPagina(o, 'MAPA'));
     return { cx: m.mapaCx, cy: m.mapaCy, r: m.mapaR };
   }
   return null;
@@ -15463,7 +15477,8 @@ function mfdPaginaSinoptico(o, m){
      A moldura tracejada é fraca de propósito (16%). Ela existe só para dizer
      "isto aqui é um comando" a quem nunca tentou — um sinóptico de verdade
      não desenha caixa de toque nenhuma, e o desenho é a informação. */
-  if (mfdTemTeclas() && !mfdEncolhido){
+  /* aqui a pergunta é "o dedo é que pilota?", não "esta página tem teclas" */
+  if (mfdModoDedo() && !mfdEncolhido){
     const rp = Math.max(15, L*0.11);
     for (const [px, py] of [[0, -L*0.20], [-L*0.115, L*0.13], [L*0.115, L*0.13]]){
       mfdZona(cx + px - rp, cy + py - rp, rp*2, rp*2,
@@ -15515,7 +15530,9 @@ function mfdPaginaSinoptico(o, m){
     h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
     h2.fillStyle = cor; h2.fillText(v, dir, y + m.fv*1.05);
   };
-  if (mfdTemTeclas() && !mfdEncolhido){
+  /* e aqui é mesmo "as teclas estão ao lado?": se estão, elas já dizem trem e
+     flape, e a coluna da direita fala de potência */
+  if (mfdTemTeclas(PAG_TECLAS) && !mfdEncolhido){
     const pot = turbinando ? 100 : Math.round(motor*100);
     dirRot(m.corpoY + m.corpoH*0.16, 'POT', turbinando ? 'A/B' : pot + '%',
            turbinando ? MFD_AMBAR : MFD_CLARO);
@@ -15938,15 +15955,42 @@ function mfdPaginaVoo(o, m){
    Só as duas de VOAR ficam aqui — trem e flape. Calibrar, visão e qualidade
    não se mexem pilotando e foram para a faixa de cima, que estava vazia.
    ========================================================================== */
-function mfdTemTeclas(){ return document.body.classList.contains('dedos'); }
-function mfdLarguraTeclas(o){
-  return mfdTemTeclas() && !mfdEncolhido ? Math.max(54, Math.min(o.w*0.20, 96)) : 0;
+/* AS TECLAS MORAM NUMA PÁGINA SÓ
+
+   "Esse botão trem e flape não tem lógica ficar em todas as telas. Deixa só
+    em uma específica."
+
+   Não tem mesmo. A coluna comia um quinto da largura das OITO páginas para
+   falar de duas coisas que dizem respeito a uma: o disco do radar, o desenho
+   do sinóptico e a cruz de aproximação eram todos desenhados 20% menores por
+   causa de teclas que nada tinham a ver com eles.
+
+   A página é a SINÓT, e não por sorteio: é ela que desenha o trem e as asas,
+   é nela que o toque no desenho já baixa o trem e move o flape, e é a página
+   de sistemas do avião — que é o que trem e flape são. As teclas viram o
+   rótulo do que o desenho ao lado mostra.
+
+   `mfdTemTeclas` respondia a UMA pergunta e era usada para TRÊS: a largura da
+   coluna, as zonas de toque do desenho, e o que a coluna da direita do
+   sinóptico escreve. Só a primeira e a terceira são "esta página tem teclas";
+   a segunda é "o dedo é que pilota". Duas perguntas, dois nomes — sem isso,
+   restringir a página apagaria também o toque no desenho. */
+const PAG_TECLAS = 'SINÓT';
+function mfdModoDedo(){ return document.body.classList.contains('dedos'); }
+function mfdTemTeclas(nome){ return mfdModoDedo() && nome === PAG_TECLAS; }
+function mfdPagDaCaixa(o, nome){
+  return nome !== undefined ? nome
+       : (o && o.k !== undefined) ? MFD_PAGS[mfdPagDe(o.k + 1)] : '';
+}
+function mfdLarguraTeclas(o, nome){
+  return mfdTemTeclas(mfdPagDaCaixa(o, nome)) && !mfdEncolhido
+         ? Math.max(54, Math.min(o.w*0.20, 96)) : 0;
 }
 /* a área que sobra para a PÁGINA, depois das teclas. Quem desenha e quem mede
    o radar leem daqui, senão o disco é calculado num lugar e pintado em outro
    — erro que já aconteceu nesta mesma tela. */
-function mfdAreaPagina(o){
-  const b = mfdLarguraTeclas(o);
+function mfdAreaPagina(o, nome){
+  const b = mfdLarguraTeclas(o, nome);
   return b ? { x: o.x + b, y: o.y, w: o.w - b, h: o.h } : o;
 }
 /* UMA COLUNA SÓ, E O CALIBRAR FORA
@@ -15993,8 +16037,8 @@ function mfdTocaZonas(k, px, py){
   return false;
 }
 let _mfdTeclasZona = null;
-function mfdDesenhaTeclas(o, m){
-  const bw = mfdLarguraTeclas(o);
+function mfdDesenhaTeclas(o, m, nome){
+  const bw = mfdLarguraTeclas(o, nome);
   _mfdTeclasZona = null;
   if (!bw) return;
   _mfdTeclasZona = [];
@@ -16430,8 +16474,8 @@ function desenhaMFD(k){
      impressa nela. Vai aqui, num save só, para não repetir em cada peça; e
      recortado na moldura, que agora é translúcida e mostraria o vazamento. */
   /* as teclas de borda primeiro: elas mandam na largura que sobra */
-  mfdDesenhaTeclas(o, m);
-  const oP = mfdAreaPagina(o), mP = (oP === o) ? m : mfdMedidas(oP);
+  mfdDesenhaTeclas(o, m, nome);
+  const oP = mfdAreaPagina(o, nome), mP = (oP === o) ? m : mfdMedidas(oP);
 
   h2.save();
   cantoInst(h2, o.x, o.y, o.w, o.h, Math.max(2, o.h*0.018)); h2.clip();
