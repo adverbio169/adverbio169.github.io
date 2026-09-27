@@ -1328,8 +1328,12 @@ const ADI = {
    dois arquivos é a receita de os dois desandarem no primeiro dia em que um
    deles muda.
    ========================================================================== */
-const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'ARMAS', 'OBJET', 'VOO'];
-const MFD_CURTO = ['SIN', 'MOT', 'MAP', 'ARM', 'OBJ', 'VOO'];
+/* AS PÁGINAS SÃO A MESMA FITA DA TV, e têm de ser a mesma LISTA: o carrossel
+   é `(carro + janela) % tamanho`, então uma página a mais aqui e uma a menos
+   lá põem cada aparelho numa página diferente com o mesmo número. */
+const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'TÁTIC', 'ARMAS', 'OBJET', 'VOO'];
+const MFD_CURTO = ['SIN', 'MOT', 'MAP', 'TAT', 'ARM', 'OBJ', 'VOO'];
+const MFD_MAG = '#ff66d9';
 const MFD_CIANO = '#63d8ff', MFD_VERDE = '#3fe070', MFD_AMBAR = '#ffc046',
       MFD_VERM = '#ff6a58', MFD_CLARO = '#e2ecf8', MFD_ROT = '#8fa3b8',
       MFD_FRACO = '#6d8095', MFD_FIO = 'rgba(226,236,248,';
@@ -1438,6 +1442,7 @@ const Painel = {
     else if (nome === 'SINÓT') this.sinoptico(c, m, d);
     else if (nome === 'MOTOR') this.motor(c, m, d);
     else if (nome === 'MAPA')  this.mapa(c, m, d);
+    else if (nome === 'TÁTIC') this.tatico(c, m, d);
     else if (nome === 'ARMAS') this.armas(c, m, d);
     else if (nome === 'OBJET') this.objetivos(c, m, d);
     else if (nome === 'VOO')   this.voo(c, m, d);
@@ -1753,6 +1758,115 @@ const Painel = {
     put(3, 'ALC', M.alc ? (Math.round(M.alc/100)/10 + 'km') : '—', MFD_FRACO);
     c.textAlign = 'left';
   },
+  /* A PÁGINA TÁTICA: o mesmo radar, mas aqui o dedo ESCOLHE. O celular não
+     sabe quem é cada contato — só recebe a lista, na ordem em que a TV a
+     montou. Então ele manda o ÍNDICE, e quem designa é a TV, que tem os
+     objetos. Uma lista, uma ordem, um índice: é isso que impede o toque aqui
+     de designar um alvo e a TV outro. */
+  tatico(c, m, d){
+    const M = d.mapa;
+    if (!M) return this.vazio(c, m);
+    const larg = m.W - m.pad*2;
+    const emColuna = larg >= 300;
+    const disco = emColuna ? Math.min(m.corpoH*0.92, larg*0.46)
+                           : Math.min(m.corpoH*0.70, larg*0.92);
+    const R = disco/2;
+    const cx = emColuna ? m.pad + R : m.W/2;
+    const cy = m.corpoY + (emColuna ? m.corpoH*0.50 : R + m.corpoH*0.03);
+    this.disco = { cx, cy, r: R };
+    this.tatPontos = [];
+
+    c.beginPath(); c.arc(cx, cy, R, 0, 7);
+    c.fillStyle = 'rgba(2,10,16,.55)'; c.fill();
+    c.strokeStyle = 'rgba(99,216,255,.35)'; c.lineWidth = 1.2; c.stroke();
+    for (const f of [0.33, 0.66]){
+      c.beginPath(); c.arc(cx, cy, R*f, 0, 7);
+      c.strokeStyle = MFD_FIO + '.12)'; c.lineWidth = 1; c.stroke();
+    }
+    c.beginPath();
+    c.moveTo(cx - R, cy); c.lineTo(cx + R, cy);
+    c.moveTo(cx, cy - R); c.lineTo(cx, cy + R);
+    c.strokeStyle = MFD_FIO + '.10)'; c.stroke();
+
+    c.save();
+    c.beginPath(); c.arc(cx, cy, R*0.99, 0, 7); c.clip();
+    (M.c || []).forEach((q, i) => {
+      const px = cx + q[0]/100*R, py = cy + q[1]/100*R;
+      const t = Math.max(2.6, R*(q[2] === 1 ? 0.055 : 0.075));
+      c.globalAlpha = q[2] === 3 ? 0.6 : 1;
+      if (q[2] === 1){
+        c.fillStyle = MFD_AMBAR; c.beginPath(); c.arc(px, py, t, 0, 7); c.fill();
+      } else {
+        c.fillStyle = MFD_VERM; c.beginPath();
+        c.moveTo(px, py - t); c.lineTo(px + t, py); c.lineTo(px, py + t); c.lineTo(px - t, py);
+        c.closePath(); c.fill();
+      }
+      c.globalAlpha = 1;
+      if (i === M.des){
+        this.aceso(c, MFD_MAG, R*0.12);
+        c.strokeStyle = MFD_MAG; c.lineWidth = Math.max(1.4, R*0.020);
+        c.beginPath(); c.arc(px, py, t + Math.max(3, R*0.055), 0, 7); c.stroke();
+        this.apaga(c);
+      }
+      this.tatPontos.push({ x: px, y: py, i });
+    });
+    c.restore();
+
+    c.strokeStyle = MFD_CLARO; c.lineWidth = Math.max(1.3, R*0.035);
+    c.beginPath();
+    c.moveTo(cx - R*0.14, cy + R*0.14); c.lineTo(cx, cy - R*0.18);
+    c.lineTo(cx + R*0.14, cy + R*0.14); c.stroke();
+
+    c.textBaseline = 'middle';
+    if (emColuna){
+      const x0 = cx + R + larg*0.05, x1 = m.W - m.pad;
+      const fr = Math.min(m.f*0.92, (x1 - x0)*0.155), fv = Math.min(m.fv*0.92, (x1 - x0)*0.20);
+      if (M.des === undefined || M.des < 0){
+        c.textAlign = 'left'; c.font = '700 ' + fr.toFixed(1) + 'px ui-monospace, monospace';
+        c.fillStyle = MFD_FRACO; c.fillText('SEM ALVO', x0, m.corpoY + m.corpoH*0.32);
+        c.fillStyle = MFD_ROT;
+        c.fillText('toque num', x0, m.corpoY + m.corpoH*0.54);
+        c.fillText('contato', x0, m.corpoY + m.corpoH*0.70);
+      } else {
+        c.textAlign = 'left'; c.font = '800 ' + fv.toFixed(1) + 'px system-ui, sans-serif';
+        this.aceso(c, MFD_MAG, fv*0.5); c.fillStyle = MFD_MAG;
+        c.fillText(M.dn || 'ALVO', x0, m.corpoY + m.corpoH*0.22); this.apaga(c);
+        const linha = (i, rot, val) => {
+          const y = m.corpoY + m.corpoH*(0.50 + i*0.24);
+          c.font = '700 ' + fr.toFixed(1) + 'px ui-monospace, monospace';
+          c.textAlign = 'left'; c.fillStyle = MFD_ROT; c.fillText(rot, x0, y);
+          c.font = '800 ' + fv.toFixed(1) + 'px ui-monospace, monospace';
+          c.textAlign = 'right'; c.fillStyle = MFD_CLARO; c.fillText(val, x1, y);
+        };
+        linha(0, 'DIST', M.dd === null || M.dd === undefined ? '—'
+              : (M.dd > 1500 ? (Math.round(M.dd/100)/10 + 'km') : M.dd + 'm'));
+        linha(1, 'RUMO', M.dr === null || M.dr === undefined ? '—'
+              : String(M.dr).padStart(3, '0') + '°');
+      }
+    } else {
+      const y = m.corpoY + m.corpoH*0.88;
+      c.textAlign = 'center';
+      c.font = '800 ' + Math.min(m.fv*0.85, larg*0.070).toFixed(1) + 'px ui-monospace, monospace';
+      c.fillStyle = (M.des >= 0) ? MFD_MAG : MFD_FRACO;
+      c.fillText((M.des >= 0)
+        ? ((M.dn || 'ALVO') + '  ' + (M.dd === null || M.dd === undefined ? '—' : M.dd + 'm'))
+        : 'TOQUE NUM CONTATO', m.W/2, y);
+    }
+    c.textAlign = 'left';
+  },
+  /* o dedo na página: hoje só a tática quer, e ela manda o índice para a TV */
+  tocaPagina(px, py){
+    if (MFD_PAGS[this.carro] !== 'TÁTIC' || !this.tatPontos || !this.tatPontos.length) return false;
+    let melhor = null, dm = 1e9;
+    for (const q of this.tatPontos){
+      const d = Math.hypot(q.x - px, q.y - py);
+      if (d < dm){ dm = d; melhor = q; }
+    }
+    if (!melhor || dm > 30) return false;
+    enviaCtl({ t: 'des', i: melhor.i });
+    try { navigator.vibrate && navigator.vibrate([10, 40, 10]); } catch(e){}
+    return true;
+  },
   mapaResumo(c, m, d){
     this.linha(c, m, 0, 4, 'ALVOS', (d.falta === undefined ? '—' : d.falta) + '',
                d.falta ? MFD_AMBAR : MFD_VERDE);
@@ -1922,8 +2036,12 @@ const Painel = {
     if (e.clientY >= q.bottom - abas){
       const i = Math.floor((e.clientX - q.left)/(q.width/MFD_PAGS.length));
       Painel.rola(i - Painel.carro);
-    } else if (Painel.encolhido || e.clientY < q.top + (Painel.alcaAltura || 0)){
-      Painel.recolhe(!Painel.encolhido);               // a alça também abre e fecha
+    } else if (Painel.encolhido){
+      Painel.recolhe(false);
+    } else if (Painel.tocaPagina(e.clientX - q.left, e.clientY - q.top)){
+      /* a página levou o toque */
+    } else if (e.clientY < q.top + (Painel.alcaAltura || 0)){
+      Painel.recolhe(true);                            // recolher é só pela alça
     }
   });
 })();

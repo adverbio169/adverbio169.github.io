@@ -89,8 +89,40 @@
   #dedos{display:none}
   body.dedos #dedos{display:block}
   #dedos > *{position:fixed;z-index:6;user-select:none;-webkit-user-select:none;touch-action:none}
-  .dedoM{border-radius:14px;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.5);
-         -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);overflow:hidden;
+  /* =========================================================================
+     O VIDRO DO PAINEL, PARA TODOS OS COMANDOS
+
+     "todos os botões têm que ter o mesmo estilo do painel retrátil. inclusive
+     a aceleração. como se fosse painel de caça mesmo."
+
+     Está certo, e é o que falta para a tela parecer UMA coisa: hoje as telas
+     multifunção são vidro aceso com esquadria, e os comandos ao redor são
+     botões de aplicativo, cantos redondos e cinza. Duas linguagens na mesma
+     cabine.
+
+     `.vidroP` é o mesmo material, em CSS: fundo translúcido, fio ciano, as
+     quatro esquadrias de luz nos cantos e a varredura de tubo. As esquadrias
+     saem de oito gradientes — dois por canto, um deitado e um em pé — porque
+     pseudo-elemento só dá para dois cantos e um `<button>` já usa os seus.
+     ================================================================== */
+  .vidroP{--fio:#63d8ff;
+    background-color:rgba(4,14,21,.72);
+    background-image:
+      linear-gradient(var(--fio),var(--fio)),linear-gradient(var(--fio),var(--fio)),
+      linear-gradient(var(--fio),var(--fio)),linear-gradient(var(--fio),var(--fio)),
+      linear-gradient(var(--fio),var(--fio)),linear-gradient(var(--fio),var(--fio)),
+      linear-gradient(var(--fio),var(--fio)),linear-gradient(var(--fio),var(--fio)),
+      repeating-linear-gradient(0deg,rgba(150,225,255,.07) 0 1px,rgba(0,0,0,0) 1px 3px);
+    background-repeat:no-repeat;
+    background-size:13px 2px,2px 13px, 13px 2px,2px 13px, 13px 2px,2px 13px, 13px 2px,2px 13px, auto;
+    background-position:0 0,0 0, 100% 0,100% 0, 0 100%,0 100%, 100% 100%,100% 100%, 0 0;
+    border:1px solid rgba(99,216,255,.28);border-radius:4px;
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    box-shadow:0 6px 18px rgba(0,0,0,.45)}
+  .vidroP.quente{--fio:#ffc24d;border-color:rgba(255,194,77,.32)}
+  .vidroP.fogo{--fio:#ff7a63;border-color:rgba(255,122,99,.36);
+               background-color:rgba(38,10,8,.78)}
+  .dedoM{overflow:hidden;
          width:min(13vw,58px);height:min(56vh,200px);top:46%;transform:translateY(-50%)}
   #dAcel{right:calc(8px + env(safe-area-inset-right))}
   #dNitro{left:calc(8px + env(safe-area-inset-left));display:flex;align-items:center;justify-content:center}
@@ -103,30 +135,37 @@
             font:900 min(3.2vw,14px)/1 inherit;letter-spacing:4px;color:#bfe6ff;text-shadow:0 2px 8px #000}
   #dNitroCarga{position:absolute;left:0;right:0;bottom:0;height:100%;
                background:linear-gradient(0deg,rgba(92,200,255,.5),rgba(140,230,255,.2))}
-  #dNitro.ligado{border-color:#7fd8ff;box-shadow:0 0 0 2px rgba(127,216,255,.35)}
+  #dNitro.ligado{border-color:#7fd8ff;box-shadow:0 0 0 2px rgba(127,216,255,.35),0 6px 18px rgba(0,0,0,.45)}
+  /* a lona do preenchimento entra por baixo das esquadrias */
+  #dNitroCarga,#dAcelBarra{z-index:0}
+  #dNitro b,#dAcelNum{z-index:2}
+  /* O GATILHO E A DEFESA CONTINUAM REDONDOS E COLORIDOS, e é de propósito:
+     são as duas AÇÕES da tela, não instrumentos, e a mão tem de achá-las sem
+     ler. O que muda é o material — o mesmo fundo de vidro e as mesmas
+     esquadrias, na cor de cada um — para pertencerem ao painel sem deixarem
+     de ser botão. Num caça, o gatilho não fica na tela: fica no manche. */
   #dFogo{right:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-right));
          bottom:calc(10px + env(safe-area-inset-bottom));
-         width:min(26vw,120px);height:min(26vw,120px);border:0;border-radius:50%;
-         font:900 min(4vw,17px)/1 inherit;letter-spacing:2px;color:#fff;background:#d8422f;
-         box-shadow:0 6px 0 #8f2a1d;cursor:pointer}
-  #dFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
+         width:min(26vw,120px);height:min(26vw,120px);border-radius:50%;
+         font:900 min(4vw,17px)/1 inherit;letter-spacing:2px;color:#ffd9d2;
+         background-color:rgba(150,38,24,.88);cursor:pointer}
+  #dFogo:active{transform:translateY(3px);background-color:rgba(216,66,47,.95)}
   /* a contramedida mora colada no gatilho, pelo mesmo motivo de sempre:
      soltar chama é decisão de meio segundo com o dedo já ali */
   #dChama{right:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-right));
           bottom:calc(10px + min(26vw,120px) + 12px + env(safe-area-inset-bottom));
-          width:min(19vw,88px);height:min(19vw,88px);border:0;border-radius:50%;
+          width:min(19vw,88px);height:min(19vw,88px);border-radius:50%;
           display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;
-          font:900 min(2.9vw,12px)/1 inherit;letter-spacing:1.2px;color:#2a1f05;
-          background:#ffc24d;box-shadow:0 5px 0 #a8761f;cursor:pointer}
+          font:900 min(2.9vw,12px)/1 inherit;letter-spacing:1.2px;color:#ffe1a8;
+          background-color:rgba(120,80,14,.85);cursor:pointer}
   /* o número não recebe toque: quem responde é o botão inteiro, sempre */
   #dChama b{font-size:min(4vw,16px);opacity:.9;pointer-events:none}
-  #dChama:active{transform:translateY(3px);box-shadow:0 2px 0 #a8761f}
-  #dChama.vazio{background:#6b6257;color:#cfc6b8;box-shadow:0 5px 0 #3f3931}
+  #dChama:active{transform:translateY(2px);background-color:rgba(168,118,31,.92)}
+  #dChama.vazio{background-color:rgba(48,44,38,.8);color:#9a9287;--fio:#6b6257}
   #dChama.espera{opacity:.5}
   #dArma{left:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-left));
          bottom:calc(10px + env(safe-area-inset-bottom));
-         width:min(32vw,180px);height:min(19vw,86px);border-radius:14px;
-         border:1px solid rgba(255,255,255,.18);background:rgba(8,12,26,.5);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+         width:min(32vw,180px);height:min(19vw,86px);
          display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab}
   #dArma b{font:900 min(3.4vw,16px)/1.1 inherit;letter-spacing:1.5px;color:#ffc24d}
   #dArma i{font-style:normal;font:700 min(2.6vw,12px)/1 inherit;color:#9fb0cc;margin-top:4px}
@@ -135,9 +174,10 @@
   #dArma.trocou{background:rgba(255,194,77,.2)}
   #dCima{top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
          display:flex;gap:6px}
-  .dBt{border:1px solid rgba(255,255,255,.2);background:rgba(8,12,26,.55);color:#dce5f5;
-       border-radius:9px;padding:7px 10px;font:700 min(2.6vw,12px)/1 inherit;cursor:pointer}
-  .dBt.ligado{background:rgba(94,255,154,.2);border-color:rgba(94,255,154,.5);color:#c7ffdb}
+  .dBt{color:#cfeeff;padding:8px 11px;font:700 min(2.6vw,12px)/1 inherit;letter-spacing:1px;
+       cursor:pointer}
+  .dBt.ligado{background-color:rgba(20,64,44,.8);--fio:#5eff9a;color:#c7ffdb;
+              border-color:rgba(94,255,154,.45)}
   /* com os comandos de dedo na tela, os painéis saem da frente dos polegares */
   /* O painel do pouso no alto do meio caía em cima da bússola e do
      combustível. A faixa livre é a de BAIXO, entre o seletor de armas e o
@@ -153,10 +193,24 @@
      mesma coluna, estão a vida e o recorde. Então eles trocam de lado: ficam
      na coluna da ESQUERDA, logo acima do seletor de armas, que é a única
      faixa livre de ponta a ponta. */
-  body.dedos #btVisao{left:calc(14px + min(13vw,58px));
-       bottom:calc(22px + min(19vw,86px) + env(safe-area-inset-bottom))}
-  body.dedos #btQual{left:calc(70px + min(13vw,58px));
-       bottom:calc(22px + min(19vw,86px) + env(safe-area-inset-bottom))}
+  /* E O `top` SAI. Com `top:14px` da regra de cima e `bottom` daqui, sem
+     altura nenhuma, o botão esticava de uma borda à outra: era por isso que o
+     olho e a qualidade viravam duas colunas do tamanho do nitro. */
+  body.dedos #btVisao,body.dedos #btQual{top:auto;height:auto;
+       bottom:calc(22px + min(19vw,86px) + env(safe-area-inset-bottom));
+       --fio:#63d8ff;background-color:rgba(4,14,21,.72);
+       background-image:
+         linear-gradient(var(--fio),var(--fio)),linear-gradient(var(--fio),var(--fio)),
+         linear-gradient(var(--fio),var(--fio)),linear-gradient(var(--fio),var(--fio)),
+         linear-gradient(var(--fio),var(--fio)),linear-gradient(var(--fio),var(--fio)),
+         linear-gradient(var(--fio),var(--fio)),linear-gradient(var(--fio),var(--fio)),
+         repeating-linear-gradient(0deg,rgba(150,225,255,.07) 0 1px,rgba(0,0,0,0) 1px 3px);
+       background-repeat:no-repeat;
+       background-size:11px 2px,2px 11px, 11px 2px,2px 11px, 11px 2px,2px 11px, 11px 2px,2px 11px, auto;
+       background-position:0 0,0 0, 100% 0,100% 0, 0 100%,0 100%, 100% 100%,100% 100%, 0 0;
+       border:1px solid rgba(99,216,255,.28);border-radius:4px;color:#cfeeff}
+  body.dedos #btVisao{left:calc(14px + min(13vw,58px))}
+  body.dedos #btQual{left:calc(78px + min(13vw,58px))}
   body.dedos #convite{display:none}
   /* As tiras laterais ocupam a borda inteira, e os painéis de canto ficavam
      por baixo delas. Com os botões na tela, tudo recua a largura da tira. */
@@ -290,18 +344,18 @@
      avião. Mesmo desenho do controle.html, porque a mão já aprendeu ele.
      ====================================================================== -->
 <div id="dedos">
-  <div class="dedoM" id="dNitro"><i id="dNitroCarga"></i><b>NITRO</b></div>
-  <div class="dedoM" id="dAcel"><i id="dAcelBarra"></i><span id="dAcelNum">70%</span></div>
+  <div class="dedoM vidroP" id="dNitro"><i id="dNitroCarga"></i><b>P&Oacute;S-COMB</b></div>
+  <div class="dedoM vidroP" id="dAcel"><i id="dAcelBarra"></i><span id="dAcelNum">70%</span></div>
   <!-- DEFESA acima do FOGO, igual ao controle de celular: quem joga só no
        telefone tem os mesmos recursos de quem joga com dois aparelhos -->
-  <button id="dChama">DEFESA <b id="dChamaN">12</b></button>
-  <button id="dFogo">FOGO</button>
-  <div id="dArma"><b id="dArmaNome">NUCLEAR</b><i id="dArmaMun">6</i>
+  <button id="dChama" class="vidroP quente">DEFESA <b id="dChamaN">12</b></button>
+  <button id="dFogo" class="vidroP fogo">FOGO</button>
+  <div id="dArma" class="vidroP quente"><b id="dArmaNome">NUCLEAR</b><i id="dArmaMun">6</i>
     <span class="dica">&lsaquo; deslize &rsaquo;</span></div>
   <div id="dCima">
-    <button class="dBt" id="dTrem">TREM ▼</button>
-    <button class="dBt" id="dFlap">FLAPE 0</button>
-    <button class="dBt" id="dZerar">zerar</button>
+    <button class="dBt vidroP" id="dTrem">TREM ▼</button>
+    <button class="dBt vidroP" id="dFlap">FLAPE 0</button>
+    <button class="dBt vidroP" id="dZerar">zerar</button>
   </div>
 </div>
 <!-- O iPhone não deixa travar a tela em paisagem (nem `screen.orientation.lock`
@@ -8188,6 +8242,9 @@ function bussola(y){
       h2.fillText(NOMES_RUMO[card/45], x, y + H*0.006);
     }
   }
+  /* O ALVO DESIGNADO vem ANTES de todos, e em magenta: é o único que o piloto
+     escolheu, e tem de ser achável de relance no meio das outras setas. */
+  if (alvoDesVivo()) marcaBussola(cx, meia, y + H*0.048, alvoDes.obj, MFD_MAG, false);
   marcaBussola(cx, meia, y + H*0.052, maisPerto(tambores, t => !t.pego), '#ffd257', false);
   marcaBussola(cx, meia, y + H*0.056, maisPerto(alvos, a => a.vivo), '#ff6a5a', true);
   /* OS DESTINOS. Sem seta na bússola, "vá até Porto Alto" é procurar uma
@@ -8422,10 +8479,10 @@ function faceInst(chave, larg, alt, pinta){
    altitude, rumo e razão de subida já estão no HUD, e uma tela que repete o
    vidro da frente é uma tela desperdiçada — que é exatamente a crítica que o
    usuário fez às duas telas mostrando a mesma coisa. */
-const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'ARMAS', 'OBJET', 'VOO'];
+const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'TÁTIC', 'ARMAS', 'OBJET', 'VOO'];
 /* e o nome curto, para quando a aba não tiver largura: seis palavras de cinco
    letras numa fita de 180 px ficam encostadas uma na outra e viram uma tarja */
-const MFD_CURTO = ['SIN', 'MOT', 'MAP', 'ARM', 'OBJ', 'VOO'];
+const MFD_CURTO = ['SIN', 'MOT', 'MAP', 'TAT', 'ARM', 'OBJ', 'VOO'];
 const MFD_TELA = '#070b0f', MFD_FIO = 'rgba(226,236,248,';
 /* O VIDRO, E POR QUE ELE DEIXOU DE SER PRETO
 
@@ -8449,6 +8506,45 @@ const MFD_TELA = '#070b0f', MFD_FIO = 'rgba(226,236,248,';
    Então: fundo em `MFD_VIDRO` (translúcido), esquadria acesa, e o retângulo
    inteiro só como um fio fraco para o olho fechar a forma sozinho. */
 const MFD_VIDRO = 'rgba(4,14,21,.70)';
+/* =============================================================================
+   O ALVO DESIGNADO — o computador de bordo
+
+   "quero mais uma tela multiuso: o radar onde clico no alvo e o HUD me dá
+   orientações de ir para esse alvo selecionado. como se fosse literalmente um
+   computador de bordo."
+
+   É exatamente o que um caça faz: o piloto DESIGNA um contato e o avião passa
+   a conduzi-lo até ele. Aqui a designação é um objeto vivo (um alvo de solo ou
+   um hostil), não uma cópia da posição: o contato se mexe, e a seta tem de ir
+   junto. Quando ele morre, a designação cai sozinha.
+
+   A cor é MAGENTA, e não é enfeite: em avião de verdade o magenta é a cor do
+   que o piloto escolheu — ela não disputa com o vermelho do inimigo nem com o
+   verde do HUD, e é a única coisa daquela cor na tela. */
+const MFD_MAG = '#ff66d9';
+let alvoDes = null;          // { obj, nome, tipo }  — obj tem x/z vivos
+function designa(o, nome, tipo){
+  if (!o){ alvoDes = null; return; }
+  if (alvoDes && alvoDes.obj === o){ alvoDes = null; mostraAviso('ALVO SOLTO', MFD_MAG, 700); return; }
+  alvoDes = { obj: o, nome: nome || 'ALVO', tipo: tipo || 'alvo' };
+  mostraAviso('ALVO DESIGNADO · ' + alvoDes.nome, MFD_MAG, 900);
+  try { navigator.vibrate && navigator.vibrate([10, 40, 10]); } catch(e){}
+}
+function alvoDesVivo(){
+  if (!alvoDes) return null;
+  const o = alvoDes.obj;
+  if (!o || o.vivo === false || o.x === undefined){ alvoDes = null; return null; }
+  return alvoDes;
+}
+/* rumo e distância até ele, que é o que o HUD mostra */
+function rumoDoAlvo(){
+  const a = alvoDesVivo();
+  if (!a) return null;
+  const dx = a.obj.x - aviaoX, dz = a.obj.z - aviaoZ;
+  const d = Math.hypot(dx, dz);
+  const rumo = (Math.atan2(-dx, dz)*180/Math.PI + 360) % 360;
+  return { d, rumo, desvio: anguloCurto(Math.atan2(-dx, dz) - rumoVisto())*180/Math.PI };
+}
 const MFD_CIANO = '#63d8ff', MFD_VERDE = '#3fe070', MFD_AMBAR = '#ffc046',
       MFD_VERM = '#ff6a58', MFD_CLARO = '#e2ecf8', MFD_ROT = '#8fa3b8',
       MFD_FRACO = '#6d8095';
@@ -9012,6 +9108,106 @@ function mfdPaginaVoo(o, m){
   mfdLinha(o, m, 5, 'PICO',   gMax.toFixed(1) + 'G', MFD_FRACO);
 }
 
+/* --- A PÁGINA TÁTICA: o radar em que se TOCA ------------------------------ */
+let _tatPontos = null;        // onde cada contato caiu na tela, para o dedo
+function mfdPaginaTatico(o, m){
+  const L = contatosVivos();
+  const vivo = alvoDesVivo();
+  const larg = o.w - m.pad*2;
+  const R = Math.min(m.corpoH*0.47, larg*0.27);
+  const cx = o.x + m.pad + R, cy = m.corpoY + m.corpoH*0.50;
+  const rv = rumoVisto(), esc = R/RADAR_KM;
+  _tatPontos = [];
+
+  // o disco
+  h2.beginPath(); h2.arc(cx, cy, R, 0, 7);
+  h2.fillStyle = 'rgba(2,10,16,.55)'; h2.fill();
+  h2.strokeStyle = 'rgba(99,216,255,.35)'; h2.lineWidth = 1.2; h2.stroke();
+  for (const f of [0.33, 0.66]){
+    h2.beginPath(); h2.arc(cx, cy, R*f, 0, 7);
+    h2.strokeStyle = MFD_FIO + '.12)'; h2.lineWidth = 1; h2.stroke();
+  }
+  h2.beginPath();
+  h2.moveTo(cx - R, cy); h2.lineTo(cx + R, cy);
+  h2.moveTo(cx, cy - R); h2.lineTo(cx, cy + R);
+  h2.strokeStyle = MFD_FIO + '.10)'; h2.stroke();
+
+  // os contatos, e onde eles caíram
+  h2.save();
+  h2.beginPath(); h2.arc(cx, cy, R*0.99, 0, 7); h2.clip();
+  for (const c of L){
+    const dx = c.obj.x - aviaoX, dz = c.obj.z - aviaoZ, d = Math.hypot(dx, dz);
+    const a2 = Math.atan2(-dx, dz) - rv;
+    let px = cx + Math.sin(a2)*d*esc, py = cy - Math.cos(a2)*d*esc;
+    const fora = d > RADAR_KM;
+    if (fora){ const an = Math.atan2(py - cy, px - cx);
+               px = cx + Math.cos(an)*R*0.96; py = cy + Math.sin(an)*R*0.96; }
+    const sel = vivo && c.obj === vivo.obj;
+    const t = Math.max(2.6, R*(c.tipo === 'alvo' ? 0.055 : 0.075));
+    h2.globalAlpha = fora ? 0.6 : 1;
+    if (c.tipo === 'alvo'){
+      h2.fillStyle = MFD_AMBAR;
+      h2.beginPath(); h2.arc(px, py, t, 0, 7); h2.fill();
+    } else {
+      h2.fillStyle = MFD_VERM;
+      h2.beginPath();
+      h2.moveTo(px, py - t); h2.lineTo(px + t, py); h2.lineTo(px, py + t); h2.lineTo(px - t, py);
+      h2.closePath(); h2.fill();
+    }
+    h2.globalAlpha = 1;
+    if (sel){        // o anel do designado, na cor de quem escolheu
+      mfdAceso(h2, MFD_MAG, R*0.12);
+      h2.strokeStyle = MFD_MAG; h2.lineWidth = Math.max(1.4, R*0.020);
+      h2.beginPath(); h2.arc(px, py, t + Math.max(3, R*0.055), 0, 7); h2.stroke();
+      mfdApaga(h2);
+    }
+    _tatPontos.push({ x: px, y: py, c });
+  }
+  h2.restore();
+
+  // nós, no centro
+  h2.strokeStyle = MFD_CLARO; h2.lineWidth = Math.max(1.3, R*0.035);
+  h2.beginPath();
+  h2.moveTo(cx - R*0.14, cy + R*0.14); h2.lineTo(cx, cy - R*0.18);
+  h2.lineTo(cx + R*0.14, cy + R*0.14); h2.stroke();
+
+  /* A COLUNA: o que o computador sabe do alvo escolhido. Sem alvo, ela diz
+     como escolher um — uma tela que não explica o próprio gesto é uma tela
+     que ninguém descobre. */
+  const x0 = cx + R + larg*0.05, x1 = o.x + o.w - m.pad;
+  const fr = Math.min(m.f, (x1 - x0)*0.155), fv = Math.min(m.fv, (x1 - x0)*0.20);
+  h2.textBaseline = 'middle';
+  if (!vivo){
+    h2.textAlign = 'left'; h2.fillStyle = MFD_FRACO;
+    h2.font = '700 ' + fr.toFixed(1) + 'px ui-monospace, monospace';
+    h2.fillText('SEM ALVO', x0, m.corpoY + m.corpoH*0.30);
+    h2.fillStyle = MFD_ROT;
+    h2.fillText('toque num', x0, m.corpoY + m.corpoH*0.52);
+    h2.fillText('contato', x0, m.corpoY + m.corpoH*0.68);
+  } else {
+    const r = rumoDoAlvo();
+    h2.textAlign = 'left';
+    h2.font = '800 ' + fv.toFixed(1) + 'px system-ui, sans-serif';
+    mfdAceso(h2, MFD_MAG, fv*0.5);
+    h2.fillStyle = MFD_MAG; h2.fillText(vivo.nome, x0, m.corpoY + m.corpoH*0.22);
+    mfdApaga(h2);
+    const linha = (i, rot, val, cor) => {
+      const y = m.corpoY + m.corpoH*(0.46 + i*0.22);
+      h2.font = '700 ' + fr.toFixed(1) + 'px ui-monospace, monospace';
+      h2.textAlign = 'left'; h2.fillStyle = MFD_ROT; h2.fillText(rot, x0, y);
+      h2.font = '800 ' + fv.toFixed(1) + 'px ui-monospace, monospace';
+      h2.textAlign = 'right'; h2.fillStyle = cor || MFD_CLARO; h2.fillText(val, x1, y);
+    };
+    linha(0, 'DIST', (r.d/METRO > 1500 ? (Math.round(r.d/METRO/100)/10 + 'km')
+                                       : Math.round(r.d/METRO) + 'm'));
+    linha(1, 'RUMO', String(Math.round(r.rumo)).padStart(3, '0') + '°');
+    linha(2, 'VIRE', Math.abs(r.desvio) < 3 ? 'NO RUMO'
+          : (Math.round(Math.abs(r.desvio)) + '°' + (r.desvio > 0 ? ' D' : ' E')),
+          Math.abs(r.desvio) < 3 ? MFD_VERDE : MFD_MAG);
+  }
+  h2.textAlign = 'left';
+}
+
 /* --- O VIDRO: as peças que fazem a tela parecer acesa --------------------- */
 
 /* O FÓSFORO. Um traço de fósforo não é tinta: ele espalha luz em volta. Duas
@@ -9127,6 +9323,7 @@ function desenhaMFD(k){
   if (nome === 'SINÓT') mfdPaginaSinoptico(o, m);
   if (nome === 'MOTOR') mfdPaginaMotor(o, m);
   if (nome === 'MAPA')  mfdPaginaMapa(o, m);
+  if (nome === 'TÁTIC') mfdPaginaTatico(o, m);
   if (nome === 'ARMAS') mfdPaginaArmas(o, m);
   if (nome === 'OBJET') mfdPaginaMissao(o, m);
   if (nome === 'VOO')   mfdPaginaVoo(o, m);
@@ -9436,6 +9633,51 @@ function desenhaHUD(){
       h2.fillText(o.nome + '  ' + Math.round(d/METRO) + 'm', x, y - r - 5);
     }
     h2.textAlign = 'left';
+  }
+
+  /* --- O ALVO DESIGNADO NO MUNDO ------------------------------------------
+     A seta da bússola diz PARA ONDE virar; esta marca diz QUAL é, quando ele
+     já está no vidro. Um losango magenta com o nome e a distância — e, quando
+     ele está fora do campo de visão, uma seta na borda apontando para lá, que
+     é o que impede o piloto de girar à toa procurando.
+
+     Ela é DESENHADA DEPOIS da caixa do buscador na ordem de leitura mas ANTES
+     dela no código, de propósito: a trava é a informação urgente e tem de
+     ficar por cima. */
+  {
+    const a2 = alvoDesVivo();
+    if (a2 && jogando && !caindo){
+      const alt = a2.obj.y !== undefined ? a2.obj.y : CHAO + 300;
+      const v = new THREE.Vector3(a2.obj.x, alt, a2.obj.z).project(cam);
+      const r = rumoDoAlvo();
+      const dTxt = r.d/METRO > 1500 ? (Math.round(r.d/METRO/100)/10 + 'km')
+                                    : (Math.round(r.d/METRO) + 'm');
+      h2.save();
+      h2.strokeStyle = MFD_MAG; h2.fillStyle = MFD_MAG; h2.lineWidth = 2;
+      h2.shadowColor = MFD_MAG; h2.shadowBlur = 6;
+      h2.textAlign = 'center';
+      h2.font = '800 ' + Math.max(9, H*0.016).toFixed(0) + 'px system-ui, sans-serif';
+      if (v.z < 1){
+        const x = (v.x*0.5+0.5)*W, y = (-v.y*0.5+0.5)*H;
+        const t = Math.max(8, Math.min(20, 200000/Math.max(900, r.d)));
+        h2.beginPath();
+        h2.moveTo(x, y - t); h2.lineTo(x + t, y); h2.lineTo(x, y + t); h2.lineTo(x - t, y);
+        h2.closePath(); h2.stroke();
+        h2.fillText(a2.nome + '  ' + dTxt, x, y - t - 6);
+      } else {
+        /* atrás de nós: a seta vai para a borda, do lado certo */
+        /* a seta não encosta na borda: a fita da altitude e a da velocidade
+           moram lá, e duas coisas magenta por cima de um número não são duas
+           informações, são um borrão */
+        const s2 = r.desvio > 0 ? 1 : -1;
+        const x = W/2 + s2*W*0.32, y = H*0.60, t = Math.max(9, H*0.018);
+        h2.beginPath();
+        h2.moveTo(x + s2*t*1.6, y); h2.lineTo(x - s2*t*0.4, y - t); h2.lineTo(x - s2*t*0.4, y + t);
+        h2.closePath(); h2.fill();
+        h2.fillText(a2.nome + '  ' + dTxt, x, y - t*2.2);
+      }
+      h2.restore();
+    }
   }
 
   /* --- A CAIXA DO BUSCADOR ------------------------------------------------
@@ -10215,6 +10457,23 @@ function mfdArrasta(px, py){
   } else if (dy > Math.abs(dx) && dy > L.v){ mfdRecolhe(true);  g.usou = true; }
   else if (-dy > Math.abs(dx) && -dy > L.v && mfdEncolhido){ mfdRecolhe(false); g.usou = true; }
 }
+/* A PÁGINA TEM A PRIMEIRA PALAVRA sobre o toque no corpo da tela. Hoje só a
+   tática quer o dedo (tocar num contato designa); as outras deixam passar, e
+   aí o toque cai na regra de sempre. É por aqui que trem, flape e o resto vão
+   entrar quando forem para dentro do painel. */
+function mfdTocaPagina(k, px, py){
+  if (MFD_PAGS[mfdPagDe(k + 1)] !== 'TÁTIC' || !_tatPontos || !_tatPontos.length) return false;
+  let melhor = null, dm = 1e9;
+  for (const q of _tatPontos){
+    const d = Math.hypot(q.x - px, q.y - py);
+    if (d < dm){ dm = d; melhor = q; }
+  }
+  /* o raio do dedo, não o do pontinho: um contato tem 3 px e ninguém acerta
+     3 px com o polegar em movimento */
+  if (!melhor || dm > 28) return false;
+  designa(melhor.c.obj, melhor.c.nome, melhor.c.tipo);
+  return true;
+}
 function mfdSolta(px, py){
   const g = mfdGesto; mfdGesto = null;
   if (!g || g.usou) return;
@@ -10236,7 +10495,14 @@ function mfdSolta(px, py){
               Math.floor((g.x0 - o.x)/(o.w/MFD_PAGS.length))));
     mfdLeva(g.k + 1, p);
     try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
-  } else mfdRecolhe(!mfdEncolhido);
+    return;
+  }
+  if (mfdEncolhido){ mfdRecolhe(false); return; }
+  if (mfdTocaPagina(g.k, g.x0, g.y0)) return;
+  /* e recolher passou a ser só pela ALÇA. Enquanto o corpo da tela não fazia
+     nada, tocar em qualquer lugar podia recolher; agora que a página responde
+     ao dedo, isso fecharia a tela na cara de quem errou o contato por 3 px. */
+  if (g.y0 < o.y + mfdMedidas(o).cab) mfdRecolhe(true);
 }
 addEventListener('touchstart', e => {
   if (!jogando || !e.touches || !e.touches[0]) return;
@@ -11076,6 +11342,10 @@ const Tripulacao = {
       case 'botao': if (d.b === 'comecar' && !jogando && !pausado) comeca(); break;
       case 'arma':  trocaArma(d.a); break;
       case 'fogo':  atirando = !!d.v; break;
+      /* o celular manda o ÍNDICE do contato, não o alvo: a lista é da TV, e é
+         ela que sabe quem é cada um. Ver `contatosVivos`. */
+      case 'des': { const L = contatosVivos(); const c2 = L[d.i];
+                    if (c2) designa(c2.obj, c2.nome, c2.tipo); break; }
       case 'visao': cockpit = !cockpit; esqueceRadar(); break;
       case 'chama': if (m.papel === 'piloto') largaContramedida(); break;
       /* o Zerar do celular zera a mão LÁ e a cabeça AQUI: são dois "retos"
@@ -11283,6 +11553,26 @@ function mandaEstado(){
    pacotes de atitude.
 
    Tipos: 1 alvo, 2 hostil dentro do alcance, 3 hostil encostado no aro. */
+/* A LISTA DE CONTATOS, UMA SÓ. A página tática, o pacote do celular e a
+   designação por índice leem a MESMA lista, na MESMA ordem — senão o toque no
+   celular designa um alvo e a TV designa outro, que é o tipo de erro que só
+   aparece com dois aparelhos na mão. Os mais perto primeiro, doze no máximo. */
+function contatosVivos(){
+  const L = [];
+  for (const a of alvos){
+    if (!a.vivo) continue;
+    const d = Math.hypot(a.x - aviaoX, a.z - aviaoZ);
+    if (d > RADAR_KM) continue;
+    L.push({ obj: a, nome: a.nome || 'ALVO', tipo: 'alvo', d });
+  }
+  for (const p2 of Batalha.outros.values()){
+    if (p2.vivo === false || p2.x === undefined) continue;
+    L.push({ obj: p2, nome: (p2.nome || 'HOSTIL').toUpperCase().slice(0, 9), tipo: 'hostil',
+             d: Math.hypot(p2.x - aviaoX, p2.z - aviaoZ) });
+  }
+  L.sort((u, v) => u.d - v.d);
+  return L.slice(0, 12);
+}
 function contatosDoRadar(){
   if (!jogando) return null;
   const rv = rumoVisto(), esc = 100/RADAR_KM, C = [];
@@ -11303,27 +11593,24 @@ function contatosDoRadar(){
     const b = poe(perto.cx + s2*perto.meiaC, perto.cz + c2*perto.meiaC);
     pista = [Math.round(a.x), Math.round(a.y), Math.round(b.x), Math.round(b.y)];
   }
-  /* os mais PERTO primeiro, e corta em doze: um radar cheio de pontinhos não
-     informa nada, e o pacote não pode crescer sem fim */
-  const cand = [];
-  for (const a of alvos){
-    if (!a.vivo) continue;
-    const q = poe(a.x, a.z);
-    if (q.d > RADAR_KM) continue;
-    cand.push([q.d, Math.round(q.x), Math.round(q.y), 1]);
-  }
-  for (const p2 of Batalha.outros.values()){
-    if (p2.vivo === false) continue;
-    const q = poe(p2.x, p2.z);
-    if (q.d > RADAR_KM){
+  const L = contatosVivos();
+  const vivo = alvoDesVivo();
+  let des = -1;
+  L.forEach((c, i) => {
+    const q = poe(c.obj.x, c.obj.z);
+    if (vivo && c.obj === vivo.obj) des = i;
+    if (c.tipo === 'alvo') C.push([Math.round(q.x), Math.round(q.y), 1]);
+    else if (q.d > RADAR_KM){
       const ang = Math.atan2(q.y, q.x);
-      cand.push([q.d, Math.round(Math.cos(ang)*100), Math.round(Math.sin(ang)*100), 3]);
-    } else cand.push([q.d, Math.round(q.x), Math.round(q.y), 2]);
-  }
-  cand.sort((u, v) => u[0] - v[0]);
-  for (let i = 0; i < Math.min(12, cand.length); i++) C.push(cand[i].slice(1));
+      C.push([Math.round(Math.cos(ang)*100), Math.round(Math.sin(ang)*100), 3]);
+    } else C.push([Math.round(q.x), Math.round(q.y), 2]);
+  });
+  const r = rumoDoAlvo();
   return { c: C, p: pista, dp: isFinite(dPista) ? Math.round(dPista/METRO) : null,
-           alc: Math.round(RADAR_KM/METRO) };
+           alc: Math.round(RADAR_KM/METRO), des,
+           dn: vivo ? vivo.nome : null,
+           dd: r ? Math.round(r.d/METRO) : null,
+           dr: r ? Math.round(r.rumo) : null };
 }
 function pausa(){
   if (!jogando || pausado) return;

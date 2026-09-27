@@ -6366,3 +6366,71 @@ agora quem atira é o botão.
 O antigo fica só para quando **não há botão na tela** — um aparelho de toque
 servindo de televisor, sem os controles de dedo. Ali o toque curto é o único
 gatilho que existe, e tirá-lo deixaria o jogador sem arma.
+
+## O computador de bordo: designar um alvo
+
+> "quero inclusive mais uma tela de multiuso, o radar onde clico no alvo e o
+> HUD me dá orientações de ir para esse alvo selecionado. como se fosse
+> literalmente um computador de bordo."
+
+É o que um caça faz: o piloto **designa** um contato e o avião passa a
+conduzi-lo até ele. Entrou como a sétima página, **TÁTIC**, e três coisas
+mudam quando um alvo é designado:
+
+- na **fita de rumo**, uma seta magenta apontando para ele, à frente de todas
+  as outras;
+- no **mundo**, um losango magenta com o nome e a distância; quando ele sai do
+  campo de visão, uma seta na borda do lado certo, para não girar à toa;
+- na **página tática**, a coluna de dados: DIST, RUMO e **VIRE 24° D** — que é
+  a orientação propriamente dita, e fica verde ("NO RUMO") dentro de 3°.
+
+A cor é **magenta**, e não é enfeite: em avião de verdade o magenta é a cor do
+que o piloto ESCOLHEU. Não disputa com o vermelho do inimigo nem com o verde
+do HUD, e é a única coisa daquela cor na tela.
+
+A designação guarda o **objeto vivo**, não uma cópia da posição — o contato se
+mexe e a seta vai junto. Se ele morre, ela cai sozinha. Tocar de novo no mesmo
+contato solta.
+
+### Uma lista, uma ordem, um índice
+
+O celular não sabe quem é cada contato: ele só recebe a lista que a TV montou.
+Então quem toca lá manda o **índice**, e quem designa é a TV, que tem os
+objetos. Para isso a lista tem de ser **uma só** — `contatosVivos()` — lida
+pela página tática, pelo pacote do rádio e pela designação por índice, sempre
+na mesma ordem (os mais perto primeiro, doze no máximo). Duas listas com
+ordens diferentes dariam o erro clássico de dois aparelhos: o dedo designa um
+alvo aqui e a TV designa outro lá.
+
+E a página ganhou a primeira palavra sobre o toque no corpo da tela
+(`mfdTocaPagina`). Com isso, **recolher passou a ser só pela alça** — antes
+tocar em qualquer lugar recolhia, e agora errar o contato por três pixels
+fecharia o painel na cara de quem tocou. É também o gancho por onde trem,
+flape e o resto vão entrar quando forem para dentro do painel.
+
+## Todos os comandos vestem o vidro do painel
+
+> "todos os botões têm que ter o mesmo estilo do painel retrátil, inclusive a
+> aceleração... como se fosse painel de caça mesmo."
+
+Faltava isto para a tela parecer UMA coisa: as telas multifunção eram vidro
+aceso com esquadria e os comandos ao redor eram botões de aplicativo, cantos
+redondos e cinza. Duas linguagens na mesma cabine.
+
+`.vidroP` é o mesmo material em CSS — fundo translúcido, fio ciano, as quatro
+esquadrias de luz e a varredura de tubo. As esquadrias saem de **oito
+gradientes** (dois por canto, um deitado e um em pé) porque pseudo-elemento
+só dá para dois cantos e um `<button>` já usa os seus. A cor sai de uma
+variável, `--fio`, então o seletor de arma fica âmbar e a defesa também, sem
+duplicar a regra.
+
+Vestiram: pós-combustão (que deixou de se chamar nitro), acelerador, seletor
+de arma, trem, flape, zerar, o olho e a qualidade. O **gatilho e a defesa
+continuam redondos e coloridos**, de propósito: são as duas AÇÕES da tela, não
+instrumentos, e a mão tem de achá-las sem ler — mas ganharam o mesmo fundo de
+vidro, cada um na sua cor.
+
+E, de quebra, o defeito que motivou tudo: `body.dedos #btVisao` dava `bottom`
+sem tirar o `top:14px` da regra de cima. Com os dois presos e sem altura, o
+botão esticava de uma borda à outra — 46×286 — e era por isso que o olho e a
+qualidade pareciam duas colunas do tamanho do nitro. `top:auto` resolve.
