@@ -922,7 +922,7 @@ const VET_AUTORIDADE = 0.38;
 let vetArf = 0, vetGui = 0, vetRol = 0;   // onde o bocal está agora
 const RAIO_PEGA = 340, GASTO = 3.0, GASTO_TURBO = 4.6;
 const DA_NORMAL = 20, DA_AZUL = 32, TURBO_SEG = 5;
-const RAIO_NUKE = 9000, RAIO_POMBO = 170, RAIO_AVIAO = 430, RAIO_HELI = 400;
+const RAIO_NUKE = 9000, RAIO_MIUDO = 170, RAIO_AVIAO = 430, RAIO_HELI = 400;
 /* --- O TREM -----------------------------------------------------------------
    "Quero mais alvos no chão, inclusive em movimento. Coloca um trem com vagões
    para servir de alvo para treinar os movimentos."
@@ -1452,9 +1452,13 @@ function montaMapa(){
          virou helicóptero, que é o que pode. E o helicóptero não é enfeite: por
          estar parado, ele é o alvo fácil, e vale menos. O avião, que atravessa,
          vale o dobro. */
+      /* OS PÁSSAROS SAÍRAM. "quero que tire os pássaros." Eram quase metade
+         do que voava no mapa, e serviam de enfeite: morriam de um tiro, não
+         reagiam e enchiam o céu de pontinhos entre o jogador e o que
+         interessa. O céu que sobrou é o lugar dos inimigos de verdade. */
       const sorte = Math.random();
-      if (sorte < 0.5){
-        const tipo = sorte < 0.17 ? 'aviao' : sorte < 0.26 ? 'helicoptero' : 'pombo';
+      if (sorte < 0.26){
+        const tipo = sorte < 0.17 ? 'aviao' : 'helicoptero';
         obstaculos.push({ tipo,
           x: tx + (Math.random()-0.5)*3000, y: 900 + Math.random()*Math.random()*(TETO*0.72),
           z: tz + (Math.random()-0.5)*3000, fase: Math.random()*6.28,
@@ -4576,28 +4580,32 @@ function passoRiscas(dt){
   riscasGeo.attributes.position.needsUpdate = true;
 }
 
-/* --- inimigos: o mesmo avião, vermelho --------------------------------- */
-// os inimigos são o mesmo dragão, em vermelho: um estilo só no céu inteiro
-const inimigos = [];
+/* --- tráfego: o mesmo avião, vermelho ---------------------------------- */
+// o tráfego é o mesmo dragão, em vermelho: um estilo só no céu inteiro
+const trafego = [];
 for (const o of []) {}
-function montaInimigos(){
-  for (const n of inimigos) cena.remove(n);
-  inimigos.length = 0;
+/* O NOME ESTAVA ENGANANDO. Esta função monta o TRÁFEGO — aviões de rota,
+   helicópteros parados e os vagões do trem —, e chamava-se `montaTrafego`
+   desde quando não havia inimigo nenhum no jogo. Agora há, e duas coisas
+   diferentes não podem ter o mesmo nome. */
+function montaTrafego(){
+  for (const n of trafego) cena.remove(n);
+  trafego.length = 0;
   for (const o of obstaculos){
     if (o.tipo !== 'aviao') continue;
     const n = modeloInimigo.clone(true);
     n.scale.setScalar(1.3);
-    o.no = n; cena.add(n); inimigos.push(n);
+    o.no = n; cena.add(n); trafego.push(n);
   }
   for (const o of obstaculos){
     if (o.tipo !== 'helicoptero') continue;
     const n = montaHelicoptero();
-    o.no = n; o.rotor = n.userData.rotor; cena.add(n); inimigos.push(n);
+    o.no = n; o.rotor = n.userData.rotor; cena.add(n); trafego.push(n);
   }
   for (const o of obstaculos){
     if (o.iVagao === undefined) continue;
     const n = o.tipo === 'locomotiva' ? montaLocomotiva() : montaVagao(o.iVagao);
-    o.no = n; cena.add(n); inimigos.push(n);
+    o.no = n; cena.add(n); trafego.push(n);
   }
 }
 
@@ -4730,28 +4738,6 @@ function montaHelicoptero(){
   cRotor.position.set(22, 66, -352); g.add(cRotor);
   g.userData.rotor = [rotor, cRotor];
   return g;
-}
-
-/* --- pombos: um corpo simples com duas asas que batem ------------------- */
-const pombos = [];
-function montaPombos(){
-  for (const n of pombos) cena.remove(n);
-  pombos.length = 0;
-  const mat = new THREE.MeshLambertMaterial({ color: 0x3b4150 });
-  for (const o of obstaculos){
-    if (o.tipo !== 'pombo') continue;
-    const g = new THREE.Group();
-    const corpo = new THREE.Mesh(new THREE.SphereGeometry(70, 10, 8), mat);
-    corpo.scale.set(1, 0.8, 1.5); g.add(corpo);
-    for (const lado of [-1, 1]){
-      const a = new THREE.Mesh(new THREE.BoxGeometry(190, 10, 80), mat);
-      a.position.set(lado*110, 10, 0);
-      g.add(a); a.userData.lado = lado;
-      if (!o.asas) o.asas = [];
-      o.asas.push(a);
-    }
-    o.no = g; cena.add(g); pombos.push(g);
-  }
 }
 
 /* =============================================================================
@@ -5636,7 +5622,13 @@ const ALARMES = [
     som(){ bip(760, 0.09, 'sine', 0.07); setTimeout(() => bip(760, 0.09, 'sine', 0.07), 160);
            setTimeout(() => Voz.diz('traffic, traffic'), 300); } },
   { id:'combust',  voz:'fuel low',   txt:'FUEL LOW',         cor:'#ffd257', ciclo:6.00, tremor:null,
-    som(){ somGongo(); setTimeout(() => Voz.diz('fuel low'), 260); } }
+    som(){ somGongo(); setTimeout(() => Voz.diz('fuel low'), 260); } },
+  /* CAÇA ATRÁS. Este é o alarme que torna o combate justo: ele acende quando
+     um inimigo está com o nariz em mim e dentro do alcance — ou seja, ANTES
+     da primeira bala. Levar tiro sem aviso é o que faz um jogo parecer
+     trapaceiro; com aviso, é o jogador que demorou a manobrar. */
+  { id:'caca',     voz:'break',      txt:'CAÇA · MANOBRE',   cor:'#ff6a5a', ciclo:1.30, tremor:[30,60,30],
+    som(){ bip(300, 0.09, 'square', 0.09); setTimeout(() => bip(240, 0.12, 'square', 0.09), 130); } }
 ];
 const Alarmes = {
   ativos: {},        // id -> true, recalculado a cada passo
@@ -5737,6 +5729,8 @@ function alarmeDeTerreno(dt){
   A.bota('trafego', trafegoPerto());
   /* 9) FUEL LOW */
   A.bota('combust', combustivel < 12);
+  /* 10) CAÇA: alguém com o nariz em mim, dentro do alcance de tiro */
+  A.bota('caca', Inimigos.ameaca());
   /* e o estol, que já tem buzina própria: aqui entra só a voz */
   A.bota('estol', estolando);
 
@@ -6481,7 +6475,7 @@ const Mira = {
       if (o === eu.alvo && c > MIRA_CONE) atualNoCone = true;
       if (c > melhorCos){ melhorCos = c; melhor = o; }
     };
-    for (const o of obstaculos) if (o.vivo && o.tipo !== 'pombo') olha(o, o.x, o.y, o.z);
+    for (const o of obstaculos) if (o.vivo) olha(o, o.x, o.y, o.z);
     for (const o of inimigosRede()) olha(o, o.x, o.y, o.z);
     for (const a of alvos) if (a.vivo) olha(a, a.x, CHAO + 300, a.z);
     return { alvo: melhor, cos: melhorCos, atualNoCone };
@@ -6604,7 +6598,7 @@ const Mira = {
    com uma folga pequena para o alarme avisar um instante ANTES de o dedo
    precisar apertar. Ou seja, quando toca, é porque acerta.
 
-   Só entra o que a metralhadora mata: aviões, helicópteros e pombos e gente
+   Só entra o que a metralhadora mata: aviões, helicópteros e gente
    de verdade na batalha. Alvo de chão não vale — a bala nem colide com ele —
    e um alarme que toca para o que não morre é mentira.
    ========================================================================== */
@@ -6650,7 +6644,7 @@ const MiraTiro = {
       const vx = o.iVagao !== undefined ? 0 : Math.sin(o.rumo || 0)*v;
       olha(o, o.x, o.y, o.z, vx, 0, vz,
            o.tipo === 'aviao' ? RAIO_AVIAO : o.tipo === 'helicoptero' ? RAIO_HELI
-           : o.iVagao !== undefined ? RAIO_VAGAO : RAIO_POMBO);
+           : o.iVagao !== undefined ? RAIO_VAGAO : RAIO_MIUDO);
     }
     for (const o of inimigosRede())
       olha(o, o.x, o.y, o.z, o.vx || 0, o.vy || 0, o.vz || 0, RAIO_AVIAO);
@@ -6820,26 +6814,49 @@ function atingeAlvo(x, z, raio){
   }
   return false;
 }
+/* A CHAPA DO QUE VOA
+
+   "quero que os aviões de tráfego sejam mais resistentes à metralhadora."
+
+   Estava certo, e o defeito era mais fundo do que parecia: `atingeAr` recebia
+   `dano` e NÃO LIA. Uma bala de 7 e uma bomba nuclear de 100 matavam igual —
+   qualquer coisa caía com um toque. A metralhadora não era fraca, era um
+   botão de apagar.
+
+   Agora cada coisa tem chapa, e o dano é descontado dela: com 7 por bala, um
+   avião de tráfego leva quatro tiros, um helicóptero três. Míssil (45) e
+   bomba (100) continuam derrubando de primeira, que é o que se espera deles.
+   O tiro que não mata solta faísca e faz barulho — acertar tem de ser
+   sentido, mesmo quando não derruba. */
+const CHAPA = { aviao: 26, helicoptero: 18, locomotiva: 40, vagao: 24 };
 function atingeAr(x, y, z, raio, dano){
   // gente de verdade primeiro: e o alvo que interessa numa batalha
   if (Batalha.acerta(x, y, z, raio, dano || 10)) return true;
+  if (typeof Inimigos !== 'undefined' && Inimigos.acerta(x, y, z, raio, dano || 10)) return true;
   for (const o of obstaculos){
     if (!o.vivo) continue;
     const r = (o.tipo === 'aviao' ? RAIO_AVIAO
              : o.tipo === 'helicoptero' ? RAIO_HELI
-             : o.iVagao !== undefined ? RAIO_VAGAO : RAIO_POMBO) + raio;
+             : o.iVagao !== undefined ? RAIO_VAGAO : RAIO_MIUDO) + raio;
     if (Math.abs(o.y-y) < r && Math.hypot(o.x-x, o.z-z) < r){
+      if (o.chapa === undefined) o.chapa = CHAPA[o.tipo] || 12;
+      o.chapa -= (dano || 10);
+      if (o.chapa > 0){
+        solta(x, y, z, 4, 0xffd08a, 18, 210);
+        Controles.bate('pegou'); sacode(0.05);
+        return true;
+      }
       o.vivo = false; if (o.no) o.no.visible = false;
       /* o helicóptero está parado: é o alvo fácil, e vale menos que o avião,
          que obriga a mirar adiante */
       pontos += o.tipo === 'aviao' ? 200 : o.tipo === 'helicoptero' ? 120
               : o.tipo === 'locomotiva' ? 300 : o.tipo === 'vagao' ? 150 : 50;
-      explode(o.x, o.y, o.z, o.tipo === 'pombo' ? 0.5 : o.iVagao !== undefined ? 1.5 : 1.2);
+      explode(o.x, o.y, o.z, o.iVagao !== undefined ? 1.5 : 1.2);
       mostraAviso(o.tipo === 'aviao' ? 'AVIÃO ABATIDO! +200'
                 : o.tipo === 'helicoptero' ? 'HELICÓPTERO ABATIDO! +120'
                 : o.tipo === 'locomotiva' ? 'LOCOMOTIVA! +300'
                 : o.tipo === 'vagao' ? 'VAGÃO! +150' : '+50', '#ffd257', 800);
-      Controles.bate(o.tipo === 'pombo' ? 'pegou' : 'alvo'); sacode(o.tipo === 'pombo' ? 0.08 : 0.22);
+      Controles.bate('alvo'); sacode(0.22);
       return true;
     }
   }
@@ -7831,6 +7848,7 @@ function atualiza(dt){
   poeCamera(dt);
   atualizaTiros(dt);
   Batalha.passo(dt);
+  Inimigos.passo(dt);
 
   for (const n of nuvens) if (Math.hypot(n.x-aviaoX, n.z-aviaoZ) > 44000) recolocaNuvem(n, false);
 
@@ -7885,7 +7903,7 @@ function atualiza(dt){
     }
     const raio = (o.tipo === 'aviao' ? RAIO_AVIAO
                 : o.tipo === 'helicoptero' ? RAIO_HELI
-                : o.iVagao !== undefined ? RAIO_VAGAO : RAIO_POMBO) + 150;
+                : o.iVagao !== undefined ? RAIO_VAGAO : RAIO_MIUDO) + 150;
     const dx = aviaoX-o.x, dy = aviaoY-o.y, dz = aviaoZ-o.z;
     if (dx*dx + dy*dy + dz*dz < raio*raio){ derruba(o.tipo); return; }
   }
@@ -8436,7 +8454,7 @@ function fitaAltura(){
       é ele que gira, não o mundo.
 
    2. SÓ O QUE SE PROCURA. A pista, os adversários e os alvos que faltam. Os
-      tambores e os pombos ficam de fora: são dezenas, e um radar cheio de
+      os tambores ficam de fora: são dezenas, e um radar cheio de
       pontinhos não responde pergunta nenhuma.
 
    3. QUEM ESTÁ FORA DO ALCANCE FICA NA BORDA, e menorzinho. Sumir com o
@@ -8977,6 +8995,7 @@ function mfdAlertas(){
   const alt = (aviaoY - CHAO)/METRO;
   if (!noChao && voo < velMin())      L.push(['ESTOL', MFD_VERM]);
   if (travadoPor.size)                L.push(['MÍSSIL · TRAVADO', MFD_VERM]);
+  if (Inimigos.ameaca())              L.push(['CAÇA · MANOBRE', MFD_VERM]);
   if (vida < 30)                      L.push(['FUSELAGEM CRÍTICA', MFD_VERM]);
   if (!noChao && alt < 60 && subida < 0) L.push(['TERRENO', MFD_VERM]);
   if (combustivel < 20)               L.push(['COMBUSTÍVEL BAIXO', MFD_AMBAR]);
@@ -9043,9 +9062,14 @@ function mfdPaginaMapa(o, m){
     if (q.d > RADAR_KM) continue;
     h2.beginPath(); h2.arc(q.x, q.y, Math.max(1.6, rS*0.045), 0, 7); h2.fill();
   }
+  /* OS HOSTIS SAEM DA LISTA ÚNICA, e não de `Batalha.outros`. Com os caças da
+     máquina no céu, esta página dizia HOSTIL 0 com dois deles em cima de mim
+     — porque só contava gente de verdade. Uma lista de contatos, lida em
+     todo lugar: aqui, na página tática, no pacote do celular. */
   let hostis = 0;
-  for (const p of Batalha.outros.values()){
-    if (p.vivo === false) continue;
+  for (const cc of contatosVivos()){
+    if (cc.tipo !== 'hostil') continue;
+    const p = cc.obj;
     hostis++;
     const q = poe(p.x, p.z);
     const fora = q.d > RADAR_KM;
@@ -9825,9 +9849,12 @@ function desenhaHUD(){
      Sem isso, num céu deste tamanho ninguém se acha. A marca traz o nome e a
      distância, e fica vermelha quando o avião está perto o bastante para
      valer o tiro. */
-  if (Batalha.ligada && jogando && !caindo){
+  if (jogando && !caindo && (Batalha.ligada || Inimigos.lista.length)){
     h2.textAlign = 'center';
-    for (const o of Batalha.outros.values()){
+    /* jogadores e caças da máquina na MESMA volta: os dois são aviões
+       hostis no céu, e marcá-los de maneiras diferentes só ensinaria o
+       jogador a reparar em qual é qual em vez de em onde estão */
+    for (const o of [...Batalha.outros.values(), ...Inimigos.lista]){
       if (o.vivo === false || o.x === undefined) continue;
       const v2 = new THREE.Vector3(o.x, o.y, o.z).project(cam);
       if (v2.z > 1) continue;
@@ -10843,6 +10870,7 @@ function sorteiaNascimento(){
 }
 
 function reinicia(){
+  if (typeof Inimigos !== 'undefined') Inimigos.limpa();
   let rumo0 = 0;
   if (naPistaAoComecar){
     /* na pista o sorteio é outro: não dá para espalhar pelo mapa quem escolheu
@@ -10906,7 +10934,7 @@ function reinicia(){
   Mira.solta(); MiraTiro.solta();
   montaMapa(); montaChao(); montaPista(); montaRuas(); montaCidade(); montaTelhados(); montaCasas(); montaTambores(); montaAlvos();
   montaTrilhos();
-  montaInimigos(); montaPombos(); montaNuvens();
+  montaTrafego(); montaNuvens();
   poeCamera(1);
   Motor.liga();
 }
@@ -11063,7 +11091,7 @@ $('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque
     tipoDeAviao = t;
     try{ localStorage.setItem('aviao3d.aviao', t); }catch(e){}
     montaGaragem();
-    montaInimigos();
+    montaTrafego();
     reinicia();
     pinta();
     mostraAviso(MEDIDAS.nome, '#ffd257', 1200);
@@ -11764,7 +11792,7 @@ function mandaEstado(){
         : { bomba: municao.bomba, missil: municao.missil, metralha: municao.metralha },
     trava: Mira.travado ? 2 : Mira.alvo ? 1 : 0,
     falta: alvos.filter(a => a.vivo).length,
-    hostis: Batalha.quantos ? Math.max(0, Batalha.quantos() - 1) : 0,
+    hostis: (Batalha.quantos ? Math.max(0, Batalha.quantos() - 1) : 0) + Inimigos.quantos(),
     rumo: (Math.round(rumo*180/Math.PI) % 360 + 360) % 360,
     subida: Math.round(subida/METRO), gmax: Math.round(gMax*10)/10,
     objs: (Missoes && Missoes.lista) ? Missoes.lista()
@@ -11804,6 +11832,11 @@ function contatosVivos(){
     L.push({ obj: p2, nome: (p2.nome || 'HOSTIL').toUpperCase().slice(0, 9), tipo: 'hostil',
              d: Math.hypot(p2.x - aviaoX, p2.z - aviaoZ) });
   }
+  /* os caças da máquina entram na MESMA lista dos jogadores: para o radar,
+     para a designação e para a página tática, um hostil é um hostil */
+  for (const c of Inimigos.lista)
+    L.push({ obj: c, nome: c.nome, tipo: 'hostil',
+             d: Math.hypot(c.x - aviaoX, c.z - aviaoZ) });
   L.sort((u, v) => u.d - v.d);
   return L.slice(0, 12);
 }
@@ -11921,6 +11954,278 @@ setInterval(() => {
 const CORES_JOGADOR = [0x5cc8ff, 0xffb03a, 0x7fffa8, 0xff7ad6, 0xc9a7ff, 0xff6a5a];
 const VIDA_CHEIA = 100;
 const DANO = { metralha: 7, missil: 45, bomba: 100 };
+
+/* =============================================================================
+   OS CAÇAS INIMIGOS — o combate de verdade
+
+   "quero inimigos mais inteligentes, quero começar o combate mesmo já. não
+   quero só tráfego passando. coloca uns inimigos para abater e também eu ser
+   abatido se for o caso."
+
+   Até aqui o jogo não tinha inimigo NENHUM. O que voava era tráfego — avião
+   de rota e helicóptero parado, que não olham para o jogador, não reagem e
+   não atiram —, e os "hostis" que o radar mostrava eram outras PESSOAS, pela
+   rede. Contra ninguém sozinho.
+
+   Estes caçam. E acertam.
+
+   A INTELIGÊNCIA, e por que ela é de três estados e não de trinta
+
+   Perseguição pura (apontar o nariz para onde o alvo está) é o erro clássico:
+   o caça fica sempre atrás, nunca alcança, e o combate vira um cachorro
+   correndo atrás do próprio rabo. Então ele mira ONDE O ALVO VAI ESTAR — a
+   posição dele mais a velocidade dele vezes o tempo que a bala leva. É a
+   mesma conta que a mira do jogador já faz, do outro lado.
+
+   Três estados, e cada um existe por um motivo de combate:
+
+     CAÇA     aponta para a antecipação e acelera. É o padrão.
+     ATIRA    dentro do alcance e alinhado: rajadas curtas, com pausa. Rajada
+              contínua não é como se atira e não dá chance nenhuma.
+     ROMPE    colado demais (abaixo de 2600) ele QUEBRA e sai. Sem isso, dois
+              aviões se aproximam até se tocarem e o combate acaba em colisão,
+              que não é combate.
+
+   O que impede a sensação de tiro injusto: eles só atiram de FRENTE para você
+   (3,5° de cone), dentro de 9000, e cada bala tem chance de errar. E antes da
+   primeira bala o alarme já diz CAÇA — levar tiro sem aviso é o que faz um
+   jogo parecer trapaceiro.
+   ========================================================================== */
+const matBalaIni = new THREE.MeshBasicMaterial({ color: 0xff8a5a, fog: false });
+const EIXO_Y = new THREE.Vector3(0, 1, 0);
+const CACA_VIDA = 30;             // 4 tiros de metralhadora, ou um míssil
+const CACA_ALC  = 9000;           // alcance de tiro
+const CACA_CONE = 3.5*Math.PI/180;
+const CACA_ROMPE = 3200;          // colado demais: quebra e sai
+const CACA_MAX  = 3;              // no céu ao mesmo tempo
+const Inimigos = {
+  lista: [], _nascer: 0, ligados: true,
+
+  limpa(){
+    for (const c of this.lista) if (c.no) cena.remove(c.no);
+    for (const b of this.balas) cena.remove(b.no);
+    this.lista.length = 0; this.balas.length = 0; this._nascer = 6;
+  },
+  /* nascem LONGE e de lados sorteados: aparecer em cima do jogador é a
+     maneira mais rápida de fazer um combate parecer roubado */
+  nasce(){
+    if (!modeloInimigo || this.lista.length >= CACA_MAX) return;
+    const ang = Math.random()*6.283, d = 26000 + Math.random()*14000;
+    const x = aviaoX + Math.sin(ang)*d, z = aviaoZ + Math.cos(ang)*d;
+    const y = Math.max(CHAO + 2200, Math.min(TETO*0.8, aviaoY + (Math.random()-0.5)*6000));
+    const no = modeloInimigo.clone(true);
+    no.scale.setScalar(1.3);
+    no.traverse(m => { if (m.isMesh && m.material && m.material.color)
+                         { m.material = m.material.clone(); m.material.color.offsetHSL(0, -0.35, -0.18); } });
+    cena.add(no);
+    const F = vnorm({ x: aviaoX - x, y: 0, z: aviaoZ - z });
+    this.lista.push({ x, y, z, F, C: {x:0,y:1,z:0}, vel: VOO_BASE*0.95,
+                      vida: CACA_VIDA, estado: 'caca', tRompe: 0, tRajada: 0,
+                      tBala: 0, banco: 0, no,
+                      nome: 'CAÇA ' + (1 + Math.floor(Math.random()*89)) });
+  },
+  quantos(){ return this.lista.length; },
+  /* alguém está com o nariz em mim, dentro do alcance? é o que acende o
+     alarme, e é a pergunta que o piloto faria olhando por cima do ombro */
+  ameaca(){
+    for (const c of this.lista) if (c.mirando) return true;
+    return false;
+  },
+
+  passo(dt){
+    this.passoBalas(dt);
+    if (!jogando || caindo) return;
+    if (!this.ligados) return;
+    this._nascer -= dt;
+    if (this._nascer <= 0 && this.lista.length < CACA_MAX){
+      this.nasce(); this._nascer = 14 + Math.random()*16;
+    }
+    for (let i = this.lista.length - 1; i >= 0; i--){
+      const c = this.lista[i];
+      const dx = aviaoX - c.x, dy = aviaoY - c.y, dz = aviaoZ - c.z;
+      const d = Math.hypot(dx, dy, dz);
+
+      /* longe demais: some. Um caça a sessenta quilômetros não está em
+         combate, está ocupando memória e enchendo o radar. */
+      if (d > 72000){ cena.remove(c.no); this.lista.splice(i, 1); continue; }
+
+      // ---- escolha do estado
+      if (c.estado === 'rompe'){
+        c.tRompe -= dt;
+        if (c.tRompe <= 0 || d > CACA_ROMPE*2.4) c.estado = 'caca';
+      } else if (d < CACA_ROMPE){
+        c.estado = 'rompe'; c.tRompe = 2.2 + Math.random();
+      }
+
+      /* ---- para onde apontar: a ANTECIPAÇÃO, não a posição.
+         O tempo de bala é a distância sobre a velocidade dela; nesse tempo o
+         alvo anda `voo` na direção do nariz dele. */
+      let mira;
+      if (c.estado === 'rompe'){
+        /* QUEBRA PARA O LADO, não para a frente. A primeira versão fugia na
+           direção em que já estava indo, mais um empurrão para trás — e como
+           os dois voam um contra o outro, isso é seguir na rota de colisão
+           mais devagar: o teste acusou duas batidas em trinta segundos.
+
+           Break de verdade é perpendicular à linha do adversário, subindo:
+           sai do plano dele e recomeça a briga de fora. */
+        const paraMim = vnorm({ x: dx, y: 0, z: dz });
+        const lado = vnorm(vcruz({x:0,y:1,z:0}, paraMim));
+        const sn = c.ladoRompe || (c.ladoRompe = Math.random() < 0.5 ? -1 : 1);
+        mira = { x: c.x + lado.x*sn*9000, y: c.y + 2600, z: c.z + lado.z*sn*9000 };
+      } else {
+        c.ladoRompe = 0;
+        const tBala = Math.min(2.2, d/9000);
+        mira = { x: aviaoX + eixoF.x*voo*tBala,
+                 y: aviaoY + eixoF.y*voo*tBala,
+                 z: aviaoZ + eixoF.z*voo*tBala };
+      }
+      const al = vnorm({ x: mira.x - c.x, y: mira.y - c.y, z: mira.z - c.z });
+
+      // ---- vira para lá, com limite de taxa (é um avião, não um ponteiro)
+      const cosA = Math.max(-1, Math.min(1, vponto(c.F, al)));
+      const ang = Math.acos(cosA);
+      const taxa = (c.estado === 'rompe' ? 1.5 : 1.15)*dt;     // rad/s
+      if (ang > 1e-4){
+        const t = Math.min(1, taxa/ang);
+        c.F = vnorm({ x: c.F.x + (al.x - c.F.x)*t,
+                      y: c.F.y + (al.y - c.F.y)*t,
+                      z: c.F.z + (al.z - c.F.z)*t });
+      }
+      /* a inclinação é PARA O OLHO: um caça que curva sem inclinar parece um
+         carrinho de trilho. Sai do quanto ele está virando na horizontal. */
+      const lado = c.F.x*al.z - c.F.z*al.x;
+      c.banco += (Math.max(-1, Math.min(1, -lado*3.4)) - c.banco)*Math.min(1, dt*3);
+      const D0 = vnorm(vcruz({x:0,y:1,z:0}, c.F));
+      c.C = vnorm(vcruz(c.F, D0));
+      const sb = Math.sin(c.banco*1.0), cb = Math.cos(c.banco*1.0);
+      c.C = vnorm({ x: c.C.x*cb + D0.x*sb, y: c.C.y*cb + D0.y*sb, z: c.C.z*cb + D0.z*sb });
+
+      // ---- anda
+      /* A VELOCIDADE DE CAÇA, e a regra de jogo que ela cria: perseguindo de
+         longe ele vai a 1,45 do cruzeiro — mais rápido que o jogador em
+         cruzeiro, mais lento que o jogador em pós-combustão. Ou seja: dá
+         para escapar, mas só QUEIMANDO NITRO. Fugir em linha reta no
+         cruzeiro não resolve, e é isso que obriga a manobrar ou brigar. */
+      const alvoVel = c.estado === 'rompe' ? VOO_BASE*1.25
+                    : d > 16000 ? VOO_BASE*1.45 : VOO_BASE*0.95;
+      c.vel += (alvoVel - c.vel)*Math.min(1, dt*0.7);
+      c.x += c.F.x*c.vel*dt; c.y += c.F.y*c.vel*dt; c.z += c.F.z*c.vel*dt;
+      if (c.y < CHAO + 1400){ c.y = CHAO + 1400; c.F.y = Math.abs(c.F.y); c.F = vnorm(c.F); }
+      if (c.y > TETO) c.y = TETO;
+
+      /* ---- ATIRA?  E o ângulo que conta é o da ANTECIPAÇÃO, não o meu.
+
+         Eu tinha escrito a comparação com a minha posição, e o caça nunca
+         atirava: o nariz dele está apontado para onde eu VOU estar, então o
+         ângulo até onde eu ESTOU nunca fecha. É o mesmo erro de quem mira
+         num pato parado depois de aprender a mirar adiante.
+
+         Quem dispara é o RASTREIO: o nariz em cima da solução. A bala, essa,
+         vai na minha direção — é hitscan, e o risco desenhado é o que o
+         jogador vê. */
+      const apontado = Math.acos(Math.max(-1, Math.min(1, vponto(c.F, al))));
+      c.mirando = c.estado !== 'rompe' && d < CACA_ALC && apontado < CACA_CONE*2.4;
+      if (c.estado !== 'rompe' && d < CACA_ALC && apontado < CACA_CONE){
+        c.tRajada -= dt;
+        if (c.tRajada <= 0){
+          c.tBala -= dt;
+          if (c.tBala <= 0){
+            c.tBala = 0.16;
+            this.tiro(c, d);
+            if (Math.random() < 0.16) c.tRajada = 1.1 + Math.random()*1.2;  // pausa entre rajadas
+          }
+        }
+      } else c.tRajada = Math.max(c.tRajada, 0);
+
+      /* BATER NUM CAÇA MATA OS DOIS. A colisão do jogo só olhava o tráfego,
+         e dava para ATRAVESSAR um inimigo — o que, num combate em que os dois
+         voam um para o outro, acontece o tempo todo e estraga tudo.
+
+         A distância é MEDIDA DE NOVO aqui, e não a do começo do passo: entre
+         uma coisa e outra os dois andaram, e a 2 km por segundo isso são
+         dezenas de metros. Com a distância velha o teste pegou um caça a 727
+         de um limiar de 731 — vivo, dentro do raio, atravessando. */
+      const dAgora = Math.hypot(aviaoX - c.x, aviaoY - c.y, aviaoZ - c.z);
+      if (dAgora < RAIO_AVIAO*1.7){
+        explode(c.x, c.y, c.z, 1.6);
+        cena.remove(c.no); this.lista.splice(i, 1);
+        derruba('bateu');
+        continue;
+      }
+
+      if (c.no){ c.no.visible = true; poeMalha(c.no, c.x, c.y, c.z, vcruz(c.C, c.F), c.C, c.F); }
+    }
+  },
+
+  /* UMA BALA. O RISCO é o que se vê; o ACERTO é sorteado na hora do tiro —
+     colado e alinhado acerta muito, longe e torto quase nunca. É hitscan com
+     rastro, que é como quase todo jogo de tiro faz, e por um motivo: bala
+     simulada a mil por hora com dez quadros por segundo erra por causa do
+     passo de tempo, não da pontaria.
+
+     Mas o rastro não é enfeite — sem ele o jogador leva dano do nada e chama
+     de trapaça. Ele sai do caça e passa RASPANDO por mim, acertando ou não:
+     é o que transforma "perdi vida" em "estão atirando em mim, daquele
+     lado". */
+  balas: [],
+  nTiros: 0, nAcertos: 0,        // contadores: é por eles que se calibra
+  /* A CALIBRAGEM, medida e não chutada: com a primeira conta (0,11 s entre
+     balas, 42% de acerto, 6 de dano) eles me levavam de 100 a zero em menos
+     de trinta segundos de perseguição — o teste mostrou, e isso não é
+     combate, é execução. Agora: 6,2 balas por segundo, 22% de acerto colado
+     e 4 de dano, ou seja uns 5,5 de vida por segundo enquanto UM caça
+     estiver em cima de mim. Dá dezoito segundos para manobrar, e manobrar é
+     o jogo. */
+  tiro(c, d){
+    const p = 0.22*(1 - d/CACA_ALC*0.7);
+    const acertou = Math.random() < p;
+    this.nTiros++; if (acertou) this.nAcertos++;
+    const esp = acertou ? 0 : 520;                 // a que errou passa ao lado
+    const mira = { x: aviaoX + (Math.random()-0.5)*esp,
+                   y: aviaoY + (Math.random()-0.5)*esp,
+                   z: aviaoZ + (Math.random()-0.5)*esp };
+    const dir = vnorm({ x: mira.x - c.x, y: mira.y - c.y, z: mira.z - c.z });
+    const m = new THREE.Mesh(geoTiro, matBalaIni);
+    cena.add(m);
+    this.balas.push({ no: m, x: c.x, y: c.y, z: c.z,
+                      dx: dir.x, dy: dir.y, dz: dir.z, v: voo*6, vida: 0.9 });
+    if (acertou) Batalha.levaTiro({ dano: 4, leve: true });
+  },
+  passoBalas(dt){
+    for (let i = this.balas.length - 1; i >= 0; i--){
+      const b = this.balas[i];
+      b.x += b.dx*b.v*dt; b.y += b.dy*b.v*dt; b.z += b.dz*b.v*dt;
+      b.vida -= dt;
+      if (b.vida <= 0){ cena.remove(b.no); this.balas.splice(i, 1); continue; }
+      b.no.position.set(b.x, b.y, b.z);
+      b.no.quaternion.setFromUnitVectors(EIXO_Y,
+        new THREE.Vector3(b.dx, b.dy, b.dz));
+    }
+  },
+
+  /* um tiro meu encostou num caça? */
+  acerta(x, y, z, raio, dano){
+    for (let i = 0; i < this.lista.length; i++){
+      const c = this.lista[i];
+      if (Math.hypot(c.x-x, c.y-y, c.z-z) > raio + RAIO_AVIAO) continue;
+      c.vida -= dano;
+      if (c.vida > 0){
+        solta(x, y, z, 4, 0xffd08a, 18, 210);
+        Controles.bate('pegou'); sacode(0.05);
+        return true;
+      }
+      explode(c.x, c.y, c.z, 1.6);
+      cena.remove(c.no);
+      this.lista.splice(i, 1);
+      pontos += 400;
+      mostraAviso('CAÇA ABATIDO! +400', '#ffd257', 1100);
+      Controles.bate('alvo'); sacode(0.30);
+      return true;
+    }
+    return false;
+  }
+};
 const Batalha = {
   ligada: false, anfitriao: false, conn: null,     // conn: ligação com o anfitrião
   eu: '', nome: '', cor: 0, outros: new Map(), conexoes: [],
@@ -12168,11 +12473,19 @@ const Batalha = {
   levaTiro(d){
     if (caindo || !jogando) return;
     vida -= d.dano || 10;
-    clarao = Math.max(clarao, 0.25);
-    bip(180, 0.08, 'square', 0.06);
-    solta(aviaoX, aviaoY, aviaoZ, 6, 0xffb86b, 26, 260);
-    mostraAviso('ATINGIDO! ' + Math.max(0, Math.round(vida)) + '%', '#ff8080', 800);
-    sacode(0.42);
+    /* `leve` é o tiro de metralhadora de um caça da máquina: vêm muitos por
+       segundo, e o solavanco de 0,42 com aviso escrito a cada bala faria a
+       tela tremer sem parar e cobriria o próprio inimigo de letra. Dano
+       igual, retorno proporcional. */
+    const leve = !!d.leve;
+    clarao = Math.max(clarao, leve ? 0.14 : 0.25);
+    bip(180, 0.08, 'square', leve ? 0.04 : 0.06);
+    solta(aviaoX, aviaoY, aviaoZ, leve ? 3 : 6, 0xffb86b, leve ? 16 : 26, 260);
+    if (!leve || Date.now() - (this._ultAviso || 0) > 1400){
+      this._ultAviso = Date.now();
+      mostraAviso('ATINGIDO! ' + Math.max(0, Math.round(vida)) + '%', '#ff8080', 800);
+    }
+    sacode(leve ? 0.16 : 0.42);
     Controles.bate('levou');
     if (vida <= 0){
       vida = 0;
@@ -12298,7 +12611,7 @@ abrirSala();
 
 /* desenha uma primeira imagem parada atrás da capa, para não abrir preto */
 montaMapa(); montaChao(); montaPista(); montaRuas(); montaCidade(); montaTelhados(); montaCasas(); montaTambores(); montaAlvos();
-montaTrilhos(); montaInimigos(); montaPombos(); montaNuvens();
+montaTrilhos(); montaTrafego(); montaNuvens();
 aviaoY = 2200; poeCamera(1); arruma(); redimensiona();
 rend.render(cena, cam);
 </script>

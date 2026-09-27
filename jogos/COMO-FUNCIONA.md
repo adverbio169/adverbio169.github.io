@@ -6567,3 +6567,88 @@ O que **ficou** da tentativa: a letra da tecla agora é medida com
 `measureText` e encolhe até caber. "CABINE" e "CALIBRAR" estouravam a tecla, e
 adivinhar tamanho pela contagem de letras é o mesmo chute que já encostou as
 abas umas nas outras nesta mesma sessão.
+
+## O combate: caças que caçam
+
+> "quero inimigos mais inteligentes, quero começar o combate mesmo já. não
+> quero só tráfego passando. coloca uns inimigos para abater e também eu ser
+> abatido se for o caso."
+
+Primeiro o achado que muda a leitura do pedido: **o jogo não tinha inimigo
+nenhum.** O que voava era tráfego — avião de rota e helicóptero parado, que
+não olham para o jogador, não reagem e não atiram —, e os "hostis" do radar
+eram outras PESSOAS, pela rede. Sozinho, não havia contra quem lutar. E a
+função que montava tudo isso chamava-se `montaInimigos`, o que atrasou a
+descoberta; agora chama-se `montaTrafego`.
+
+### A inteligência é de três estados, e cada um por um motivo de combate
+
+| estado | o que faz | por que existe |
+|---|---|---|
+| CAÇA | aponta para a **antecipação** e acelera | perseguição pura nunca alcança: o caça fica sempre atrás, correndo atrás do próprio rabo |
+| ATIRA | rajadas curtas com pausa, dentro de 9000 e alinhado | rajada contínua não é como se atira e não dá chance nenhuma |
+| ROMPE | abaixo de 3200 ele **quebra para o lado** e sobe | sem isso dois aviões se aproximam até se tocarem, e o combate acaba em colisão |
+
+A antecipação é a mesma conta que a mira do jogador já faz, do outro lado:
+onde o alvo vai estar depois do tempo que a bala leva.
+
+### Três erros que o teste pegou, e o que cada um ensinou
+
+**1. Eles não atiravam.** Eu comparava o nariz com a MINHA posição — mas o
+nariz está apontado para a antecipação, então o ângulo até onde eu estou
+nunca fecha. Quem dispara é o **rastreio**: o nariz em cima da solução.
+
+**2. Eles me matavam em trinta segundos.** Com 0,11 s entre balas, 42% de
+acerto e 6 de dano, isso não é combate, é execução. Medido e recalibrado:
+6,2 balas por segundo, 22% colado, 4 de dano — uns 5,5 de vida por segundo
+enquanto UM caça estiver em cima. Dezoito segundos para manobrar, e manobrar
+é o jogo.
+
+**3. Dava para atravessar um caça.** A colisão do jogo só olhava o tráfego. E
+quando pus a colisão, ela usava a distância do INÍCIO do passo: a dois mil
+por segundo isso são dezenas de metros, e o teste pegou um caça a 727 de um
+limiar de 731 — vivo, dentro do raio, atravessando. Mede-se de novo depois de
+andar.
+
+### A regra de jogo que apareceu sozinha
+
+Perseguindo de longe eles vão a 1,45 do cruzeiro: **mais rápido que o
+jogador em cruzeiro, mais lento que o jogador em pós-combustão.** Ou seja, dá
+para escapar — mas só queimando nitro. Fugir em linha reta no cruzeiro não
+resolve, e é isso que obriga a manobrar ou brigar. Não planejei; caiu da
+escolha de velocidade e resolvi manter, porque dá sentido ao nitro.
+
+E o alarme **CAÇA · MANOBRE** acende quando um inimigo está com o nariz em
+mim dentro do alcance — ou seja, ANTES da primeira bala. Levar tiro sem aviso
+é o que faz um jogo parecer trapaceiro; com aviso, foi o jogador que demorou.
+
+### O que o teste do combate teve de aprender
+
+O jogador do teste **tinha velocidade mas não andava**. A IA mira na
+antecipação, então ela passou o combate perseguindo um ponto onde eu nunca
+chegava, e o teste concluiu que os caças não atiram. Um alvo parado com
+velocidade no papel não existe no ar. Agora ele voa — e em curva larga, como
+quem está em combate, porque voando reto para sempre ele simplesmente sai do
+mapa.
+
+E a pontaria é provada **direto**, com dois mil tiros a uma distância fixa,
+em vez de espiada no resultado de uma perseguição: número sorteado não se
+prova com uma amostra de sorte.
+
+## O tráfego ganhou chapa, e os pássaros saíram
+
+> "quero que os aviões de tráfego sejam mais resistentes à metralhadora. e
+> quero que tire os pássaros."
+
+O defeito era mais fundo do que parecia: `atingeAr` **recebia `dano` e não
+lia**. Uma bala de 7 e uma bomba de 100 matavam igual — tudo caía com um
+toque. A metralhadora não era fraca, era um botão de apagar.
+
+Agora cada coisa tem chapa e o dano desconta dela: avião de tráfego aguenta
+**quatro** tiros de metralhadora, helicóptero três, e míssil ou bomba
+continuam derrubando de primeira. O tiro que não mata solta faísca e faz
+barulho — acertar tem de ser sentido mesmo quando não derruba.
+
+Os pássaros eram quase metade do que voava: morriam de um tiro, não reagiam e
+enchiam o céu de pontinhos entre o jogador e o que interessa. O céu que sobrou
+é o lugar dos caças.
