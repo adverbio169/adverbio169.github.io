@@ -358,118 +358,119 @@ body.paisagem #controle.ver,
   body.paisagem #telaControle.ver{display:block;padding:0}
   body.paisagem #controle.ver > *,
   body.paisagem #telaControle.ver > *{position:absolute}
-  /* a bola sai do meio e encosta na coluna da esquerda: o meio agora é da
-     tela, e as duas juntas formam a linha de instrumentos */
-  body.paisagem #horizonte{left:calc(8px + var(--col) + 12px);top:46%;
-               transform:translateY(-50%);
-               --d:var(--adi);width:var(--d);height:var(--d)}
-  /* O AVISO DA REDE SAI DO MEIO. O meio do cabeçalho passou a ser da linha do
-     giro; e o aviso, que às vezes é uma frase inteira ("sala 4821 não
-     encontrada…"), atropelava os botões. Encostado no PILOTO, com reticências
-     quando não couber, ele para de brigar por espaço. */
-  body.paisagem #estadoRede{top:8px;right:calc(78px + env(safe-area-inset-right));left:auto;
-             transform:none;width:auto;max-width:34vw;white-space:nowrap;
-             overflow:hidden;text-overflow:ellipsis}
-  body.paisagem #posto{top:8px;right:calc(10px + env(safe-area-inset-right));padding:5px 10px;font-size:10.5px;letter-spacing:1.5px}
-  body.paisagem .placar .val2{font-size:16px}
-  /* A LINHA DO GIRO SOBE PARA O CABEÇALHO. Ela morava no rodapé do meio —
-     que agora é painel. Em cima, à direita dos botões de começar e calibrar,
-     há uma faixa livre de ponta a ponta e ninguém a usava. */
-  body.paisagem #giroLinha{top:10px;bottom:auto;left:180px;right:auto;transform:none;
-                           font-size:0;justify-content:flex-start;flex-wrap:nowrap;
-                           max-width:calc(100vw - 180px - 34vw - 92px);overflow:hidden}
-
-  /* =====================================================================
-     AJUSTE NÃO FICA NA TELA DURANTE O VOO
-
-     "Como tá a versão controle? Lá o painel pode ser bem maior."
-
-     Está, e o que o impedia era medível: num iPhone SE o painel era 169×307,
-     21% da tela — mais estreito que a bola do horizonte ao lado dele. A faixa
-     de cima, 50 px de ponta a ponta, era a única coisa acima dele.
-
-     O que há nessa faixa? "Começar", "Calibrar", "girar" e "cabine". Começar
-     serve uma vez por partida; girar e cabine, quase nunca. Nenhum dos três é
-     comando de voo, e os três ficavam ocupando altura em todo instante de
-     todo voo.
-
-     Tentei primeiro empilhá-los na coluna da esquerda. A prova de
-     sobreposição reprovou em aparelho curto: a linha caía em cima da coluna
-     do nitro e a bola do horizonte ficava a 2 px. Empurrar peça não resolve
-     tela cheia — tirar da tela o que não é de voar, sim.
-
-     Então: quando o avião está voando, a faixa some e o painel toma o lugar
-     dela. Some SOZINHA, no instante em que o voo começa, porque é aí que ela
-     deixa de servir; e volta por uma engrenagem no canto, para quem precisar
-     de "cabine" no meio do voo. O Calibrar FICA — esse se usa voando, é o
-     zero da mão. */
-  body.paisagem.voando:not(.ajustes) #btComecar,
-  body.paisagem.voando:not(.ajustes) #giroLinha{display:none}
-  body.paisagem.voando:not(.ajustes) #painelTela{top:8px;
-              height:calc(100vh - 18px);height:calc(100dvh - 18px)}
-  #btAjustes{display:none}
-  body.paisagem.voando #btAjustes{display:flex;position:fixed;z-index:6;
-              top:8px;left:calc(10px + env(safe-area-inset-left));
-              width:34px;height:31px;align-items:center;justify-content:center;
-              border:1px solid rgba(255,255,255,.18);border-radius:10px;
-              background:rgba(8,12,26,.6);color:#dce5f5;font-size:15px;
-              padding:0;cursor:pointer}
-  body.paisagem.voando.ajustes #btAjustes{background:rgba(92,200,255,.18);
-              border-color:rgba(92,200,255,.55)}
-  /* a engrenagem ocupa o canto, então o Calibrar (e a fileira dele) desliza
-     34 px para a direita enquanto ela existe */
-  body.paisagem.voando .linha{left:calc(52px + env(safe-area-inset-left))}
-  /* DEITADO, "asas: niveladas" SAI e ficam só os dois botões. O texto dizia o
-     que a bola do horizonte já mostra — ela É a resposta para "as asas estão
-     niveladas?" — e num aparelho pequeno era ele que empurrava o botão
-     "cabine" para fora da faixa. Em pé, onde não há bola, o texto fica. */
-  body.paisagem #giroLinha button{font-size:12px}
-  /* polegar esquerdo */
-  body.paisagem .armas{left:calc(10px + env(safe-area-inset-left));bottom:calc(10px + env(safe-area-inset-bottom));
-           width:min(34vw,190px);max-width:none;height:min(21vw,96px)}
   body.paisagem .armaAtual{font-size:min(3.6vw,17px)}
   /* deitado não cabe o nome das armas vizinhas sem passar por cima da do
-       meio; fica só a seta, que é o que interessa para saber que dá para
-       deslizar */
+     meio; fica só a seta, que é o que interessa para saber que dá para
+     deslizar */
   body.paisagem .armaLado{width:14%;font-size:0}
   body.paisagem .armaLado::first-letter{font-size:13px}
-  /* polegar direito */
-  body.paisagem #btFogo{right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));
-            width:min(27vw,132px);height:min(27vw,132px);max-width:none;border-radius:50%;
-            font-size:17px;letter-spacing:2px;box-shadow:0 7px 0 #8f2a1d}
-  body.paisagem #btFogo:active{transform:translateY(5px);box-shadow:0 2px 0 #8f2a1d}
-  /* deitado, ela vira um círculo menor empilhado em cima do FOGO */
-  body.paisagem #btChama{right:calc(10px + env(safe-area-inset-right));
-            bottom:calc(10px + min(27vw,132px) + 12px + env(safe-area-inset-bottom));
-            position:fixed;width:min(20vw,98px);height:min(20vw,98px);max-width:none;
-            border-radius:50%;font-size:12.5px;letter-spacing:1.5px;margin:0;
-            display:none;box-shadow:0 6px 0 #a8761f;z-index:6}
-  body.pousa.paisagem #btChama{display:flex;align-items:center;justify-content:center;
-            flex-direction:column;gap:2px}
-  body.paisagem #btChama b{margin:0;font-size:15px;opacity:.9}
-  /* o que se usa pouco fica em cima, longe do polegar */
-  body.paisagem .linha{top:8px;left:calc(10px + env(safe-area-inset-left));width:auto;max-width:none;gap:6px}
-  body.paisagem .linha .bt{flex:0 0 auto;width:auto;padding:7px 12px;font-size:12.5px}
-  body.paisagem .bt.pouso{padding:7px 9px;font-size:11.5px;letter-spacing:.5px}
-  body.paisagem .linha .bt b{font-size:12.5px}
-
-  /* deitado: cada um colado na sua borda; o resto dá passagem */
-  /* os seletores precisam do ID: a regra de tamanho de #acel/#nitro é mais
-     forte que uma de classe, e a tira continuava larga e baixa deitada */
-  body.paisagem #acel, body.paisagem #nitro{width:min(13vw,58px);max-width:none;
-           height:min(62vh,215px);top:48%;transform:translateY(-50%)}
-  body.paisagem #acel{right:calc(8px + env(safe-area-inset-right));left:auto}
-  body.paisagem #nitro{left:calc(8px + env(safe-area-inset-left));right:auto}
-  body.paisagem #acelNum{font-size:min(3.4vw,15px)}
-  body.paisagem #acelRot{font-size:8px;letter-spacing:1px}
+  body.paisagem #btChama b{margin:0;font-size:14px;opacity:.9}
+  /* o número desce para o pé da coluna: com o rótulo de pé no meio, os dois
+     centrados escreviam um por cima do outro ("POTÊNCIA" atravessando "67%") */
+  body.paisagem #acelNum{position:absolute;left:0;right:0;bottom:5px;top:auto;
+           text-align:center;font-size:min(3.4vw,14px)}
+  /* POTÊNCIA de pé, como o NITRO. Deitada numa coluna de 40 px ela saía
+     "POTÊN" — e um rótulo cortado num painel de instrumento é pior que
+     nenhum, porque parece defeito. */
+  body.paisagem #acelRot{writing-mode:vertical-rl;transform:rotate(180deg);
+           position:absolute;left:2px;top:50%;translate:0 -50%;bottom:auto;
+           width:auto;font-size:min(3.2vw,12px);letter-spacing:3px}
   /* NITRO de pé, para caber na tira estreita */
-  body.paisagem #nitro b{writing-mode:vertical-rl;transform:rotate(180deg);font-size:min(3.2vw,14px);letter-spacing:4px}
-  body.paisagem #nitroCarga{left:0;right:0;top:auto;bottom:0;width:100%;height:var(--carga,100%);
+  body.paisagem #nitro b{writing-mode:vertical-rl;transform:rotate(180deg);
+           font-size:min(3.2vw,13px);letter-spacing:4px}
+  body.paisagem #nitroCarga{left:0;right:0;top:auto;bottom:0;width:100%;
+           height:var(--carga,100%);
            background:linear-gradient(0deg,rgba(92,200,255,.5),rgba(140,230,255,.22))}
-  /* o gatilho e o seletor recuam a largura da alavanca */
-  body.paisagem #btFogo{right:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-right))}
-  body.paisagem #btChama{right:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-right))}
-  body.paisagem .armas{left:calc(8px + min(13vw,58px) + 10px + env(safe-area-inset-left))}
+  body.paisagem .placar .val2{font-size:16px}
+
+  /* =========================================================================
+     O PAINEL É O CELULAR INTEIRO
+
+     "Isso tem que ser parte integrante do painel. Não podemos mais ter nada
+      fora do painel. O painel é o celular todo. Todo o celular é o controle
+      do avião. Tem que redesenhar tudo com a nova visão."
+
+     Até aqui o vidro era um retângulo no MEIO da tela e os comandos eram
+     peças soltas ao redor dele: a bola do horizonte flutuando no preto, o
+     seletor de arma num cartão próprio, o FOGO e as alavancas encostados nas
+     bordas. Cada um com a sua moldura, o seu raio de canto, o seu fundo. Dava
+     um aplicativo com um painel dentro, e não um painel.
+
+     A inversão: o VIDRO É A TELA. Uma superfície só, com a moldura na borda
+     do aparelho, e tudo o que existe é um POÇO aberto nessa superfície — a
+     bola, as alavancas, o gatilho, as armas, as páginas. Quem desenha todas
+     as molduras é a mesma função, então a linguagem visual é uma só por
+     construção, e não por disciplina.
+
+     UMA FONTE DE VERDADE PARA A GEOMETRIA. `regioes()` calcula todos os
+     retângulos, em pixels de tela, a partir de um lugar só. O desenho lê dali
+     e `acomoda()` põe os elementos de HTML exatamente nos mesmos retângulos.
+     Já aconteceu neste projeto de o disco do radar ser calculado num lugar e
+     pintado em outro; com duas contas paralelas — uma em CSS, outra em JS —
+     isso volta a acontecer na primeira tela de tamanho diferente. Aqui o CSS
+     não mede nada: ele só pinta o que está dentro do poço.
+     ====================================================================== */
+  body.paisagem #painelTela{position:fixed;left:0;top:0;right:auto;bottom:auto;
+              width:100vw;height:100vh;height:100dvh;transform:none;
+              box-shadow:none;border-radius:0;transition:none}
+  /* nada de recolher: recolher existia para revelar o jogo atrás do painel, e
+     no controle não há jogo atrás — há o próprio painel. */
+  body.paisagem #painelTela.encolhido{top:0;bottom:auto;height:100vh;height:100dvh}
+  /* OS POÇOS. O elemento não desenha mais moldura nenhuma: a moldura é do
+     vidro, desenhada na lona, e o HTML só carrega o conteúdo. */
+  body.paisagem #horizonte, body.paisagem .armas, body.paisagem #nitro,
+  body.paisagem #acel, body.paisagem #btFogo, body.paisagem #btChama,
+  body.paisagem #estadoRede, body.paisagem #posto{
+              position:fixed;z-index:4;margin:0;transform:none;
+              border:0;box-shadow:none;background:transparent}
+  body.paisagem #horizonte{border-radius:50%;overflow:hidden;
+              box-shadow:inset 0 0 0 1px rgba(99,216,255,.30)}
+  body.paisagem .armas{display:flex;align-items:center;justify-content:center;
+              border-radius:8px;background:rgba(4,14,21,.35)}
+  body.paisagem #nitro, body.paisagem #acel{border-radius:6px;overflow:hidden;
+              background:rgba(4,14,21,.35)}
+  /* o gatilho continua botão de verdade -- vermelho, redondo e com queda,
+     porque ele é a única peça que se aperta com força e no escuro */
+  body.paisagem #btFogo{border-radius:50%;background:#d8422f;
+              box-shadow:0 6px 0 #8f2a1d;font-size:min(4vw,17px);letter-spacing:2px}
+  body.paisagem #btFogo:active{transform:translateY(4px);box-shadow:0 2px 0 #8f2a1d}
+  body.paisagem #btChama{border-radius:50%;background:#ffc24d;color:#2a1f05;
+              box-shadow:0 5px 0 #a8761f;display:none}
+  body.pousa.paisagem #btChama{display:flex;align-items:center;
+              justify-content:center;flex-direction:column;gap:1px}
+  body.paisagem #estadoRede, body.paisagem #posto{
+              display:flex;align-items:center;white-space:nowrap;overflow:hidden;
+              text-overflow:ellipsis;padding:0 6px;font-size:10.5px}
+  body.paisagem #posto{justify-content:flex-end;letter-spacing:1.5px}
+  body.paisagem #estadoRede{justify-content:flex-start}
+  /* a engrenagem e o calibrar moram na faixa de cabeça, dentro do vidro */
+  body.paisagem #btAjustes{position:fixed;z-index:6;display:flex;
+              align-items:center;justify-content:center;
+              border:1px solid rgba(99,216,255,.28);border-radius:7px;
+              background:rgba(4,14,21,.45);color:#cfe8ff;font-size:14px;
+              padding:0;cursor:pointer}
+  body.paisagem .linha{position:fixed;z-index:6;display:flex;gap:6px;
+              width:auto;max-width:none}
+  body.paisagem .linha .bt{flex:0 0 auto;width:auto;padding:0 10px;
+              font-size:11.5px;border:1px solid rgba(99,216,255,.28);
+              border-radius:7px;background:rgba(4,14,21,.45);color:#cfe8ff}
+  body.paisagem #giroLinha{position:fixed;z-index:6;top:auto;left:auto;
+              display:flex;gap:6px;font-size:0;flex-wrap:nowrap}
+  /* AJUSTE NÃO FICA NA TELA DURANTE O VOO. Vale ainda mais agora: a faixa de
+     cabeça tem 32 px e é parte do painel, não uma barra de aplicativo. Ali
+     cabem a engrenagem, o Calibrar (que se usa voando, é o zero da mão) e o
+     estado da ligação. O resto aparece quando a engrenagem pede. */
+  body.paisagem.voando:not(.ajustes) #btComecar,
+  body.paisagem.voando:not(.ajustes) #giroLinha{display:none}
+  body.paisagem.voando.ajustes #btAjustes{background:rgba(92,200,255,.18);
+              border-color:rgba(92,200,255,.55)}
+  body.paisagem #giroLinha button{font-size:11.5px;padding:0 10px;
+              border:1px solid rgba(99,216,255,.28);border-radius:7px;
+              background:rgba(4,14,21,.45);color:#cfe8ff}
+  /* as três regras que recuavam FOGO, DEFESA e armas "a largura da alavanca"
+     saíram: quem decide onde cada poço fica é `Painel.regioes()`, e uma conta
+     de CSS por cima dela seria a segunda fonte de verdade que esta mudança
+     existe para eliminar. */
   body.paisagem #dica{display:none}
   body.paisagem .estado{padding:6px 10px;font-size:11.5px}
   
@@ -1428,6 +1429,10 @@ const Painel = {
      a alça; para cima ele volta. Fica guardado, porque quem escolheu voar com
      a tela pequena não quer reescolher a cada partida. */
   recolhe(v){
+    /* recolher existia para revelar o JOGO atrás do painel. No controle de
+       tela cheia não há jogo atrás — há o próprio painel — e recolher deixaria
+       o aparelho sem instrumento nenhum. */
+    if (this.telaCheia()) return;
     v = !!v;
     if (this.encolhido === v) return;
     this.encolhido = v;
@@ -1445,6 +1450,123 @@ const Painel = {
     enviaCtl({ t:'pag', c: this.carro });
     try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
   },
+  /* ======================= A GEOMETRIA DO PAINEL =======================
+     Um lugar só calcula TODOS os retângulos. O desenho lê daqui e `acomoda`
+     põe os elementos de HTML nos mesmos números. Tudo em pixels de tela.
+
+     A ordem das colunas não é arbitrária: as duas alavancas nas bordas,
+     porque é onde os polegares alcançam sem soltar o aparelho; a bola do
+     horizonte à esquerda, que é onde o olho procura atitude; o gatilho à
+     direita, sob o polegar direito; e as páginas no meio, que é o que se LÊ
+     e não o que se aperta. A fita de abas atravessa o rodapé inteiro — antes
+     ela vivia espremida em 169 px com oito rótulos. */
+  telaCheia(){ return document.body.classList.contains('paisagem'); },
+  regioes(W, H){
+    const m = Math.max(5, Math.min(W*0.010, 10));
+    const hCab = Math.max(22, Math.min(H*0.088, 32));
+    const hAbas = Math.max(26, Math.min(H*0.105, 40));
+    const y0 = m + hCab + m*0.8, y1 = H - m - hAbas - m*0.6;
+    const alt = y1 - y0;
+    const wAlav = Math.max(34, Math.min(W*0.062, 52));
+    const wEsq  = Math.max(104, Math.min(W*0.205, 178));
+    const wFogo = Math.max(88, Math.min(W*0.158, 124));
+    let x = m;
+    const nitro = { x, y: y0, w: wAlav, h: alt }; x += wAlav + m;
+    const colE = x; x += wEsq + m;
+    const xDir = W - m - wAlav, pot = { x: xDir, y: y0, w: wAlav, h: alt };
+    const colD = xDir - m - wFogo;
+    const pag = { x, y: y0, w: Math.max(80, colD - m - x), h: alt };
+
+    /* na coluna da esquerda: a bola em cima, quadrada, e as armas no que
+       sobrar. A bola é redonda, então o poço dela é o maior quadrado que
+       cabe — nunca mais alta que dois terços da coluna, senão as armas
+       viram uma tira sem altura para o nome da arma. */
+    const ladoAdi = Math.min(wEsq, alt*0.66);
+    const adi  = { x: colE + (wEsq - ladoAdi)/2, y: y0, w: ladoAdi, h: ladoAdi };
+    const arma = { x: colE, y: y0 + ladoAdi + m*0.8, w: wEsq,
+                   h: Math.max(38, alt - ladoAdi - m*0.8) };
+
+    /* na coluna da direita: o gatilho embaixo, redondo e o maior que caiba,
+       e a DEFESA em cima dele quando houver pouso */
+    const pousa = document.body.classList.contains('pousa');
+    const ladoFogo = Math.min(wFogo, pousa ? alt*0.60 : alt*0.74);
+    const fogo = { x: colD + (wFogo - ladoFogo)/2, y: y1 - ladoFogo,
+                   w: ladoFogo, h: ladoFogo };
+    const ladoCh = Math.min(wFogo*0.82, Math.max(0, fogo.y - y0 - m*0.8));
+    const chama = (pousa && ladoCh > 34)
+      ? { x: colD + (wFogo - ladoCh)/2, y: fogo.y - m*0.8 - ladoCh, w: ladoCh, h: ladoCh }
+      : null;
+
+    return { W, H, m, hCab, hAbas,
+             cab:  { x: m, y: m, w: W - m*2, h: hCab },
+             abas: { x: m, y: H - m - hAbas, w: W - m*2, h: hAbas },
+             nitro, adi, arma, pag, fogo, chama, pot,
+             colD: { x: colD, y: y0, w: wFogo, h: alt } };
+  },
+  /* põe cada elemento de HTML exatamente no retângulo que o desenho usou.
+     Só quando muda: isto escreve estilo em doze elementos, e escrever estilo
+     sessenta vezes por segundo para gravar o mesmo número é trabalho que o
+     navegador faz e ninguém vê. */
+  acomoda(R){
+    const chave = [R.W, R.H, document.body.className].join('|');
+    if (chave === this._acomodado) return;
+    this._acomodado = chave;
+    const poe = (id, r) => {
+      const e = document.getElementById(id); if (!e) return;
+      if (!r){ e.style.display = 'none'; return; }
+      e.style.left = r.x + 'px'; e.style.top = r.y + 'px';
+      e.style.width = r.w + 'px'; e.style.height = r.h + 'px';
+      e.style.right = 'auto'; e.style.bottom = 'auto';
+      e.style.removeProperty('display');
+    };
+    const fo = Math.max(3, R.m*0.55);
+    poe('nitro', this.miolo(R.nitro, null, fo));
+    poe('acel',  this.miolo(R.pot,   null, fo));
+    poe('seletorArma', this.miolo(R.arma, 'ARMAMENTO', fo));
+    poe('btFogo', R.fogo);
+    if (R.chama) poe('btChama', R.chama);
+    /* a bola é REDONDA, então ela é o maior círculo que cabe no miolo — que
+       já desconta a faixa do rótulo. Sem o menor dos dois lados ela virava um
+       oval espremido em telas onde o poço não sai quadrado. */
+    const mi = this.miolo(R.adi, 'ATITUDE', fo);
+    const lado = Math.min(mi.w, mi.h);
+    poe('horizonte', { x: mi.x + (mi.w - lado)/2, y: mi.y, w: lado, h: lado });
+
+    /* a faixa de cabeça: engrenagem e calibrar à esquerda, estado e posto à
+       direita, tudo na mesma altura da faixa */
+    const hb = Math.max(20, R.hCab - 6), yb = R.cab.y + (R.hCab - hb)/2;
+    const g = document.getElementById('btAjustes');
+    let xe = R.cab.x + 4;
+    if (g && getComputedStyle(g).display !== 'none'){
+      g.style.left = xe + 'px'; g.style.top = yb + 'px';
+      g.style.width = (hb*1.1) + 'px'; g.style.height = hb + 'px';
+      xe += hb*1.1 + 5;
+    }
+    const li = document.querySelector('#telaControle .linha');
+    if (li){ li.style.left = xe + 'px'; li.style.top = yb + 'px';
+             li.style.height = hb + 'px'; li.style.right = 'auto'; li.style.bottom = 'auto';
+             li.querySelectorAll('.bt').forEach(b => { b.style.height = hb + 'px';
+                                                       b.style.lineHeight = hb + 'px'; }); }
+    const gl = document.getElementById('giroLinha');
+    if (gl && getComputedStyle(gl).display !== 'none'){
+      const lr = li ? li.getBoundingClientRect() : { right: xe };
+      gl.style.left = (lr.right + 6) + 'px'; gl.style.top = yb + 'px';
+      gl.style.height = hb + 'px';
+      gl.querySelectorAll('button').forEach(b => { b.style.height = hb + 'px'; });
+    }
+    const po = document.getElementById('posto');
+    const er = document.getElementById('estadoRede');
+    let xd = R.cab.x + R.cab.w;
+    if (po){ const wp = 66; xd -= wp;
+             po.style.left = xd + 'px'; po.style.top = yb + 'px';
+             po.style.width = wp + 'px'; po.style.height = hb + 'px';
+             po.style.right = 'auto'; xd -= 6; }
+    if (er){ const we = Math.max(80, Math.min(R.W*0.24, 190));
+             er.style.left = (xd - we) + 'px'; er.style.top = yb + 'px';
+             er.style.width = we + 'px'; er.style.height = hb + 'px';
+             er.style.right = 'auto'; }
+  },
+
   prepara(){
     const el = document.getElementById('painelTela');
     if (!el) return null;
@@ -1466,10 +1588,88 @@ const Painel = {
     }
     return { w, h };
   },
+  /* um POÇO: a abertura de um instrumento na superfície do vidro. Fundo mais
+     escuro (é um rebaixo), fio de luz na boca e as quatro esquadrias. É a
+     MESMA função para a bola, as alavancas, as armas e a página — é por isso
+     que o painel parece uma peça só e não um mostruário de caixinhas. */
+  /* a altura que o rótulo do poço come. Fica aqui, e não espalhada, porque
+     quem desenha a moldura e quem põe o instrumento dentro têm de usar o
+     MESMO número — na primeira versão o rótulo era escrito por baixo da bola
+     do horizonte, que é o que acontece quando dois lugares chutam a folga. */
+  faixaRot(r){ return Math.max(9, Math.min(r.h*0.10, 13)); },
+  miolo(r, rot, folga){
+    const f = folga === undefined ? 4 : folga;
+    return { x: r.x + f, y: r.y + f, w: r.w - f*2,
+             h: r.h - f - (rot ? this.faixaRot(r) : f) };
+  },
+  poco(c, r, rot, cor){
+    c.save();
+    c.fillStyle = 'rgba(2,8,13,.55)';
+    c.fillRect(r.x, r.y, r.w, r.h);
+    c.strokeStyle = 'rgba(99,216,255,.13)'; c.lineWidth = 1;
+    c.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    const q = Math.max(6, Math.min(r.w, r.h)*0.13);
+    c.strokeStyle = cor || 'rgba(99,216,255,.42)'; c.lineWidth = 1.6;
+    for (const [sx, sy] of [[1,1],[-1,1],[1,-1],[-1,-1]]){
+      const x = sx > 0 ? r.x + 1 : r.x + r.w - 1, y = sy > 0 ? r.y + 1 : r.y + r.h - 1;
+      c.beginPath();
+      c.moveTo(x + sx*q, y); c.lineTo(x, y); c.lineTo(x, y + sy*q);
+      c.stroke();
+    }
+    if (rot){
+      const fr = this.faixaRot(r);
+      c.font = '800 ' + Math.max(7, Math.min(fr*0.72, 9.5)).toFixed(1) + 'px system-ui, sans-serif';
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillStyle = 'rgba(143,163,184,.72)';
+      c.fillText(rot, r.x + r.w/2, r.y + r.h - fr/2);
+    }
+    c.restore();
+  },
+
+  /* O DESENHO DA TELA CHEIA. O vidro cobre o aparelho, os poços são abertos
+     nele e a página é desenhada DENTRO do poço dela, com a origem transladada
+     — assim nenhuma das oito funções de página precisou saber que o painel
+     mudou de tamanho: para elas, a tela continua começando em (0,0). */
+  pintaCheio(c, W, H, d){
+    const R = this.regioes(W, H);
+    this.R = R;
+    c.clearRect(0, 0, W, H);
+    this.vidro(c, { W, H, cab: R.hCab, abas: R.hAbas, pad: R.m });
+    this.acomoda(R);
+
+    this.poco(c, R.adi, 'ATITUDE');
+    this.poco(c, R.arma, 'ARMAMENTO');
+    this.poco(c, R.nitro, null);
+    this.poco(c, R.pot, null);
+    this.poco(c, R.pag, null);
+
+    /* a página, na região dela */
+    const P = R.pag;
+    const abasP = 0;
+    const cab  = Math.max(14, Math.min(P.h*0.105, 30));
+    const pad  = Math.max(8, Math.min(P.w*0.045, 20));
+    const f    = Math.max(9, Math.min(P.h*0.078, P.w*0.062));
+    const m = { pad, cab, abas: abasP, corpoY: cab, corpoH: P.h - cab,
+                f, fv: f*1.35, W: P.w, H: P.h };
+    c.save();
+    c.beginPath(); c.rect(P.x, P.y, P.w, P.h); c.clip();
+    c.translate(P.x, P.y);
+    this.cabecalhoPag(c, m, d);
+    this.corpoPag(c, m, d);
+    c.restore();
+
+    /* e a fita de abas, atravessando o rodapé inteiro */
+    this.abasAltura = R.hAbas; this.alcaAltura = 0;
+    c.save(); c.translate(R.abas.x, R.abas.y);
+    this.pintaAbas(c, R.abas.w, R.abas.h, R.abas.h);
+    c.restore();
+  },
+
   pinta(){
     const t = this.prepara();
     if (!t) return;
     const c = this.cx, W = t.w, H = t.h, d = this.dado;
+    if (this.telaCheia()) return this.pintaCheio(c, W, H, d);
     /* ENCOLHIDO: sobra a fita de abas e a alça. É o mínimo para ainda trocar
        de página com o dedo e para o painel não sumir sem deixar endereço. */
     if (this.encolhido){
@@ -1503,6 +1703,21 @@ const Painel = {
       c.fillStyle = 'rgba(99,216,255,.32)';
       c.fillRect(W/2 - aw/2, Math.max(2.5, cab*0.14), aw, ah); }
 
+    this.cabecalhoPag(c, m, d);
+    this.corpoPag(c, m, d);
+
+    /* AS ABAS mostram as oito páginas e marcam as três que estão abertas: a
+       desta tela, as duas da TV com um fio embaixo. Ver onde as outras duas
+       estão é o que faz a fita parecer uma fita, e não um sorteio. */
+    this.abasAltura = abas;
+    this.pintaAbas(c, W, H, abas);
+  },
+  /* O CABEÇALHO E O CORPO DA PÁGINA viraram métodos porque agora há DOIS
+     desenhos que precisam deles: o painel de tela cheia (deitado) e o antigo
+     retângulo (em pé). Duplicar o despacho das oito páginas seria garantir
+     que um dia uma delas exista só num dos dois. */
+  cabecalhoPag(c, m, d){
+    const { pad, cab, W } = m;
     const nome = MFD_PAGS[this.carro];
     c.textBaseline = 'middle'; c.textAlign = 'left';
     const bh = Math.max(2, cab*0.34);
@@ -1517,10 +1732,11 @@ const Painel = {
       c.textAlign = 'right'; c.fillStyle = MFD_FRACO;
       c.fillText('‹ arraste ›', W - pad, cab*0.60);
     }
-
+  },
+  corpoPag(c, m, d){
+    const nome = MFD_PAGS[this.carro];
     /* o conteúdo pinta aceso, igual ao da TV: um save só para a página toda */
-    c.save(); this.aceso(c, 'rgba(120,225,255,.42)', Math.max(3, H*0.016));
-
+    c.save(); this.aceso(c, 'rgba(120,225,255,.42)', Math.max(3, m.H*0.016));
     if (!d.jogando && !d.vel){ this.vazio(c, m); }
     else if (nome === 'SINÓT') this.sinoptico(c, m, d);
     else if (nome === 'MOTOR') this.motor(c, m, d);
@@ -1531,12 +1747,6 @@ const Painel = {
     else if (nome === 'OBJET') this.objetivos(c, m, d);
     else if (nome === 'VOO')   this.voo(c, m, d);
     c.restore();
-
-    /* AS ABAS mostram as SEIS páginas e marcam as três que estão abertas: a
-       desta tela cheia, as duas da TV com um fio embaixo. Ver onde as outras
-       duas estão é o que faz a fita parecer uma fita, e não um sorteio. */
-    this.abasAltura = abas;
-    this.pintaAbas(c, W, H, abas);
   },
   /* A FITA DE ABAS, que o painel aberto e o encolhido dividem: ela marca a
      página desta tela e, com um fio embaixo, as DUAS que estão na TV. */
@@ -2316,11 +2526,21 @@ const Painel = {
      Agora: o eixo é decidido pelo TOTAL do gesto, na hora de soltar; o
      limiar é 12% da largura com mínimo de 28 px; e o mesmo laço atende
      `touch` e `pointer`. Para baixo, encolhe; para cima, abre. */
+  const dentro = (r, x, y) => !!r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
   let x0 = null, y0 = null, usou = false, movi = false, id = null;
   const limH = () => Math.max(28, Math.min(el.clientWidth*0.12, 70));
   const limV = () => Math.max(34, Math.min(el.clientHeight*0.18, 90));
 
-  function pega(x, y){ x0 = x; y0 = y; usou = false; movi = false; Painel.arrastando = true; }
+  /* e o arrasto que troca de página só começa DENTRO da página: arrastar em
+     cima da bola do horizonte para virar a fita seria um comando escondido
+     onde ninguém procura, e pior, num lugar onde o dedo passa sem querer. */
+  function pega(x, y){
+    const R = Painel.R;
+    if (Painel.telaCheia() && R && !dentro(R.pag, x, y) && !dentro(R.abas, x, y)){
+      x0 = null; return;
+    }
+    x0 = x; y0 = y; usou = false; movi = false; Painel.arrastando = true;
+  }
   function anda(x, y, e){
     if (x0 === null || usou) return;
     const dx = x - x0, dy = y - y0;
@@ -2380,8 +2600,23 @@ const Painel = {
   /* e tocar numa aba leva direto: quem vê seis abas tenta tocar nelas. Só
      que um TOQUE, não o fim de um arrasto — senão o gesto rola a fita e o
      clique que vem atrás rola de novo. */
+  /* EM TELA CHEIA O TOQUE LÊ AS REGIÕES, e não mais a caixa inteira: a fita
+     de abas e a página são dois retângulos conhecidos, e um toque no vidro
+     vazio entre os poços não é de ninguém. Medir "os últimos N pixels da
+     caixa" funcionava quando a caixa ERA a página; agora a caixa é o
+     aparelho. */
   el.addEventListener('click', e => {
     if (movi){ movi = false; return; }
+    const R = Painel.R;
+    if (Painel.telaCheia() && R){
+      if (dentro(R.abas, e.clientX, e.clientY)){
+        const i = Math.floor((e.clientX - R.abas.x)/(R.abas.w/MFD_PAGS.length));
+        Painel.rola(Math.max(0, Math.min(MFD_PAGS.length - 1, i)) - Painel.carro);
+      } else if (dentro(R.pag, e.clientX, e.clientY)){
+        Painel.tocaPagina(e.clientX - R.pag.x, e.clientY - R.pag.y);
+      }
+      return;
+    }
     const q = el.getBoundingClientRect();
     const abas = Painel.abasAltura || Math.max(18, q.height*0.155);
     if (e.clientY >= q.bottom - abas){

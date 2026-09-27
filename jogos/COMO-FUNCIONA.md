@@ -7130,3 +7130,84 @@ painel**, como coluna fixa à esquerda do vidro — o mesmo mecanismo das teclas
 de borda do lado do jogo. Num avião de verdade o ADI *é* o instrumento do
 meio do painel, não um aparelho ao lado dele; e a conta fecha: o painel iria
 de 169 para ~371 px de largura no SE, **mais que o dobro de área**.
+
+# O painel é o celular inteiro
+
+> "Isso tem que ser parte integrante do painel. Não podemos mais ter nada fora
+> do painel. O painel é o celular todo. Todo o celular é o controle do avião.
+> Tem que redesenhar tudo com a nova visão."
+
+Até aqui o vidro era um retângulo no **meio** da tela e os comandos eram peças
+soltas ao redor: a bola do horizonte flutuando no preto, o seletor de arma num
+cartão próprio, o FOGO e as alavancas encostados nas bordas. Cada um com a sua
+moldura, o seu raio de canto, o seu fundo. Isso dava *um aplicativo com um
+painel dentro*, e não um painel.
+
+A inversão: **o vidro é a tela**. Uma superfície só, com a moldura na borda do
+aparelho, e tudo o que existe é um **poço** aberto nessa superfície — a bola,
+as alavancas, o gatilho, as armas, as páginas.
+
+## Uma função desenha todas as molduras
+
+`poco(c, r, rótulo)` faz o rebaixo, o fio de luz na boca, as quatro esquadrias
+e a faixa do rótulo. A bola usa a mesma, as alavancas usam a mesma, a página
+usa a mesma. A linguagem visual passa a ser uma só **por construção**, e não
+por disciplina de quem escreve a próxima peça.
+
+## Uma fonte de verdade para a geometria
+
+`regioes(W,H)` calcula **todos** os retângulos a partir de um lugar só, em
+pixels de tela. O desenho lê dali, e `acomoda()` põe os elementos de HTML
+exatamente nos mesmos números. O CSS não mede mais nada: ele só pinta o que
+está dentro do poço.
+
+Isso não é preciosismo. Já aconteceu neste projeto de o disco do radar ser
+calculado num lugar e pintado em outro. Com duas contas paralelas — uma em
+CSS, outra em JS — a divergência não é uma possibilidade, é uma questão de
+qual tela de tamanho diferente chega primeiro. Saíram quatro regras de CSS que
+recuavam FOGO, DEFESA e armas "a largura da alavanca": eram exatamente a
+segunda conta.
+
+O teste `ctlpainel.js` verifica isto diretamente em quatro aparelhos: o
+retângulo de cada instrumento no DOM tem de estar **dentro** do poço que o
+desenho abriu para ele.
+
+## O que a tela ganhou
+
+| iPhone SE 667×375 | antes | agora |
+|---|---|---|
+| página de instrumentos | 169 px de largura | **302 px** |
+| fita de abas | 169 px, oito rótulos espremidos | **654 px** |
+| vidro | um retângulo de 21% da tela | o aparelho inteiro |
+
+## Dois erros meus, na mesma hora
+
+**O rótulo escrito por baixo do conteúdo.** `poco` desenhava o rótulo no
+rodapé do poço e `acomoda` punha o instrumento ocupando o poço inteiro: a bola
+do horizonte cobria a palavra ATITUDE. Dois lugares chutando a mesma folga.
+Agora `faixaRot()` é um número só, e `miolo()` é o que sobra depois dela —
+quem desenha a moldura e quem põe o instrumento dentro leem a mesma conta.
+
+**"POTÊNCIA" cortado em "POTÊN"**, e depois, de pé, escrito por cima do
+"67%". Rótulo de instrumento cortado é pior que rótulo nenhum, porque parece
+defeito do aparelho. De pé como o NITRO, e o número no pé da coluna.
+
+## E um erro de teste que quase virou defeito
+
+Escrevi uma prova de que a bola do horizonte continua viva e ela reprovou: "a
+bola NÃO se mexe". Duas coisas erradas na prova, nenhuma no código:
+`Atitude.recebe` quer `{r,p,h}` e eu mandei `{rol,arf,rumo}`, então tudo virou
+zero; e eu comparava o `transform` do `#ceu`, um elemento que **não
+transforma mais** — a bola é desenhada numa lona desde que o gradiente saiu.
+
+A correção é a mesma lição de sempre neste projeto: **comparar pixels**. Três
+atitudes têm de dar três desenhos diferentes, e o poço tem de ficar no mesmo
+lugar nos três. Assinatura de imagem em vez de asserção de estado.
+
+## O que NÃO mudou
+
+O modo **retrato** do controle segue com a arquitetura antiga — lá não há bola
+do horizonte nem o mesmo conjunto de comandos, e misturar as duas seria pagar
+o risco sem o ganho. E **recolher o painel** deixou de existir deitado:
+recolher servia para revelar o jogo atrás do painel, e no controle não há jogo
+atrás — há o próprio painel.
