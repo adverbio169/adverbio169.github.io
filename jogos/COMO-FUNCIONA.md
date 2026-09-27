@@ -6479,3 +6479,48 @@ fio entre dois aparelhos, e um celular com a página velha em cache falando
 com uma TV nova precisa continuar se entendendo. Rótulo é para gente, nome de
 mensagem é para máquina — trocar os dois juntos é como se quebra a
 compatibilidade sem perceber.
+
+## O painel absorve o trem e o flape — pela borda, não pela página
+
+> "o botão trem de pouso, flaps, etc etc tudo pode entrar no painel. tudo pode
+> ser absorvido pelo painel."
+
+Pode — mas **onde** dentro do painel muda tudo, e esta é a decisão de projeto
+da rodada.
+
+O caminho óbvio seria pôr o trem dentro da página SINÓT, que é a página do
+avião. Só que aí baixar o trem no meio de um pouso vira: abrir o painel, rolar
+até SINÓT, tocar. Três gestos, olhando para a tela, com o avião a trezentos
+metros do chão. O botão solto, por pior que fosse, estava **sempre ali**.
+
+Então eles viraram **teclas de borda** — que é o que um MFD de verdade tem:
+teclas na moldura, ao lado da tela, não dentro da página. Somem como botões
+avulsos (que era o pedido) e continuam num lugar só, visível em **qualquer**
+página.
+
+Só as duas de VOAR ficam na borda: **TREM** e **FLAPE**. Calibrar, visão e
+qualidade não se mexem pilotando e subiram para a faixa de cima, que estava
+vazia — e com isso a coluna da esquerda ficou só com a pós-combustão, que era
+a reclamação original sobre aquele canto.
+
+### A regra que impede o buraco
+
+Com o painel **recolhido** não há borda, logo não há teclas. Se parasse aí, um
+toque errado na alça deixaria o piloto sem trem. Então: recolheu o painel, os
+botões TREM e FLAPE **voltam** para a faixa de cima. Some a tela, voltam os
+botões. Nunca existe um estado sem trem.
+
+### E a página não repete o que a tecla já diz
+
+A coluna direita do sinóptico mostrava "TREM FORA / FLAPE 1" — que, com as
+teclas acesas a três centímetros dali, é dizer a mesma coisa duas vezes na
+mesma tela (e o desenho do avião já mostra as duas graficamente, que é para
+isso que serve um sinóptico). Quando há teclas, aquela coluna passa a mostrar
+o que ninguém mais mostra: **POT** e **NITRO**.
+
+### A largura é calculada num lugar só
+
+As teclas comem a largura da esquerda, e a página tem de saber disso.
+`mfdAreaPagina(o)` devolve o retângulo que sobra, e tanto o desenho quanto o
+`radarOnde()` (que é quem o teste pergunta) leem **dele**. Calcular o disco num
+lugar e pintá-lo em outro já deu erro nesta mesma tela uma vez.

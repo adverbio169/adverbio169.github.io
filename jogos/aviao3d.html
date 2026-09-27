@@ -220,9 +220,13 @@
      faixa livre de ponta a ponta. */
   /* E O `top` SAI. Com `top:14px` da regra de cima e `bottom` daqui, sem
      altura nenhuma, o botão esticava de uma borda à outra: era por isso que o
-     olho e a qualidade viravam duas colunas do tamanho do nitro. */
-  body.dedos #btVisao,body.dedos #btQual{top:auto;height:auto;
-       bottom:calc(22px + min(19vw,86px) + env(safe-area-inset-bottom));
+     olho e a qualidade viravam duas colunas do tamanho do nitro.
+
+     Agora eles moram EM CIMA, ao lado do calibrar: com o trem e o flape
+     dentro do painel, a faixa de cima é dos três ajustes que ninguém mexe
+     pilotando — e a coluna da esquerda fica só com a pós-combustão. */
+  body.dedos #btVisao,body.dedos #btQual{top:calc(9px + env(safe-area-inset-top));
+       bottom:auto;height:auto;
        --fio:#63d8ff;background-color:rgba(4,14,21,.72);
        background-image:
          linear-gradient(var(--fio),var(--fio)),linear-gradient(var(--fio),var(--fio)),
@@ -234,8 +238,16 @@
        background-size:11px 2px,2px 11px, 11px 2px,2px 11px, 11px 2px,2px 11px, 11px 2px,2px 11px, auto;
        background-position:0 0,0 0, 100% 0,100% 0, 0 100%,0 100%, 100% 100%,100% 100%, 0 0;
        border:1px solid rgba(99,216,255,.28);border-radius:4px;color:#cfeeff}
-  body.dedos #btVisao{left:calc(14px + min(13vw,58px))}
-  body.dedos #btQual{left:calc(78px + min(13vw,58px))}
+  body.dedos #btVisao{left:calc(10px + env(safe-area-inset-left))}
+  body.dedos #btQual{left:calc(62px + env(safe-area-inset-left))}
+  /* o SALA encostava na qualidade por dois pixels: com "médio" escrito, a
+     tarja da qualidade termina em 124 e ele começava em 126 */
+  body.dedos #btAbreSala{left:calc(134px + env(safe-area-inset-left))}
+  /* O TREM E O FLAPE VIRARAM TECLAS DE BORDA DO PAINEL — e só voltam a ser
+     botões quando o painel está RECOLHIDO. Some a tela, voltam os botões:
+     ninguém pode ficar sem trem por ter encolhido o painel na hora errada. */
+  body.dedos #dTrem,body.dedos #dFlap{display:none}
+  body.dedos.painelFechado #dTrem,body.dedos.painelFechado #dFlap{display:inline-block}
   body.dedos #convite{display:none}
   /* As tiras laterais ocupam a borda inteira, e os painéis de canto ficavam
      por baixo delas. Com os botões na tela, tudo recua a largura da tira. */
@@ -15185,10 +15197,13 @@ function mfdVagaNoDedo(){
    (aqui e no controle), porque o pedido é o mesmo. */
 let mfdEncolhido = false;
 try { mfdEncolhido = localStorage.getItem('mfdEncolhido') === '1'; } catch(e){}
+if (mfdEncolhido) addEventListener('DOMContentLoaded',
+  () => document.body.classList.add('painelFechado'));
 function mfdRecolhe(v){
   v = !!v;
   if (mfdEncolhido === v) return;
   mfdEncolhido = v;
+  document.body.classList.toggle('painelFechado', v);
   try { localStorage.setItem('mfdEncolhido', v ? '1' : '0'); } catch(e){}
   try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
 }
@@ -15219,7 +15234,7 @@ function radarOnde(){
     if (MFD_PAGS[mfdPagDe(k + 1)] !== 'MAPA') continue;
     const o = mfdOnde(k);
     if (!o) continue;
-    const m = mfdMedidas(o);
+    const m = mfdMedidas(mfdAreaPagina(o));
     return { cx: m.mapaCx, cy: m.mapaCy, r: m.mapaR };
   }
   return null;
@@ -15419,18 +15434,32 @@ function mfdPaginaSinoptico(o, m){
   rot(o.x + m.pad, m.corpoY + m.corpoH*0.16, 'COMB', Math.round(pc) + '%',
       pc < 20 ? MFD_VERM : MFD_CLARO);
   rot(o.x + m.pad, m.corpoY + m.corpoH*0.62, 'FUSEL', Math.round(pv) + '%', corEstado(pv));
+  /* A COLUNA DA DIREITA MUDA CONFORME QUEM MOSTRA O TREM.
+
+     Com as teclas de borda acesas a três centímetros daqui, repetir "TREM
+     FORA / FLAPE 1" é dizer a mesma coisa duas vezes na mesma tela — e o
+     desenho do avião já mostra as duas graficamente, que é para isso que
+     serve um sinóptico. Então, quando há teclas, a coluna mostra o que
+     NINGUÉM mais está mostrando: potência e nitro. */
   h2.textAlign = 'right';
   const dir = o.x + o.w - m.pad;
-  h2.font = '700 ' + (m.f*0.92).toFixed(1) + 'px ui-monospace, monospace';
-  h2.fillStyle = MFD_ROT; h2.fillText('TREM', dir, m.corpoY + m.corpoH*0.16);
-  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
-  h2.fillStyle = trem ? MFD_VERDE : MFD_FIO + '.55)';
-  h2.fillText(trem ? 'FORA' : 'DENTRO', dir, m.corpoY + m.corpoH*0.16 + m.fv*1.05);
-  h2.font = '700 ' + (m.f*0.92).toFixed(1) + 'px ui-monospace, monospace';
-  h2.fillStyle = MFD_ROT; h2.fillText('FLAPE', dir, m.corpoY + m.corpoH*0.62);
-  h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
-  h2.fillStyle = flap ? MFD_VERDE : MFD_CLARO;
-  h2.fillText(String(flap), dir, m.corpoY + m.corpoH*0.62 + m.fv*1.05);
+  const dirRot = (y, r2, v, cor) => {
+    h2.font = '700 ' + (m.f*0.92).toFixed(1) + 'px ui-monospace, monospace';
+    h2.fillStyle = MFD_ROT; h2.fillText(r2, dir, y);
+    h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
+    h2.fillStyle = cor; h2.fillText(v, dir, y + m.fv*1.05);
+  };
+  if (mfdTemTeclas() && !mfdEncolhido){
+    const pot = turbinando ? 100 : Math.round(motor*100);
+    dirRot(m.corpoY + m.corpoH*0.16, 'POT', turbinando ? 'A/B' : pot + '%',
+           turbinando ? MFD_AMBAR : MFD_CLARO);
+    dirRot(m.corpoY + m.corpoH*0.62, 'NITRO', Math.round(nitroCarga) + '%',
+           nitroCarga < 20 ? MFD_VERM : MFD_CIANO);
+  } else {
+    dirRot(m.corpoY + m.corpoH*0.16, 'TREM', trem ? 'FORA' : 'DENTRO',
+           trem ? MFD_VERDE : MFD_FIO + '.55)');
+    dirRot(m.corpoY + m.corpoH*0.62, 'FLAPE', String(flap), flap ? MFD_VERDE : MFD_CLARO);
+  }
   h2.textAlign = 'left';
   mfdTeclas(o, m, 'G · F');
 }
@@ -15668,6 +15697,83 @@ function mfdPaginaVoo(o, m){
   mfdLinha(o, m, 5, 'PICO',   gMax.toFixed(1) + 'G', MFD_FRACO);
 }
 
+/* =============================================================================
+   AS TECLAS DE BORDA — o painel absorve o trem e o flape
+
+   "o botão trem de pouso, flaps, etc etc tudo pode entrar no painel. tudo
+   pode ser absorvido pelo painel."
+
+   Pode, e é assim que um MFD de verdade faz: teclas na MOLDURA, ao lado da
+   tela, não dentro da página. A diferença não é estética.
+
+   Se o trem morasse dentro da página SINÓT, baixar o trem no meio de um pouso
+   exigiria: abrir o painel, rolar até SINÓT, tocar. Três gestos, olhando para
+   a tela, na hora em que o avião está a trezentos metros do chão. O botão
+   solto, por pior que fosse, estava sempre ali.
+
+   Teclas de borda resolvem as duas coisas: somem da tela como botões avulsos
+   (que era o pedido) e continuam num lugar só, visível em QUALQUER página.
+
+   Só as duas de VOAR ficam aqui — trem e flape. Calibrar, visão e qualidade
+   não se mexem pilotando e foram para a faixa de cima, que estava vazia.
+   ========================================================================== */
+function mfdTemTeclas(){ return document.body.classList.contains('dedos'); }
+function mfdLarguraTeclas(o){
+  return mfdTemTeclas() && !mfdEncolhido ? Math.max(54, Math.min(o.w*0.20, 96)) : 0;
+}
+/* a área que sobra para a PÁGINA, depois das teclas. Quem desenha e quem
+   mede o radar leem daqui, senão o disco é calculado num lugar e pintado em
+   outro — erro que já aconteceu nesta mesma tela. */
+function mfdAreaPagina(o){
+  const b = mfdLarguraTeclas(o);
+  return b ? { x: o.x + b, y: o.y, w: o.w - b, h: o.h } : o;
+}
+let _mfdTeclasZona = null;
+function mfdDesenhaTeclas(o, m){
+  const bw = mfdLarguraTeclas(o);
+  _mfdTeclasZona = null;
+  if (!bw) return;
+  const T = [
+    { rot: 'TREM', val: trem ? 'FORA' : 'DENTRO', on: trem,
+      fn: () => { mexeTrem(); tremeAqui(35); } },
+    { rot: 'FLAPE', val: String(flap), on: flap > 0,
+      fn: () => { mexeFlap(); tremeAqui([18, 40, 18]); } }
+  ];
+  const y0 = m.corpoY, alt = m.corpoH/T.length;
+  const pad = Math.max(3, bw*0.06);
+  _mfdTeclasZona = { x: o.x, y: y0, w: bw, h: m.corpoH, n: T.length, T };
+  h2.save();
+  h2.textAlign = 'center'; h2.textBaseline = 'middle';
+  T.forEach((t, i) => {
+    const y = y0 + i*alt;
+    const x = o.x + pad, w = bw - pad*2, hh = alt - pad*1.6;
+    const cor = t.on ? MFD_VERDE : MFD_CIANO;
+    cantoInst(h2, x, y + pad*0.8, w, hh, Math.max(2, hh*0.10));
+    h2.fillStyle = t.on ? 'rgba(20,64,44,.62)' : 'rgba(8,24,34,.55)';
+    h2.fill();
+    h2.strokeStyle = t.on ? 'rgba(94,255,154,.55)' : 'rgba(99,216,255,.35)';
+    h2.lineWidth = 1; h2.stroke();
+    mfdEsquadria(h2, x, y + pad*0.8, w, hh, cor, Math.max(3, hh*0.12));
+    const cy = y + pad*0.8 + hh/2;
+    h2.font = '700 ' + Math.max(7, Math.min(hh*0.24, w*0.17)).toFixed(1) + 'px system-ui, sans-serif';
+    h2.fillStyle = MFD_ROT; h2.fillText(t.rot, x + w/2, cy - hh*0.20);
+    mfdAceso(h2, cor, hh*0.22);
+    h2.font = '800 ' + Math.max(9, Math.min(hh*0.34, w*0.26)).toFixed(1) + 'px system-ui, sans-serif';
+    h2.fillStyle = cor; h2.fillText(t.val, x + w/2, cy + hh*0.16);
+    mfdApaga(h2);
+  });
+  h2.restore();
+  h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
+}
+function mfdTocaTeclas(px, py){
+  const z = _mfdTeclasZona;
+  if (!z) return false;
+  if (px < z.x || px > z.x + z.w || py < z.y || py > z.y + z.h) return false;
+  const i = Math.max(0, Math.min(z.n - 1, Math.floor((py - z.y)/(z.h/z.n))));
+  z.T[i].fn();
+  return true;
+}
+
 /* --- A PÁGINA TÁTICA: o radar em que se TOCA ------------------------------ */
 let _tatPontos = null;        // onde cada contato caiu na tela, para o dedo
 function mfdPaginaTatico(o, m){
@@ -15877,16 +15983,20 @@ function desenhaMFD(k){
      próprio vidro — é o que faz a informação parecer emitida pela tela e não
      impressa nela. Vai aqui, num save só, para não repetir em cada peça; e
      recortado na moldura, que agora é translúcida e mostraria o vazamento. */
+  /* as teclas de borda primeiro: elas mandam na largura que sobra */
+  mfdDesenhaTeclas(o, m);
+  const oP = mfdAreaPagina(o), mP = (oP === o) ? m : mfdMedidas(oP);
+
   h2.save();
   cantoInst(h2, o.x, o.y, o.w, o.h, Math.max(2, o.h*0.018)); h2.clip();
   mfdAceso(h2, 'rgba(120,225,255,.42)', Math.max(3, o.h*0.020));
-  if (nome === 'SINÓT') mfdPaginaSinoptico(o, m);
-  if (nome === 'MOTOR') mfdPaginaMotor(o, m);
-  if (nome === 'MAPA')  mfdPaginaMapa(o, m);
-  if (nome === 'TÁTIC') mfdPaginaTatico(o, m);
-  if (nome === 'ARMAS') mfdPaginaArmas(o, m);
-  if (nome === 'OBJET') mfdPaginaMissao(o, m);
-  if (nome === 'VOO')   mfdPaginaVoo(o, m);
+  if (nome === 'SINÓT') mfdPaginaSinoptico(oP, mP);
+  if (nome === 'MOTOR') mfdPaginaMotor(oP, mP);
+  if (nome === 'MAPA')  mfdPaginaMapa(oP, mP);
+  if (nome === 'TÁTIC') mfdPaginaTatico(oP, mP);
+  if (nome === 'ARMAS') mfdPaginaArmas(oP, mP);
+  if (nome === 'OBJET') mfdPaginaMissao(oP, mP);
+  if (nome === 'VOO')   mfdPaginaVoo(oP, mP);
   h2.restore();
 
   /* AS ABAS. São a peça que diz "esta tela tem outras páginas" — sem elas
@@ -17058,6 +17168,10 @@ function mfdSolta(px, py){
     return;
   }
   if (mfdEncolhido){ mfdRecolhe(false); return; }
+  if (mfdTocaTeclas(g.x0, g.y0)){
+    try { navigator.vibrate && navigator.vibrate(14); } catch(e){}
+    return;
+  }
   if (mfdTocaPagina(g.k, g.x0, g.y0)) return;
   /* e recolher passou a ser só pela ALÇA. Enquanto o corpo da tela não fazia
      nada, tocar em qualquer lugar podia recolher; agora que a página responde
