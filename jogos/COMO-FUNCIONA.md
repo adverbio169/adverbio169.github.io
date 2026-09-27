@@ -7267,3 +7267,41 @@ fantasma. Hoje ninguém as alcançaria, porque quem toca confere o formato
 antes; mas isso é uma salvaguarda a duas casas de distância, e essas somem numa
 refatoração. `pintaJanela` limpa as zonas que não são do formato que ela está
 desenhando.
+
+## "Como aperto o enter?"
+
+> "Uma pergunta. No formato celular, como escolho as opções? Como aperto o
+> 'enter'? Kkkk"
+
+Não tem enter. O alvo é o próprio item e o toque já é a escolha — não há
+cursor para mover nem confirmação para dar. É a diferença entre um painel com
+teclas de borda e um painel que *é* a tela.
+
+Onde se escolhe, hoje:
+
+| o quê | como |
+|---|---|
+| formato de uma janela | toca na janela, depois no formato na fita |
+| ...ou | arrasta de lado **dentro** da janela |
+| sortida (missão) | página OBJET em solo, toca na linha |
+| cabeceira de pouso | página APROX, toca na linha |
+| alvo designado | página TÁTIC, toca no contato |
+| arma | desliza no poço ARMAMENTO |
+| trem e flape | página SINÓT, toca no desenho do avião |
+
+A pergunta, porém, achou um buraco: as páginas que oferecem escolha **dizem**
+("TOQUE PARA ESCOLHER", "TOQUE PARA CARREGAR"), e o mecanismo das janelas —
+o último a nascer — não dizia nada. Um comando que só existe na cabeça de quem
+o escreveu não existe.
+
+Três coisas foram acrescentadas, e nenhuma é um texto de ajuda:
+
+- **A janela em foco aponta para a fita.** Uma seta no pé do poço, virada para
+  baixo, liga "esta janela" a "aquela fita" sem palavra nenhuma. O brilho da
+  esquadria sozinho dizia isso baixo demais.
+- **O nome do formato ganhou `▾`**, no cabeçalho de cada janela. Diz que o
+  nome é uma escolha, e não uma etiqueta.
+- **Uma linha de dica** acima da fita: *"toque numa janela ▾ e depois no
+  formato"*. Ela some na primeira troca de formato e não volta — depois disso
+  a pessoa já sabe, e aviso que não some vira mobília. A faixa sai da
+  geometria junto, então a janela recupera os 16 px.
