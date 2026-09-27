@@ -15072,10 +15072,10 @@ function faceInst(chave, larg, alt, pinta){
    altitude, rumo e razão de subida já estão no HUD, e uma tela que repete o
    vidro da frente é uma tela desperdiçada — que é exatamente a crítica que o
    usuário fez às duas telas mostrando a mesma coisa. */
-const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'TÁTIC', 'ARMAS', 'OBJET', 'VOO'];
+const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'TÁTIC', 'ARMAS', 'APROX', 'OBJET', 'VOO'];
 /* e o nome curto, para quando a aba não tiver largura: seis palavras de cinco
    letras numa fita de 180 px ficam encostadas uma na outra e viram uma tarja */
-const MFD_CURTO = ['SIN', 'MOT', 'MAP', 'TAT', 'ARM', 'OBJ', 'VOO'];
+const MFD_CURTO = ['SIN', 'MOT', 'MAP', 'TAT', 'ARM', 'APR', 'OBJ', 'VOO'];
 const MFD_TELA = '#070b0f', MFD_FIO = 'rgba(226,236,248,';
 /* O VIDRO, E POR QUE ELE DEIXOU DE SER PRETO
 
@@ -15891,6 +15891,143 @@ function mfdTocaTeclas(px, py){
   return false;
 }
 
+/* =============================================================================
+   A APROXIMAÇÃO — o pouso guiado
+
+   Pousar é a parte mais difícil do jogo e a mais frustrante de errar: o
+   jogador chega alto, rápido e torto, e não tem como saber qual das três
+   coisas está errada até bater. Um computador de bordo resolve isso desde os
+   anos 50, e a conta é simples.
+
+   A RAMPA são 3°, que é a inclinação de aproximação de qualquer pista do
+   mundo — não é número escolhido a dedo: mais íngreme e não dá para frear,
+   mais raso e você raspa em tudo antes da cabeceira.
+
+   QUAL CABECEIRA. Uma pista tem duas pontas e se pousa nas duas; a escolhida
+   é aquela cuja direção de pouso mais combina com para onde o nariz aponta.
+   Escolher pela distância erraria sempre que se voa em direção à pista pelo
+   lado de lá.
+
+   OS SINAIS, e por que são dois e não um: o DESVIO LATERAL diz se você está
+   à esquerda ou à direita do eixo; a RAMPA diz se está alto ou baixo. Juntos
+   são a cruz que todo avião de verdade mostra, e cada agulha responde por uma
+   pergunta só. */
+const RAMPA = 3*Math.PI/180;
+function aproxDados(){
+  let melhor = null;
+  for (const p of PISTAS){
+    const dx = aviaoX - p.cx, dz = aviaoZ - p.cz;
+    const c = Math.cos(p.rumo), sn = Math.sin(p.rumo);
+    const aoLongo = dx*sn + dz*c, deTraves = dx*c - dz*sn;
+    /* das duas pontas, a que se pousa indo para onde eu já estou indo */
+    for (const s of [1, -1]){
+      const dir = { x: Math.sin(p.rumo)*s, z: Math.cos(p.rumo)*s };
+      const casa = dir.x*eixoF.x + dir.z*eixoF.z;          // -1 a 1
+      /* A DISTÂNCIA ATÉ A CABECEIRA, e o erro que eu tinha feito aqui.
+
+         As duas pontas estão em `aoLongo = ±meiaC`. Pousando no sentido do
+         rumo, cruza-se a de −meiaC; no sentido contrário, a de +meiaC. Eu
+         tinha escrito `-aoLongo*s + meiaC`, que SOMA o comprimento inteiro da
+         pista à distância: o teste mediu 2600 m onde eram 1500, e eu quase
+         aceitei o número por parecer plausível.
+
+         E o peso da distância na escolha era fraco demais (÷60000): com o
+         nariz virado para longe da pista de casa, o computador mandava para
+         um aeroporto a noventa quilômetros em vez de mandar dar meia-volta. */
+      const dist = -s*aoLongo - p.meiaC;                   // até a cabeceira
+      if (dist < -p.meiaC*1.2) continue;                   // já passou dela
+      const nota = casa*2 - dist/8000;
+      if (!melhor || nota > melhor.nota)
+        melhor = { p, s, dist, lat: deTraves*s, nota,
+                   rumoPouso: ((p.rumo*180/Math.PI + (s > 0 ? 0 : 180)) % 360 + 360) % 360 };
+    }
+  }
+  if (!melhor) return null;
+  /* TUDO EM METROS daqui para fora. A primeira versão devolvia unidades de
+     mundo e eu comparei com metros na hora de decidir se a cruz aparece:
+     saiu `14000*METRO/20`, que não quer dizer nada. Uma unidade por função,
+     e a função diz qual é. */
+  const alt = (aviaoY - PISTA_Y)/METRO;
+  const dist = melhor.dist/METRO;
+  const lat = melhor.lat/METRO;
+  const ideal = Math.max(0, dist)*Math.tan(RAMPA);
+  const vAlvo = velMin()*1.25;
+  return { nome: melhor.p.nome, rumo: melhor.rumoPouso,
+           dist, lat, alt, vert: alt - ideal, ideal, vAlvo,
+           ok: { trem: trem, flap: flap > 0, vel: voo < vAlvo*1.18 && voo > velMin() },
+           noEixo: Math.abs(lat) < 45, naRampa: Math.abs(alt - ideal) < 18 };
+}
+function mfdPaginaAprox(o, m){
+  const A = aproxDados();
+  const larg = o.w - m.pad*2;
+  h2.textBaseline = 'middle';
+  if (!A){
+    h2.textAlign = 'center'; h2.fillStyle = MFD_FRACO;
+    h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    h2.fillText('SEM PISTA', o.x + o.w/2, m.corpoY + m.corpoH*0.5);
+    h2.textAlign = 'left'; return;
+  }
+  /* A CRUZ, à esquerda: a agulha vertical é o eixo, a horizontal é a rampa.
+     Cada uma mostra PARA ONDE IR, não onde você está — agulha à direita quer
+     dizer "vá para a direita", que é como se lê num avião. */
+  const lado = Math.min(m.corpoH*0.92, larg*0.46);
+  const cx = o.x + m.pad + lado/2, cy = m.corpoY + m.corpoH*0.5, r = lado/2;
+  h2.strokeStyle = 'rgba(99,216,255,.28)'; h2.lineWidth = 1;
+  cantoInst(h2, cx - r, cy - r, r*2, r*2, 3); h2.stroke();
+  h2.strokeStyle = MFD_FIO + '.16)';
+  for (const f of [-0.6, -0.3, 0.3, 0.6]){
+    h2.beginPath(); h2.moveTo(cx + r*f, cy - r*0.10); h2.lineTo(cx + r*f, cy + r*0.10); h2.stroke();
+    h2.beginPath(); h2.moveTo(cx - r*0.10, cy + r*f); h2.lineTo(cx + r*0.10, cy + r*f); h2.stroke();
+  }
+  h2.strokeStyle = MFD_CLARO; h2.lineWidth = 1.4;
+  h2.beginPath(); h2.moveTo(cx - r*0.16, cy); h2.lineTo(cx + r*0.16, cy);
+  h2.moveTo(cx, cy - r*0.16); h2.lineTo(cx, cy + r*0.16); h2.stroke();
+
+  const ex = Math.max(-1, Math.min(1, -A.lat/120));    // fundo de escala: 120 m de lado
+  const ey = Math.max(-1, Math.min(1, A.vert/60));     // e 60 m de rampa
+  mfdAceso(h2, A.noEixo ? MFD_VERDE : MFD_CIANO, r*0.10);
+  h2.strokeStyle = A.noEixo ? MFD_VERDE : MFD_CIANO;
+  h2.lineWidth = Math.max(2, r*0.055);
+  h2.beginPath(); h2.moveTo(cx + ex*r*0.82, cy - r*0.86); h2.lineTo(cx + ex*r*0.82, cy + r*0.86); h2.stroke();
+  h2.strokeStyle = A.naRampa ? MFD_VERDE : MFD_CIANO;
+  h2.beginPath(); h2.moveTo(cx - r*0.86, cy + ey*r*0.82); h2.lineTo(cx + r*0.86, cy + ey*r*0.82); h2.stroke();
+  mfdApaga(h2);
+
+  // a coluna: número, e a lista que fica verde sozinha
+  const x0 = cx + r + larg*0.06, x1 = o.x + o.w - m.pad;
+  const fr = Math.min(m.f*0.92, (x1 - x0)*0.155), fv = Math.min(m.fv*0.95, (x1 - x0)*0.20);
+  h2.textAlign = 'left';
+  h2.font = '800 ' + fv.toFixed(1) + 'px system-ui, sans-serif';
+  mfdAceso(h2, MFD_CIANO, fv*0.4); h2.fillStyle = MFD_CIANO;
+  h2.fillText(A.nome + ' ' + String(Math.round(A.rumo)).padStart(3, '0'),
+              x0, m.corpoY + m.corpoH*0.14);
+  mfdApaga(h2);
+  const linha = (i, rot, val, cor) => {
+    const y = m.corpoY + m.corpoH*(0.36 + i*0.21);
+    h2.font = '700 ' + fr.toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'left'; h2.fillStyle = MFD_ROT; h2.fillText(rot, x0, y);
+    h2.font = '800 ' + fv.toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'right'; h2.fillStyle = cor || MFD_CLARO; h2.fillText(val, x1, y);
+  };
+  const dm = A.dist;
+  linha(0, 'DIST', dm > 1500 ? (Math.round(dm/100)/10 + 'km') : (Math.round(dm) + 'm'));
+  linha(1, 'RAMPA', (A.vert > 0 ? '+' : '') + Math.round(A.vert) + 'm',
+        A.naRampa ? MFD_VERDE : Math.abs(A.vert) > 70 ? MFD_AMBAR : MFD_CLARO);
+  linha(2, 'VEL', Math.round(voo) + '/' + Math.round(A.vAlvo),
+        A.ok.vel ? MFD_VERDE : MFD_AMBAR);
+  // o checklist, numa linha só
+  const y = m.corpoY + m.corpoH*0.94;
+  h2.font = '800 ' + (fr*0.98).toFixed(1) + 'px ui-monospace, monospace';
+  h2.textAlign = 'left';
+  let px = x0;
+  for (const [txt, bom] of [['TREM', A.ok.trem], ['FLAPE', A.ok.flap], ['VEL', A.ok.vel]]){
+    h2.fillStyle = bom ? MFD_VERDE : MFD_FRACO;
+    h2.fillText((bom ? '✓' : '·') + txt, px, y);
+    px += h2.measureText((bom ? '✓' : '·') + txt).width + fr*0.7;
+  }
+  h2.textAlign = 'left';
+}
+
 /* --- A PÁGINA TÁTICA: o radar em que se TOCA ------------------------------ */
 let _tatPontos = null;        // onde cada contato caiu na tela, para o dedo
 function mfdPaginaTatico(o, m){
@@ -15983,12 +16120,42 @@ function mfdPaginaTatico(o, m){
     };
     linha(0, 'DIST', (r.d/METRO > 1500 ? (Math.round(r.d/METRO/100)/10 + 'km')
                                        : Math.round(r.d/METRO) + 'm'));
-    linha(1, 'RUMO', String(Math.round(r.rumo)).padStart(3, '0') + '°');
-    linha(2, 'VIRE', Math.abs(r.desvio) < 3 ? 'NO RUMO'
+    linha(1, 'VIRE', Math.abs(r.desvio) < 3 ? 'NO RUMO'
           : (Math.round(Math.abs(r.desvio)) + '°' + (r.desvio > 0 ? ' D' : ' E')),
           Math.abs(r.desvio) < 3 ? MFD_VERDE : MFD_MAG);
+    /* A SOLUÇÃO DE TIRO, que é o que fecha o ciclo desta página: você designa
+       e o computador diz QUANDO atirar. Ela mora aqui e não numa página
+       própria porque o assunto é o mesmo — o alvo escolhido — e uma fita de
+       nove páginas é uma fita que ninguém rola até o fim.
+
+       ALCANCE é o da arma na mão. APROX é a velocidade de aproximação: o
+       quanto a distância está caindo por segundo, que é o que diz se você vai
+       alcançá-lo ou se ele está fugindo. E o tempo até entrar no alcance sai
+       dos dois — se a distância não estiver caindo, não há tempo nenhum e a
+       resposta honesta é um traço. */
+    const s = solucaoTiro(r);
+    linha(2, s.rot, s.val, s.cor);
   }
   h2.textAlign = 'left';
+}
+
+/* A SOLUÇÃO DE TIRO. Guarda a distância do quadro anterior para saber se ela
+   está caindo: velocidade de aproximação não é um dado do jogo, é uma
+   derivada, e derivada sem memória não existe. */
+let _tiroAnt = null;
+function solucaoTiro(r){
+  const alc = alcanceBala ? alcanceBala() : 9000;
+  const agora = Date.now();
+  let fecha = 0;                                   // metros por segundo, fechando
+  if (_tiroAnt && agora - _tiroAnt.t > 60 && agora - _tiroAnt.t < 1500)
+    fecha = (_tiroAnt.d - r.d)/((agora - _tiroAnt.t)/1000);
+  if (!_tiroAnt || agora - _tiroAnt.t > 60) _tiroAnt = { d: r.d, t: agora };
+
+  if (r.d <= alc) return { rot: 'TIRO', val: 'NO ALCANCE', cor: MFD_VERDE };
+  if (fecha <= 1) return { rot: 'ALC', val: Math.round(alc/METRO) + 'm', cor: MFD_FRACO };
+  const seg = (r.d - alc)/fecha;
+  if (seg > 99) return { rot: 'ALC', val: Math.round(alc/METRO) + 'm', cor: MFD_FRACO };
+  return { rot: 'ENTRA', val: Math.round(seg) + ' s', cor: MFD_AMBAR };
 }
 
 /* --- O VIDRO: as peças que fazem a tela parecer acesa --------------------- */
@@ -16112,6 +16279,7 @@ function desenhaMFD(k){
   if (nome === 'MOTOR') mfdPaginaMotor(oP, mP);
   if (nome === 'MAPA')  mfdPaginaMapa(oP, mP);
   if (nome === 'TÁTIC') mfdPaginaTatico(oP, mP);
+  if (nome === 'APROX') mfdPaginaAprox(oP, mP);
   if (nome === 'ARMAS') mfdPaginaArmas(oP, mP);
   if (nome === 'OBJET') mfdPaginaMissao(oP, mP);
   if (nome === 'VOO')   mfdPaginaVoo(oP, mP);
@@ -16378,6 +16546,44 @@ function desenhaHUD(){
     }
     presoNaTela();      // fecha o vidro AQUI: o que vem depois já vem projetado
 
+  }
+
+  /* --- A CRUZ DA APROXIMAÇÃO ---------------------------------------------
+     As mesmas duas agulhas da página APROX, mas no vidro da frente — que é
+     onde os olhos estão quando se pousa. Ninguém pousa olhando para o
+     painel: o painel diz os números, o vidro diz para onde ir.
+
+     Ela aparece SOZINHA quando se está em aproximação (perto da cabeceira,
+     baixo). Não há botão para ligar, porque um piloto em aproximação não tem
+     mão sobrando — e porque uma cruz aparecendo alto no meio do mapa seria
+     lixo na tela.
+
+     E fica FORA do bloco da cabine. Eu a tinha escrito lá dentro, e ela
+     simplesmente não existia para quem voa em terceira pessoa — que é como
+     ele joga. O teste contou zero pixels cianos no meio da tela com todas as
+     condições satisfeitas, e foi assim que apareceu. */
+  if (jogando && !caindo && !noChao){
+    const A = aproxDados();
+    if (A && A.dist > 60 && A.dist < 3000 && A.alt < 900){
+      presoNoAviao();
+      const r = Math.min(W, H)*0.155, cx2 = W/2, cy2 = H*0.53;
+      const ex = Math.max(-1, Math.min(1, -A.lat/120));
+      const ey = Math.max(-1, Math.min(1, A.vert/60));
+      h2.save();
+      h2.strokeStyle = 'rgba(160,230,255,.30)'; h2.lineWidth = 1;
+      for (const f of [-0.6, -0.3, 0.3, 0.6]){
+        h2.beginPath(); h2.moveTo(cx2 + r*f, cy2 - r*0.07); h2.lineTo(cx2 + r*f, cy2 + r*0.07); h2.stroke();
+        h2.beginPath(); h2.moveTo(cx2 - r*0.07, cy2 + r*f); h2.lineTo(cx2 + r*0.07, cy2 + r*f); h2.stroke();
+      }
+      h2.lineWidth = Math.max(2, r*0.035);
+      h2.shadowColor = '#63d8ff'; h2.shadowBlur = 6;
+      h2.strokeStyle = A.noEixo ? 'rgba(124,249,180,.95)' : 'rgba(99,216,255,.95)';
+      h2.beginPath(); h2.moveTo(cx2 + ex*r, cy2 - r); h2.lineTo(cx2 + ex*r, cy2 + r); h2.stroke();
+      h2.strokeStyle = A.naRampa ? 'rgba(124,249,180,.95)' : 'rgba(99,216,255,.95)';
+      h2.beginPath(); h2.moveTo(cx2 - r, cy2 + ey*r); h2.lineTo(cx2 + r, cy2 + ey*r); h2.stroke();
+      h2.restore();
+      presoNaTela();
+    }
   }
 
   /* --- OS OUTROS AVIÕES: uma marca em cima de cada um ---------------------
@@ -18333,8 +18539,21 @@ function mandaEstado(){
     objs: (Missoes && Missoes.lista) ? Missoes.lista()
             .map(o2 => [o2.feito ? 1 : 0, o2.txt, o2.progresso || '']) : [],
     alertas: mfdAlertas().map(a => [a[0], a[1] === MFD_VERM ? 2 : 1]),
-    mapa: contatosDoRadar() });
+    mapa: contatosDoRadar(), apx: aproxParaOCelular() });
 }
+/* a aproximação, mastigada para o celular: ele não tem as pistas nem a
+   geometria, e não precisa — recebe os desvios prontos, em metros */
+function aproxParaOCelular(){
+  if (!jogando) return null;
+  const A = aproxDados();
+  if (!A) return null;
+  return { n: A.nome, r: Math.round(A.rumo), d: Math.round(A.dist),
+           lat: Math.round(A.lat), v: Math.round(A.vert),
+           vel: Math.round(voo), va: Math.round(A.vAlvo),
+           ok: [A.ok.trem ? 1 : 0, A.ok.flap ? 1 : 0, A.ok.vel ? 1 : 0],
+           eixo: A.noEixo ? 1 : 0, rampa: A.naRampa ? 1 : 0 };
+}
+
 /* OS CONTATOS, PARA O RADAR DO CELULAR
 
    A página MAPA do celular era um resumo de quatro linhas — "ALVOS 26,

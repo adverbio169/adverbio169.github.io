@@ -6652,3 +6652,61 @@ barulho — acertar tem de ser sentido mesmo quando não derruba.
 Os pássaros eram quase metade do que voava: morriam de um tiro, não reagiam e
 enchiam o céu de pontinhos entre o jogador e o que interessa. O céu que sobrou
 é o lugar dos caças.
+
+## APROX: o pouso guiado
+
+Pousar é a parte mais difícil do jogo e a mais frustrante de errar — o
+jogador chega alto, rápido e torto, e não tem como saber **qual** das três
+coisas está errada até bater. Um computador de bordo resolve isso desde os
+anos 50.
+
+A **rampa são 3°**, que é a inclinação de aproximação de qualquer pista do
+mundo: mais íngreme e não dá para frear, mais raso e você raspa em tudo antes
+da cabeceira.
+
+**Qual cabeceira.** Uma pista tem duas pontas e se pousa nas duas; a escolhida
+é aquela cuja direção de pouso mais combina com para onde o nariz aponta.
+Escolher pela distância erraria sempre que se voa em direção à pista pelo lado
+de lá. E vindo do sul com o nariz para o sul, a resposta certa não é "pouse
+180" — aquela ponta ficou para trás — e sim "dê meia-volta e pouse 000", que é
+o que ele responde.
+
+**Dois sinais, e não um**: o desvio lateral diz se você está à esquerda ou à
+direita do eixo; a rampa diz se está alto ou baixo. Cada agulha responde por
+uma pergunta só, e cada uma mostra **para onde ir**, não onde você está —
+agulha à direita quer dizer "vá para a direita", que é como se lê num avião.
+
+A cruz também vai para o **vidro da frente**, porque ninguém pousa olhando
+para o painel: o painel diz os números, o vidro diz para onde ir. Ela aparece
+sozinha em aproximação (perto da cabeceira, baixo) e não tem botão — um piloto
+em aproximação não tem mão sobrando.
+
+E o **checklist** fica verde sozinho: TREM, FLAPE, VEL.
+
+### Dois erros que o teste pegou
+
+**A distância somava a pista inteira.** As duas pontas estão em `±meiaC`;
+pousando no sentido do rumo cruza-se a de −meiaC. Eu tinha escrito
+`-aoLongo*s + meiaC`, que **soma** o comprimento da pista: o teste mediu
+2600 m onde eram 1500, e eu quase aceitei o número por parecer plausível.
+
+**A cruz não existia na vista de fora.** Eu a escrevi dentro do bloco da vista
+de cabine — e ele joga em terceira pessoa. A condição dava `true`, todos os
+números estavam certos, e a tela ficava vazia. Só a **contagem de pixels**
+pega um erro desses: agora o teste conta os pixels cianos no meio da tela.
+
+E uma lição de unidade: `aproxDados` devolve **tudo em metros**. A primeira
+versão misturava unidades de mundo com metros e eu escrevi
+`14000*METRO/20` numa comparação, que não quer dizer nada.
+
+## A solução de tiro, dentro da TÁTIC
+
+Fecha o ciclo da página: você designa e o computador diz **quando** atirar.
+Mora na tática e não numa página própria porque o assunto é o mesmo — o alvo
+escolhido — e uma fita de nove páginas é uma fita que ninguém rola até o fim.
+
+**ALCANCE** é o da arma na mão. A **velocidade de aproximação** (o quanto a
+distância cai por segundo) não é um dado do jogo, é uma derivada — e derivada
+sem memória não existe, então a página guarda a distância do quadro anterior.
+Se a distância não estiver caindo, não há tempo nenhum para mostrar, e a
+resposta honesta é o alcance da arma, não um número inventado.

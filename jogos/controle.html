@@ -1331,8 +1331,8 @@ const ADI = {
 /* AS PÁGINAS SÃO A MESMA FITA DA TV, e têm de ser a mesma LISTA: o carrossel
    é `(carro + janela) % tamanho`, então uma página a mais aqui e uma a menos
    lá põem cada aparelho numa página diferente com o mesmo número. */
-const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'TÁTIC', 'ARMAS', 'OBJET', 'VOO'];
-const MFD_CURTO = ['SIN', 'MOT', 'MAP', 'TAT', 'ARM', 'OBJ', 'VOO'];
+const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'TÁTIC', 'ARMAS', 'APROX', 'OBJET', 'VOO'];
+const MFD_CURTO = ['SIN', 'MOT', 'MAP', 'TAT', 'ARM', 'APR', 'OBJ', 'VOO'];
 const MFD_MAG = '#ff66d9';
 const MFD_CIANO = '#63d8ff', MFD_VERDE = '#3fe070', MFD_AMBAR = '#ffc046',
       MFD_VERM = '#ff6a58', MFD_CLARO = '#e2ecf8', MFD_ROT = '#8fa3b8',
@@ -1443,6 +1443,7 @@ const Painel = {
     else if (nome === 'MOTOR') this.motor(c, m, d);
     else if (nome === 'MAPA')  this.mapa(c, m, d);
     else if (nome === 'TÁTIC') this.tatico(c, m, d);
+    else if (nome === 'APROX') this.aprox(c, m, d);
     else if (nome === 'ARMAS') this.armas(c, m, d);
     else if (nome === 'OBJET') this.objetivos(c, m, d);
     else if (nome === 'VOO')   this.voo(c, m, d);
@@ -1866,6 +1867,75 @@ const Painel = {
     enviaCtl({ t: 'des', i: melhor.i });
     try { navigator.vibrate && navigator.vibrate([10, 40, 10]); } catch(e){}
     return true;
+  },
+  /* A APROXIMAÇÃO no celular: a mesma cruz da TV, com os desvios que vieram
+     prontos no pacote. O celular não tem as pistas nem a geometria — e não
+     precisa: quem sabe onde está a cabeceira é quem desenha o mundo. */
+  aprox(c, m, d){
+    const A = d.apx;
+    c.textBaseline = 'middle';
+    if (!A){
+      c.textAlign = 'center'; c.fillStyle = MFD_FRACO;
+      c.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+      c.fillText('SEM PISTA', m.W/2, m.corpoY + m.corpoH*0.5);
+      c.textAlign = 'left'; return;
+    }
+    const larg = m.W - m.pad*2, emColuna = larg >= 300;
+    const lado = emColuna ? Math.min(m.corpoH*0.9, larg*0.44)
+                          : Math.min(m.corpoH*0.66, larg*0.8);
+    const cx = emColuna ? m.pad + lado/2 : m.W/2;
+    const cy = m.corpoY + (emColuna ? m.corpoH*0.5 : lado/2 + m.corpoH*0.04);
+    const r = lado/2;
+    c.strokeStyle = 'rgba(99,216,255,.28)'; c.lineWidth = 1;
+    c.strokeRect(cx - r, cy - r, r*2, r*2);
+    c.strokeStyle = MFD_FIO + '.16)';
+    for (const f of [-0.6, -0.3, 0.3, 0.6]){
+      c.beginPath(); c.moveTo(cx + r*f, cy - r*0.10); c.lineTo(cx + r*f, cy + r*0.10); c.stroke();
+      c.beginPath(); c.moveTo(cx - r*0.10, cy + r*f); c.lineTo(cx + r*0.10, cy + r*f); c.stroke();
+    }
+    c.strokeStyle = MFD_CLARO; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(cx - r*0.16, cy); c.lineTo(cx + r*0.16, cy);
+    c.moveTo(cx, cy - r*0.16); c.lineTo(cx, cy + r*0.16); c.stroke();
+    const ex = Math.max(-1, Math.min(1, -A.lat/120));
+    const ey = Math.max(-1, Math.min(1, A.v/60));
+    c.lineWidth = Math.max(2, r*0.055);
+    this.aceso(c, A.eixo ? MFD_VERDE : MFD_CIANO, r*0.10);
+    c.strokeStyle = A.eixo ? MFD_VERDE : MFD_CIANO;
+    c.beginPath(); c.moveTo(cx + ex*r*0.82, cy - r*0.86); c.lineTo(cx + ex*r*0.82, cy + r*0.86); c.stroke();
+    c.strokeStyle = A.rampa ? MFD_VERDE : MFD_CIANO;
+    c.beginPath(); c.moveTo(cx - r*0.86, cy + ey*r*0.82); c.lineTo(cx + r*0.86, cy + ey*r*0.82); c.stroke();
+    this.apaga(c);
+
+    const x0 = emColuna ? cx + r + larg*0.06 : m.pad, x1 = m.W - m.pad;
+    const fr = Math.min(m.f*0.9, (x1 - x0)*0.155), fv = Math.min(m.fv*0.9, (x1 - x0)*0.20);
+    c.textAlign = 'left';
+    c.font = '800 ' + fv.toFixed(1) + 'px system-ui, sans-serif';
+    this.aceso(c, MFD_CIANO, fv*0.4); c.fillStyle = MFD_CIANO;
+    c.fillText(A.n + ' ' + String(A.r).padStart(3, '0'),
+               x0, m.corpoY + (emColuna ? m.corpoH*0.14 : m.corpoH*0.74));
+    this.apaga(c);
+    if (emColuna){
+      const linha = (i, rot, val, cor) => {
+        const y = m.corpoY + m.corpoH*(0.38 + i*0.22);
+        c.font = '700 ' + fr.toFixed(1) + 'px ui-monospace, monospace';
+        c.textAlign = 'left'; c.fillStyle = MFD_ROT; c.fillText(rot, x0, y);
+        c.font = '800 ' + fv.toFixed(1) + 'px ui-monospace, monospace';
+        c.textAlign = 'right'; c.fillStyle = cor || MFD_CLARO; c.fillText(val, x1, y);
+      };
+      linha(0, 'DIST', A.d > 1500 ? (Math.round(A.d/100)/10 + 'km') : (A.d + 'm'));
+      linha(1, 'RAMPA', (A.v > 0 ? '+' : '') + A.v + 'm', A.rampa ? MFD_VERDE : MFD_CLARO);
+      linha(2, 'VEL', A.vel + '/' + A.va, A.ok[2] ? MFD_VERDE : MFD_AMBAR);
+    }
+    const y = m.corpoY + m.corpoH*0.95;
+    c.font = '800 ' + (fr*0.98).toFixed(1) + 'px ui-monospace, monospace';
+    c.textAlign = 'left';
+    let px = x0;
+    ['TREM', 'FLAPE', 'VEL'].forEach((t, i) => {
+      c.fillStyle = A.ok[i] ? MFD_VERDE : MFD_FRACO;
+      c.fillText((A.ok[i] ? '✓' : '·') + t, px, y);
+      px += c.measureText((A.ok[i] ? '✓' : '·') + t).width + fr*0.7;
+    });
+    c.textAlign = 'left';
   },
   mapaResumo(c, m, d){
     this.linha(c, m, 0, 4, 'ALVOS', (d.falta === undefined ? '—' : d.falta) + '',
