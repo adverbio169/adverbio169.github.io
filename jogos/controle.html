@@ -134,6 +134,7 @@
               box-shadow:0 10px 26px rgba(0,0,0,.45);
               width:min(74vw,360px);height:min(36vh,190px);flex-shrink:0;
               touch-action:none;user-select:none;-webkit-user-select:none}
+  #painelTela.encolhido{height:58px}
   body.artilheiro #painelTela{display:none}
   /* DEITADO, A TELA FICA AO LADO DO HORIZONTE, não embaixo dele. Embaixo
      sobravam noventa pixels entre a bola e o seletor de arma — e uma página de
@@ -150,8 +151,21 @@
      horizonte e o seletor de arma, que fica embaixo dela e é mais largo
      (190px fixos). Medindo só pela bola, num aparelho pequeno o painel
      começava três pixels dentro do seletor — a prova de sobreposição pegou. */
+  /* A FAIXA DO ENTALHE ENTRA NA CONTA — foi ela que fez o painel disparar.
+
+     O botão FOGO se posiciona com `env(safe-area-inset-right)`, a tira que o
+     iPhone reserva para o entalhe; deitado ela chega a 59 px. O painel eu
+     tinha medido SEM ela. Resultado: o FOGO desliza para dentro e fica POR
+     CIMA da borda direita do painel — tocar ali dispara, e um arrasto que
+     comece ali vai inteiro para o botão. Que é exatamente onde o polegar
+     direito descansa: "quando aperto no painel o disparo acontece".
+
+     O mesmo vale do outro lado: o seletor de arma usa o inset da esquerda e o
+     horizonte não, então o vão da esquerda é o MAIOR dos dois. */
   body.paisagem{--adi:min(30vw,46vh,180px);--col:min(13vw,58px);--fogo:min(27vw,132px);
-                --telaX:calc(76px + max(var(--adi), 190px) + 12px)}
+                --sal:env(safe-area-inset-left, 0px);--sar:env(safe-area-inset-right, 0px);
+                --telaX:calc(8px + var(--col)
+                       + max(12px + var(--adi), 10px + var(--sal) + 190px) + 12px)}
   /* E ELA CRESCE ATÉ ONDE HÁ CHÃO. "aumenta mais o painel no celular e o
      celular tem que ser o painel de instrumento do avião. gostei do desenho
      do avião mas pode explorar bem o espaço."
@@ -170,7 +184,16 @@
      DOBRO de área. */
   body.paisagem #painelTela{position:fixed;left:var(--telaX);top:58px;transform:none;
               height:calc(100vh - 68px);height:calc(100dvh - 68px);
-              width:calc(100vw - var(--col) - var(--fogo) - 26px - var(--telaX))}
+              width:calc(100vw - var(--col) - var(--fogo) - var(--sar) - 30px - var(--telaX));
+              transition:height .18s ease, top .18s ease}
+  /* RETRÁTIL. "ele ocupa muito a tela. acho que podemos fazer no modo celular
+     ele ser retrátil: se arrastar para baixo ele desce, e arrastar para os
+     lados ele passa."
+
+     Encolhido, sobra a FITA DE ABAS e a alça — que é o mínimo para ainda
+     trocar de página e para saber que o painel está ali. Ele desce para o
+     rodapé do próprio vão, deixando o céu livre no meio. */
+  body.paisagem #painelTela.encolhido{top:auto;bottom:10px;height:58px}
   /* o placar em JANELAS, como as do EADI: caixa preta, moldura fina e o
      algarismo monoespaçado dentro. Três números soltos no fundo pareciam
      legenda de aplicativo; assim eles pertencem ao mesmo painel. */
@@ -1313,6 +1336,19 @@ const MFD_CIANO = '#63d8ff', MFD_VERDE = '#3fe070', MFD_AMBAR = '#ffc046',
 
 const Painel = {
   carro: 0, dado: {}, lona: null, cx: null, w: 0, h: 0, desl: 0,
+  encolhido: false, abasAltura: 0, alcaAltura: 14,
+  /* RECOLHER. Arrastar para baixo desce o painel até sobrar a fita de abas e
+     a alça; para cima ele volta. Fica guardado, porque quem escolheu voar com
+     a tela pequena não quer reescolher a cada partida. */
+  recolhe(v){
+    v = !!v;
+    if (this.encolhido === v) return;
+    this.encolhido = v;
+    const el = document.getElementById('painelTela');
+    if (el) el.classList.toggle('encolhido', v);
+    try { localStorage.setItem('painelEncolhido', v ? '1' : '0'); } catch(e){}
+    try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
+  },
   recebe(d){
     this.dado = d;
     if (typeof d.carro === 'number' && !this.arrastando) this.carro = d.carro;
@@ -1327,7 +1363,10 @@ const Painel = {
     if (!el) return null;
     if (!this.lona){
       const c = document.createElement('canvas');
-      c.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+      /* a lona é quem o dedo acerta de fato; o `touch-action` do pai já
+         bastaria pela regra de herança efetiva, mas repetir aqui tira do
+         caminho uma classe inteira de dúvida no Safari do iPhone */
+      c.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;touch-action:none';
       el.appendChild(c); this.lona = c; this.cx = c.getContext('2d');
     }
     const q = this.lona.getBoundingClientRect();
@@ -1344,6 +1383,19 @@ const Painel = {
     const t = this.prepara();
     if (!t) return;
     const c = this.cx, W = t.w, H = t.h, d = this.dado;
+    /* ENCOLHIDO: sobra a fita de abas e a alça. É o mínimo para ainda trocar
+       de página com o dedo e para o painel não sumir sem deixar endereço. */
+    if (this.encolhido){
+      const abas = Math.max(22, H - 20), alca = H - abas;
+      this.abasAltura = abas; this.alcaAltura = alca;
+      c.clearRect(0, 0, W, H);
+      this.vidro(c, { W, H, cab: 0, abas, pad: 10 });
+      const aw = Math.min(52, W*0.20), ah = Math.max(2.5, alca*0.16);
+      c.fillStyle = 'rgba(99,216,255,.6)';
+      c.fillRect(W/2 - aw/2, alca/2 - ah/2, aw, ah);
+      this.pintaAbas(c, W, H, abas);
+      return;
+    }
     /* AS MEDIDAS SAEM DO MENOR LADO. A tela cresceu e ficou quase quadrada num
        aparelho grande e estreita e alta num pequeno; com a letra presa só na
        ALTURA, o painel do aparelho pequeno ficava com número de 23px numa
@@ -1357,6 +1409,12 @@ const Painel = {
                 f, fv: f*1.35, W, H };
     c.clearRect(0, 0, W, H);
     this.vidro(c, m);
+
+    /* a alça, também aberta: é o que diz "dá para arrastar isto" */
+    this.alcaAltura = Math.max(12, cab*0.42);
+    { const aw = Math.min(52, W*0.20), ah = Math.max(2, cab*0.07);
+      c.fillStyle = 'rgba(99,216,255,.32)';
+      c.fillRect(W/2 - aw/2, Math.max(2.5, cab*0.14), aw, ah); }
 
     const nome = MFD_PAGS[this.carro];
     c.textBaseline = 'middle'; c.textAlign = 'left';
@@ -1388,7 +1446,14 @@ const Painel = {
     /* AS ABAS mostram as SEIS páginas e marcam as três que estão abertas: a
        desta tela cheia, as duas da TV com um fio embaixo. Ver onde as outras
        duas estão é o que faz a fita parecer uma fita, e não um sorteio. */
+    this.abasAltura = abas;
+    this.pintaAbas(c, W, H, abas);
+  },
+  /* A FITA DE ABAS, que o painel aberto e o encolhido dividem: ela marca a
+     página desta tela e, com um fio embaixo, as DUAS que estão na TV. */
+  pintaAbas(c, W, H, abas){
     const ay = H - abas, aw = W/MFD_PAGS.length;
+    c.textBaseline = 'middle';
     c.strokeStyle = MFD_FIO + '.14)'; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, ay + 0.5); c.lineTo(W, ay + 0.5); c.stroke();
     c.textAlign = 'center';
@@ -1408,6 +1473,7 @@ const Painel = {
       c.fillText(aw < 46 ? MFD_CURTO[i] : p, ax + aw/2, ay + abas*0.48);
       this.apaga(c);
     });
+    c.textAlign = 'left';
   },
   /* --- o vidro, o mesmo da TV ------------------------------------------- */
   aceso(c, cor, forca){ c.shadowColor = cor; c.shadowBlur = forca; },
@@ -1767,32 +1833,97 @@ const Painel = {
 (function gestoDoPainel(){
   const el = document.getElementById('painelTela');
   if (!el) return;
-  let x0 = null, y0 = null, usou = false;
+  /* quem voou com a tela encolhida da última vez continua com ela encolhida */
+  try { if (localStorage.getItem('painelEncolhido') === '1'){
+          Painel.encolhido = true; el.classList.add('encolhido'); } } catch(e){}
+  /* A PRIMEIRA VERSÃO EXIGIA DEMAIS, e por isso ele não conseguia rolar:
+
+     1. só decidia DURANTE o arrasto, e só se já tivesse passado de 20% da
+        largura. Na tela nova isso são setenta pixels: quem arrasta cinquenta
+        e solta não conseguia nada, e não havia resposta nenhuma dizendo que
+        faltou;
+     2. `|dy| > |dx|` desistia do evento. Polegar em celular deitado desenha
+        um ARCO, e o começo do arco é quase todo vertical;
+     3. e só existia em `touch`. Num aparelho que mande `pointer` (caneta,
+        alguns Android, o navegador de mesa) não havia gesto nenhum.
+
+     Agora: o eixo é decidido pelo TOTAL do gesto, na hora de soltar; o
+     limiar é 12% da largura com mínimo de 28 px; e o mesmo laço atende
+     `touch` e `pointer`. Para baixo, encolhe; para cima, abre. */
+  let x0 = null, y0 = null, usou = false, movi = false, id = null;
+  const limH = () => Math.max(28, Math.min(el.clientWidth*0.12, 70));
+  const limV = () => Math.max(34, Math.min(el.clientHeight*0.18, 90));
+
+  function pega(x, y){ x0 = x; y0 = y; usou = false; movi = false; Painel.arrastando = true; }
+  function anda(x, y, e){
+    if (x0 === null || usou) return;
+    const dx = x - x0, dy = y - y0;
+    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) movi = true;
+    if (e && e.cancelable) e.preventDefault();
+    // resolve na hora quando o gesto já é inequívoco
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > limH()){
+      Painel.rola(dx < 0 ? 1 : -1); usou = true;       // puxar para a esquerda avança
+    } else if (dy > Math.abs(dx) && dy > limV()){
+      Painel.recolhe(true); usou = true;
+    } else if (-dy > Math.abs(dx) && -dy > limV() && Painel.encolhido){
+      Painel.recolhe(false); usou = true;
+    }
+  }
+  function solta(x, y){
+    if (x0 !== null && !usou && x !== undefined){
+      /* o resto do gesto: soltar antes do limiar ainda conta, se passou de
+         metade dele. Sem isto, um arrasto curto não faz NADA e parece que a
+         tela não responde a gesto nenhum. */
+      const dx = x - x0, dy = y - y0;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > limH()*0.5) Painel.rola(dx < 0 ? 1 : -1);
+      else if (dy > Math.abs(dx) && dy > limV()*0.5) Painel.recolhe(true);
+      else if (-dy > Math.abs(dx) && -dy > limV()*0.5) Painel.recolhe(false);
+    }
+    x0 = null; id = null; Painel.arrastando = false;
+  }
+
   el.addEventListener('touchstart', e => {
     if (!e.touches[0]) return;
-    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; usou = false;
-    Painel.arrastando = true;
+    pega(e.touches[0].clientX, e.touches[0].clientY);
   }, {passive:true});
   el.addEventListener('touchmove', e => {
-    if (x0 === null || usou || !e.touches[0]) return;
-    const dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
-    if (Math.abs(dy) > Math.abs(dx)) return;          // arrasto vertical não é meu
-    e.preventDefault();
-    if (Math.abs(dx) > el.clientWidth*0.20){
-      Painel.rola(dx < 0 ? 1 : -1);                   // puxar para a esquerda avança
-      usou = true;
-    }
+    if (!e.touches[0]) return;
+    anda(e.touches[0].clientX, e.touches[0].clientY, e);
   }, {passive:false});
-  const solta = () => { x0 = null; Painel.arrastando = false; };
-  el.addEventListener('touchend', solta);
-  el.addEventListener('touchcancel', solta);
-  /* e tocar numa aba leva direto: quem vê seis abas tenta tocar nelas */
+  el.addEventListener('touchend', e => {
+    const t = e.changedTouches && e.changedTouches[0];
+    solta(t ? t.clientX : undefined, t ? t.clientY : undefined);
+  });
+  el.addEventListener('touchcancel', () => solta());
+
+  /* e o mesmo por ponteiro, para quem não manda touch */
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') return;             // já veio por touch
+    id = e.pointerId; pega(e.clientX, e.clientY);
+    if (el.setPointerCapture) try { el.setPointerCapture(id); } catch(x){}
+  });
+  el.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch' || e.pointerId !== id) return;
+    anda(e.clientX, e.clientY, e);
+  });
+  el.addEventListener('pointerup', e => {
+    if (e.pointerType === 'touch' || e.pointerId !== id) return;
+    solta(e.clientX, e.clientY);
+  });
+
+  /* e tocar numa aba leva direto: quem vê seis abas tenta tocar nelas. Só
+     que um TOQUE, não o fim de um arrasto — senão o gesto rola a fita e o
+     clique que vem atrás rola de novo. */
   el.addEventListener('click', e => {
+    if (movi){ movi = false; return; }
     const q = el.getBoundingClientRect();
-    const abas = Math.max(18, q.height*0.155);
-    if (e.clientY < q.bottom - abas) return;
-    const i = Math.floor((e.clientX - q.left)/(q.width/MFD_PAGS.length));
-    Painel.rola(i - Painel.carro);
+    const abas = Painel.abasAltura || Math.max(18, q.height*0.155);
+    if (e.clientY >= q.bottom - abas){
+      const i = Math.floor((e.clientX - q.left)/(q.width/MFD_PAGS.length));
+      Painel.rola(i - Painel.carro);
+    } else if (Painel.encolhido || e.clientY < q.top + (Painel.alcaAltura || 0)){
+      Painel.recolhe(!Painel.encolhido);               // a alça também abre e fecha
+    }
   });
 })();
 

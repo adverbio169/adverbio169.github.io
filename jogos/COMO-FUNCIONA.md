@@ -6245,3 +6245,61 @@ resumo de antes.
 - **A letra saía da altura.** Com a tela quase quadrada num aparelho grande e
   estreita num pequeno, amarrar a fonte só na altura dava número de 23 px numa
   coluna de 188. Agora sai do menor lado.
+
+## O botão FOGO estava por cima do painel
+
+> "percebi também que quando aperto no painel o disparo acontece."
+
+Esse é o achado da rodada, e ele explica mais do que parece.
+
+O `#btFogo` se posiciona com `right: calc(… + env(safe-area-inset-right))` —
+a tira que o iPhone reserva para o entalhe, que deitado chega a **59 px**. A
+largura do painel eu tinha medido **sem** essa tira. Resultado: num aparelho
+com entalhe o FOGO desliza para dentro e fica por cima da borda direita do
+painel. Tocar ali dispara.
+
+E é a mesma coisa que provavelmente derrubava o arrasto: o polegar direito
+descansa justamente naquela borda, então o gesto começava **dentro do botão
+de FOGO** e ia inteiro para ele. O toque nas abas funcionava porque as abas
+ficam mais à esquerda e embaixo.
+
+A conta passou a incluir os dois lados, porque o seletor de arma usa o inset
+da esquerda e o horizonte não:
+
+```
+--telaX: 8px + col + max(12px + adi, 10px + inset-esq + 190px) + 12px
+largura: 100vw − col − fogo − inset-dir − 30px − telaX
+```
+
+O teste novo (`scratchpad/gesto.js`) roda com a tira em **0 e em 59 px** e
+mede a sobreposição do painel com o FOGO e com o seletor de arma nos dois
+casos.
+
+### E o gesto exigia demais
+
+Mesmo sem o botão por cima, a primeira versão era difícil de acertar:
+
+1. só decidia **durante** o arrasto e só depois de 20% da largura — na tela
+   nova, setenta pixels. Quem arrastava cinquenta e soltava não conseguia
+   nada, e não havia resposta nenhuma dizendo que faltou;
+2. `|dy| > |dx|` fazia o evento desistir. Polegar em celular deitado desenha
+   um **arco**, e o começo do arco é quase todo vertical;
+3. e só existia em `touch`. Em quem manda `pointer`, não havia gesto nenhum.
+
+Agora o eixo sai do **total** do gesto, avaliado ao soltar; o limiar é 12% da
+largura (mínimo 28 px) e metade disso ainda conta na soltura; e o mesmo laço
+atende `touch` e `pointer`. O teste dirige o dedo pelo **CDP**
+(`Input.dispatchTouchEvent`), não por `TouchEvent` sintético, e faz o arco de
+propósito — a versão anterior passava no teste sintético e falhava no dedo.
+
+### Retrátil
+
+> "ele ocupa muito a tela. acho que podemos fazer no modo celular ele ser
+> retrátil. se arrastar para baixo ele desce. e arrastar para os lados ele
+> passa."
+
+Arrastar para baixo encolhe o painel a **58 px** no rodapé do próprio vão:
+sobra a fita de abas e uma alça. Ainda dá para trocar de página com o dedo e
+o painel não some sem deixar endereço. Para cima ele volta; tocar na alça
+também. Fica guardado no aparelho, porque quem escolheu voar com a tela
+pequena não quer reescolher a cada partida.
