@@ -7072,3 +7072,61 @@ Vale reparar em como ele apareceu: o sintoma era `cota 3, nenhum no ar` numa
 rodada de teste — um estado que não podia existir. Contradição em números é a
 maneira mais barata de achar defeito, e é por isso que os testes imprimem o
 estado inteiro quando reprovam, em vez de só "falhou".
+
+# O painel do controle toma a tela
+
+> "Como tá a versão controle? Lá o painel pode ser bem maior."
+
+Pode, e o quanto era medível. Num iPhone SE deitado o painel era **169×307 —
+21% da tela**, mais estreito que a bola do horizonte ao lado dele. O
+computador de voo era o menor instrumento do painel.
+
+## O que o impedia: uma faixa de ajustes
+
+Acima do painel havia 50 px de cabeçalho, de ponta a ponta: *Começar*,
+*Calibrar*, *girar* e *cabine*. Medindo elemento por elemento, era a **única**
+coisa acima da coluna dele — à esquerda e à direita havia outras, mas fora
+dessa coluna.
+
+Desses quatro, *Começar* serve uma vez por partida e *girar* e *cabine* quase
+nunca. Nenhum é comando de voo, e os três ocupavam altura em todo instante de
+todo voo.
+
+**A primeira tentativa foi empurrar**: empilhar a linha na coluna da esquerda.
+A prova de sobreposição reprovou em aparelho curto — a linha caía em cima da
+coluna do nitro e a bola ficava a 2 px do seletor de arma. Empurrar peça não
+resolve tela cheia; tirar da tela o que não é de voar, sim.
+
+Então a faixa **some sozinha quando o voo começa** — sozinha é o ponto, pedir
+um toque para ganhar 50 px seria trocar um estorvo por outro — e volta por uma
+engrenagem no canto, para quem precisar de *cabine* no meio do voo. O
+*Calibrar* fica: esse se usa voando, é o zero da mão.
+
+| aparelho | antes | agora |
+|---|---|---|
+| iPhone SE 667×375 | 169×307 (21%) | 169×357 (24%) |
+| iPhone 14 844×390 | 346×322 (34%) | 346×372 (39%) |
+| Pixel 915×412 | 417×344 (38%) | 417×394 (44%) |
+
+## A prova de sobreposição pegou um defeito antigo
+
+Escrevi o teste para validar a mudança e ele reprovou numa coisa que eu não
+tinha tocado: num aparelho de 320 de altura, a bola do horizonte invadia 7 px
+do seletor de arma. `--adi: min(30vw, 46vh, 180px)` não sabia do seletor —
+`46vh` de 320 dá 147, e 147 mais os 96 px do seletor não cabem abaixo do
+cabeçalho. O terceiro termo agora é o vão real.
+
+Teste escrito para uma mudança que acha um defeito de outra: é o melhor tipo
+de retorno que um teste dá.
+
+## O que ainda falta, e quanto vale
+
+A **altura** está resolvida. A **largura** não: no SE o painel continua com
+169 px porque à esquerda dele estão a bola do horizonte (172) e o seletor de
+arma (190), e os oito rótulos de aba mal cabem lado a lado.
+
+O caminho, se o atrito aparecer voando: **a bola do horizonte entra no
+painel**, como coluna fixa à esquerda do vidro — o mesmo mecanismo das teclas
+de borda do lado do jogo. Num avião de verdade o ADI *é* o instrumento do
+meio do painel, não um aparelho ao lado dele; e a conta fecha: o painel iria
+de 169 para ~371 px de largura no SE, **mais que o dobro de área**.

@@ -162,7 +162,14 @@
 
      O mesmo vale do outro lado: o seletor de arma usa o inset da esquerda e o
      horizonte não, então o vão da esquerda é o MAIOR dos dois. */
-  body.paisagem{--adi:min(30vw,46vh,180px);--col:min(13vw,58px);--fogo:min(27vw,132px);
+  /* A BOLA DO HORIZONTE tem de caber ENTRE o cabeçalho e o seletor de arma.
+     `46vh` não sabia disso: num aparelho de 320 de altura ela dava 147 px,
+     ficava centrada em 46% e invadia 7 px do seletor — a prova de
+     sobreposição pegou, e o defeito é anterior a tudo isto. O terceiro termo
+     agora é o vão real: a altura menos o cabeçalho, menos os 96 px do
+     seletor, menos as folgas. */
+  body.paisagem{--adi:min(30vw,46vh,calc(100vh - 58px - 96px - 40px),180px);
+                --col:min(13vw,58px);--fogo:min(27vw,132px);
                 --sal:env(safe-area-inset-left, 0px);--sar:env(safe-area-inset-right, 0px);
                 --telaX:calc(8px + var(--col)
                        + max(12px + var(--adi), 10px + var(--sal) + 190px) + 12px)}
@@ -371,6 +378,47 @@ body.paisagem #controle.ver,
   body.paisagem #giroLinha{top:10px;bottom:auto;left:180px;right:auto;transform:none;
                            font-size:0;justify-content:flex-start;flex-wrap:nowrap;
                            max-width:calc(100vw - 180px - 34vw - 92px);overflow:hidden}
+
+  /* =====================================================================
+     AJUSTE NÃO FICA NA TELA DURANTE O VOO
+
+     "Como tá a versão controle? Lá o painel pode ser bem maior."
+
+     Está, e o que o impedia era medível: num iPhone SE o painel era 169×307,
+     21% da tela — mais estreito que a bola do horizonte ao lado dele. A faixa
+     de cima, 50 px de ponta a ponta, era a única coisa acima dele.
+
+     O que há nessa faixa? "Começar", "Calibrar", "girar" e "cabine". Começar
+     serve uma vez por partida; girar e cabine, quase nunca. Nenhum dos três é
+     comando de voo, e os três ficavam ocupando altura em todo instante de
+     todo voo.
+
+     Tentei primeiro empilhá-los na coluna da esquerda. A prova de
+     sobreposição reprovou em aparelho curto: a linha caía em cima da coluna
+     do nitro e a bola do horizonte ficava a 2 px. Empurrar peça não resolve
+     tela cheia — tirar da tela o que não é de voar, sim.
+
+     Então: quando o avião está voando, a faixa some e o painel toma o lugar
+     dela. Some SOZINHA, no instante em que o voo começa, porque é aí que ela
+     deixa de servir; e volta por uma engrenagem no canto, para quem precisar
+     de "cabine" no meio do voo. O Calibrar FICA — esse se usa voando, é o
+     zero da mão. */
+  body.paisagem.voando:not(.ajustes) #btComecar,
+  body.paisagem.voando:not(.ajustes) #giroLinha{display:none}
+  body.paisagem.voando:not(.ajustes) #painelTela{top:8px;
+              height:calc(100vh - 18px);height:calc(100dvh - 18px)}
+  #btAjustes{display:none}
+  body.paisagem.voando #btAjustes{display:flex;position:fixed;z-index:6;
+              top:8px;left:calc(10px + env(safe-area-inset-left));
+              width:34px;height:31px;align-items:center;justify-content:center;
+              border:1px solid rgba(255,255,255,.18);border-radius:10px;
+              background:rgba(8,12,26,.6);color:#dce5f5;font-size:15px;
+              padding:0;cursor:pointer}
+  body.paisagem.voando.ajustes #btAjustes{background:rgba(92,200,255,.18);
+              border-color:rgba(92,200,255,.55)}
+  /* a engrenagem ocupa o canto, então o Calibrar (e a fileira dele) desliza
+     34 px para a direita enquanto ela existe */
+  body.paisagem.voando .linha{left:calc(52px + env(safe-area-inset-left))}
   /* DEITADO, "asas: niveladas" SAI e ficam só os dois botões. O texto dizia o
      que a bola do horizonte já mostra — ela É a resposta para "as asas estão
      niveladas?" — e num aparelho pequeno era ele que empurrava o botão
@@ -523,6 +571,7 @@ body.paisagem #controle.ver,
     <button class="bt sec pouso" id="btTrem">TREM</button>
     <button class="bt sec pouso" id="btFlap">FLAPE</button>
   </div>
+  <button id="btAjustes" title="mostrar os ajustes" aria-label="mostrar os ajustes">&#9881;</button>
   <div id="giroLinha">asas: <b id="giroTxt">&hellip;</b>
     <button id="btGiro">girar</button>
     <button id="btVisaoC">cabine</button></div>
@@ -832,6 +881,11 @@ function conectar(codigo){
         if (d.comb > combAntes + 4) vibra(d.turbo ? 140 : 60);
         if (!d.jogando && jogandoAntes) vibra(320);
         combAntes = d.comb; jogandoAntes = !!d.jogando;
+        /* voando: a faixa de ajustes sai e o painel sobe. Sair sozinha é o
+           ponto — pedir um toque para ganhar 50 px seria trocar um estorvo
+           por outro. */
+        document.body.classList.toggle('voando', !!d.jogando);
+        if (!d.jogando) document.body.classList.remove('ajustes');
       }
     });
     conn.on('close', () => { estadoRede('nao', 'a TV desconectou'); Tremor.calaTudo(); });
@@ -2830,6 +2884,10 @@ function medeDeitado(){
   document.body.classList.toggle('paisagem', alt <= 520);
 }
 
+$('btAjustes').onclick = () => {
+  document.body.classList.toggle('ajustes');
+  try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
+};
 function ajeitaDeitado(){
   const emPe = window.innerHeight > window.innerWidth;
   const gira = emPe && !travouDeVerdade;
