@@ -6832,3 +6832,63 @@ outro** na mesma página — dois deles de antes desta mudança:
 O padrão é sempre o mesmo, e é a quarta vez: onde havia um número mágico
 (`slice(0,17)`, `w*0.50`, `m.f*0.6`), havia um encostão esperando um valor
 maior. Mede-se o que está do lado e posiciona-se a partir dele.
+
+# A escolha da missão mora no computador de bordo
+
+> "Acho que as escolhas da missão têm que ser o painel do computador de bordo.
+> O computador de bordo tem que fazer essas coisas."
+
+Está certo, e é como funciona um avião de verdade: o plano de voo se carrega
+no computador, em solo, **na mesma página que depois acompanha o cumprimento
+dele**. Escolher numa tela de HTML antes de o jogo abrir era pôr uma decisão
+do voo fora do avião — e ainda por cima numa tela que, uma vez começado o
+jogo, não existe mais.
+
+## A página OBJET tem duas caras
+
+**Em SOLO** ela é a seleção: as quatro sortidas em lista, a escolhida com
+barra de acento e realce, `SEM HOSTIS` ou `COMBATE` à direita, e embaixo o
+briefing da que está marcada. Toca-se numa linha para escolher.
+
+**No ar** ela volta a ser o acompanhamento de sempre: objetivos, fase, e o que
+falta para o contato.
+
+Entre as duas não há botão de confirmar — **decolar é confirmar**. É a coisa
+que o jogador ia fazer de qualquer jeito, e ela já significa exatamente isso.
+
+## Trocar depois de decolar, mas só até o rádio chamar
+
+Quem começa no ar nunca passa por SOLO, e quem decolou pode mudar de ideia.
+Então, no acompanhamento, a **linha da sortida é tocável** enquanto a fase for
+TRÂNSITO: toca-se nela e a seleção reabre. A partir do ALERTA, não — com caça
+a caminho, trocar de missão é desistir, não escolher. `Sortida.alerta()` fecha
+a seleção sozinha.
+
+## O celular-controle escolhe também
+
+No arranjo em que o celular é o controle de uma TV, o computador de bordo é o
+painel dele — então ele tem a mesma página. Não tem a lista de sortidas: ela
+vai no pacote (`sorL`), e **só enquanto pode ser escolhida** — fora da
+preparação vai `null`, porque no pacote tudo o que não é usado é peso. De
+volta ele manda o **índice** do que o dedo tocou, exatamente como já faz com a
+designação de alvo: a lista é de quem desenha o mundo.
+
+## A capa deixou de escolher e passou a apontar
+
+Onde estavam os quatro cartões há agora uma linha: *"A missão você escolhe
+dentro do avião, no computador de bordo: página OBJET, com ele ainda parado na
+pista."* Um aviso não é um controle — não há dois lugares para fazer a mesma
+coisa, que é o que o pedido queria evitar.
+
+## Duas coisas que a tela obrigou a arrumar
+
+**O terceiro laço de quebra de linha.** Eu já tinha escrito o mesmo laço de
+quebrar texto em palavras duas vezes, à mão, em duas páginas. A segunda vez é
+coincidência; a terceira é função — `mfdParagrafo` de um lado, `paragrafo` do
+outro.
+
+**O rodapé cortado.** `TOQUE PARA ESCOLHER · DECOLE PARA COMEÇAR` cabe na tela
+do jogo e não cabe no celular, onde a letra é maior; cortado, virava
+`DECOLE …`, que não instrui ninguém. Agora o rodapé **escolhe a frase que
+cabe** em vez de ser truncado — cortar serve para nome próprio, não para
+instrução.

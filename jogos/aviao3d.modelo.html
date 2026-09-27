@@ -107,16 +107,11 @@
   #btBatalha, #btBatalha2{flex:0 0 auto}
   #ondeComeca{display:flex;gap:8px;width:100%}
   #ondeComeca .op{flex:1;padding:10px 8px}
-  /* A SORTIDA: quatro cartões, dois por linha no celular, e o lema embaixo.
-     Dois por linha e não quatro porque o nome da missão é a informação, e
-     "INFILTRAÇÃO" num botão de 70px vira três sílabas quebradas. */
-  #sortidas{width:100%;margin:2px 0 4px;border:1px solid rgba(92,200,255,.22);
-            border-radius:12px;padding:10px;background:rgba(92,200,255,.05)}
-  #sortBotoes{display:flex;flex-wrap:wrap;gap:7px;margin:6px 0 0}
-  #sortBotoes .op{flex:1 1 calc(50% - 4px);padding:9px 6px;font-size:12.5px;
-                  line-height:1.25;letter-spacing:.3px}
-  #sortBotoes .op b{display:block;font-size:15px;margin-bottom:1px}
-  #sortLema{text-align:left;font-size:12.5px;margin:8px 2px 0;color:#a8bcd8;min-height:3.2em}
+  /* um aviso, não um controle: a escolha da missão mora no painel de bordo */
+  #ondeMissao{width:100%;margin:2px 0 4px;border:1px solid rgba(92,200,255,.22);
+              border-radius:12px;padding:9px 11px;background:rgba(92,200,255,.05);
+              text-align:left;font-size:12.5px;line-height:1.45;color:#a8bcd8}
+  #ondeMissao b{color:#dff1ff}
   /* quantos estão no ar: só aparece quando há batalha */
   /* embaixo dos pontos, à esquerda: no meio de cima ele batia na bússola */
   /* o leme sai do MEIO para os lados, então a barra é ancorada no centro */
@@ -522,13 +517,12 @@
       <button class="op" id="btDragao">🐲 Dragão</button>
       <button class="op ligado" id="btCaca">✈ Caça AD-02</button>
     </div>
-    <!-- A SORTIDA. Fica AQUI, o último passo antes dos dois botões de jogar,
-         porque é a última decisão antes de decolar: escolher o avião e onde
-         começar são ajustes; escolher a missão é escolher o jogo. -->
-    <div id="sortidas">
-      <div class="rot rotG">A missão de hoje</div>
-      <div id="sortBotoes"></div>
-      <p class="txt" id="sortLema">&nbsp;</p>
+    <!-- A MISSÃO NÃO SE ESCOLHE AQUI. Ela se escolhe no computador de bordo,
+         na página OBJET, com o avião ainda na pista — que é onde um plano de
+         voo se carrega. A capa só diz onde fica, para ninguém procurar. -->
+    <div id="ondeMissao">
+      <b>A missão você escolhe dentro do avião</b>, no computador de bordo:
+      página <b>OBJET</b>, com ele ainda parado na pista.
     </div>
     <button class="grande azul" id="btSensor">Jogar com a inclinação do celular</button>
     <button class="grande cinza" id="btToque">Jogar com o dedo / teclado</button>
@@ -9172,6 +9166,25 @@ function mfdPaginaArmas(o, m){
   mfdTeclas(o, m, '1 2 3 · ESPAÇO · Z');
 }
 
+/* escreve um texto corrido quebrando nas palavras, na largura que há. Eu
+   já tinha escrito este laço duas vezes à mão em duas páginas diferentes —
+   a segunda vez é coincidência, a terceira é função. Devolve quantas linhas
+   escreveu. */
+function mfdParagrafo(txt, x, y, larg, dy, maxLinhas){
+  const pal = String(txt).split(' ');
+  let ln = '', n = 0;
+  for (let i = 0; i <= pal.length; i++){
+    const tent = ln ? ln + ' ' + pal[i] : pal[i];
+    if (i === pal.length || h2.measureText(tent).width > larg){
+      if (ln) h2.fillText(n === maxLinhas - 1 && i < pal.length
+                          ? mfdCorta(ln + ' ' + pal.slice(i).join(' '), larg) : ln, x, y + n*dy);
+      n++; ln = pal[i] || '';
+      if (n >= maxLinhas) break;
+    } else ln = tent;
+  }
+  return n;
+}
+
 /* corta um texto na largura que ele TEM, não no número de letras que alguém
    achou que caberia. Supõe a fonte já escolhida no contexto. */
 function mfdCorta(txt, larg){
@@ -9181,7 +9194,74 @@ function mfdCorta(txt, larg){
   return t + '…';
 }
 
+/* --- A PÁGINA OBJET TEM DUAS CARAS ------------------------------------
+   "Acho que as escolhas da missão têm que ser o painel do computador de
+    bordo. O computador de bordo tem que fazer essas coisas."
+
+   Está certo, e é como funciona um avião de verdade: o plano de voo se
+   carrega no computador, em solo, na mesma página que depois acompanha o
+   cumprimento dele. Escolher numa tela de HTML antes do jogo abrir era pôr
+   uma decisão do voo fora do avião.
+
+   Então: em SOLO a página OBJET é a seleção; no ar ela é o acompanhamento. E
+   entre as duas não há botão de confirmar — decolar é confirmar. */
+let mfdEscolhendo = false;
+
+function mfdPaginaEscolha(o, m){
+  const x = o.x + m.pad, w = o.w - m.pad*2;
+  h2.textBaseline = 'middle'; h2.textAlign = 'left';
+  h2.font = '800 ' + Math.max(7, m.cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
+  const lgNome = h2.measureText('OBJET').width;
+  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+  h2.fillStyle = MFD_AMBAR;
+  h2.fillText('SELEÇÃO', o.x + m.pad + lgNome + m.f*1.3, o.y + m.cab*0.62);
+
+  for (let i = 0; i < SORTIDAS.length; i++){
+    const q = SORTIDAS[i], sel = q.id === sortidaId;
+    const y = m.corpoY + m.corpoH*(0.10 + i*0.135);
+    const alt = m.corpoH*0.128;
+    /* a zona é mais alta que a letra: quem escolhe aqui está com o polegar
+       na tela, não com um ponteiro */
+    mfdZona(o.x, y - alt/2, o.w, alt, () => { escolheSortida(q.id); mfdEscolhendo = false; });
+    if (sel){
+      h2.fillStyle = 'rgba(99,216,255,.17)';
+      h2.fillRect(o.x + m.pad*0.4, y - alt/2, o.w - m.pad*0.8, alt);
+      h2.fillStyle = MFD_CIANO;
+      h2.fillRect(o.x + m.pad*0.4, y - alt/2, Math.max(2, m.pad*0.22), alt);
+    }
+    h2.font = '800 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'left'; h2.fillStyle = sel ? MFD_CIANO : MFD_ROT;
+    if (sel) mfdAceso(h2, MFD_CIANO, m.f*0.8);
+    h2.fillText((sel ? '▸ ' : '  ') + q.nome, x, y);
+    mfdApaga(h2);
+    h2.font = '700 ' + (m.f*0.72).toFixed(1) + 'px system-ui, sans-serif';
+    h2.textAlign = 'right'; h2.fillStyle = q.caca.max ? MFD_VERM : MFD_VERDE;
+    h2.fillText(q.caca.max ? 'COMBATE' : 'SEM HOSTIS', x + w, y);
+  }
+
+  /* o briefing da escolhida: é o que responde "o que eu vou fazer lá?" antes
+     de decolar, e é a razão de a seleção morar aqui e não num menu */
+  const yB = m.corpoY + m.corpoH*0.66;
+  h2.strokeStyle = MFD_FIO + '.10)'; h2.lineWidth = 1;
+  h2.beginPath(); h2.moveTo(x, yB - m.corpoH*0.07); h2.lineTo(x + w, yB - m.corpoH*0.07); h2.stroke();
+  h2.font = '700 ' + (m.f*0.78).toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'left'; h2.fillStyle = MFD_CLARO;
+  mfdParagrafo(Sortida.atual().lema, x, yB, w, m.corpoH*0.085, 3);
+
+  /* o rodapé escolhe a frase que CABE, em vez de ser cortado: "DECOLE ..."
+     não instrui ninguém. A tela do jogo é larga e leva as duas; o celular,
+     com letra maior, leva só a primeira. */
+  h2.font = '800 ' + (m.f*0.72).toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'center'; h2.fillStyle = MFD_ROT;
+  const rod = 'TOQUE PARA ESCOLHER · DECOLE PARA COMEÇAR';
+  h2.fillText(h2.measureText(rod).width <= w ? rod : 'TOQUE PARA ESCOLHER',
+              x + w/2, m.corpoY + m.corpoH*0.95);
+  h2.textAlign = 'left';
+}
+
 function mfdPaginaMissao(o, m){
+  /* em solo, o plano de voo ainda está aberto */
+  if (Sortida.fase === 'solo' || mfdEscolhendo) return mfdPaginaEscolha(o, m);
   const x = o.x + m.pad, w = o.w - m.pad*2;
   /* OS QUE FALTAM PRIMEIRO. A lista tem seis objetivos e a página mostra
      cinco: mostrando na ordem original, cumprir os primeiros escondia
@@ -9249,22 +9329,17 @@ function mfdPaginaMissao(o, m){
   if (Sortida.fase === 'alerta' || Sortida.fase === 'quente') mfdAceso(h2, S.cor, m.f*0.9);
   h2.fillText(S.txt, x + w, yS);
   mfdApaga(h2);
+  /* decolou e quer trocar de missão? Enquanto o rádio não chamou contato, o
+     plano de voo ainda se reabre — tocar na linha da sortida volta para a
+     seleção. Depois do ALERTA, não: com caça a caminho isso é desistir, não
+     escolher. */
+  if (Sortida.fase === 'transito')
+    mfdZona(o.x, yS - m.corpoH*0.075, o.w, m.corpoH*0.15, () => { mfdEscolhendo = true; });
   const ord = Sortida.ordem();
   if (ord){
     h2.font = '700 ' + (m.f*0.74).toFixed(1) + 'px system-ui, sans-serif';
     h2.textAlign = 'left'; h2.fillStyle = MFD_ROT;
-    /* quebra em duas linhas na largura da tela, porque o aviso é uma frase e
-       não um rótulo — cortar no meio de "1 200 m" não ajuda ninguém */
-    const pal = ord.toUpperCase().split(' ');
-    let ln = '', li = 0;
-    for (let i = 0; i <= pal.length; i++){
-      const tent = ln ? ln + ' ' + pal[i] : pal[i];
-      if (i === pal.length || h2.measureText(tent).width > w){
-        h2.fillText(ln, x, yS + m.corpoH*(0.085 + li*0.075));
-        ln = pal[i] || ''; li++;
-        if (li > 1) break;
-      } else ln = tent;
-    }
+    mfdParagrafo(ord.toUpperCase(), x, yS + m.corpoH*0.085, w, m.corpoH*0.075, 2);
   }
   const y2 = m.corpoY + m.corpoH*0.86;
   h2.strokeStyle = MFD_FIO + '.12)'; h2.lineWidth = 1;
@@ -10800,28 +10875,28 @@ const OBJ_DEF = {
    pode evitar, e é isso que separa combate de sorteio. */
 const SORTIDAS = [
   { id:'patrulha', nome:'PATRULHA', icone:'🛩',
-    lema:'Céu limpo, ninguém atrás de você. Conheça o mapa, voe rasante entre '
-       + 'os prédios, pouse onde quiser. É aqui que se aprende o avião.',
+    lema:'Céu limpo. Conheça o mapa, voe rasante entre os prédios e pouse onde '
+       + 'quiser. É aqui que se aprende o avião.',
     objs:['decolar','alvos','porto','rasante','avenida','vale'],
     caca:{ max:0 } },
 
   { id:'defesa', nome:'DEFESA AÉREA', icone:'🎯',
-    lema:'Quatro caças cruzaram a fronteira. Decole, ganhe altura e espere o '
-       + 'contato do radar — ele só varre acima de 350 m. Depois é caçar.',
+    lema:'Quatro caças cruzaram a fronteira. Suba acima de 350 m e o radar os '
+       + 'entrega. Depois é caçar, e voltar inteiro.',
     objs:[['abater',4],'voltar'],
     caca:{ max:2, cota:4, espera:30, gatilho:'altura', alt:350, aviso:
            'suba acima de 350 m para o radar varrer' } },
 
   { id:'bombardeio', nome:'BOMBARDEIO', icone:'💥',
-    lema:'Oito alvos no chão. Eles têm quem os defenda: na terceira explosão '
-       + 'um par de caças decola atrás de você. Leve bomba, e leve pressa.',
+    lema:'Oito alvos no chão. Na terceira explosão um par de caças decola '
+       + 'atrás de você. Leve bomba, e leve pressa.',
     objs:[['alvos',8],'voltar'],
     caca:{ max:2, cota:3, espera:20, gatilho:'alvos', quantos:3, aviso:
            'os caças só decolam depois do 3º alvo' } },
 
   { id:'infiltra', nome:'INFILTRAÇÃO', icone:'🕶',
-    lema:'Dezoito segundos sobre ' + CIDADE2.nome + ' abaixo de 200 m, sem '
-       + 'ser visto. Passar de 320 m entrega você ao radar — e aí eles vêm.',
+    lema:'Dezoito segundos sobre ' + CIDADE2.nome + ' abaixo de 200 m. Passar '
+       + 'de 320 m entrega você ao radar — e aí eles vêm.',
     objs:[['furtivo',18],'voltar'],
     caca:{ max:3, cota:9, espera:15, gatilho:'exposto', alt:320, tempo:4, aviso:
            'voe baixo sobre ' + CIDADE2.nome + '; acima de 320 m eles te veem' } }
@@ -10832,6 +10907,21 @@ try {
   const g = localStorage.getItem('aviao3d.sortida');
   if (g && SORTIDAS.some(q => q.id === g)) sortidaId = g;
 } catch(e){}
+
+/* Trocar de sortida é recomeçar: a lista de objetivos é outra, as fases
+   voltam ao princípio e o céu se esvazia. Virou função porque agora tem dois
+   donos — o painel de bordo e, pelo pacote, o celular-controle. */
+function escolheSortida(id){
+  if (!SORTIDAS.some(q => q.id === id) || id === sortidaId) return false;
+  sortidaId = id;
+  try { localStorage.setItem('aviao3d.sortida', id); } catch(e){}
+  if (Missoes) Missoes.zera();
+  Sortida.zera();
+  if (typeof Inimigos !== 'undefined') Inimigos.limpa();
+  mostraAviso('SORTIDA: ' + Sortida.atual().nome, '#9fd8ff', 2000);
+  bip(620, 0.08, 'square', 0.05);
+  return true;
+}
 
 const Sortida = {
   fase: 'solo', t: 0, tAlerta: 0, exposto: 0, alto: 0,
@@ -10924,6 +11014,7 @@ const Sortida = {
   alerta(){
     const c = this.atual().caca;
     this.fase = 'alerta'; this.tAlerta = 12;
+    mfdEscolhendo = false;      // com caça a caminho não se mexe no plano de voo
     if (typeof Inimigos !== 'undefined') Inimigos.cota = c.cota || 4;
     const comeco = c.gatilho === 'exposto' ? 'VOCÊ FOI VISTO'
                  : c.gatilho === 'alvos'   ? 'CAÇAS DECOLARAM'
@@ -11635,41 +11726,6 @@ $('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque
   bc.onclick = () => poe('caca');
   pinta();
 })();
-/* --- A ESCOLHA DA SORTIDA -----------------------------------------------
-   Os botões são MONTADOS a partir de `SORTIDAS`, não escritos no HTML: assim a
-   lista de missões existe num lugar só, e acrescentar a quinta é acrescentar
-   um objeto. O lema da escolhida fica embaixo, em letra corrida — é o
-   briefing, e ele é o que responde "o que eu vou fazer lá?" ANTES de decolar,
-   que era justamente o que faltava. */
-(function(){
-  const cx = $('sortBotoes'), lema = $('sortLema');
-  const bts = SORTIDAS.map(q => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'op';
-    b.innerHTML = '<b>' + q.icone + ' ' + q.nome + '</b>'
-                + (q.caca.max ? '<span style="color:#ff9c8f">combate</span>'
-                              : '<span style="color:#9fd4ff">sem hostis</span>');
-    b.onclick = () => poe(q.id);
-    cx.appendChild(b);
-    return b;
-  });
-  function pinta(){
-    SORTIDAS.forEach((q, i) => bts[i].classList.toggle('ligado', q.id === sortidaId));
-    lema.textContent = (SORTIDAS.find(q => q.id === sortidaId) || SORTIDAS[0]).lema;
-  }
-  function poe(id){
-    sortidaId = id;
-    try{ localStorage.setItem('aviao3d.sortida', id); }catch(e){}
-    /* a lista de objetivos é montada no `zera()`, então trocar de sortida na
-       capa exige rezerar — senão o painel entra no ar com os objetivos da
-       missão anterior */
-    if (Missoes) Missoes.zera();
-    Sortida.zera();
-    if (typeof Inimigos !== 'undefined') Inimigos.limpa();
-    pinta();
-  }
-  pinta();
-})();
 (function(){
   const bp = $('btPista'), ba = $('btAr');
   const pinta = () => { bp.classList.toggle('ligado', naPistaAoComecar);
@@ -12178,6 +12234,12 @@ const Tripulacao = {
          ela que sabe quem é cada um. Ver `contatosVivos`. */
       case 'des': { const L = contatosVivos(); const c2 = L[d.i];
                     if (c2) designa(c2.obj, c2.nome, c2.tipo); break; }
+      /* mesma regra da designação: o celular manda o ÍNDICE, porque a lista
+         é daqui. E só vale antes do contato — depois do alerta, trocar de
+         missão é desistir, não escolher. */
+      case 'sor': { const q = SORTIDAS[d.i];
+                    if (q && (Sortida.fase === 'solo' || Sortida.fase === 'transito'))
+                      escolheSortida(q.id); break; }
       case 'visao': cockpit = !cockpit; esqueceRadar(); break;
       case 'chama': if (m.papel === 'piloto') largaContramedida(); break;
       /* o Zerar do celular zera a mão LÁ e a cabeça AQUI: são dois "retos"
@@ -12374,6 +12436,14 @@ function mandaEstado(){
                       return [Sortida.atual().nome, S.txt,
                               S.cor === MFD_VERM ? 3 : S.cor === MFD_MAG ? 2
                             : S.cor === MFD_AMBAR ? 1 : 0, Sortida.ordem()]; })(),
+    /* a lista de sortidas só viaja enquanto ela pode ser escolhida — e aí o
+       celular desenha a mesma seleção que a tela do jogo. Fora da preparação
+       é peso morto no pacote, e vai `null`. */
+    sorL: (Sortida.fase === 'solo' || Sortida.fase === 'transito')
+            ? SORTIDAS.map(q => [q.nome, q.caca.max ? 1 : 0,
+                                 q.id === sortidaId ? 1 : 0, q.lema])
+            : null,
+    sorF: Sortida.fase,
     alertas: mfdAlertas().map(a => [a[0], a[1] === MFD_VERM ? 2 : 1]),
     mapa: contatosDoRadar(), apx: aproxParaOCelular() });
 }
