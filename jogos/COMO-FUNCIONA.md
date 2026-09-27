@@ -7211,3 +7211,59 @@ do horizonte nem o mesmo conjunto de comandos, e misturar as duas seria pagar
 o risco sem o ganho. E **recolher o painel** deixou de existir deitado:
 recolher servia para revelar o jogo atrás do painel, e no controle não há jogo
 atrás — há o próprio painel.
+
+# As janelas são multifunção — e eu tinha dito o contrário
+
+Defendendo o arranjo fixo, eu escrevi que *"painel de instrumento não muda de
+arranjo no meio do voo"*. Ele corrigiu:
+
+> "É por isso que os painéis modernos são multiuso, amigo. Muda a configuração
+> sim. Hoje os painéis são telas de vários instrumentos que mudam sim. Por isso
+> falei para você ver as telas multiuso do KC-390 e outros."
+
+Está certo, e a frase que eu escrevi é o oposto do que uma tela multifunção é.
+Num KC-390, num C-130J, em qualquer cabine de vidro, o piloto **escolhe o
+formato de cada display**: leva o mapa para a tela da direita, põe motor onde
+estava o tático, tira o que não quer ver. *Multifunção* é o nome da coisa.
+
+## O painel deixou de ter lugares com dono
+
+Ele tem **duas janelas**, e cada uma aceita qualquer formato — inclusive
+`ATITUDE`. A bola do horizonte virou um formato como os outros: ela pode
+ocupar a janela grande do meio, e o que estava lá troca de lugar com ela.
+
+```
+FORMATOS = ATITUDE SINÓT MOTOR MAPA TÁTIC ARMAS APROX OBJET VOO
+```
+
+A fita do rodapé deixou de ser "as páginas da TV" e virou o **catálogo de
+formatos**, com três marcas diferentes: caixa acesa para o que está na janela
+em foco, barra fina para o que está na outra janela daqui, pontinho para o que
+está numa das telas da TV. Tocar num formato o põe na janela em foco — e tocar
+numa janela dá foco a ela. É a ordem de qualquer cabine de vidro: escolhe-se o
+display, depois o formato.
+
+A configuração fica guardada, então o painel volta como você o deixou.
+
+## O que continua fixo, e por quê
+
+A janela não muda de **lugar**. Mudar de formato é decisão do piloto; mudar de
+lugar sozinho é o olho perder o endereço. O que era errado na minha frase não
+era "fixo" — era dizer que o **conteúdo** também era.
+
+## Duas listas, de propósito
+
+`FORMATOS` é local do controle e não vai ao ar. Quem viaja pelo fio é o índice
+em `MFD_PAGS`, e acrescentar `ATITUDE` àquela lista desalinharia o carrossel da
+TV — que é exatamente o defeito que as duas listas existem para evitar. A
+janela grande, quando mostra uma página de verdade, continua avisando a TV.
+
+## Uma porta que fechei antes de alguém entrar
+
+`sorZonas`, `sorLinha`, `apxZonas` e `apxCab` são zonas de toque criadas pela
+página que as desenhou. Com janelas trocando de formato, uma janela que deixou
+de mostrar OBJET deixaria para trás as linhas de sortida da última vez — zonas
+fantasma. Hoje ninguém as alcançaria, porque quem toca confere o formato
+antes; mas isso é uma salvaguarda a duas casas de distância, e essas somem numa
+refatoração. `pintaJanela` limpa as zonas que não são do formato que ela está
+desenhando.

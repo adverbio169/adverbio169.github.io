@@ -1441,11 +1441,26 @@ const Painel = {
     try { localStorage.setItem('painelEncolhido', v ? '1' : '0'); } catch(e){}
     try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
   },
+  janelas: [{ fmt:'ATITUDE' }, { fmt:'MAPA' }],
+  foco: 1,
   recebe(d){
     this.dado = d;
-    if (typeof d.carro === 'number' && !this.arrastando) this.carro = d.carro;
+    if (typeof d.carro === 'number' && !this.arrastando){
+      this.carro = d.carro;
+      /* a TV trocou de página: a janela grande acompanha, desde que não
+         esteja mostrando outra coisa por escolha de quem está aqui */
+      if (MFD_PAGS.indexOf(this.janelas[1].fmt) >= 0) this.janelas[1].fmt = MFD_PAGS[d.carro];
+    }
   },
   rola(n){
+    if (this.telaCheia()){
+      /* em tela cheia rolar é passar o formato DA JANELA EM FOCO pela lista,
+         e não girar um carrossel só */
+      const F = this.formatos(), j = this.foco;
+      const i = (F.indexOf(this.janelas[j].fmt) + n + F.length) % F.length;
+      this.poeFormato(j, F[i]);
+      return;
+    }
     this.carro = ((this.carro + n) % MFD_PAGS.length + MFD_PAGS.length) % MFD_PAGS.length;
     enviaCtl({ t:'pag', c: this.carro });
     try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
@@ -1460,7 +1475,58 @@ const Painel = {
      direita, sob o polegar direito; e as páginas no meio, que é o que se LÊ
      e não o que se aperta. A fita de abas atravessa o rodapé inteiro — antes
      ela vivia espremida em 169 px com oito rótulos. */
+  /* =====================================================================
+     AS JANELAS SÃO MULTIFUNÇÃO — foi esta a correção
+
+     Eu tinha escrito, defendendo o arranjo fixo, que "painel de instrumento
+     não muda de arranjo no meio do voo". É o contrário, e ele apontou: é
+     exatamente para MUDAR que existe uma tela multifunção. Num KC-390, num
+     C-130J, em qualquer cabine de vidro, o piloto escolhe o formato de cada
+     display — leva o mapa para a tela da direita, põe motor onde estava o
+     tático, tira o que não quer ver. "Multifunção" é o nome da coisa.
+
+     Então o painel deixa de ter "a bola ali e a página aqui". Ele tem DUAS
+     JANELAS, e cada uma aceita qualquer formato, inclusive ATITUDE. A fita de
+     abas passa a comandar a janela EM FOCO, e tocar numa janela dá foco a
+     ela.
+
+     Uma coisa continua fixa, e essa sim é regra de cabine: a janela não muda
+     de LUGAR. Mudar de formato é decisão; mudar de lugar sozinho é o olho
+     perder o endereço. O piloto escolhe o que aparece, não para onde olhar.
+
+     `FORMATOS` é local do controle e não vai ao ar. Quem viaja pelo fio é o
+     índice em `MFD_PAGS`, e acrescentar ATITUDE àquela lista desalinharia o
+     carrossel da TV — que é o defeito que as duas listas existem para evitar. */
+  formatos(){ return ['ATITUDE'].concat(MFD_PAGS); },
   telaCheia(){ return document.body.classList.contains('paisagem'); },
+  /* a janela em foco recebe o que a fita mandar */
+  poeFormato(j, fmt){
+    if (!this.janelas[j]) return;
+    /* o mesmo formato em duas janelas seria desperdiçar metade do painel:
+       quem já tinha, troca com quem pediu */
+    const outra = this.janelas.findIndex((w, k) => k !== j && w.fmt === fmt);
+    if (outra >= 0) this.janelas[outra].fmt = this.janelas[j].fmt;
+    this.janelas[j].fmt = fmt;
+    this.guardaJanelas();
+    /* a TV segue a janela grande, quando ela mostra uma página de verdade */
+    const i = MFD_PAGS.indexOf(this.janelas[1].fmt);
+    if (i >= 0 && i !== this.carro){ this.carro = i; enviaCtl({ t:'pag', c:i }); }
+    try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
+  },
+  guardaJanelas(){
+    try { localStorage.setItem('painelJanelas',
+            JSON.stringify(this.janelas.map(w => w.fmt))); } catch(e){}
+  },
+  leJanelas(){
+    try {
+      const g = JSON.parse(localStorage.getItem('painelJanelas') || 'null');
+      if (Array.isArray(g) && g.length === 2){
+        const ok = this.formatos();
+        if (ok.indexOf(g[0]) >= 0 && ok.indexOf(g[1]) >= 0)
+          this.janelas = [{ fmt: g[0] }, { fmt: g[1] }];
+      }
+    } catch(e){}
+  },
   regioes(W, H){
     const m = Math.max(5, Math.min(W*0.010, 10));
     const hCab = Math.max(22, Math.min(H*0.088, 32));
@@ -1508,7 +1574,8 @@ const Painel = {
      sessenta vezes por segundo para gravar o mesmo número é trabalho que o
      navegador faz e ninguém vê. */
   acomoda(R){
-    const chave = [R.W, R.H, document.body.className].join('|');
+    const chave = [R.W, R.H, document.body.className,
+                   this.janelas.map(w => w.fmt).join(',')].join('|');
     if (chave === this._acomodado) return;
     this._acomodado = chave;
     const poe = (id, r) => {
@@ -1525,12 +1592,18 @@ const Painel = {
     poe('seletorArma', this.miolo(R.arma, 'ARMAMENTO', fo));
     poe('btFogo', R.fogo);
     if (R.chama) poe('btChama', R.chama);
-    /* a bola é REDONDA, então ela é o maior círculo que cabe no miolo — que
-       já desconta a faixa do rótulo. Sem o menor dos dois lados ela virava um
-       oval espremido em telas onde o poço não sai quadrado. */
-    const mi = this.miolo(R.adi, 'ATITUDE', fo);
-    const lado = Math.min(mi.w, mi.h);
-    poe('horizonte', { x: mi.x + (mi.w - lado)/2, y: mi.y, w: lado, h: lado });
+    /* A BOLA VAI PARA A JANELA QUE PEDIU ATITUDE — e some se nenhuma pediu.
+       É o que faz dela um FORMATO e não um enfeite pregado num canto. Redonda,
+       então é o maior círculo que cabe no miolo, que já desconta a faixa do
+       rótulo. */
+    const jAdi = this.janelas.findIndex(w => w.fmt === 'ATITUDE');
+    if (jAdi < 0) poe('horizonte', null);
+    else {
+      const mi = this.miolo(jAdi === 0 ? R.adi : R.pag, 'ATITUDE', fo);
+      const lado = Math.min(mi.w, mi.h);
+      poe('horizonte', { x: mi.x + (mi.w - lado)/2, y: mi.y + (mi.h - lado)/2,
+                         w: lado, h: lado });
+    }
 
     /* a faixa de cabeça: engrenagem e calibrar à esquerda, estado e posto à
        direita, tudo na mesma altura da faixa */
@@ -1637,31 +1710,18 @@ const Painel = {
     this.vidro(c, { W, H, cab: R.hCab, abas: R.hAbas, pad: R.m });
     this.acomoda(R);
 
-    this.poco(c, R.adi, 'ATITUDE');
     this.poco(c, R.arma, 'ARMAMENTO');
     this.poco(c, R.nitro, null);
     this.poco(c, R.pot, null);
-    this.poco(c, R.pag, null);
 
-    /* a página, na região dela */
-    const P = R.pag;
-    const abasP = 0;
-    const cab  = Math.max(14, Math.min(P.h*0.105, 30));
-    const pad  = Math.max(8, Math.min(P.w*0.045, 20));
-    const f    = Math.max(9, Math.min(P.h*0.078, P.w*0.062));
-    const m = { pad, cab, abas: abasP, corpoY: cab, corpoH: P.h - cab,
-                f, fv: f*1.35, W: P.w, H: P.h };
-    c.save();
-    c.beginPath(); c.rect(P.x, P.y, P.w, P.h); c.clip();
-    c.translate(P.x, P.y);
-    this.cabecalhoPag(c, m, d);
-    this.corpoPag(c, m, d);
-    c.restore();
+    /* AS DUAS JANELAS. Qualquer formato em qualquer uma. */
+    this.pintaJanela(c, R.adi, this.janelas[0].fmt, d, this.foco === 0);
+    this.pintaJanela(c, R.pag, this.janelas[1].fmt, d, this.foco === 1);
 
-    /* e a fita de abas, atravessando o rodapé inteiro */
+    /* e a fita de formatos, atravessando o rodapé inteiro */
     this.abasAltura = R.hAbas; this.alcaAltura = 0;
     c.save(); c.translate(R.abas.x, R.abas.y);
-    this.pintaAbas(c, R.abas.w, R.abas.h, R.abas.h);
+    this.pintaFormatos(c, R.abas.w, R.abas.h);
     c.restore();
   },
 
@@ -1716,9 +1776,9 @@ const Painel = {
      desenhos que precisam deles: o painel de tela cheia (deitado) e o antigo
      retângulo (em pé). Duplicar o despacho das oito páginas seria garantir
      que um dia uma delas exista só num dos dois. */
-  cabecalhoPag(c, m, d){
+  cabecalhoPag(c, m, d, fmt){
     const { pad, cab, W } = m;
-    const nome = MFD_PAGS[this.carro];
+    const nome = fmt || MFD_PAGS[this.carro];
     c.textBaseline = 'middle'; c.textAlign = 'left';
     const bh = Math.max(2, cab*0.34);
     c.fillStyle = MFD_CIANO; c.fillRect(pad*0.45, cab*0.60 - bh/2, Math.max(2, cab*0.11), bh);
@@ -1733,8 +1793,41 @@ const Painel = {
       c.fillText('‹ arraste ›', W - pad, cab*0.60);
     }
   },
-  corpoPag(c, m, d){
-    const nome = MFD_PAGS[this.carro];
+  /* desenha UM formato dentro de um retângulo. É a peça que faz a janela ser
+     multifunção: o formato é argumento, e não uma variável global lida lá
+     dentro. ATITUDE não desenha nada aqui — a bola é um elemento de HTML, e
+     quem a põe no lugar é `acomoda`. */
+  pintaJanela(c, r, fmt, d, foco){
+    this.poco(c, r, null, foco ? 'rgba(99,216,255,.75)' : 'rgba(99,216,255,.34)');
+    /* as zonas de toque pertencem à página que as desenhou. Com janelas
+       trocando de formato, uma janela que deixou de mostrar OBJET deixaria
+       para trás as linhas de sortida da última vez — zonas fantasma, que só
+       não pegam ninguém hoje porque quem toca confere o formato antes. Limpar
+       aqui é fechar a porta antes de alguém entrar por ela. */
+    if (fmt !== 'OBJET'){ this.sorZonas = null; this.sorLinha = null; }
+    if (fmt !== 'APROX'){ this.apxZonas = null; this.apxCab = null; }
+    if (fmt === 'ATITUDE'){
+      const fr = this.faixaRot(r);
+      c.font = '800 ' + Math.max(7, Math.min(fr*0.72, 9.5)).toFixed(1) + 'px system-ui, sans-serif';
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillStyle = foco ? MFD_CIANO : 'rgba(143,163,184,.72)';
+      c.fillText('ATITUDE', r.x + r.w/2, r.y + r.h - fr/2);
+      return;
+    }
+    const cab = Math.max(14, Math.min(r.h*0.115, 30));
+    const pad = Math.max(7, Math.min(r.w*0.045, 20));
+    const f   = Math.max(8, Math.min(r.h*0.078, r.w*0.062));
+    const m = { pad, cab, abas: 0, corpoY: cab, corpoH: r.h - cab,
+                f, fv: f*1.35, W: r.w, H: r.h };
+    c.save();
+    c.beginPath(); c.rect(r.x, r.y, r.w, r.h); c.clip();
+    c.translate(r.x, r.y);
+    this.cabecalhoPag(c, m, d, fmt);
+    this.corpoPag(c, m, d, fmt);
+    c.restore();
+  },
+  corpoPag(c, m, d, fmt){
+    const nome = fmt || MFD_PAGS[this.carro];
     /* o conteúdo pinta aceso, igual ao da TV: um save só para a página toda */
     c.save(); this.aceso(c, 'rgba(120,225,255,.42)', Math.max(3, m.H*0.016));
     if (!d.jogando && !d.vel){ this.vazio(c, m); }
@@ -1750,6 +1843,42 @@ const Painel = {
   },
   /* A FITA DE ABAS, que o painel aberto e o encolhido dividem: ela marca a
      página desta tela e, com um fio embaixo, as DUAS que estão na TV. */
+  /* A FITA DE FORMATOS. Ela não é mais "as páginas da TV": é o catálogo do
+     que cabe numa janela, e o que ela marca é ONDE cada formato está.
+       · caixa acesa e barra grossa embaixo → está na janela em FOCO
+       · barra fina                         → está na outra janela daqui
+       · pontinho                           → está numa das duas telas da TV
+     Tocar põe o formato na janela em foco. É assim que se troca o que a tela
+     mostra numa cabine de vidro: escolhe-se o display e depois o formato. */
+  pintaFormatos(c, W, H){
+    const F = this.formatos(), aw = W/F.length, gr = Math.max(2, H*0.12);
+    const doFoco = this.janelas[this.foco].fmt;
+    const daOutra = this.janelas[1 - this.foco].fmt;
+    const naTv = [MFD_PAGS[(this.carro + 1) % MFD_PAGS.length],
+                  MFD_PAGS[(this.carro + 2) % MFD_PAGS.length]];
+    c.textBaseline = 'middle'; c.textAlign = 'center';
+    c.strokeStyle = MFD_FIO + '.14)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(0, 0.5); c.lineTo(W, 0.5); c.stroke();
+    c.font = '700 ' + Math.max(8, Math.min(H*0.36, aw*0.26)).toFixed(1) + 'px system-ui, sans-serif';
+    F.forEach((p, i) => {
+      const ax = i*aw, curto = (p === 'ATITUDE') ? 'ATI' : MFD_CURTO[MFD_PAGS.indexOf(p)];
+      if (p === doFoco){
+        this.aceso(c, MFD_CIANO, H*0.34);
+        c.fillStyle = 'rgba(99,216,255,.13)'; c.fillRect(ax, 1, aw, H - 1);
+        c.fillStyle = MFD_CIANO; c.fillRect(ax + aw*0.10, H - gr, aw*0.80, gr);
+      } else if (p === daOutra){
+        c.fillStyle = 'rgba(99,216,255,.55)';
+        c.fillRect(ax + aw*0.22, H - gr, aw*0.56, gr*0.6);
+      } else if (naTv.indexOf(p) >= 0){
+        c.fillStyle = 'rgba(99,216,255,.34)';
+        c.beginPath(); c.arc(ax + aw/2, H - gr*0.8, Math.max(1.4, gr*0.4), 0, 6.283); c.fill();
+      }
+      c.fillStyle = p === doFoco ? MFD_CIANO : MFD_FRACO;
+      c.fillText(c.measureText(p).width > aw*0.84 ? curto : p, ax + aw/2, H*0.46);
+      this.apaga(c);
+    });
+    c.textAlign = 'left';
+  },
   pintaAbas(c, W, H, abas){
     const ay = H - abas, aw = W/MFD_PAGS.length;
     c.textBaseline = 'middle';
@@ -2252,6 +2381,19 @@ const Painel = {
     }
     c.textAlign = 'left';
   },
+  /* o dedo dentro de UMA janela. `tocaPagina` foi escrita quando havia uma
+     página só e lê `this.carro`; aqui diz-se qual janela, e portanto qual
+     formato, antes de perguntar a ela. */
+  tocaJanela(j, px, py){
+    const fmt = this.janelas[j].fmt;
+    if (fmt === 'ATITUDE') return false;
+    const guarda = this.carro;
+    const i = MFD_PAGS.indexOf(fmt);
+    if (i >= 0) this.carro = i;
+    const r = this.tocaPagina(px, py);
+    this.carro = guarda;
+    return r;
+  },
   /* o dedo na página: hoje só a tática quer, e ela manda o índice para a TV */
   tocaPagina(px, py){
     if (MFD_PAGS[this.carro] === 'APROX'){
@@ -2509,6 +2651,7 @@ const Painel = {
 (function gestoDoPainel(){
   const el = document.getElementById('painelTela');
   if (!el) return;
+  Painel.leJanelas();
   /* quem voou com a tela encolhida da última vez continua com ela encolhida */
   try { if (localStorage.getItem('painelEncolhido') === '1'){
           Painel.encolhido = true; el.classList.add('encolhido'); } } catch(e){}
@@ -2536,8 +2679,13 @@ const Painel = {
      onde ninguém procura, e pior, num lugar onde o dedo passa sem querer. */
   function pega(x, y){
     const R = Painel.R;
-    if (Painel.telaCheia() && R && !dentro(R.pag, x, y) && !dentro(R.abas, x, y)){
-      x0 = null; return;
+    if (Painel.telaCheia() && R){
+      /* arrastar numa janela passa o formato DELA, e dá foco a ela de
+         quebra: o gesto age onde o dedo está, não numa janela escolhida
+         noutro canto da tela */
+      if (dentro(R.pag, x, y)) Painel.foco = 1;
+      else if (dentro(R.adi, x, y)) Painel.foco = 0;
+      else if (!dentro(R.abas, x, y)){ x0 = null; return; }
     }
     x0 = x; y0 = y; usou = false; movi = false; Painel.arrastando = true;
   }
@@ -2609,11 +2757,20 @@ const Painel = {
     if (movi){ movi = false; return; }
     const R = Painel.R;
     if (Painel.telaCheia() && R){
+      const F = Painel.formatos();
       if (dentro(R.abas, e.clientX, e.clientY)){
-        const i = Math.floor((e.clientX - R.abas.x)/(R.abas.w/MFD_PAGS.length));
-        Painel.rola(Math.max(0, Math.min(MFD_PAGS.length - 1, i)) - Painel.carro);
+        /* a fita manda na janela EM FOCO: escolhe-se o display e depois o
+           formato, que é a ordem de qualquer cabine de vidro */
+        const i = Math.floor((e.clientX - R.abas.x)/(R.abas.w/F.length));
+        Painel.poeFormato(Painel.foco, F[Math.max(0, Math.min(F.length - 1, i))]);
+      } else if (dentro(R.adi, e.clientX, e.clientY)){
+        if (Painel.foco !== 0){ Painel.foco = 0; Painel.pinta();
+          try { navigator.vibrate && navigator.vibrate(8); } catch(x){} }
+        else Painel.tocaJanela(0, e.clientX - R.adi.x, e.clientY - R.adi.y);
       } else if (dentro(R.pag, e.clientX, e.clientY)){
-        Painel.tocaPagina(e.clientX - R.pag.x, e.clientY - R.pag.y);
+        if (Painel.foco !== 1){ Painel.foco = 1; Painel.pinta();
+          try { navigator.vibrate && navigator.vibrate(8); } catch(x){} }
+        else Painel.tocaJanela(1, e.clientX - R.pag.x, e.clientY - R.pag.y);
       }
       return;
     }
