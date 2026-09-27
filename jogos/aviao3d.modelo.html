@@ -8885,6 +8885,38 @@ function mfdPaginaSinoptico(o, m){
   perna(0, -L*0.20);
   perna(-L*0.115, L*0.13);
   perna(L*0.115, L*0.13);
+
+  /* AS PEÇAS RESPONDEM AO DEDO. Tocar na ASA mexe o flape; tocar numa PERNA
+     recolhe ou baixa o trem. O trem vem ANTES na lista porque as duas pernas
+     principais caem dentro do retângulo da asa: zona pequena e específica
+     primeiro, zona grande depois.
+
+     A moldura tracejada é fraca de propósito (16%). Ela existe só para dizer
+     "isto aqui é um comando" a quem nunca tentou — um sinóptico de verdade
+     não desenha caixa de toque nenhuma, e o desenho é a informação. */
+  if (mfdTemTeclas() && !mfdEncolhido){
+    const rp = Math.max(15, L*0.11);
+    for (const [px, py] of [[0, -L*0.20], [-L*0.115, L*0.13], [L*0.115, L*0.13]]){
+      mfdZona(cx + px - rp, cy + py - rp, rp*2, rp*2,
+              () => { mexeTrem(); tremeAqui(35); });
+    }
+    for (const lado of [-1, 1]){
+      const x0 = lado > 0 ? L*0.07 : -L*0.48;
+      mfdZona(cx + x0, cy + L*0.00, L*0.41, L*0.34,
+              () => { mexeFlap(); tremeAqui([18, 40, 18]); });
+    }
+    h2.save();
+    h2.setLineDash([3, 3]); h2.lineWidth = 1;
+    h2.strokeStyle = 'rgba(99,216,255,.16)';
+    for (const lado of [-1, 1]){
+      const x0 = lado > 0 ? L*0.07 : -L*0.48;
+      h2.strokeRect(x0, 0, L*0.41, L*0.34);
+    }
+    for (const [px, py] of [[0, -L*0.20], [-L*0.115, L*0.13], [L*0.115, L*0.13]]){
+      h2.beginPath(); h2.arc(px, py, Math.max(7, L*0.065), 0, 7); h2.stroke();
+    }
+    h2.restore();
+  }
   h2.restore();
 
   // e os números, nas laterais da figura
@@ -9193,6 +9225,30 @@ function mfdAreaPagina(o){
   const b = mfdLarguraTeclas(o);
   return b ? { x: o.x + b, y: o.y, w: o.w - b, h: o.h } : o;
 }
+/* AS ZONAS DE TOQUE DE UMA PÁGINA
+
+   "o botão de flap eu posso acionar clicando no desenho do avião (na asa),
+   naquela tela onde ele aparece."
+
+   Pode, e é a coisa certa a fazer com um sinóptico: ele já desenha a peça na
+   posição em que ela está, então tocar NA PEÇA é o gesto mais curto que
+   existe — não há rótulo a ler nem botão a procurar.
+
+   A página registra retângulos enquanto desenha, cada um com o que fazer.
+   Guardo o número da JANELA junto: no computador há duas telas abertas, e a
+   segunda a desenhar apagaria as zonas da primeira. */
+let _mfdKAtual = -1, _mfdZonas = [];
+function mfdZona(x, y, w, h, fn){ _mfdZonas.push({ k: _mfdKAtual, x, y, w, h, fn }); }
+function mfdTocaZonas(k, px, py){
+  for (const z of _mfdZonas){
+    if (z.k !== k) continue;
+    if (px < z.x || px > z.x + z.w || py < z.y || py > z.y + z.h) continue;
+    z.fn();
+    try { navigator.vibrate && navigator.vibrate(14); } catch(e){}
+    return true;
+  }
+  return false;
+}
 let _mfdTeclasZona = null;
 function mfdDesenhaTeclas(o, m){
   const bw = mfdLarguraTeclas(o);
@@ -9455,6 +9511,7 @@ function desenhaMFD(k){
   h2.save();
   cantoInst(h2, o.x, o.y, o.w, o.h, Math.max(2, o.h*0.018)); h2.clip();
   mfdAceso(h2, 'rgba(120,225,255,.42)', Math.max(3, o.h*0.020));
+  _mfdKAtual = k;
   if (nome === 'SINÓT') mfdPaginaSinoptico(oP, mP);
   if (nome === 'MOTOR') mfdPaginaMotor(oP, mP);
   if (nome === 'MAPA')  mfdPaginaMapa(oP, mP);
@@ -9494,7 +9551,7 @@ function mfdPintaAbas(o, abas, k){
   });
   h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
 }
-function desenhaTelas(){ desenhaMFD(0); desenhaMFD(1); }
+function desenhaTelas(){ _mfdZonas = []; desenhaMFD(0); desenhaMFD(1); }
 
 /* =============================================================================
    O HUD É VIDRO PRESO NO AVIÃO — NÃO É ÓCULOS
@@ -10597,6 +10654,7 @@ function mfdArrasta(px, py){
    aí o toque cai na regra de sempre. É por aqui que trem, flape e o resto vão
    entrar quando forem para dentro do painel. */
 function mfdTocaPagina(k, px, py){
+  if (mfdTocaZonas(k, px, py)) return true;
   if (MFD_PAGS[mfdPagDe(k + 1)] !== 'TÁTIC' || !_tatPontos || !_tatPontos.length) return false;
   let melhor = null, dm = 1e9;
   for (const q of _tatPontos){

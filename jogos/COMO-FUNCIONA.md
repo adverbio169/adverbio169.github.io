@@ -6524,3 +6524,28 @@ As teclas comem a largura da esquerda, e a página tem de saber disso.
 `mfdAreaPagina(o)` devolve o retângulo que sobra, e tanto o desenho quanto o
 `radarOnde()` (que é quem o teste pergunta) leem **dele**. Calcular o disco num
 lugar e pintá-lo em outro já deu erro nesta mesma tela uma vez.
+
+### E as peças do sinóptico respondem ao dedo
+
+> "o botão de flap eu posso acionar clicando no desenho do avião (na asa),
+> naquela tela onde ele aparece."
+
+É a coisa certa a fazer com um sinóptico: ele já desenha a peça **na posição
+em que ela está**, então tocar NA PEÇA é o gesto mais curto que existe — não
+há rótulo para ler nem botão para procurar. Tocar na **asa** mexe o flape;
+tocar numa **perna** recolhe ou baixa o trem.
+
+Duas coisas que a implementação teve de acertar:
+
+- **A ordem importa.** As duas pernas principais caem DENTRO do retângulo da
+  asa. Zona pequena e específica primeiro, zona grande depois — senão tocar na
+  perna desceria o flape.
+- **Cada janela guarda as suas zonas.** No computador há duas telas abertas, e
+  a segunda a desenhar apagaria as zonas da primeira se a lista fosse uma só.
+
+A moldura tracejada é fraca de propósito (16%). Ela existe só para dizer "isto
+aqui é um comando" a quem nunca tentou; um sinóptico de verdade não desenha
+caixa de toque nenhuma, porque lá o desenho é só informação.
+
+As teclas de borda **continuam**: o sinóptico é uma das sete páginas, e o trem
+não pode depender de qual página está aberta.
