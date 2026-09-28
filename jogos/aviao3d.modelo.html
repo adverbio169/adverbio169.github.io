@@ -2792,7 +2792,17 @@ function atualizaTelasCabine(agora){
     h2.clearRect(0, 0, t.c.width, t.c.height);
     try {
       if (t.tira) pintaTiraAlarmes(h2);
-      else desenhaMFDEm({ x: 0, y: 0, w: TELA_CAB_L, h: TELA_CAB_A, k: t.jan }, t.jan, true);
+      else {
+        /* (tentei um ZOOM aqui para a letra crescer: desenhar numa caixa
+           menor e ampliar. Não faz nada, e a razão é boba — a página calcula
+           o corpo de letra A PARTIR da caixa, então encolher a caixa encolhe
+           a letra na mesma proporção e a ampliação devolve as duas ao
+           tamanho de antes. Letra maior aqui só mudando a página, não o
+           pincel. Fica registrado para eu não tentar de novo.) */
+        _mfdEscala = 1.45;
+        desenhaMFDEm({ x: 0, y: 0, w: TELA_CAB_L, h: TELA_CAB_A, k: t.jan }, t.jan, true, true);
+        _mfdEscala = 1;
+      }
     } catch(e){}
     t.tex.needsUpdate = true;
   }
@@ -3696,6 +3706,23 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
      forma. */
   const mPreto   = new THREE.MeshPhongMaterial({ color: 0x1e2530, shininess: 26 });
   const mFosco   = new THREE.MeshPhongMaterial({ color: 0x27303d, shininess: 12 });
+  /* A COR DE DENTRO DA CABINE.
+
+     Estava tudo em `mPreto`/`mFosco`, que são cores de PEÇA DE FORA vista ao
+     sol. Por dentro, contra um céu claro, elas viram uma silhueta chapada:
+     arco, coaming, consoles e painel no mesmo preto, sem uma aresta para o
+     olho segurar. É disso que vem a cara de recorte.
+
+     Cabine de caça de verdade é CINZA-ESCURO fosco (o "dark gull grey"), e a
+     graça é que com uma luz de céu vinda de cima as faces viradas para cima
+     clareiam e as verticais escurecem sozinhas: o cinza dá FORMA onde o preto
+     dava mancha. Com brilho baixo e um específico frio, a quina do coaming
+     e o tubo da capota ganham um fio de luz — que é o que separa uma peça da
+     outra sem desenhar nada. */
+  const mCabine  = new THREE.MeshPhongMaterial({ color: 0x3b434d, shininess: 8,
+                                                 specular: 0x39434f });
+  const mCabEsc  = new THREE.MeshPhongMaterial({ color: 0x272d34, shininess: 6,
+                                                 specular: 0x2d353f });
   /* --- A COR DAS SUPERFÍCIES MÓVEIS -----------------------------------------
      A regra anterior era "móvel = cor oposta": painel de asa amarelo, flape e
      aileron azuis. Lida de longe, essa regra ARREBENTA o avião: a troca de cor
@@ -3987,7 +4014,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        dentro do arco ainda vê a face de FORA dele. */
     /* e o TUBO afinou de 0,075 para 0,05: visto de dentro, a 25 unidades do
        olho, o de antes era uma barra de arquibancada. Moldura é moldura. */
-    const arco = new THREE.Mesh(new THREE.TorusGeometry(1, 0.028, 6, 20, Math.PI), mAmarelo);
+    const arco = new THREE.Mesh(new THREE.TorusGeometry(1, 0.028, 8, 44, Math.PI), mAmarelo);
     arco.scale.set(CP.x*k + 0.4, CP.y*k + 0.4, 3); arco.position.set(0, CP.cy, CP.arco); g.add(arco);
     /* O TAMANHO DO ESCURO é conta, não gosto. Ele tem de ser o mais interno
        nos dois sentidos e o mais externo em nenhum:
@@ -3998,7 +4025,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        centésimos). Na primeira tentativa o escuro era 5,5% menor e sobrava
        uma tarja amarela grossa por dentro — a 25 unidades do olho, 5% de 20
        é um dedo de tinta. */
-    const arcoI = new THREE.Mesh(new THREE.TorusGeometry(1, 0.036, 6, 20, Math.PI), mFosco);
+    const arcoI = new THREE.Mesh(new THREE.TorusGeometry(1, 0.036, 8, 44, Math.PI), mCabine);
     arcoI.scale.set((CP.x*k + 0.4)*0.985, (CP.y*k + 0.4)*0.985, 2.6);
     arcoI.position.set(0, CP.cy, CP.arco - 0.5); g.add(arcoI);
   }
@@ -4016,7 +4043,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     }, mFosco, 10));
   /* o aro: TorusGeometry(1,1) tem raio EXTERNO 2 — escalado, ele virava uma
      mancha amarela do dobro da cabine na frente dela. Tubo fino resolve. */
-  const moldura = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 6, 26), mAmarelo);
+  const moldura = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 8, 52), mAmarelo);
   moldura.scale.set(CP.x + 0.6, CP.z + 0.6, 3.2); moldura.rotation.x = Math.PI/2;
   moldura.position.set(0, CP.cy, CP.cz); g.add(moldura);
   /* e a carenagem que desce da cabine para a cauda: sem ela o dorso fica reto
@@ -4103,19 +4130,18 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        Ninguém vai contar os botões, mas a diferença entre uma bolha VAZIA e uma
        bolha com um banco dentro é a diferença entre um brinquedo e um avião. */
     {
-      g.add(convesDaCabine(CP, M.secoes,
-              new THREE.MeshPhongMaterial({ color: 0x151a21, shininess: 5 })));
+      g.add(convesDaCabine(CP, M.secoes, mCabEsc));
       /* O PISO ficava em y=18: dentro da fuselagem, debaixo da abóbada, sem
          nunca aparecer em vista nenhuma — nem de fora pelo vidro. Ele e o
          resto da mobília sobem para cima do convés, que é onde o chão está
          de verdade. */
-      const piso = new THREE.Mesh(new THREE.BoxGeometry(26, 2, 54), mEscuro);
+      const piso = new THREE.Mesh(new THREE.BoxGeometry(26, 2, 54), mCabEsc);
       piso.position.set(0, 32.5, 122); g.add(piso);
       /* os CONSOLES laterais: dois degraus escuros correndo dos dois lados do
          banco até o painel. De fora quase não se veem; de dentro são eles que
          fazem a cabine ter PAREDE em vez de ser um assento no meio do nada. */
       for (const lado of [-1, 1]){
-        const con = new THREE.Mesh(caixaViva(6.4, 4.4, 42, 1.2), mPreto);
+        const con = new THREE.Mesh(caixaViva(6.4, 4.4, 42, 1.2), mCabine);
         con.position.set(lado*16, 33.4, 126); g.add(con);
         /* a face de cima ganha a lona: sem ela o console é uma cunha preta */
         const tampo = new THREE.Mesh(new THREE.PlaneGeometry(42, 6),
@@ -4138,17 +4164,17 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       }
       g.add(maneteG);
       comandos.manete = maneteG;
-      const assento = new THREE.Mesh(caixaViva(17, 5, 23, 2.2), mFosco);
+      const assento = new THREE.Mesh(caixaViva(17, 5, 23, 2.2), mCabine);
       assento.position.set(0, 36, 112); g.add(assento);
       /* o encosto tinha 30 de altura e o topo saía em y=50, acima da capota
          (que ali vale uns 46): de fora, uma caixa preta espiando por cima do
          vidro. Vinte e dois, e ele fica DENTRO da bolha, que é onde mora. */
-      const encosto = new THREE.Mesh(caixaViva(17, 16, 6, 2.2), mFosco);
+      const encosto = new THREE.Mesh(caixaViva(17, 16, 6, 2.2), mCabine);
       encosto.position.set(0, 42, 99); encosto.rotation.x = -0.16; g.add(encosto);
       /* o apoio de cabeça encosta no teto da bolha: a capota naquela estação
          (z=96) vale 51, e uma peça de 9 de altura centrada em 50 saía por
          cima do vidro. É a mesma conta que já tinha corrigido o encosto. */
-      const apoio = new THREE.Mesh(caixaViva(16, 7, 7, 2.4), mEscuro);
+      const apoio = new THREE.Mesh(caixaViva(16, 7, 7, 2.4), mCabine);
       apoio.position.set(0, 46.5, 96); g.add(apoio);
       /* --- O PAINEL: uma chapa com a lona, e as telas vivas por cima -----
          A INCLINAÇÃO É 0,38 rad e a face é a DE TRÁS. `rotation.set(0.38,
@@ -4157,8 +4183,8 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          olhando para o nariz — invisíveis para quem senta atrás deles, e
          ninguém nunca notou porque nada nesta cabine aparecia. */
       const PL = 21, PA = PL*PAINEL_LONA.alt/PAINEL_LONA.larg;
-      const caixaP = new THREE.Mesh(caixaViva(PL + 1, PA + 0.9, 3.2, 0.8), mEscuro);
-      caixaP.position.set(0, 38.38, 145.98); caixaP.rotation.x = 0.52; g.add(caixaP);
+      const caixaP = new THREE.Mesh(caixaViva(PL + 1, PA + 0.9, 3.2, 0.8), mCabEsc);
+      caixaP.position.set(0, 39.5, 145.98); caixaP.rotation.x = 0.52; g.add(caixaP);
       const grupoP = new THREE.Group();
       grupoP.add(new THREE.Mesh(new THREE.PlaneGeometry(PL, PA), materialDoPainel()));
       const telasC = fazTelasCabine();
@@ -4183,7 +4209,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       /* a chapa fica meia unidade à frente da face de trás da caixa; com a
          caixa em (0; 38,38; 145,98), 3,2 de fundo e 0,52 de inclinação, a
          normal para o piloto é (0; 0,497; -0,868). */
-      grupoP.position.set(0, 39.4, 144.2);
+      grupoP.position.set(0, 40.52, 144.2);
       grupoP.rotation.set(0.52, Math.PI, 0);
       g.add(grupoP);
       g.userData.telasCabine = telasC;
@@ -4192,8 +4218,8 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          — sem ela o painel acaba numa linha reta, com o mundo começando no
          mesmo pixel. A borda de cima da chapa está em (0; 42,5; 147); esta
          vem de lá para trás, na direção do piloto. */
-      const coam = new THREE.Mesh(caixaViva(23, 0.8, 4.6, 0.3), mPreto);
-      coam.position.set(0, 43.0, 144.0); coam.rotation.x = -0.07; g.add(coam);
+      const coam = new THREE.Mesh(caixaViva(23, 0.8, 4.6, 0.3), mCabEsc);
+      coam.position.set(0, 44.1, 144.0); coam.rotation.x = -0.07; g.add(coam);
       /* e a FITA DE ALARMES vai na cara do coaming, não no alto do painel:
          debaixo da aba ela ficava escondida, e em avião de verdade é ali que
          ela mora mesmo — na altura dos olhos, onde não dá para não ver.
@@ -4203,7 +4229,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
         const tt = telasC[telasC.length - 1];        // a última é a fita
         const pl = new THREE.Mesh(new THREE.PlaneGeometry(14, 14*TIRA_CAB_A/TIRA_CAB_L),
                      new THREE.MeshBasicMaterial({ map: tt.tex, transparent: true }));
-        pl.position.set(0, 42.85, 141.6); pl.rotation.set(0.07, Math.PI, 0);
+        pl.position.set(0, 43.95, 141.6); pl.rotation.set(0.07, Math.PI, 0);
         g.add(pl);
       }
       /* O MANCHE MUDOU DE LUGAR, e não foi enfeite. Manche no meio das pernas
@@ -9460,6 +9486,17 @@ function mfdLeva(janela, pag){
 }
 
 /* as medidas de dentro de uma tela, num lugar só: cabeçalho, corpo e abas */
+/* A LETRA DA TELA FÍSICA É MAIOR NA MESMA CAIXA.
+
+   A página escolhe o corpo de letra como fração da ALTURA da caixa, e essa
+   fração foi acertada para uma janela de 240 pixels na tela do jogador. A
+   tela do painel da cabine tem uns 130 — a mesma página, na mesma proporção,
+   com metade do tamanho aparente.
+
+   (Tentei antes resolver com zoom: desenhar numa caixa menor e ampliar. Não
+   faz nada, porque encolher a caixa encolhe a letra na mesma proporção. O
+   que muda a legibilidade é a PROPORÇÃO, e é isto aqui.) */
+let _mfdEscala = 1;
 function mfdMedidas(o){
   const abas = Math.max(15, o.h*0.115);
   const cab = Math.max(13, o.h*0.105);
@@ -9469,8 +9506,8 @@ function mfdMedidas(o){
   return { abas, cab, pad, corpoY: cy, corpoH: ch,
            /* medido: com 7,5% e 9,8% da altura as seis linhas do corpo ficavam
               encostadas umas nas outras e o algarismo batia na barra */
-           f: Math.max(7, o.h*0.060),           // corpo de letra do rótulo
-           fv: Math.max(9, o.h*0.080),          // e do valor
+           f: Math.max(7, o.h*0.060*_mfdEscala),   // corpo de letra do rótulo
+           fv: Math.max(9, o.h*0.080*_mfdEscala),  // e do valor
            mapaCx: o.x + pad + o.w*0.23, mapaCy: cy + ch/2, mapaR };
 }
 
@@ -10800,6 +10837,64 @@ function mfdVidro(c, x, y, w, h, m){
   mfdEsquadria(c, x, y, w, h, MFD_CIANO, Math.max(5, h*0.07));
 }
 
+/* =============================================================================
+   O VIDRO DA CABINE
+
+   "Ainda tá feio. Tá com cara de jogo merda."
+
+   Fui procurar o que exatamente dá essa cara, porque "feio" não é conserto.
+   Comparando com foto de cabine de verdade, o que falta não é peça: é a
+   CÂMERA ESTAR ATRÁS DE UM VIDRO. Numa foto real há sempre três coisas que
+   nenhuma geometria produz:
+
+     1. o mundo lá fora é MUITO mais claro que o de dentro, e a borda do
+        quadro escurece — o olho está dentro de uma caixa escura olhando por
+        um buraco;
+     2. o sol bate no acrílico e espalha um borrão comprido, que anda quando
+        o avião gira;
+     3. o acrílico é velho: risco fino, reflexo do painel na parte de baixo.
+
+   As três são DESENHO 2D sobre o quadro pronto, custam quase nada e mudam a
+   fotografia inteira. É a diferença entre "modelo dentro de uma caixa" e
+   "estou sentado aqui". Vão antes do HUD, porque o HUD é projetado no
+   combinador, que está entre o olho e o vidro.
+   ========================================================================== */
+function vidroDaCabine(){
+  if (!cockpit) return;
+  h2.save();
+  /* 1. a vinheta, e SÓ NOS CANTOS. A primeira versão começava a escurecer no
+     meio do quadro e o resultado foi leitoso: o mundo inteiro ficou com
+     névoa. Vinheta que se percebe não é vinheta, é sujeira. */
+  const v = h2.createRadialGradient(W*0.5, H*0.40, Math.min(W, H)*0.42,
+                                    W*0.5, H*0.40, Math.max(W, H)*0.74);
+  v.addColorStop(0, 'rgba(4,8,14,0)');
+  v.addColorStop(1, 'rgba(4,8,14,.30)');
+  h2.fillStyle = v; h2.fillRect(0, 0, W, H);
+
+  /* 2. o sol no acrílico, e só quando ele está de fato à frente. A posição
+     sai da PROJEÇÃO do sol, então o borrão anda com o avião em vez de ficar
+     colado na tela — que é o detalhe que faz o olho aceitar que há um vidro.
+     (A primeira versão tinha também um "reflexo do painel" atravessando o
+     horizonte e quatro riscos no acrílico. Os dois viraram névoa e linha de
+     sujeira no céu. Saíram: num quadro de 1000 pixels, 7% de alfa espalhado
+     em meia tela não lê como vidro, lê como lente suja.) */
+  const p = new THREE.Vector3(cam.position.x + solDir.x*9000,
+                              cam.position.y + solDir.y*9000,
+                              cam.position.z + solDir.z*9000).project(cam);
+  if (p.z < 1){
+    const sx = (p.x*0.5 + 0.5)*W, sy = (-p.y*0.5 + 0.5)*H;
+    if (sx > -W*0.35 && sx < W*1.35 && sy > -H*0.5 && sy < H*0.9){
+      const r = Math.max(W, H)*0.40;
+      const g = h2.createRadialGradient(sx, sy, 0, sx, sy, r);
+      g.addColorStop(0, 'rgba(255,246,222,.20)');
+      g.addColorStop(0.3, 'rgba(255,240,205,.05)');
+      g.addColorStop(1, 'rgba(255,240,205,0)');
+      h2.fillStyle = g; h2.fillRect(0, 0, W, H);
+    }
+  }
+  h2.restore();
+}
+
 /* --- UMA TELA INTEIRA ---------------------------------------------------- */
 function desenhaMFD(k){
   const o = mfdOnde(k);
@@ -10809,7 +10904,7 @@ function desenhaMFD(k){
 /* A CAIXA VEM DE FORA. Era `mfdOnde(k)` lá dentro, e por isso a página só
    sabia nascer no canto da tela. Separado, o mesmo desenho serve para a
    janela do HUD e para a textura da tela da cabine. */
-function desenhaMFDEm(o, k, cheio){
+function desenhaMFDEm(o, k, cheio, fisico){
   /* ENCOLHIDA: só a alça e a fita de abas. (Na cabine, nunca: a tela física
      não encolhe.) */
   if (mfdEncolhido && !cheio){
@@ -10825,28 +10920,48 @@ function desenhaMFDEm(o, k, cheio){
   const m = mfdMedidas(o);
   const nome = MFD_PAGS[mfdPagDe(k + 1)];   // janela 0 é o celular
 
-  // o vidro
-  mfdVidro(h2, o.x, o.y, o.w, o.h, m);
+  /* --- JANELA ou TELA FÍSICA ------------------------------------------------
+     As duas desenham a mesma página, e é só isso que elas têm em comum.
 
-  /* a alça: é o que diz "dá para arrastar isto para baixo" */
-  { const aw = Math.min(52, o.w*0.20), ah = Math.max(2, m.cab*0.09);
+     A JANELA flutua sobre o mundo: precisa de vidro com canto arredondado,
+     moldura acesa, alça de arrastar e a etiqueta "TELA 1 · Q" dizendo qual
+     tecla a controla. Tudo isso é conversa de INTERFACE — existe para a
+     pessoa entender que aquele retângulo é móvel.
+
+     A TELA FÍSICA já tem moldura: é de alumínio, está parafusada no painel e
+     tem cinco botões pintados de cada lado. Repetir ali o vidrinho com canto
+     redondo e a alça de arrastar é o que dá a um jogo aquela cara de "menu
+     colado em cima do cenário" — a interface aparecendo duas vezes, uma
+     desenhada e outra modelada. Na tela física o desenho começa na borda e
+     acaba na borda, preto de tela apagada por baixo, e o nome da página fica
+     miúdo no canto, como serigrafia. */
+  if (fisico){
+    h2.fillStyle = '#03070a';
+    h2.fillRect(o.x, o.y, o.w, o.h);
+  } else {
+    mfdVidro(h2, o.x, o.y, o.w, o.h, m);
+    /* a alça: é o que diz "dá para arrastar isto para baixo" */
+    const aw = Math.min(52, o.w*0.20), ah = Math.max(2, m.cab*0.09);
     h2.fillStyle = 'rgba(99,216,255,.32)';
-    h2.fillRect(o.x + o.w/2 - aw/2, o.y + Math.max(2.5, m.cab*0.16), aw, ah); }
+    h2.fillRect(o.x + o.w/2 - aw/2, o.y + Math.max(2.5, m.cab*0.16), aw, ah);
+  }
 
   // o cabeçalho, com a barrinha acesa que marca a tela
   const cy = o.y + m.cab*0.62, bh = Math.max(2, m.cab*0.30);
-  h2.fillStyle = MFD_CIANO; h2.globalAlpha = 0.9;
+  h2.fillStyle = MFD_CIANO; h2.globalAlpha = fisico ? 0.55 : 0.9;
   h2.fillRect(o.x + m.pad*0.45, cy - bh/2, Math.max(2, m.cab*0.10), bh);
   h2.globalAlpha = 1;
   h2.textBaseline = 'middle';
-  h2.font = '800 ' + Math.max(7, m.cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
-  h2.textAlign = 'left'; h2.fillStyle = MFD_CIANO;
-  mfdAceso(h2, MFD_CIANO, m.cab*0.30);
+  h2.font = '800 ' + Math.max(7, m.cab*(fisico ? 0.40 : 0.52)).toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'left'; h2.fillStyle = fisico ? MFD_FRACO : MFD_CIANO;
+  if (!fisico) mfdAceso(h2, MFD_CIANO, m.cab*0.30);
   h2.fillText(nome, o.x + m.pad + m.cab*0.30, cy);
   mfdApaga(h2);
-  h2.font = '700 ' + Math.max(6, m.cab*0.44).toFixed(1) + 'px ui-monospace, monospace';
-  h2.textAlign = 'right'; h2.fillStyle = MFD_FRACO;
-  h2.fillText('TELA ' + (k + 1) + ' · ' + (k ? 'E' : 'Q'), o.x + o.w - m.pad, cy);
+  if (!fisico){
+    h2.font = '700 ' + Math.max(6, m.cab*0.44).toFixed(1) + 'px ui-monospace, monospace';
+    h2.textAlign = 'right'; h2.fillStyle = MFD_FRACO;
+    h2.fillText('TELA ' + (k + 1) + ' · ' + (k ? 'E' : 'Q'), o.x + o.w - m.pad, cy);
+  }
 
   /* O CONTEÚDO PINTA ACESO. Todo traço da página ganha um halo da cor do
      próprio vidro — é o que faz a informação parecer emitida pela tela e não
@@ -10857,7 +10972,8 @@ function desenhaMFDEm(o, k, cheio){
   const oP = mfdAreaPagina(o, nome), mP = (oP === o) ? m : mfdMedidas(oP);
 
   h2.save();
-  cantoInst(h2, o.x, o.y, o.w, o.h, Math.max(2, o.h*0.018)); h2.clip();
+  if (fisico){ h2.beginPath(); h2.rect(o.x, o.y, o.w, o.h); h2.clip(); }
+  else { cantoInst(h2, o.x, o.y, o.w, o.h, Math.max(2, o.h*0.018)); h2.clip(); }
   mfdAceso(h2, 'rgba(120,225,255,.42)', Math.max(3, o.h*0.020));
   _mfdKAtual = k;
   if (nome === 'SINÓT') mfdPaginaSinoptico(oP, mP);
@@ -10987,6 +11103,7 @@ function desenhaHUD(){
   presoNaTela();
   h2.clearRect(0,0,W,H);
   calculaDeslocHUD();
+  vidroDaCabine();
   if (clarao > 0){
     h2.fillStyle = 'rgba(255,250,235,' + Math.min(0.92, clarao).toFixed(3) + ')';
     h2.fillRect(0,0,W,H);

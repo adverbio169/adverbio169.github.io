@@ -8021,3 +8021,64 @@ por cima do trilho. Isso é a vista funcionando, não quebrando.
 O que a cabine tem de garantir é outra coisa: **não se vê o mundo pelo chão**.
 O raio foi para -55°, que é onde o chão está. Afrouxar teria sido trocar o
 `>0` por um `>=0`; corrigir foi perguntar a coisa certa.
+
+---
+
+# "Tá com cara de jogo merda"
+
+Crítica curta e útil, porque me obrigou a parar de mexer em número e
+perguntar **o que exatamente** dá essa cara. Comparei o quadro da cabine com
+foto de cabine de verdade e a lista saiu curta:
+
+1. **tudo é a mesma mancha preta.** Arco, coaming, consoles, painel, todos em
+   `mPreto`/`mFosco` — que são cores de peça VISTA DE FORA, ao sol. Contra um
+   céu claro, por dentro, elas viram um recorte chapado sem uma aresta para o
+   olho segurar;
+2. **as molduras são facetadas.** Tubo de 20 lados a 25 unidades do olho
+   mostra cada lado;
+3. **não há vidro.** A câmera está no ar, não atrás de um acrílico;
+4. **a interface aparece duas vezes** — a tela física tem moldura de alumínio
+   com botões pintados, e por dentro dela desenhava-se OUTRA moldura, a
+   janelinha com canto arredondado, alça de arrastar e a etiqueta "TELA 1 ·
+   Q". É a cara de menu colado no cenário.
+
+## O cinza que dá forma
+
+Cabine de caça é **cinza-escuro fosco**, não preta, e a razão é ótica: com
+uma luz de céu vinda de cima, as faces viradas para cima clareiam e as
+verticais escurecem **sozinhas**. O cinza dá forma onde o preto dava mancha.
+Duas cores novas (`mCabine`, `mCabEsc`), brilho baixo, especular frio — e o
+tubo da capota ganhou um fio de luz na quina que separa uma peça da outra sem
+desenhar nada.
+
+## A tela física não usa chrome de janela
+
+`desenhaMFDEm` ganhou um modo `fisico`: sem vidro de canto redondo, sem alça,
+sem "TELA 1 · Q", recorte retangular, preto de tela apagada por baixo, e o
+nome da página miúdo no canto como serigrafia. A moldura já existe — é de
+alumínio e está parafusada no painel.
+
+E a letra cresceu 45% **na mesma caixa**. Antes disso tentei um zoom (desenhar
+numa caixa menor e ampliar) e não fez nada: a página escolhe o corpo de letra
+como fração da altura da caixa, então encolher a caixa encolhe a letra na
+mesma proporção e a ampliação devolve as duas ao tamanho de antes. O que muda
+legibilidade é a PROPORÇÃO — `_mfdEscala`.
+
+## O vidro, e a dose que eu errei
+
+A primeira versão tinha quatro coisas: vinheta, brilho do sol, reflexo do
+painel na parte de baixo e riscos no acrílico. Ficou **leitosa** — o mundo
+inteiro com névoa e umas linhas claras atravessando o céu.
+
+O erro foi de dose, e a lição serve para qualquer camada 2D sobre um quadro
+3D: **7% de alfa espalhado em meia tela não lê como vidro, lê como lente
+suja**. Sobraram duas, as que funcionam:
+
+- a **vinheta** começando a 42% do raio (só os cantos, não o meio);
+- o **sol no acrílico**, com a posição saindo da projeção do sol — então o
+  borrão anda quando o avião gira, que é justamente o que faz o olho aceitar
+  que existe um vidro ali. Vinheta e brilho parados seriam filtro; o que
+  convence é o brilho se mexer sozinho.
+
+O reflexo do painel e os riscos saíram inteiros. Vidro que se percebe não é
+vidro.
