@@ -2590,7 +2590,18 @@ const MEDIDAS_CACA = {
      ver. Recuado, o mesmo arco sobe para treze graus, e o horizonte passa
      folgado por baixo dele. De fora a diferença é o para-brisa ficar um
      tiquinho mais comprido. */
-  canopia: { x: 21, y: 29, z: 54, cy: 30, cz: 122, arco: 143 },
+  /* A LARGURA DA CAPOTA, e este número era o que fazia a cabine parecer uma
+     fresta. Ela tinha 21 de meia-largura numa fuselagem que ali tem 32: 42
+     de vão para 64 de casco. Na foto do F-16 a canópia é quase tão larga
+     quanto a fuselagem e a cabine ocupa a LARGURA INTEIRA do quadro; a nossa
+     ocupava 45% dele.
+
+     Fui a 26 e a vista de dentro melhorou na hora — e a de FORA estragou: com
+     26 de meia-largura para 54 de meio-comprimento a gota vira uma bolha
+     redonda de helicóptero, e o avião perde a linha. 23 é onde as duas
+     cabem: a cabine abre um terço e a gota continua gota (1 para 2,3, contra
+     1 para 2,6 de antes). Medir de dentro sem olhar de fora é meio caminho. */
+  canopia: { x: 23, y: 29, z: 54, cy: 30, cz: 122, arco: 143 },
   jatos: [{ x: -26, y: -7, z: -252 }, { x: 26, y: -7, z: -252 }],
   fogo: { raio: 14, nucleo: 7.5, anel: 6.5 },
   ponta: null,                   // vem da tabela AD02, que é mais exata
@@ -2752,7 +2763,7 @@ function atualizaTelasCabine(agora){
      `material.map === telasCabine[i].tex` e respondeu "não". */
   telasCabine = aviao && aviao.userData.telasCabine;
   if (!telasCabine) return;
-  if (!cockpit && !VISTAS[nVista].preso) return;      // ninguém está olhando
+  if (!mostraPainelDeVerdade()) return;               // ninguém está olhando
   if (agora - _telaCabT < 100) return;                // dez por segundo bastam
   _telaCabT = agora;
   const ctxAntes = h2, kAntes = _mfdKAtual, mudoAntes = _mfdMudo;
@@ -4105,19 +4116,19 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          nunca aparecer em vista nenhuma — nem de fora pelo vidro. Ele e o
          resto da mobília sobem para cima do convés, que é onde o chão está
          de verdade. */
-      const piso = new THREE.Mesh(new THREE.BoxGeometry(26, 2, 54), mCabEsc);
+      const piso = new THREE.Mesh(new THREE.BoxGeometry(32, 2, 54), mCabEsc);
       piso.position.set(0, 32.5, 122); g.add(piso);
       /* os CONSOLES laterais: dois degraus escuros correndo dos dois lados do
          banco até o painel. De fora quase não se veem; de dentro são eles que
          fazem a cabine ter PAREDE em vez de ser um assento no meio do nada. */
       for (const lado of [-1, 1]){
         const con = new THREE.Mesh(caixaViva(6.4, 4.4, 42, 1.2), mCabine);
-        con.position.set(lado*16, 33.4, 126); g.add(con);
+        con.position.set(lado*18.4, 33.4, 126); g.add(con);
         /* a face de cima ganha a lona: sem ela o console é uma cunha preta */
         const tampo = new THREE.Mesh(new THREE.PlaneGeometry(42, 6),
                         new THREE.MeshPhongMaterial({ map: lonaConsole(lado < 0), shininess: 10 }));
         tampo.rotation.set(-Math.PI/2, 0, lado < 0 ? Math.PI/2 : -Math.PI/2);
-        tampo.position.set(lado*16, 35.7, 126); g.add(tampo);
+        tampo.position.set(lado*18.4, 35.7, 126); g.add(tampo);
       }
       /* =====================================================================
          O QUE ENCHE O QUADRO — do vídeo do F-16, quadro a quadro
@@ -4148,20 +4159,20 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       const mTrilho= new THREE.MeshPhongMaterial({ color: 0x79828e, shininess: 18,
                                                    specular: 0x555e69 });
       for (const lado of [-1, 1]){
-        const coxa = new THREE.Mesh(caixaViva(8.4, 8, 30, 2.6), mVoo);
-        coxa.position.set(lado*5.4, 35.6, 126); coxa.rotation.x = 0.07; g.add(coxa);
-        const canela = new THREE.Mesh(caixaViva(7, 7, 17, 2.2), mVoo);
-        canela.position.set(lado*6, 33, 148); canela.rotation.x = -0.26; g.add(canela);
+        const coxa = new THREE.Mesh(caixaViva(9.6, 8.4, 30, 2.8), mVoo);
+        coxa.position.set(lado*6.6, 35.6, 126); coxa.rotation.x = 0.07; g.add(coxa);
+        const canela = new THREE.Mesh(caixaViva(8, 7.4, 17, 2.4), mVoo);
+        canela.position.set(lado*7, 33, 148); canela.rotation.x = -0.26; g.add(canela);
         /* as tiras do paraquedas: dois riscos escuros atravessando a coxa */
         for (const z of [119, 133]){
-          const t = new THREE.Mesh(new THREE.BoxGeometry(9, 1.2, 2.4), mTira);
-          t.position.set(lado*5.4, 39.6, z); g.add(t);
+          const t = new THREE.Mesh(new THREE.BoxGeometry(10.2, 1.2, 2.4), mTira);
+          t.position.set(lado*6.6, 39.6, z); g.add(t);
         }
       }
       /* os trilhos da capota, por cima dos consoles */
       for (const lado of [-1, 1]){
-        const tr = new THREE.Mesh(caixaViva(2.6, 1.1, 46, 0.45), mTrilho);
-        tr.position.set(lado*19.2, 35.4, 124); g.add(tr);
+        const tr = new THREE.Mesh(caixaViva(3.2, 1.2, 50, 0.5), mTrilho);
+        tr.position.set(lado*21.3, 35.2, 124); g.add(tr);
       }
       /* --- A MANETE, e ela ANDA -------------------------------------------
          Cabine parada é maquete. As duas peças que a mão do piloto move o
@@ -4169,7 +4180,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          pivô mais uma linha em `arruma`. É o detalhe mais barato que existe
          para a cabine deixar de parecer uma foto. */
       const maneteG = new THREE.Group();
-      maneteG.position.set(-16, 34.6, 112);
+      maneteG.position.set(-18.4, 34.6, 112);
       {
         const haste = new THREE.Mesh(caixaViva(3, 9, 2.6, 0.8), mPreto);
         haste.position.set(0, 4, 0); maneteG.add(haste);
@@ -4198,7 +4209,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          tábua. Os três mostradores antigos estavam na face da FRENTE,
          olhando para o nariz — invisíveis para quem senta atrás deles, e
          ninguém nunca notou porque nada nesta cabine aparecia. */
-      const PL = 21, PA = PL*PAINEL_LONA.alt/PAINEL_LONA.larg;
+      const PL = 24, PA = PL*PAINEL_LONA.alt/PAINEL_LONA.larg;
       const caixaP = new THREE.Mesh(caixaViva(PL + 1, PA + 0.9, 3.2, 0.8), mCabEsc);
       caixaP.position.set(0, 39.5, 145.98); caixaP.rotation.x = 0.52; g.add(caixaP);
       const grupoP = new THREE.Group();
@@ -4288,7 +4299,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          pôs o manche no console DIREITO. Aqui é a mesma solução pela mesma
          razão. */
       const mancheG = new THREE.Group();
-      mancheG.position.set(14, 32.6, 124);
+      mancheG.position.set(16.2, 32.6, 124);
       {
         const haste = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.9, 10, 8), mPreto);
         haste.position.y = 5; mancheG.add(haste);
@@ -11067,12 +11078,23 @@ function mfdPintaAbas(o, abas, k){
   });
   h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
 }
+/* a vista mostra o painel FÍSICO da cabine? É ele quem manda nas janelas 2D
+   e em quem gasta quadro redesenhando as texturas. */
+function mostraPainelDeVerdade(){ return cockpit || !!VISTAS[nVista].preso; }
 function desenhaTelas(){
   _mfdZonas = [];
-  /* NA CABINE AS JANELAS SOMEM DA TELA, porque elas estão DENTRO do avião:
-     as duas telas do painel mostram exatamente estas duas páginas, ao vivo.
-     Desenhá-las de novo por cima seria tapar o painel com uma foto dele. */
-  if (cockpit) return;
+  /* DE DENTRO DO AVIÃO AS JANELAS 2D SOMEM, porque o painel está ali: as
+     duas telas dele mostram exatamente estas duas páginas, ao vivo.
+
+     Escrevi isto olhando só para a CABINE e esqueci que a vista do CAPACETE
+     também mostra o painel — então nela a página MOTOR aparecia duas vezes,
+     uma na tela do avião e outra na janela do canto, e o MAPA idem. O
+     usuário circulou as quatro: "que lógica tem aparecer duas coisas ao
+     mesmo tempo?". Nenhuma.
+
+     A pergunta certa não é "é a cabine?" e sim "o painel de verdade está à
+     vista?" — e isso é `cockpit` OU qualquer vista presa ao avião. */
+  if (mostraPainelDeVerdade()) return;
   desenhaMFD(0); desenhaMFD(1);
 }
 

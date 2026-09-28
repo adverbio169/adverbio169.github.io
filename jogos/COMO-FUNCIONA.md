@@ -8174,3 +8174,40 @@ peça.
 Saiu também a travessa de cima (dali o piloto não a vê, e ela cortava o
 horizonte) e entrou uma base ligando os dois montantes — sem ela, eles leem
 como duas antenas em vez de uma moldura.
+
+## Duas coisas ao mesmo tempo
+
+> *"Que lógica tem aparecer duas coisas ao mesmo tempo?"* — com as quatro
+> circuladas: MOTOR na tela do avião e MOTOR na janela do canto, MAPA e MAPA.
+
+Nenhuma. E o defeito é instrutivo, porque a linha estava certa e a
+**pergunta** estava errada:
+
+```js
+if (cockpit) return;          // errado
+if (mostraPainelDeVerdade())  // certo: cockpit OU vista presa ao avião
+```
+
+Escrevi "na cabine as janelas somem" olhando para a vista de cabine e
+esqueci que a do CAPACETE também mostra o painel físico. `cockpit` não
+significa "o painel está à vista": significa "é a vista de dentro". São duas
+perguntas parecidas e uma delas é a que a tela precisa.
+
+Vale para a outra ponta também — quem gasta quadro redesenhando as texturas
+das telas fazia a mesma pergunta pela metade. Agora as duas chamam a mesma
+função.
+
+## A largura da capota, medida dos dois lados
+
+A cabine parecia uma fresta por um número: 21 de meia-largura numa fuselagem
+que ali tem 32 — 42 de vão para 64 de casco. Na foto do F-16 a canópia é
+quase tão larga quanto a fuselagem e a cabine ocupa a largura inteira do
+quadro; a nossa ocupava 45% dele.
+
+Fui a 26 e a vista de dentro melhorou na hora. A de fora estragou: com 26
+para 54 de meio-comprimento a gota vira bolha redonda de helicóptero e o
+avião perde a linha. 23 é onde as duas cabem — a cabine abre um terço e a
+proporção da gota fica 1 para 2,3, contra 1 para 2,6 de antes.
+
+**Medir de dentro sem olhar de fora é meio caminho.** Toda mudança na capota
+precisa das duas fotos.
