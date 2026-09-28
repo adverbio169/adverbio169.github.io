@@ -9425,19 +9425,27 @@ function fundePorCor(raiz){
        `material.map === a textura que eu pinto?` e, depois, olhar o que a
        fusão copia. */
     const temUV = partes.every(g2 => g2.attributes.uv);
+    /* e a COR POR VÉRTICE, pela mesma razão e com a mesma história: ela não
+       existia no avião até a cabine precisar de sombra de canto. Quem
+       esquecer de emendar um atributo aqui vai vê-lo sumir na fusão sem
+       nenhum erro — só uma peça chapada do outro lado. */
+    const temCor = partes.every(g2 => g2.attributes.color);
     const pos = new Float32Array(n*3), nor = new Float32Array(n*3);
     const uvs = temUV ? new Float32Array(n*2) : null;
+    const cor = temCor ? new Float32Array(n*3) : null;
     let k = 0;
     for (const g2 of partes){
       pos.set(g2.attributes.position.array, k*3);
       nor.set(g2.attributes.normal.array,   k*3);
       if (temUV) uvs.set(g2.attributes.uv.array, k*2);
+      if (temCor) cor.set(g2.attributes.color.array, k*3);
       k += g2.attributes.position.count;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('normal',   new THREE.BufferAttribute(nor, 3));
     if (temUV) geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    if (temCor) geo.setAttribute('color', new THREE.BufferAttribute(cor, 3));
     geo.computeBoundingSphere();
     const malha = new THREE.Mesh(geo, mat);
     malha.castShadow = true;
@@ -9661,6 +9669,45 @@ function faixaNoCasco(secoes, lado, marcas, mat, n){
    qualquer seção que ela atravessa), então de fora não muda nada — a não ser
    pelo escuro que já se via através do vidro, que agora é escuro de verdade.
    ========================================================================== */
+/* =============================================================================
+   A SOMBRA DE CANTO DA CABINE
+
+   O maior delator de 3D barato não é a contagem de triângulos: é TUDO SER
+   ILUMINADO POR IGUAL. Numa cabine de verdade a luz entra por um buraco em
+   cima — a capota — e morre à medida que desce: o coaming e o encosto pegam
+   céu, o painel já está na sombra da própria aba, o assoalho é quase preto.
+   Sem esse degradê, cada peça fica com a sua cor chapada e o conjunto lê
+   como papelão pintado.
+
+   Fazer isso com luz de verdade sairia caro (mapa de sombra na escala da
+   cabine, com o avião voando). Fazer com COR POR VÉRTICE custa um laço na
+   montagem e nada por quadro: cada vértice ganha um multiplicador que vem da
+   altura dele dentro da cabine, e o material multiplica a própria cor por
+   ele. É oclusão assada, a mesma ideia que todo jogo usa — só que aqui a
+   geometria é tão simples que a altura sozinha já dá a resposta certa.
+
+   `CAB_FUNDO` é onde a luz acaba e `CAB_TOPO` onde ela entra inteira. O
+   expoente deixa a queda mais rápida embaixo, que é como sombra se comporta.
+   ========================================================================== */
+/* 0,34 no fundo era escuro DEMAIS: a cabine voltou a ser o recorte preto que
+   o cinza tinha acabado de resolver. Sombra assada some com o material se
+   passar do ponto — o degradê tem de escurecer, não apagar. 0,58, e as cores
+   de base subiram junto para o meio-tom aguentar a queda. */
+const CAB_FUNDO = 27, CAB_TOPO = 50, CAB_ESC = 0.58;
+function sombraNaCabine(no, extra){
+  no.updateMatrix();
+  const g = no.geometry, p = g.attributes.position;
+  const c = new Float32Array(p.count*3), v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++){
+    v.fromBufferAttribute(p, i).applyMatrix4(no.matrix);
+    const t = Math.max(0, Math.min(1, (v.y - CAB_FUNDO)/(CAB_TOPO - CAB_FUNDO)));
+    const f = (CAB_ESC + (1 - CAB_ESC)*Math.pow(t, 1.35))*(extra === undefined ? 1 : extra);
+    c[i*3] = c[i*3+1] = c[i*3+2] = f;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  return no;
+}
+
 /* =============================================================================
    O CONVÉS DA CABINE — a peça que só existe por causa da vista de dentro
 
@@ -10235,10 +10282,10 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
      dava mancha. Com brilho baixo e um específico frio, a quina do coaming
      e o tubo da capota ganham um fio de luz — que é o que separa uma peça da
      outra sem desenhar nada. */
-  const mCabine  = new THREE.MeshPhongMaterial({ color: 0x3b434d, shininess: 8,
-                                                 specular: 0x39434f });
-  const mCabEsc  = new THREE.MeshPhongMaterial({ color: 0x272d34, shininess: 6,
-                                                 specular: 0x2d353f });
+  const mCabine  = new THREE.MeshPhongMaterial({ color: 0x4a535e, shininess: 8,
+                                                 specular: 0x39434f, vertexColors: true });
+  const mCabEsc  = new THREE.MeshPhongMaterial({ color: 0x343c45, shininess: 6,
+                                                 specular: 0x2d353f, vertexColors: true });
   /* --- A COR DAS SUPERFÍCIES MÓVEIS -----------------------------------------
      A regra anterior era "móvel = cor oposta": painel de asa amarelo, flape e
      aileron azuis. Lida de longe, essa regra ARREBENTA o avião: a troca de cor
@@ -10646,19 +10693,19 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        Ninguém vai contar os botões, mas a diferença entre uma bolha VAZIA e uma
        bolha com um banco dentro é a diferença entre um brinquedo e um avião. */
     {
-      g.add(convesDaCabine(CP, M.secoes, mCabEsc));
+      g.add(sombraNaCabine(convesDaCabine(CP, M.secoes, mCabEsc)));
       /* O PISO ficava em y=18: dentro da fuselagem, debaixo da abóbada, sem
          nunca aparecer em vista nenhuma — nem de fora pelo vidro. Ele e o
          resto da mobília sobem para cima do convés, que é onde o chão está
          de verdade. */
       const piso = new THREE.Mesh(new THREE.BoxGeometry(32, 2, 54), mCabEsc);
-      piso.position.set(0, 32.5, 122); g.add(piso);
+      piso.position.set(0, 32.5, 122); g.add(sombraNaCabine(piso));
       /* os CONSOLES laterais: dois degraus escuros correndo dos dois lados do
          banco até o painel. De fora quase não se veem; de dentro são eles que
          fazem a cabine ter PAREDE em vez de ser um assento no meio do nada. */
       for (const lado of [-1, 1]){
         const con = new THREE.Mesh(caixaViva(6.4, 4.4, 42, 1.2), mCabine);
-        con.position.set(lado*18.4, 33.4, 126); g.add(con);
+        con.position.set(lado*18.4, 33.4, 126); g.add(sombraNaCabine(con));
         /* a face de cima ganha a lona: sem ela o console é uma cunha preta */
         const tampo = new THREE.Mesh(new THREE.PlaneGeometry(42, 6),
                         new THREE.MeshPhongMaterial({ map: lonaConsole(lado < 0), shininess: 10 }));
@@ -10688,16 +10735,18 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
 
          Em vez de caçar o bico, é isto que faltava. As mãos são filhas dos
          grupos que se mexem, então elas acompanham o comando de graça. */
-      const mVoo   = new THREE.MeshPhongMaterial({ color: 0x4e5642, shininess: 4 });
+      const mVoo   = new THREE.MeshPhongMaterial({ color: 0x626b52, shininess: 4, vertexColors: true });
       const mLuva  = new THREE.MeshPhongMaterial({ color: 0x2c3138, shininess: 10 });
       const mTira  = new THREE.MeshPhongMaterial({ color: 0x23272c, shininess: 6 });
       const mTrilho= new THREE.MeshPhongMaterial({ color: 0x79828e, shininess: 18,
                                                    specular: 0x555e69 });
       for (const lado of [-1, 1]){
         const coxa = new THREE.Mesh(caixaViva(9.6, 8.4, 30, 2.8), mVoo);
-        coxa.position.set(lado*6.6, 35.6, 126); coxa.rotation.x = 0.07; g.add(coxa);
+        coxa.position.set(lado*6.6, 35.6, 126); coxa.rotation.x = 0.07;
+        g.add(sombraNaCabine(coxa));
         const canela = new THREE.Mesh(caixaViva(8, 7.4, 17, 2.4), mVoo);
-        canela.position.set(lado*7, 33, 148); canela.rotation.x = -0.26; g.add(canela);
+        canela.position.set(lado*7, 33, 148); canela.rotation.x = -0.26;
+        g.add(sombraNaCabine(canela));
         /* as tiras do paraquedas: dois riscos escuros atravessando a coxa */
         for (const z of [119, 133]){
           const t = new THREE.Mesh(new THREE.BoxGeometry(10.2, 1.2, 2.4), mTira);
@@ -10727,17 +10776,18 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       g.add(maneteG);
       comandos.manete = maneteG;
       const assento = new THREE.Mesh(caixaViva(17, 5, 23, 2.2), mCabine);
-      assento.position.set(0, 36, 112); g.add(assento);
+      assento.position.set(0, 36, 112); g.add(sombraNaCabine(assento));
       /* o encosto tinha 30 de altura e o topo saía em y=50, acima da capota
          (que ali vale uns 46): de fora, uma caixa preta espiando por cima do
          vidro. Vinte e dois, e ele fica DENTRO da bolha, que é onde mora. */
       const encosto = new THREE.Mesh(caixaViva(17, 16, 6, 2.2), mCabine);
-      encosto.position.set(0, 42, 99); encosto.rotation.x = -0.16; g.add(encosto);
+      encosto.position.set(0, 42, 99); encosto.rotation.x = -0.16;
+      g.add(sombraNaCabine(encosto));
       /* o apoio de cabeça encosta no teto da bolha: a capota naquela estação
          (z=96) vale 51, e uma peça de 9 de altura centrada em 50 saía por
          cima do vidro. É a mesma conta que já tinha corrigido o encosto. */
       const apoio = new THREE.Mesh(caixaViva(16, 7, 7, 2.4), mCabine);
-      apoio.position.set(0, 46.5, 96); g.add(apoio);
+      apoio.position.set(0, 46.5, 96); g.add(sombraNaCabine(apoio));
       /* --- O PAINEL: uma chapa com a lona, e as telas vivas por cima -----
          A INCLINAÇÃO É 0,38 rad e a face é a DE TRÁS. `rotation.set(0.38,
          PI, 0)`: o PI vira a chapa para o piloto e o 0,38 acompanha a
@@ -10746,7 +10796,8 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          ninguém nunca notou porque nada nesta cabine aparecia. */
       const PL = 24, PA = PL*PAINEL_LONA.alt/PAINEL_LONA.larg;
       const caixaP = new THREE.Mesh(caixaViva(PL + 1, PA + 0.9, 3.2, 0.8), mCabEsc);
-      caixaP.position.set(0, 39.5, 145.98); caixaP.rotation.x = 0.52; g.add(caixaP);
+      caixaP.position.set(0, 39.5, 145.98); caixaP.rotation.x = 0.52;
+      g.add(sombraNaCabine(caixaP));
       const grupoP = new THREE.Group();
       grupoP.add(new THREE.Mesh(new THREE.PlaneGeometry(PL, PA), materialDoPainel()));
       const telasC = fazTelasCabine();
@@ -10796,7 +10847,8 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          para o painel não acabar numa linha reta contra o céu, e para mais
          nada. */
       const coam = new THREE.Mesh(caixaViva(PL, 0.5, 2.2, 0.2), mCabEsc);
-      coam.position.set(0, 43.55, 143.2); coam.rotation.x = 0.30; g.add(coam);
+      coam.position.set(0, 43.55, 143.2); coam.rotation.x = 0.30;
+      g.add(sombraNaCabine(coam));
       /* O COMBINADOR. No vídeo é a peça que mais diz "caça": um vidro
          emoldurado em pé sobre o coaming, com o desenho verde do HUD nele.
 
@@ -10812,11 +10864,19 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
            estreitado para 9, dá ±8,7° — que é a proporção que ele tem no
            vídeo. E sem travessa em cima: dali o piloto não a vê, e o que ela
            fazia aqui era cortar o horizonte. */
+        /* MOLDURA FINA FECHADA, não dois montantes. Com 0,6 de largura e sem
+           travessa, os dois montantes liam como duas ANTENAS pretas no meio
+           da vista — peça vertical isolada sempre lê como haste. Fechando o
+           retângulo com um fio de 0,3 em cima, a mesma peça vira moldura, e
+           o desenho do HUD que já é pintado ali dentro passa a parecer
+           projetado nela. */
         const mMont = new THREE.MeshPhongMaterial({ color: 0x2a3038, shininess: 20 });
         for (const lado of [-1, 1]){
-          const mo = new THREE.Mesh(caixaViva(0.6, 8, 1.1, 0.22), mMont);
+          const mo = new THREE.Mesh(caixaViva(0.34, 8, 0.9, 0.12), mMont);
           mo.position.set(lado*4.8, 48.2, 146.2); mo.rotation.x = 0.16; g.add(mo);
         }
+        const topo = new THREE.Mesh(caixaViva(10, 0.34, 0.9, 0.12), mMont);
+        topo.position.set(0, 52.1, 145.6); g.add(topo);
         /* uma base ligando os dois montantes: sem ela eles leem como duas
            antenas, não como uma moldura */
         const base = new THREE.Mesh(caixaViva(10.4, 0.8, 1.6, 0.25), mMont);
@@ -12490,7 +12550,24 @@ function poeCamera(dt){
      abrir de repente enjoa. */
   /* o campo de visão é da VISTA: a do capacete é grande-angular, e é dela
      que vem a sensação de estar dentro de uma máquina rápida */
-  const fovBase = VISTAS[nVista].fov || CAM_FOV;
+  let fovBase = VISTAS[nVista].fov || CAM_FOV;
+  /* A LENTE É DADA NA VERTICAL, e isso muda de aparelho para aparelho.
+
+     Um monitor tem proporção 1,6; um celular deitado tem 2,16. Os 92° da
+     vista do capacete, que num monitor dão 118° horizontais, no celular dão
+     quase 140 — e a cabine inteira encolhe para um terço da tela. É o mesmo
+     "tá muito longe" de antes, só que causado pelo aparelho e não pela
+     posição da câmera.
+
+     Para as vistas que declaram lente própria, o que se mantém é o CAMPO
+     HORIZONTAL de um monitor 16:9: em tela larga a lente fecha na vertical
+     para o enquadramento ser o mesmo. A vista de fora não entra nisto — ela
+     usa a lente de sempre, que é o enquadramento que o jogo sempre teve. */
+  if (VISTAS[nVista].fov){
+    const hAlvo = 2*Math.atan(Math.tan(fovBase*Math.PI/360)*1.6);
+    const porTela = 2*Math.atan(Math.tan(hAlvo/2)/Math.max(1.2, cam.aspect))*180/Math.PI;
+    fovBase = Math.min(fovBase, porTela);
+  }
   const fovQuer = turbinando ? fovBase + (CAM_FOV_TURBO - CAM_FOV) : fovBase;
   if (Math.abs(cam.fov - fovQuer) > 0.05){
     cam.fov += (fovQuer - cam.fov) * Math.min(1, dt*(turbinando ? 3.2 : 2.0));

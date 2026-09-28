@@ -8211,3 +8211,56 @@ proporção da gota fica 1 para 2,3, contra 1 para 2,6 de antes.
 
 **Medir de dentro sem olhar de fora é meio caminho.** Toda mudança na capota
 precisa das duas fotos.
+
+---
+
+# Sombra de canto, e a lente que muda de aparelho
+
+## O maior delator de 3D barato
+
+Não é contagem de triângulo: é **tudo ser iluminado por igual**. Numa cabine
+de verdade a luz entra por um buraco em cima — a capota — e morre à medida
+que desce: o coaming e o encosto pegam céu, o painel já está na sombra da
+própria aba, o assoalho é quase preto. Sem esse degradê, cada peça fica com
+a sua cor chapada e o conjunto lê como papelão pintado.
+
+Fazer com luz de verdade sairia caro (mapa de sombra na escala da cabine,
+com o avião voando). Fazer com **cor por vértice** custa um laço na montagem
+e nada por quadro: cada vértice ganha um multiplicador vindo da altura dele
+dentro da cabine, e o material multiplica a própria cor por ele. Aqui a
+geometria é tão simples que a altura sozinha já dá a resposta certa.
+
+E, pela terceira vez na mesma função: **`fundePorCor` jogava o atributo
+fora.** Primeiro foi a UV, quando o painel virou lona; agora a cor por
+vértice. A fusão emenda o que alguém lembrou de emendar, e o que falta some
+sem erro nenhum — só uma peça chapada do outro lado. Já são três atributos;
+o próximo que entrar tem de passar por lá.
+
+**A dose, de novo.** Comecei com 0,34 no fundo e a cabine voltou a ser o
+recorte preto que o cinza tinha acabado de resolver. Sombra assada some com
+o material se passar do ponto: o degradê tem de escurecer, não apagar. 0,58,
+e as cores de base subiram junto para o meio-tom aguentar a queda.
+
+## Duas antenas viram uma moldura
+
+O combinador do HUD eram dois montantes de 0,6 sem travessa, e liam como
+duas **antenas pretas** no meio da vista. Peça vertical isolada sempre lê
+como haste. Fechando o retângulo com um fio de 0,3 em cima, a mesma peça
+vira moldura — e o desenho do HUD, que já era pintado ali dentro, passa a
+parecer projetado nela.
+
+## A lente é vertical, e o celular é o dobro de largo
+
+No celular deitado a cabine encolhia para um terço da tela, e a causa não
+era a câmera: **`fov` no three.js é o campo VERTICAL**. Um monitor tem
+proporção 1,6 e um celular deitado 2,16, então os 92° da vista do capacete,
+que num monitor dão 118° horizontais, no celular dão quase 140 — e tudo
+afasta.
+
+Para as vistas que declaram lente própria, agora o que se mantém é o **campo
+horizontal de um monitor 16:9**: em tela larga a lente fecha na vertical
+para o enquadramento ser o mesmo. No celular a do capacete vira 75°.
+
+A vista de fora ficou de fora dessa conta de propósito: ela usa a lente de
+sempre, que é o enquadramento que o jogo sempre teve, e mudá-la mudaria o
+jogo inteiro para consertar a cabine.
