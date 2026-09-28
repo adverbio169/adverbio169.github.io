@@ -19040,6 +19040,22 @@ const Tripulacao = {
                              : { i: d.i >> 1, s: (d.i & 1) ? -1 : 1 };
                   break;
       case 'visao': cockpit = !cockpit; esqueceRadar(); break;
+      /* AS FUNÇÕES DE VISUALIZAÇÃO, PELO CELULAR. Elas moravam só em botões
+         da tela do jogo — e quem joga com a TV a três metros não alcança
+         botão de tela. O celular É o painel, então o painel manda nelas.
+
+         `qual` traz o valor, e não um "próximo": assim o celular e a tela
+         nunca discordam sobre qual é o próximo, que é o defeito clássico de
+         dois donos girando o mesmo carrossel. */
+      case 'qual': { const q = Math.max(0, Math.min(2, d.q | 0));
+                     if (q !== qualidade){ poeQualidade(q);
+                       mostraAviso('GRÁFICO ' + ['BAIXO','MÉDIO','ALTO'][q], '#9fd8ff', 1200); }
+                     break; }
+      case 'cabeca': if (!Cabeca.temCamera())
+                       mostraAviso('SEM CÂMERA NESTA TELA', '#ffc046', 1600);
+                     else if (Cabeca.ligada) Cabeca.desliga();
+                     else Cabeca.liga();
+                     break;
       case 'chama': if (m.papel === 'piloto') largaContramedida(); break;
       /* o Zerar do celular zera a mão LÁ e a cabeça AQUI: são dois "retos"
          medidos em aparelhos diferentes, e o botão é um só */
@@ -19245,6 +19261,11 @@ function mandaEstado(){
     sorF: Sortida.fase,
     cab: cockpit ? 1 : 0,        // em que vista a tela está, para o botão do celular
                                  // não ser um interruptor cego
+    qual: qualidade,             // 0 baixo, 1 médio, 2 alto
+    /* 0 sem câmera nesta tela · 1 tem câmera e está desligado · 2 ligado e
+       achando o rosto · 3 ligado e perdeu o rosto. O celular precisa dos
+       quatro: "não dá" e "está desligado" pedem respostas diferentes dele. */
+    olho: !Cabeca.temCamera() ? 0 : !Cabeca.ligada ? 1 : (Cabeca.achou ? 2 : 3),
     alertas: mfdAlertas().map(a => [a[0], a[1] === MFD_VERM ? 2 : 1]),
     mapa: contatosDoRadar(), apx: aproxParaOCelular() });
 }

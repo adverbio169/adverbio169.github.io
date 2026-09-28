@@ -7441,3 +7441,58 @@ Tirei, e provei a metade que dá para provar de verdade: `pacote.js` troca
 com `cockpit` falso e verdadeiro, e lê o campo. **Interceptar a saída** é o
 que mostra o conteúdo; ler o texto do fonte só mostra que alguém digitou a
 linha.
+
+# Todas as funções de visualização no controle
+
+> "Sim. Quero tudo tbm no controle."
+
+Vista, qualidade e olhar-com-a-cabeça moravam em botões da **tela do jogo** — e
+quem joga com a TV a três metros não alcança botão de tela. O celular é o
+painel; o painel manda neles. Os três agora ficam na faixa de cabeça:
+👁 `FORA`/`CABINE`, ◉ `ALTO`/`MÉDIO`/`BAIXO`, 🧠 `CABEÇA`/`OLHANDO`/`CADÊ VOCÊ?`.
+
+## Nenhum deles é interruptor cego
+
+Os três leem o estado **da tela**, por campos novos do pacote: `cab`, `qual` e
+`olho`. Sem isso, o botão diria "FORA" depois de a pessoa ter trocado a vista
+pelo teclado — e a segunda tocada faria o contrário do que o rótulo promete.
+
+O `olho` tem **quatro** valores, não dois: sem câmera, desligado, olhando,
+perdeu o rosto. "Não dá" e "está desligado" pedem respostas diferentes de
+quem está segurando o controle, e "ligado mas não te acha" é justamente o caso
+em que a pessoa acha que o jogo travou. Por isso o botão fica verde quando
+acha e âmbar quando perde.
+
+## A qualidade manda o VALOR, não o "próximo"
+
+`{t:'qual', q:1}`, e não "gire para o próximo". O celular lê o que a tela
+disse que está valendo, soma um e manda o número. Com "próximo", dois donos
+girando o mesmo carrossel discordam na primeira vez que um pacote chega
+atrasado — e o defeito aparece como "apertei uma vez e pulou dois".
+
+## O limite da faixa, calculado antes de encostar
+
+Com cinco itens à esquerda mais o estado da rede e o posto à direita, num
+aparelho de 568 px o terceiro botão entrava por cima do estado. A prova de
+sobreposição pegou.
+
+A fileira agora **tem um fim**: o limite é calculado por aritmética (largura
+do posto + largura do estado + folgas) **antes** de posicionar qualquer coisa,
+e se o último botão passar dele, os rótulos saem e ficam os ícones. Perde-se a
+palavra, não o comando.
+
+Calcular o limite antes evita a armadilha de medir algo que ainda vai mudar —
+e resolver por classe no `body` criaria laço, porque a classe entra na chave
+que decide se vale a pena reposicionar.
+
+## E um teste meu que mentiu por omissão
+
+O teste dizia "o botão de qualidade não está na faixa" — e estava. A lista de
+ids dentro dele nunca foi atualizada: eu apliquei o remendo com `replace`
+**sem asserção**, ele não casou, e o arquivo seguiu com a lista velha em
+silêncio.
+
+É a mesma disciplina que uso em todo patch do código-fonte (`assert
+s.count(a)==1`) e que relaxei por ser "só um teste". Um teste que falha por
+estar desatualizado gasta o mesmo tempo que um defeito de verdade, e ainda
+ensina a desconfiar do vermelho — que é o pior estrago possível numa suíte.

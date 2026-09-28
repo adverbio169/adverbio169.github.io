@@ -481,8 +481,24 @@ body.paisagem #controle.ver,
               border:1px solid rgba(99,216,255,.28);border-radius:7px;
               background:rgba(4,14,21,.45);color:#cfe8ff;font:700 11.5px/1 inherit;
               padding:0 9px;cursor:pointer;white-space:nowrap}
-  body.paisagem #btVisao b{color:#9fd4ff;font-weight:800;letter-spacing:.5px}
-  #btVisao{display:none}
+  body.paisagem #btVisao b, body.paisagem #btQual b, body.paisagem #btOlho b{
+              color:#9fd4ff;font-weight:800;letter-spacing:.5px}
+  body.paisagem #btQual, body.paisagem #btOlho{position:fixed;z-index:6;display:flex;
+              align-items:center;justify-content:center;gap:5px;
+              border:1px solid rgba(99,216,255,.28);border-radius:7px;
+              background:rgba(4,14,21,.45);color:#cfe8ff;font:700 11.5px/1 inherit;
+              padding:0 9px;cursor:pointer;white-space:nowrap}
+  /* o olhar ACESO quando está funcionando, ÂMBAR quando perdeu o rosto: o
+     estado importa mais que o rótulo, porque "ligado mas não te acha" é
+     exatamente o caso em que a pessoa fica achando que o jogo travou */
+  body.paisagem #btOlho.on{background:rgba(94,255,154,.16);
+              border-color:rgba(94,255,154,.45);color:#bfffd6}
+  body.paisagem #btOlho.on b{color:#bfffd6}
+  body.paisagem #btOlho.perdeu{background:rgba(255,194,77,.16);
+              border-color:rgba(255,194,77,.45);color:#ffe1a8}
+  body.paisagem #btOlho.perdeu b{color:#ffe1a8}
+  body.paisagem #btOlho.naoDa{opacity:.45}
+  #btVisao, #btQual, #btOlho{display:none}
   body.paisagem.voando.ajustes #btAjustes{background:rgba(92,200,255,.18);
               border-color:rgba(92,200,255,.55)}
   body.paisagem #giroLinha button{font-size:11.5px;padding:0 10px;
@@ -595,6 +611,8 @@ body.paisagem #controle.ver,
   </div>
   <button id="btAjustes" title="mostrar os ajustes" aria-label="mostrar os ajustes">&#9881;</button>
   <button id="btVisao" title="trocar a vista">&#128065; <b id="visaoTxt">FORA</b></button>
+  <button id="btQual" title="qualidade do desenho">&#9673; <b id="qualTxt">ALTO</b></button>
+  <button id="btOlho" title="olhar com a cabeça (câmera da tela)">&#129504; <b id="olhoTxt">CABEÇA</b></button>
   <div id="giroLinha">asas: <b id="giroTxt">&hellip;</b>
     <button id="btGiro">girar</button>
     <button id="btVisaoC">cabine</button></div>
@@ -911,9 +929,22 @@ function conectar(codigo){
         if (!d.jogando) document.body.classList.remove('ajustes');
         /* a visão vem da TV: sem isso o botão seria um interruptor cego, que
            diz "FORA" depois de a pessoa ter trocado a vista pelo teclado */
-        const bv = $('btVisao');
-        if (bv){ bv.style.display = d.jogando ? '' : 'none';
-                 $('visaoTxt').textContent = d.cab ? 'CABINE' : 'FORA'; }
+        for (const id of ['btVisao','btQual','btOlho']){
+          const e = $(id); if (e) e.style.display = d.jogando ? '' : 'none';
+        }
+        if ($('visaoTxt')) $('visaoTxt').textContent = d.cab ? 'CABINE' : 'FORA';
+        if ($('qualTxt'))  $('qualTxt').textContent =
+          ['BAIXO','MÉDIO','ALTO'][d.qual === undefined ? 2 : d.qual];
+        const bo = $('btOlho');
+        if (bo){
+          /* 0 sem câmera · 1 desligado · 2 olhando · 3 perdeu o rosto */
+          const o = d.olho === undefined ? 1 : d.olho;
+          bo.classList.toggle('naoDa', o === 0);
+          bo.classList.toggle('on', o === 2);
+          bo.classList.toggle('perdeu', o === 3);
+          $('olhoTxt').textContent = o === 0 ? 'SEM CÂMERA' : o === 2 ? 'OLHANDO'
+                                   : o === 3 ? 'CADÊ VOCÊ?' : 'CABEÇA';
+        }
       }
     });
     conn.on('close', () => { estadoRede('nao', 'a TV desconectou'); Tremor.calaTudo(); });
@@ -1676,19 +1707,42 @@ const Painel = {
              li.style.height = hb + 'px'; li.style.right = 'auto'; li.style.bottom = 'auto';
              li.querySelectorAll('.bt').forEach(b => { b.style.height = hb + 'px';
                                                        b.style.lineHeight = hb + 'px'; }); }
-    /* a visão fica logo depois do Calibrar: os dois são de voo, e os dois
-       ficam onde a mão esquerda alcança sem cobrir instrumento */
-    const bv = document.getElementById('btVisao');
-    if (bv && getComputedStyle(bv).display !== 'none'){
-      const lr = li ? li.getBoundingClientRect() : { right: xe };
-      bv.style.left = (lr.right + 5) + 'px'; bv.style.top = yb + 'px';
-      bv.style.height = hb + 'px';
+    /* A FILEIRA DE VISUALIZAÇÃO, logo depois do Calibrar. Elas vão uma atrás
+       da outra, cada uma lendo onde a anterior TERMINOU — porque o texto
+       muda de largura ("ALTO" e "MÉDIO" não medem igual, "CADÊ VOCÊ?" mede o
+       dobro). Posição a partir da medida, nunca somando larguras supostas.
+
+       E ELA TEM UM FIM. À direita estão o estado da rede e o posto, e num
+       aparelho de 568 px o terceiro botão entrava por cima deles — a prova
+       de sobreposição pegou. Quando não cabe com rótulo, o rótulo sai e fica
+       o ícone: perde-se a palavra, não o comando. A conta do limite é
+       aritmética, feita ANTES de posicionar, para não depender de medir algo
+       que ainda vai mudar. */
+    const wPosto = 66, wEstado = Math.max(80, Math.min(R.W*0.24, 190));
+    const limite = R.cab.x + R.cab.w - wPosto - 6 - wEstado - 8;
+    const bts = ['btVisao', 'btQual', 'btOlho']
+      .map(id => document.getElementById(id))
+      .filter(e => e && getComputedStyle(e).display !== 'none');
+    const poeFila = () => {
+      let u = li;
+      for (const e of bts){
+        const lr = u ? u.getBoundingClientRect() : { right: xe };
+        e.style.left = (lr.right + 5) + 'px'; e.style.top = yb + 'px';
+        e.style.height = hb + 'px'; e.style.right = 'auto'; e.style.bottom = 'auto';
+        u = e;
+      }
+      return u;
+    };
+    bts.forEach(e => { const r2 = e.querySelector('b'); if (r2) r2.style.display = ''; });
+    let ult = poeFila();
+    if (ult && ult !== li && ult.getBoundingClientRect().right > limite){
+      bts.forEach(e => { const r2 = e.querySelector('b'); if (r2) r2.style.display = 'none'; });
+      ult = poeFila();
     }
+    const bv = ult;
     const gl = document.getElementById('giroLinha');
     if (gl && getComputedStyle(gl).display !== 'none'){
-      const ant = (bv && getComputedStyle(bv).display !== 'none') ? bv
-                : (li || null);
-      const lr = ant ? ant.getBoundingClientRect() : { right: xe };
+      const lr = (bv || li) ? (bv || li).getBoundingClientRect() : { right: xe };
       gl.style.left = (lr.right + 6) + 'px'; gl.style.top = yb + 'px';
       gl.style.height = hb + 'px';
       gl.querySelectorAll('button').forEach(b => { b.style.height = hb + 'px'; });
@@ -3366,6 +3420,21 @@ function medeDeitado(){
 
 $('btVisao').onclick = () => {
   enviaCtl({ t: 'visao' });
+  try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
+};
+/* A QUALIDADE MANDA O VALOR, NÃO O "PRÓXIMO". O celular lê o que a tela disse
+   que está valendo, soma um e manda o número — assim os dois nunca discordam
+   sobre qual é o próximo, que é o defeito clássico de dois donos girando o
+   mesmo carrossel. */
+let _qual = 2;
+$('btQual').onclick = () => {
+  const atual = ['BAIXO','MÉDIO','ALTO'].indexOf($('qualTxt').textContent);
+  _qual = ((atual < 0 ? _qual : atual) + 1) % 3;
+  enviaCtl({ t: 'qual', q: _qual });
+  try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
+};
+$('btOlho').onclick = () => {
+  enviaCtl({ t: 'cabeca' });
   try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
 };
 $('btAjustes').onclick = () => {

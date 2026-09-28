@@ -106,6 +106,8 @@ borda de cima** = profundor, **apontar para o lado** = leme. O resto é toque.
 | arma | desliza no poço ARMAMENTO |
 | trem e flape | página **SINÓT**, toca no desenho do avião |
 | trocar a vista (cabine/fora) | botão **👁** na faixa de cima do controle |
+| qualidade do desenho | botão **◉** na mesma faixa (alto → médio → baixo) |
+| olhar com a cabeça | botão **🧠** na mesma faixa (precisa de câmera **na tela do jogo**) |
 | descarregar a aproximação | toca no cabeçalho dela |
 
 ---
