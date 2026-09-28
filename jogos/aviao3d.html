@@ -9264,7 +9264,7 @@ function materialDoPainel(){
        vezes por segundo seria pagar o painel inteiro duas vezes por quadro
        para ver um número mudar de 100 para 99.
    ========================================================================== */
-const TELA_CAB_L = 384, TELA_CAB_A = 256, TIRA_CAB_L = 512, TIRA_CAB_A = 40;
+const TELA_CAB_L = 384, TELA_CAB_A = 256;
 let telasCabine = null, _telaCabT = 0;
 function fazTelasCabine(){
   const faz = (l, a, resto) => {
@@ -9275,36 +9275,7 @@ function fazTelasCabine(){
     return Object.assign({ c, ctx: c.getContext('2d'), tex }, resto);
   };
   telasCabine = PAINEL_TELAS.map((_, i) => faz(TELA_CAB_L, TELA_CAB_A, { jan: i }));
-  telasCabine.push(faz(TIRA_CAB_L, TIRA_CAB_A, { tira: true }));
   return telasCabine;
-}
-/* A FITA DE ALARMES DO COAMING, e ela é DE VERDADE.
-
-   Podia ser pintura — e foi, na primeira versão: seis quadradinhos com TREM e
-   ELE acesos para sempre. Só que a lista de alertas do jogo já existe
-   (`mfdAlertas`), já é ela que a página MOTOR mostra, e um anunciador que não
-   anuncia nada é enfeite. Custa um canvas de 512x40 redesenhado dez vezes por
-   segundo. */
-function pintaTiraAlarmes(g){
-  const W = TIRA_CAB_L, H = TIRA_CAB_A;
-  const A = mfdAlertas(), tem = t => A.some(a => a[0].indexOf(t) === 0);
-  const grave = A.some(a => a[1] === MFD_VERM);
-  const lamp = [['MESTRE', MFD_VERM, grave], ['ESTOL', MFD_VERM, tem('ESTOL')],
-                ['TERRENO', MFD_VERM, tem('TERRENO')], ['COMB', MFD_AMBAR, combustivel < 20],
-                ['TREM', MFD_VERDE, !!trem], ['TRAVA', MFD_VERM, travadoPor.size > 0]];
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.clearRect(0, 0, W, H);
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  lamp.forEach(([txt, cor, on], i) => {
-    const w = W/6 - 8, x = i*(W/6) + 4, y = 3, h = H - 6;
-    g.fillStyle = on ? cor : '#0d1217';
-    g.fillRect(x, y, w, h);
-    g.strokeStyle = on ? '#ffffff88' : '#39424c'; g.lineWidth = 2;
-    g.strokeRect(x + 1, y + 1, w - 2, h - 2);
-    g.font = '800 17px ui-monospace, monospace';
-    g.fillStyle = on ? '#08120a' : cor + '33';
-    g.fillText(txt, x + w/2, y + h/2 + 1);
-  });
 }
 function atualizaTelasCabine(agora){
   /* AS TELAS SÃO DO AVIÃO QUE ESTÁ NO CÉU, não as últimas que alguém montou.
@@ -9326,8 +9297,7 @@ function atualizaTelasCabine(agora){
     h2.setTransform(1, 0, 0, 1, 0, 0);
     h2.clearRect(0, 0, t.c.width, t.c.height);
     try {
-      if (t.tira) pintaTiraAlarmes(h2);
-      else {
+      {
         /* (tentei um ZOOM aqui para a letra crescer: desenhar numa caixa
            menor e ampliar. Não faz nada, e a razão é boba — a página calcula
            o corpo de letra A PARTIR da caixa, então encolher a caixa encolhe
@@ -10748,25 +10718,28 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       grupoP.rotation.set(0.52, Math.PI, 0);
       g.add(grupoP);
       g.userData.telasCabine = telasC;
-      /* O COAMING: a aba escura que corre por cima do painel, entre ele e o
-         vidro. É a peça mais barata da cabine e a que mais a faz parecer uma
-         — sem ela o painel acaba numa linha reta, com o mundo começando no
-         mesmo pixel. A borda de cima da chapa está em (0; 42,5; 147); esta
-         vem de lá para trás, na direção do piloto. */
-      const coam = new THREE.Mesh(caixaViva(23, 0.8, 4.6, 0.3), mCabEsc);
-      coam.position.set(0, 44.1, 144.0); coam.rotation.x = -0.07; g.add(coam);
-      /* e a FITA DE ALARMES vai na cara do coaming, não no alto do painel:
-         debaixo da aba ela ficava escondida, e em avião de verdade é ali que
-         ela mora mesmo — na altura dos olhos, onde não dá para não ver.
-         Não é textura nova: é a MESMA lona, recortada pelo `offset`/`repeat`
-         no pedaço onde a fita está pintada. */
-      {
-        const tt = telasC[telasC.length - 1];        // a última é a fita
-        const pl = new THREE.Mesh(new THREE.PlaneGeometry(14, 14*TIRA_CAB_A/TIRA_CAB_L),
-                     new THREE.MeshBasicMaterial({ map: tt.tex, transparent: true }));
-        pl.position.set(0, 43.95, 141.6); pl.rotation.set(0.07, Math.PI, 0);
-        g.add(pl);
-      }
+      /* O LÁBIO DO PAINEL.
+
+         Aqui havia uma ABA larga por cima do painel com uma fita de seis
+         alarmes na cara dela. O usuário circulou de vermelho: "isso tá muito
+         ridículo" — e está. Dois erros na mesma peça:
+
+           - a aba era MAIS LARGA que o painel (23 contra 21) e ficava à
+             frente dele. Não terminava o painel: pairava sobre ele como uma
+             prateleira;
+           - a fita era um WIDGET. Seis caixinhas com nome dentro, flutuando,
+             dizendo o que a linha de alertas da página MOTOR já diz e o que
+             o HUD já grita em vermelho. A mesma informação pela terceira
+             vez, agora em forma de enfeite. Anunciador de verdade existe
+             porque o piloto não pode perder aquilo de vista; aqui era só
+             mais uma coisa desenhada.
+
+         Sobra o que um coaming é: um LÁBIO fino, da largura EXATA do painel,
+         encostado na borda de cima dele e na mesma inclinação. Ele existe
+         para o painel não acabar numa linha reta contra o céu, e para mais
+         nada. */
+      const coam = new THREE.Mesh(caixaViva(PL, 0.5, 2.2, 0.2), mCabEsc);
+      coam.position.set(0, 43.55, 143.2); coam.rotation.x = 0.30; g.add(coam);
       /* O MANCHE MUDOU DE LUGAR, e não foi enfeite. Manche no meio das pernas
          fica exatamente na linha de visada de quem senta seis unidades acima
          do chão da cabine — e o que se via na vista de dentro era um cabo

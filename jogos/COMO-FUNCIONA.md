@@ -8082,3 +8082,30 @@ suja**. Sobraram duas, as que funcionam:
 
 O reflexo do painel e os riscos saíram inteiros. Vidro que se percebe não é
 vidro.
+
+## E a aba dos alarmes, que era um widget
+
+O usuário circulou de vermelho a peça que eu tinha acabado de fazer com
+carinho — a aba do coaming com a fita de seis alarmes — e escreveu: *"isso
+tá muito ridículo."*
+
+Estava. Dois erros na mesma peça:
+
+- **a aba era mais larga que o painel** (23 contra 21) e ficava à frente
+  dele. Ela não TERMINAVA o painel; pairava sobre ele como uma prateleira. É
+  o tipo de coisa que o olho reconhece na hora sem saber nomear;
+- **a fita era um widget.** Seis caixinhas com nome dentro, flutuando,
+  dizendo o que a linha de alertas da página MOTOR já diz e o que o HUD já
+  grita em vermelho. A mesma informação pela terceira vez, em forma de
+  enfeite.
+
+O detalhe amargo é que eu tinha escrito, duas seções acima, que "anunciador
+que não anuncia é enfeite" e a tornei viva por isso. Estava certo sobre o
+mecanismo e errado sobre a peça: um anunciador existe porque o piloto não
+pode perder aquilo de vista, e num jogo em que o HUD já pisca vermelho na
+cara dele, ele não tem função nenhuma. Fazer bem uma peça que não devia
+existir é o desperdício mais fácil de cometer.
+
+Sobrou o que um coaming é: um lábio fino, da largura exata do painel,
+encostado na borda de cima e na mesma inclinação. Ele existe para o painel
+não acabar numa linha reta contra o céu, e para mais nada.

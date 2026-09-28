@@ -117,16 +117,13 @@ borda de cima** = profundor, **apontar para o lado** = leme. O resto é toque.
 | vista | o que é |
 |---|---|
 | **FORA** | perseguição atrás do avião, a de sempre |
-| **CABINE** | de dentro, olhando pelo vidro: o arco fino do para-brisa, o **painel digital do jogo nas telas do avião** (largo e baixo, como caça moderno), a fita de alarmes no coaming, os consoles, e o manche e a manete que **se mexem com o comando** |
+| **CABINE** | de dentro, olhando pelo vidro: o arco fino do para-brisa, o **painel digital do jogo nas telas do avião** (largo e baixo, como caça moderno), os consoles, e o manche e a manete que **se mexem com o comando** |
 | **CAPACETE** | grande-angular logo atrás da canópia: a mesma cabine vista de cima do banco, com o avião inteiro em volta |
 
 **Na cabine as duas janelas do HUD somem**: elas estão dentro do avião. As
 duas telas do painel mostram as mesmas duas páginas, ao vivo, redesenhadas dez
 vezes por segundo — é o mesmo código do painel 2D pintando num canvas que vira
-textura. A fita de alarmes do coaming também é de verdade: lê a mesma lista de
-alertas da página MOTOR.
-
-A cabine **não foi desenhada agora** — banco, painel, mostradores e manche já
+textura. A cabine **não foi desenhada agora** — banco, painel, mostradores e manche já
 estavam no modelo desde sempre. O que faltava era caber na lente: o plano de
 corte da câmera vale 40 unidades e o painel está a 28 do olho. Cada vista
 declara o seu corte (`perto`), e a cabine usa 8. Ver
