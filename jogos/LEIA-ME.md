@@ -118,7 +118,7 @@ borda de cima** = profundor, **apontar para o lado** = leme. O resto é toque.
 |---|---|
 | **FORA** | perseguição atrás do avião, a de sempre |
 | **CABINE** | de dentro, olhando pelo vidro: o arco fino do para-brisa, o **painel digital do jogo nas telas do avião** (largo e baixo, como caça moderno), os consoles, e o manche e a manete que **se mexem com o comando** |
-| **CAPACETE** | grande-angular logo atrás da canópia: a mesma cabine vista de cima do banco, com o avião inteiro em volta |
+| **CAPACETE** | logo atrás e acima da cabeça, como a câmera do vídeo: pernas, mãos no manche e na manete, trilhos da capota, painel e o combinador do HUD, com o mundo na metade de cima |
 
 **Na cabine as duas janelas do HUD somem**: elas estão dentro do avião. As
 duas telas do painel mostram as mesmas duas páginas, ao vivo, redesenhadas dez
@@ -250,8 +250,13 @@ plausível no lugar errado.
 - **`trem.js` acusa três falhas** e já acusava antes desta leva: rajada em
   vagão e em locomotiva não tira vida nem dá ponto. Não é regressão nova; é
   defeito do trem, esperando a vez.
-- **A cabine não tem piloto** — nem mãos no manche. É o que mais falta agora
-  que o resto se mexe.
+- **Não se vê o bico do avião da cabine**, e não é defeito: o topo do casco
+  cai a 20° abaixo da linha do olho e o painel ocupa de 14° a 34°. No vídeo
+  do F-16 que serviu de referência também não se vê. Levantar o nariz oito
+  unidades resolveria — e seria outro avião.
+- **O piloto é só pernas e mãos.** Falta o tronco e o capacete, que só
+  aparecem de fora pelo vidro (e na vista do capacete teriam de sumir, senão
+  tapam a lente).
 - **De cabine, na final, a pista fica baixa.** O painel tapa de uns 15° para
   baixo. Dá para pousar de olho no HUD e na página APROX, mas quem quiser ver
   a pista usa a vista de fora. 

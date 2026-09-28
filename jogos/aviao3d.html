@@ -10654,6 +10654,50 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
         tampo.rotation.set(-Math.PI/2, 0, lado < 0 ? Math.PI/2 : -Math.PI/2);
         tampo.position.set(lado*16, 35.7, 126); g.add(tampo);
       }
+      /* =====================================================================
+         O QUE ENCHE O QUADRO — do vídeo do F-16, quadro a quadro
+
+         "Não deveria ver o bico do avião?" Medi: o topo do casco cai a 19,6°
+         abaixo da linha do olho em z=208 e a 23,4° em z=178, e o painel ocupa
+         de 14° a 34°. O bico está atrás do painel, e não há altura de olho
+         que resolva — qualquer coisa a 25 unidades tapa o que está a 90 na
+         mesma direção.
+
+         E aí fui rever o vídeo que ele mandou, e a resposta estava lá: **no
+         F-16 também não se vê o bico**. O que enche a metade de baixo do
+         quadro é outra coisa, e nada disso existia aqui:
+
+           - as PERNAS do piloto, duas formas verde-oliva que convergem para
+             a frente, com as tiras do paraquedas atravessando;
+           - as MÃOS: uma no manche do console direito, outra na manete;
+           - os TRILHOS da capota, duas tiras claras correndo por cima dos
+             consoles de ponta a ponta — são elas que dão a PROFUNDIDADE da
+             cabine, porque correm para o fundo;
+           - o COMBINADOR do HUD, o vidro emoldurado em cima do coaming.
+
+         Em vez de caçar o bico, é isto que faltava. As mãos são filhas dos
+         grupos que se mexem, então elas acompanham o comando de graça. */
+      const mVoo   = new THREE.MeshPhongMaterial({ color: 0x4e5642, shininess: 4 });
+      const mLuva  = new THREE.MeshPhongMaterial({ color: 0x2c3138, shininess: 10 });
+      const mTira  = new THREE.MeshPhongMaterial({ color: 0x23272c, shininess: 6 });
+      const mTrilho= new THREE.MeshPhongMaterial({ color: 0x79828e, shininess: 18,
+                                                   specular: 0x555e69 });
+      for (const lado of [-1, 1]){
+        const coxa = new THREE.Mesh(caixaViva(8.4, 8, 30, 2.6), mVoo);
+        coxa.position.set(lado*5.4, 35.6, 126); coxa.rotation.x = 0.07; g.add(coxa);
+        const canela = new THREE.Mesh(caixaViva(7, 7, 17, 2.2), mVoo);
+        canela.position.set(lado*6, 33, 148); canela.rotation.x = -0.26; g.add(canela);
+        /* as tiras do paraquedas: dois riscos escuros atravessando a coxa */
+        for (const z of [119, 133]){
+          const t = new THREE.Mesh(new THREE.BoxGeometry(9, 1.2, 2.4), mTira);
+          t.position.set(lado*5.4, 39.6, z); g.add(t);
+        }
+      }
+      /* os trilhos da capota, por cima dos consoles */
+      for (const lado of [-1, 1]){
+        const tr = new THREE.Mesh(caixaViva(2.6, 1.1, 46, 0.45), mTrilho);
+        tr.position.set(lado*19.2, 35.4, 124); g.add(tr);
+      }
       /* --- A MANETE, e ela ANDA -------------------------------------------
          Cabine parada é maquete. As duas peças que a mão do piloto move o
          tempo todo são o manche e a manete, e as duas custam um grupo com
@@ -10666,6 +10710,8 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
         haste.position.set(0, 4, 0); maneteG.add(haste);
         const bola = new THREE.Mesh(new THREE.SphereGeometry(2.6, 10, 8), mFosco);
         bola.scale.set(1, 0.8, 1.25); bola.position.set(0, 8.6, 0); maneteG.add(bola);
+        const mao = new THREE.Mesh(caixaViva(5, 4.2, 7, 1.8), mLuva);
+        mao.position.set(0.6, 8.4, 0.6); maneteG.add(mao);
       }
       g.add(maneteG);
       comandos.manete = maneteG;
@@ -10740,6 +10786,36 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          nada. */
       const coam = new THREE.Mesh(caixaViva(PL, 0.5, 2.2, 0.2), mCabEsc);
       coam.position.set(0, 43.55, 143.2); coam.rotation.x = 0.30; g.add(coam);
+      /* O COMBINADOR. No vídeo é a peça que mais diz "caça": um vidro
+         emoldurado em pé sobre o coaming, com o desenho verde do HUD nele.
+
+         Aqui ele não precisa DESENHAR nada — o HUD do jogo já é pintado na
+         tela inteira, e o combinador cai exatamente em volta da mira e da
+         escada de arfagem. Posto no lugar certo, ele faz o desenho que já
+         existe parecer projetado num vidro em vez de colado na tela. Custa
+         dois montantes, uma travessa e uma placa quase transparente. */
+      {
+        /* O TAMANHO É MEDIDO NO ÂNGULO, não na peça. Na primeira tentativa o
+           combinador tinha 12 de largura a 23 unidades do olho: ±15°, meia
+           tela de moldura preta no meio da vista. Empurrado para 146 e
+           estreitado para 9, dá ±8,7° — que é a proporção que ele tem no
+           vídeo. E sem travessa em cima: dali o piloto não a vê, e o que ela
+           fazia aqui era cortar o horizonte. */
+        const mMont = new THREE.MeshPhongMaterial({ color: 0x2a3038, shininess: 20 });
+        for (const lado of [-1, 1]){
+          const mo = new THREE.Mesh(caixaViva(0.6, 8, 1.1, 0.22), mMont);
+          mo.position.set(lado*4.8, 48.2, 146.2); mo.rotation.x = 0.16; g.add(mo);
+        }
+        /* uma base ligando os dois montantes: sem ela eles leem como duas
+           antenas, não como uma moldura */
+        const base = new THREE.Mesh(caixaViva(10.4, 0.8, 1.6, 0.25), mMont);
+        base.position.set(0, 44.5, 146.9); g.add(base);
+        const vidro = new THREE.Mesh(new THREE.PlaneGeometry(9, 7.4),
+          new THREE.MeshPhongMaterial({ color: 0x9fffd8, transparent: true, opacity: 0.11,
+            side: THREE.DoubleSide, shininess: 120, specular: 0xbfffe6, depthWrite: false }));
+        vidro.position.set(0, 48.3, 146.1); vidro.rotation.set(0.16, Math.PI, 0);
+        g.add(vidro);
+      }
       /* O MANCHE MUDOU DE LUGAR, e não foi enfeite. Manche no meio das pernas
          fica exatamente na linha de visada de quem senta seis unidades acima
          do chão da cabine — e o que se via na vista de dentro era um cabo
@@ -10755,6 +10831,8 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
         pega.position.y = 11.4; mancheG.add(pega);
         const gatilho = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 1.2), mBranco);
         gatilho.position.set(0, 11.6, -2.2); mancheG.add(gatilho);
+        const mao = new THREE.Mesh(caixaViva(5, 5.4, 7, 1.8), mLuva);
+        mao.position.set(-0.4, 10.6, 0.4); mancheG.add(mao);
       }
       mancheG.rotation.set(-0.10, 0, -0.08);
       g.add(mancheG);
@@ -11949,7 +12027,7 @@ const VISTAS = [
      nariz enorme embaixo — parece drone atrás do avião, não câmera de
      capacete. Dez atrás e 100° é logo atrás da cabeça, que é onde a câmera
      do vídeo fica. */
-  { nome:'CAPACETE', preso: true, tras: 8, cima: 3, fov: 92, perto: 10 }
+  { nome:'CAPACETE', preso: true, tras: 8, cima: 9, fov: 92, perto: 10 }
 ];
 let nVista = 0;
 function poeVista(n){

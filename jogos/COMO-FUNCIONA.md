@@ -8109,3 +8109,68 @@ existir é o desperdício mais fácil de cometer.
 Sobrou o que um coaming é: um lábio fino, da largura exata do painel,
 encostado na borda de cima e na mesma inclinação. Ele existe para o painel
 não acabar numa linha reta contra o céu, e para mais nada.
+
+---
+
+# "Não deveria ver o bico do avião?"
+
+Boa pergunta, e a resposta tem duas partes: **a medida** e **o vídeo**.
+
+## A medida
+
+Do olho do piloto (z=118, y=50), o topo do casco cai assim:
+
+| estação | topo do casco | ângulo abaixo do olho |
+|---|---|---|
+| z=152 | 30 | 30,5° |
+| z=178 | 24 | 23,4° |
+| z=208 | 18 | 19,6° |
+| z=246 (bico) | 0,8 | 21,0° |
+
+E o painel, a 25 unidades do olho, ocupa de **14° a 34°**. O bico inteiro
+mora dentro dessa faixa: está atrás do painel.
+
+E não há altura de olho que resolva. Qualquer coisa a 25 unidades tapa o que
+está a 90 na mesma direção — subir o olho sobe os dois juntos. As saídas
+seriam baixar o painel até o rodapé (e aí ele não aparece) ou levantar o
+nariz do avião oito unidades (e aí é outro avião).
+
+O raio confirma, grau a grau: 6° e 10° abaixo do horizonte devolvem MUNDO;
+de 14° a 34°, painel.
+
+## O vídeo
+
+Aí fui rever o vídeo que ele mandou (`Incredible Cockpit View | F-16`) e a
+resposta estava lá: **no F-16 daquela câmera também não se vê o bico**. O
+que enche a metade de baixo do quadro é outra coisa — e nada disso existia
+aqui:
+
+- as **pernas** do piloto, duas formas verde-oliva convergindo para a frente,
+  com as tiras do paraquedas atravessando;
+- as **mãos**: uma no manche do console direito, outra na manete;
+- os **trilhos da capota**, duas tiras claras correndo por cima dos consoles
+  de ponta a ponta — e são elas que dão PROFUNDIDADE, porque correm para o
+  fundo do quadro;
+- o **combinador do HUD**, o vidro emoldurado em pé sobre o coaming.
+
+Procurar o bico era a pergunta errada. O que faltava era isto.
+
+As mãos são **filhas dos grupos que já se mexem** (manche e manete), então
+acompanham o comando sem uma linha de animação nova — foi o pedaço mais
+barato do dia.
+
+## O combinador, e o tamanho medido em ângulo
+
+O combinador não desenha nada: o HUD do jogo já é pintado na tela inteira e
+cai exatamente em volta da mira. Posto no lugar certo, ele faz o desenho que
+já existe **parecer projetado num vidro** em vez de colado na tela.
+
+Na primeira tentativa ele tinha 12 de largura a 23 unidades do olho: ±15°,
+meia tela de moldura preta no meio da vista. Empurrado para 146 e estreitado
+para 9, dá ±8,7° — a proporção que ele tem no vídeo. Peça de cabine se mede
+em GRAU, não em unidade: a mesma peça a 23 ou a 30 unidades do olho é outra
+peça.
+
+Saiu também a travessa de cima (dali o piloto não a vê, e ela cortava o
+horizonte) e entrou uma base ligando os dois montantes — sem ela, eles leem
+como duas antenas em vez de uma moldura.
