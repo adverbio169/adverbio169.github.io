@@ -7644,3 +7644,178 @@ desenhado** — a vista anterior.
 
 Gastei seis tentativas discutindo com uma imagem velha. A regra, agora no
 leia-me: **antes de fotografar um canvas, desenhe.**
+
+---
+
+# A cabine por dentro
+
+O pedido foi curto: *"terminou a visão do cockpit?"* — e a escolha, entre duas
+opções, foi a 2: **modelar um interior de cabine de verdade**, para que CABINE
+vire "de dentro, olhando pelo vidro" e CAPACETE vire "câmera no capacete,
+vendo a máquina em volta".
+
+Comecei a listar o que teria de desenhar — arco da canópia, coaming, bordas da
+fuselagem nos cantos — e parei no primeiro `grep`. **Já estava tudo lá.**
+
+## O interior existia e ninguém nunca o viu
+
+Dentro do construtor do AD-02, num bloco chamado "CABINE POR DENTRO", há banco,
+encosto, apoio de cabeça, painel, três mostradores e manche. O comentário que
+os acompanha diz, em 2025: *"a diferença entre uma bolha VAZIA e uma bolha com
+um banco dentro é a diferença entre um brinquedo e um avião"*.
+
+Só que ninguém, em vista nenhuma, jamais viu aquilo. Por dois motivos que nada
+têm a ver com modelagem:
+
+1. **`aviao.visible = !cockpit`** — na vista de cabine o avião inteiro era
+   apagado. Era uma defesa: sem ela, a câmera dentro da fuselagem mostrava a
+   carcaça cortada ao meio.
+2. **O plano de corte da lente em 40 unidades.** O painel está a 28 do olho, o
+   manche a 18, o trilho da capota a 4. Quarenta unidades à frente do olho é
+   *depois* da cabine inteira. Mesmo com o avião visível, não haveria nada.
+
+E havia um terceiro, mais sorrateiro: o banco estava em y=22 e o piso em y=18,
+enquanto o **dorso da fuselagem naquela estação chega a y=34**. A mobília toda
+estava enterrada dentro do casco. Nem de fora, pelo vidro, dava para vê-la.
+
+Ou seja: a vista de cabine não precisava de um interior novo. Precisava que o
+que existia **coubesse dentro do campo de visão e estivesse acima do chão**.
+
+## O que mudou, em ordem de importância
+
+**O corte da lente virou propriedade da vista.** `CAM_PERTO = 40` continua
+valendo para FORA e para CAPACETE; a cabine declara `perto: 8`. O preço é
+precisão de profundidade a distância (o erro cresce com o quadrado da
+distância dividido pelo corte), e é por isso que ele não desce para todo
+mundo. E não desce no CAPACETE por um motivo concreto: o apoio de cabeça fica
+em cima da lente ali — são os 40 que o limpam.
+
+**O avião deixou de sumir.** Com a lente começando em 8, o que aparece é a
+cabine; e junto com ela o nariz à frente e a asa entrando pelos cantos.
+
+**A mobília subiu para cima do casco** (piso 18→32,5; banco 22→36; painel
+30→34; consoles novos), e os mostradores foram **virados para o piloto** —
+estavam na face da frente do painel, olhando para o nariz. Nunca tinha
+aparecido porque nada ali aparecia.
+
+**O manche mudou de lugar.** No meio das pernas, com o olho a doze unidades do
+chão da cabine, ele ficava exatamente na linha de visada: um cabo preto no
+meio da tela. Foi para o console direito, que é onde o F-16 pôs o dele, pela
+mesma razão.
+
+**Os mostradores acendem** (`emissive`). Painel apagado, visto de dentro, é
+uma tábua preta; painel aceso é uma cabine. Custa um material e nenhuma luz
+nova.
+
+## A chapa azul: três tentativas até medir direito
+
+No primeiro quadro da vista nova havia, entre os pés e o painel, **uma chapa
+azul iluminada como se fosse o lado de fora**. Tentei duas correções de olho,
+as duas erradas:
+
+1. uma **tigela** pendurada no trilho da capota, para tapar o chão;
+2. a mesma tigela com **a borda subida** até encostar na casca.
+
+Nenhuma resolveu. Quem resolveu foi parar de olhar e **perguntar ao raio**: um
+`Raycaster` do olho para nove direções, devolvendo distância **e a cor do
+material atingido**. Veio `24 · #1f5fd0`. Aquilo não era peça solta nenhuma —
+era `mCorpo`, a lataria. Eu estava vendo **o dorso da própria fuselagem por
+dentro da capota**.
+
+É que a casca **não tem buraco**. A fuselagem é fechada e a capota é uma bolha
+pousada em cima dela; o dorso passa inteiro por baixo do vidro e, na estação da
+cabine, sobe quatro unidades *acima* do plano onde a bolha nasce. Tapar a boca
+de uma tigela não adianta quando a abóbada entra por cima dela.
+
+A peça certa é um **convés**: uma casca escura que acompanha a abóbada meia
+unidade acima dela, de trilho a trilho, na pegada exata do vidro. Não é buraco
+nem tigela — é o casco, pintado de escuro onde o piloto o vê. `secaoEm` e
+`pontoNoCasco`, que já existiam para a pintura seguir a chapa, dão os pontos.
+
+**Lição, a enésima da mesma família:** quando a medida discorda do olho, a
+medida ganha — mas só se ela disser **o quê**, e não só **quanto**. Distância
+sozinha não distingue assoalho de asa. Foi a cor do material que resolveu em
+um quadro o que duas correções de olho não resolveram.
+
+## O olho estava seis unidades acima do próprio chão
+
+Com o convés no lugar, a tela ficou 100% escura embaixo. O raio explicou de
+novo: qualquer coisa apoiada no convés — os consoles, o painel — nascia **na
+linha do horizonte**, porque o olho estava a seis unidades do chão da cabine.
+
+Seis unidades, na escala deste avião (630 de comprimento), é um piloto do
+tamanho de um gato. O olho subiu para 46: doze acima do chão, oito abaixo do
+vidro. Sentar na cabine em vez de deitar nela.
+
+E aqui um detalhe que quase passou: **a câmera do capacete é medida a partir
+do olho** (20 atrás, 14 acima). Subir o olho subiria ela junto, e o
+enquadramento do vídeo que o Brunno mandou iria embora. O `cima` dela caiu de
+14 para 8 no mesmo commit, para a soma continuar 54.
+
+## O arco amarelo, e por que dois tubos
+
+Na primeira foto de dentro, o que dominava a tela era um **arco amarelo**
+gigante: a moldura do para-brisa, que de fora é a cara do avião e de dentro é
+um arco de circo a 32 unidades do olho. Moldura de canópia de verdade é
+pintada por fora e preta por dentro — pelo mesmo motivo, aliás: amarelo na
+frente do piloto reflete no vidro.
+
+Material de duas faces **não** resolve: quem olha o tubo estando dentro do
+*aro* ainda vê a face de FORA do tubo. O que resolve é tamanho. São dois
+arcos, e a conta é esta:
+
+```
+amarelo: raio 20,0 ± 1,00  →  [19,00 ; 21,00]
+escuro : raio 19,7 ± 1,24  →  [18,46 ; 20,94]
+```
+
+De dentro manda quem tem a borda **interna** menor — o escuro, por meia
+unidade. De fora manda quem tem a **externa** maior — o amarelo, por seis
+centésimos. Na primeira tentativa o escuro era 5,5% menor e sobrava uma tarja
+amarela grossa: a 25 unidades do olho, 5% de 20 é um dedo de tinta.
+
+O arco também **recuou de 150 para 143**. Em 150 o topo dele caía a oito graus
+acima do horizonte — ou seja, em cima da linha do horizonte, atravessando
+exatamente o que o piloto precisa ver em voo reto. Recuado, sobe para treze
+graus e o horizonte passa por baixo.
+
+## O prato amarelo do dragão
+
+O dragão tem a mesma cabine agora, e a vista dele começou pior: uma **parede
+amarela**. O `aro` dele é `TorusGeometry(1, 1, …)` — tubo do tamanho do raio,
+o furo do meio fecha, e o que sai é um **disco**. Escalado por 37 × 57, um
+prato amarelo de 74 por 114 em volta da cabine, com a cabeça do piloto dentro
+dele.
+
+O engraçado é que este defeito já tinha sido diagnosticado e corrigido — no
+caça, com direito a comentário: *"o aro: TorusGeometry(1,1) tem raio EXTERNO 2
+— escalado, ele virava uma mancha amarela do dobro da cabine na frente dela.
+Tubo fino resolve."* A correção nunca atravessou para o outro modelo. **Achado
+duas vezes, corrigido uma.** É o argumento mais forte que já tive para a regra
+que este arquivo repete: número igual em dois lugares muda em um.
+
+E foi por isso que, no mesmo commit, a canópia dos dois aviões virou **medida**
+(`MEDIDAS.canopia`): meios-eixos, centro e estação do arco numa tabela só, lida
+pelo vidro, pelo aro e pelo convés. Eram três cópias dos mesmos números.
+
+## Como isto é provado
+
+`scratchpad/cabine.js`, duas medidas independentes porque uma só engana:
+
+- **raio**: do olho, em nove direções, o que o piloto encontra é o próprio
+  avião? Para baixo tem de bater e bater **perto** (22 unidades: é a cabine,
+  não a asa); para cima não pode bater nada;
+- **pixel**: quanto do quadro é escuro, em cima e embaixo. CABINE dá 66% de
+  escuro embaixo contra 0,2% da vista FORA, e 66% embaixo contra 16% em cima —
+  o escuro tem de estar **embaixo**, como painel, não espalhado.
+
+E um erro meu no próprio teste, digno de nota porque é o terceiro da mesma
+família: `readPixels(0, 0, 200, 128)` **recorta, não reduz**. Eu lia o canto de
+baixo à esquerda e chamava aquilo de "a tela" — e obtive um resultado
+plausível e errado: 45% de escuro "em cima", num quadro cujo topo é céu limpo.
+
+`scratchpad/cabfora.js` fotografa a mesma cabine de fora, em cinco ângulos:
+nada do que entrou pode furar a lataria ou o vidro. É ela que mostra o ganho
+inesperado — **de fora, pelo vidro, agora se vê o banco, o apoio de cabeça, o
+console e o painel aceso**, que era o que o comentário de 2025 prometia e o
+modelo nunca entregou.

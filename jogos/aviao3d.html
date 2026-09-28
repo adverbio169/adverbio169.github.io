@@ -8228,8 +8228,8 @@ rend.toneMappingExposure = 0.95;
 
 const cena = new THREE.Scene();
 cena.fog = new THREE.Fog(COR_CEU, 5000, 46000);
-const CAM_FOV = 58, CAM_FOV_TURBO = 74;
-const cam = new THREE.PerspectiveCamera(CAM_FOV, 1, 40, 130000);
+const CAM_FOV = 58, CAM_FOV_TURBO = 74, CAM_PERTO = 40;
+const cam = new THREE.PerspectiveCamera(CAM_FOV, 1, CAM_PERTO, 130000);
 cena.add(cam);
 
 /* A luz de baixo era VERDE-CAMPO (0x46603f), para o chão devolver a cor da
@@ -9075,10 +9075,31 @@ try { const q = localStorage.getItem('aviao3d.pintura');
       if (q === 'asas' || q === 'bordo' || q === 'meio') PINTURA_AD02 = q; } catch(e){}
 try { const t = localStorage.getItem('aviao3d.aviao'); if (t === 'dragao' || t === 'caca') tipoDeAviao = t; } catch(e){}
 
+/* A CANÓPIA É MEDIDA, não número solto.
+
+   Ela estava escrita duas vezes em cada avião — na bolha de vidro e no aro
+   que a contorna — e agora é lida por um terceiro: o que decide o que o
+   piloto vê de DENTRO. Três cópias do mesmo número é a receita conhecida
+   deste arquivo para o vidro e a moldura andarem para lados diferentes.
+
+   `x`, `y` e `z` são os meios-eixos da meia-elipsoide; `cy`/`cz` o centro
+   dela; `arco` a estação onde para-brisa e capota se encontram. */
 const MEDIDAS_DRAGAO = {
   nome: 'DRAGÃO',
   roda: 158,                    // altura do centro com o trem no chão
-  cabine: { frente: 40, cima: 26 },
+  /* O OLHO ESTAVA DEBAIXO DO VIDRO. A bolha do dragão nasce em y=42 e vai a
+     74; o olho marcado aqui era y=26 — dezesseis unidades ABAIXO da base da
+     capota, ou seja, dentro da fuselagem. Enquanto a vista de cabine não
+     desenhava nada, ninguém percebia: o mundo aparece igual de qualquer
+     altura. Agora que a cabine existe, o olho tem de estar onde cabe uma
+     cabeça. */
+  /* e ele sobe e avança mais um tanto: o aro amarelo do dragão não é um fio
+     como o do caça — é um tubo gordo (raio 1 numa escala de 37), parte do
+     jeitão de brinquedo dele. Com o olho em 74/52 a cabeça do piloto ficava
+     DENTRO do tubo e a vista de dentro era uma parede amarela. Em 95/56 ela
+     passa por cima dele. */
+  cabine: { frente: 95, cima: 56 },
+  canopia: { x: 36, y: 32, z: 56, cy: 42, cz: 78 },
   /* o fogo mora na SAÍDA DE VERDADE: x=86 (o eixo do motor, não 82), y junto
      com ele lá embaixo, e z=-114, que é onde o bocal escuro acaba. */
   jatos: [{ x: -86, y: -22, z: -114 }, { x: 86, y: -22, z: -114 }],
@@ -9089,7 +9110,22 @@ const MEDIDAS_DRAGAO = {
 const MEDIDAS_CACA = {
   nome: 'CAÇA AD-02',
   roda: 103,
-  cabine: { frente: 118, cima: 40 },
+  /* A ALTURA DO OLHO, medida agora que existe chão para comparar: o convés da
+     cabine fica em 34 e o teto da bolha em 54. Com o olho em 40 o piloto
+     estava SEIS unidades acima do próprio chão — e o efeito na tela era
+     brutal: qualquer coisa apoiada no convés (os consoles, o painel) nascia
+     na linha do horizonte e tapava o mundo inteiro abaixo dele. Em 46 ele
+     fica doze acima do chão e oito abaixo do vidro, que é sentar na cabine em
+     vez de deitar nela. */
+  cabine: { frente: 118, cima: 46 },
+  /* O ARCO recuou de 150 para 143 quando a vista de dentro passou a existir.
+     Com ele em 150 — 32 à frente do olho — o topo da moldura caía a oito
+     graus acima do horizonte, ou seja, EM CIMA da linha do horizonte: voando
+     reto, o piloto tinha uma barra atravessando exatamente o que ele precisa
+     ver. Recuado, o mesmo arco sobe para treze graus, e o horizonte passa
+     folgado por baixo dele. De fora a diferença é o para-brisa ficar um
+     tiquinho mais comprido. */
+  canopia: { x: 21, y: 24, z: 54, cy: 30, cz: 122, arco: 143 },
   jatos: [{ x: -26, y: -7, z: -252 }, { x: 26, y: -7, z: -252 }],
   fogo: { raio: 14, nucleo: 7.5, anel: 6.5 },
   ponta: null,                   // vem da tabela AD02, que é mais exata
@@ -9398,6 +9434,84 @@ function faixaNoCasco(secoes, lado, marcas, mat, n){
     aneis.push([p0, p1, q1, q0]);            // um anel de 4 pontos: uma fita fina
   }
   return costura(aneis, mat, true);
+}
+
+/* =============================================================================
+   A BANHEIRA DA CABINE — a peça que só existe por causa da vista de dentro
+
+   Olhando de fora, o assoalho da cabine nunca fez falta: a fuselagem tapa
+   tudo. Olhando de DENTRO, a chapa da fuselagem não tapa nada — o material
+   dela é de uma face só (`FrontSide`), e face virada para fora, vista por
+   trás, simplesmente não é desenhada. O piloto veria o chão do mundo passando
+   por baixo dos próprios pés.
+
+   Esta é a tigela que fecha o buraco: a mesma elipse onde o vidro encontra a
+   fuselagem, descendo e afinando até quase fechar, com material de duas
+   faces. Cabe inteira dentro do casco (a elipse da capota é mais estreita que
+   qualquer seção que ela atravessa), então de fora não muda nada — a não ser
+   pelo escuro que já se via através do vidro, que agora é escuro de verdade.
+   ========================================================================== */
+/* =============================================================================
+   O CONVÉS DA CABINE — a peça que só existe por causa da vista de dentro
+
+   A CASCA NÃO TEM BURACO, e é isso que muda tudo. Eu imaginava a cabine como
+   uma tigela aberta no dorso; não é. A fuselagem é um casco FECHADO e a
+   capota é uma bolha pousada em cima dele. O dorso passa inteiro por baixo do
+   vidro, e na estação da cabine ele sobe a 34 — quatro unidades ACIMA do
+   plano onde a bolha nasce. Enquanto a vista de dentro não existia, ninguém
+   via; no primeiro quadro dela apareceu, entre os pés e o painel, uma chapa
+   AZUL iluminada como lado de fora. Era o próprio dorso, visto de cima.
+
+   Tentei duas vezes antes de medir direito:
+     1. uma tigela pendurada no trilho da capota — o dorso entra pela boca
+        dela por cima, então tapar a boca não tapa nada;
+     2. a mesma tigela com a borda subida até encostar na casca — o raio
+        mostrou o azul ainda na frente, porque a abóbada é mais alta NO MEIO
+        do que na borda.
+   Quem resolveu foi olhar o que o raio devolvia: distância 24, material
+   #1f5fd0. O azul não era peça solta nenhuma; era a lataria.
+
+   Então a peça certa é um CONVÉS: uma casca escura que acompanha a abóbada
+   meia unidade acima dela, de trilho a trilho, exatamente na pegada do vidro.
+   Não precisa de buraco, não pode furar o casco (ela É o casco, meio ponto
+   para fora) e some por completo na vista de fora, onde o vidro já mostrava
+   escuro ali. E o que mora na cabine — banco, painel, manche — passa a ter
+   chão para pousar.
+   ========================================================================== */
+function convesDaCabine(CP, secoes, mat, nz, na){
+  nz = nz || 16; na = na || 12;
+  const aneis = [];
+  for (let i = 0; i <= nz; i++){
+    const z = CP.cz - CP.z*0.995 + CP.z*1.99*i/nz;
+    const sec = secaoEm(secoes, z), e = sec.n || 2.4;
+    /* onde o vidro encosta na chapa, NESTA estação, em ângulo de seção */
+    const xs = CP.x*0.99*Math.sqrt(Math.max(0, 1 - Math.pow((z - CP.cz)/CP.z, 2)));
+    const lim = Math.acos(Math.min(1, Math.pow(Math.min(1, xs/sec.w), e/2)));
+    const anel = [];
+    for (let j = 0; j <= na; j++)
+      anel.push(pontoNoCasco(sec, lim + (Math.PI - 2*lim)*j/na, 0.45));
+    aneis.push(anel);
+  }
+  const m = costura(aneis, mat, false);
+  m.castShadow = false;
+  return m;
+}
+
+/* a mesma ideia para quem não tem tabela de seções (o dragão): uma tigela
+   pendurada no trilho. Tapa menos bem — o dorso dele também sobe por dentro —
+   mas é o que dá para fazer sem a casca em números. */
+function banheiraDaCabine(CP, mat){
+  const anel = (k, dy) => {
+    const a = [];
+    for (let i = 0; i < 24; i++){
+      const t = i/24*Math.PI*2;
+      a.push(new THREE.Vector3(Math.cos(t)*CP.x*k, CP.cy + dy, CP.cz + Math.sin(t)*CP.z*k));
+    }
+    return a;
+  };
+  const m = costura([anel(1, 2), anel(0.95, -12), anel(0.8, -26), anel(0.42, -36)], mat, true);
+  m.castShadow = false;
+  return m;
 }
 
 function fuselagem(secoes, mat, de, ate){
@@ -10166,8 +10280,9 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
   /* A CABINE é uma GOTA, não uma lente: mais alta que larga, puxada para a
      frente. Na primeira versão ela era chata e larga e lia como um olho de
      ciclope no meio das costas. */
+  const CP = MEDIDAS_CACA.canopia;
   const bolha = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12, 0, Math.PI*2, 0, Math.PI/2), mVidro);
-  bolha.scale.set(21, 24, 54); bolha.position.set(0, 30, 122); g.add(bolha);
+  bolha.scale.set(CP.x, CP.y, CP.z); bolha.position.set(0, CP.cy, CP.cz); g.add(bolha);
   /* o arco que divide para-brisa e capota, e o painel antirreflexo preto na
      frente do para-brisa — os dois estão em todo caça, e os dois dizem
      "cabine" de longe */
@@ -10176,9 +10291,32 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
      já afinou para 0,85 disso — e o resultado foi um cabide amarelo pairando
      acima do vidro. A conta é a da própria elipsoide. */
   {
-    const t = (150 - 122)/54, k = Math.sqrt(Math.max(0, 1 - t*t));
-    const arco = new THREE.Mesh(new THREE.TorusGeometry(1, 0.075, 6, 20, Math.PI), mAmarelo);
-    arco.scale.set(21*k + 0.4, 24*k + 0.4, 3); arco.position.set(0, 30, 150); g.add(arco);
+    const t = (CP.arco - CP.cz)/CP.z, k = Math.sqrt(Math.max(0, 1 - t*t));
+    /* DOIS ARCOS, e o de dentro é escuro. Moldura de canópia é pintada por
+       fora e preta por dentro — em avião de verdade, porque amarelo na frente
+       do olho do piloto reflete no vidro. Aqui a razão é a mesma e mais uma:
+       na vista de cabine o arco fica a 32 unidades do olho, ocupando meia
+       tela, e amarelo ali dentro vira um arco de circo.
+       O truque é de tamanho, não de material: o escuro é 6% menor, então de
+       dentro (onde o menor tapa o maior) vê-se preto, e de fora vê-se o
+       amarelo. Material de duas faces não resolveria: quem olha o tubo de
+       dentro do arco ainda vê a face de FORA dele. */
+    /* e o TUBO afinou de 0,075 para 0,05: visto de dentro, a 25 unidades do
+       olho, o de antes era uma barra de arquibancada. Moldura é moldura. */
+    const arco = new THREE.Mesh(new THREE.TorusGeometry(1, 0.05, 6, 20, Math.PI), mAmarelo);
+    arco.scale.set(CP.x*k + 0.4, CP.y*k + 0.4, 3); arco.position.set(0, CP.cy, CP.arco); g.add(arco);
+    /* O TAMANHO DO ESCURO é conta, não gosto. Ele tem de ser o mais interno
+       nos dois sentidos e o mais externo em nenhum:
+         amarelo: raio 20 ± 1,00  →  [19,00 ; 21,00]
+         escuro : raio 19,7 ± 1,24 →  [18,46 ; 20,94]
+       De dentro manda quem tem a borda interna menor (o escuro, por meia
+       unidade); de fora manda quem tem a externa maior (o amarelo, por seis
+       centésimos). Na primeira tentativa o escuro era 5,5% menor e sobrava
+       uma tarja amarela grossa por dentro — a 25 unidades do olho, 5% de 20
+       é um dedo de tinta. */
+    const arcoI = new THREE.Mesh(new THREE.TorusGeometry(1, 0.062, 6, 20, Math.PI), mFosco);
+    arcoI.scale.set((CP.x*k + 0.4)*0.985, (CP.y*k + 0.4)*0.985, 2.6);
+    arcoI.position.set(0, CP.cy, CP.arco - 0.5); g.add(arcoI);
   }
   /* O PAINEL ANTIRREFLEXO seguia o mesmo caminho errado de todo o resto que já
      consertei aqui: era uma CAIXA pousada numa altura escrita na mão (y=30,6)
@@ -10195,8 +10333,8 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
   /* o aro: TorusGeometry(1,1) tem raio EXTERNO 2 — escalado, ele virava uma
      mancha amarela do dobro da cabine na frente dela. Tubo fino resolve. */
   const moldura = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 6, 26), mAmarelo);
-  moldura.scale.set(21.6, 54.6, 3.2); moldura.rotation.x = Math.PI/2;
-  moldura.position.set(0, 30, 122); g.add(moldura);
+  moldura.scale.set(CP.x + 0.6, CP.z + 0.6, 3.2); moldura.rotation.x = Math.PI/2;
+  moldura.position.set(0, CP.cy, CP.cz); g.add(moldura);
   /* e a carenagem que desce da cabine para a cauda: sem ela o dorso fica reto
      e o avião perde a linha */
 
@@ -10281,26 +10419,67 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        Ninguém vai contar os botões, mas a diferença entre uma bolha VAZIA e uma
        bolha com um banco dentro é a diferença entre um brinquedo e um avião. */
     {
-      const piso = new THREE.Mesh(new THREE.BoxGeometry(30, 3, 62), mEscuro);
-      piso.position.set(0, 18, 122); g.add(piso);
+      g.add(convesDaCabine(CP, M.secoes,
+              new THREE.MeshPhongMaterial({ color: 0x151a21, shininess: 5 })));
+      /* O PISO ficava em y=18: dentro da fuselagem, debaixo da abóbada, sem
+         nunca aparecer em vista nenhuma — nem de fora pelo vidro. Ele e o
+         resto da mobília sobem para cima do convés, que é onde o chão está
+         de verdade. */
+      const piso = new THREE.Mesh(new THREE.BoxGeometry(26, 2, 54), mEscuro);
+      piso.position.set(0, 32.5, 122); g.add(piso);
+      /* os CONSOLES laterais: dois degraus escuros correndo dos dois lados do
+         banco até o painel. De fora quase não se veem; de dentro são eles que
+         fazem a cabine ter PAREDE em vez de ser um assento no meio do nada. */
+      for (const lado of [-1, 1]){
+        const con = new THREE.Mesh(caixaViva(6, 6, 42, 1.6), mFosco);
+        con.position.set(lado*13, 34.5, 126); g.add(con);
+        const punho = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2, 12), mPreto);
+        punho.position.set(lado*13, 38, 114); g.add(punho);
+      }
       const assento = new THREE.Mesh(caixaViva(17, 5, 23, 2.2), mFosco);
-      assento.position.set(0, 22, 112); g.add(assento);
+      assento.position.set(0, 36, 112); g.add(assento);
       /* o encosto tinha 30 de altura e o topo saía em y=50, acima da capota
          (que ali vale uns 46): de fora, uma caixa preta espiando por cima do
          vidro. Vinte e dois, e ele fica DENTRO da bolha, que é onde mora. */
-      const encosto = new THREE.Mesh(caixaViva(17, 22, 6, 2.2), mFosco);
-      encosto.position.set(0, 31, 99); encosto.rotation.x = -0.16; g.add(encosto);
-      const apoio = new THREE.Mesh(caixaViva(16, 9, 7, 2.4), mEscuro);
-      apoio.position.set(0, 50, 96); g.add(apoio);
+      const encosto = new THREE.Mesh(caixaViva(17, 16, 6, 2.2), mFosco);
+      encosto.position.set(0, 42, 99); encosto.rotation.x = -0.16; g.add(encosto);
+      /* o apoio de cabeça encosta no teto da bolha: a capota naquela estação
+         (z=96) vale 51, e uma peça de 9 de altura centrada em 50 saía por
+         cima do vidro. É a mesma conta que já tinha corrigido o encosto. */
+      const apoio = new THREE.Mesh(caixaViva(16, 7, 7, 2.4), mEscuro);
+      apoio.position.set(0, 46.5, 96); g.add(apoio);
       const painel = new THREE.Mesh(caixaViva(24, 14, 4, 1.4), mEscuro);
-      painel.position.set(0, 30, 146); painel.rotation.x = 0.38; g.add(painel);
-      for (const dx of [-6, 0, 6]){
-        const mostrador = new THREE.Mesh(new THREE.CircleGeometry(3.2, 12), mPreto);
-        mostrador.position.set(dx, 31.5, 148.4); mostrador.rotation.x = 0.38 - Math.PI/2 + Math.PI/2;
-        mostrador.rotation.x = 0.38; g.add(mostrador);
+      painel.position.set(0, 34, 146); painel.rotation.x = 0.38; g.add(painel);
+      /* OS MOSTRADORES ACENDEM. São três discos de 3,2 e duas telinhas, e o
+         que os faz existir não é o desenho — é a LUZ PRÓPRIA: painel apagado,
+         visto de dentro, é uma tábua preta; painel aceso é uma cabine. Custa
+         um material com `emissive` e nenhuma luz nova na cena. */
+      const mTela = new THREE.MeshPhongMaterial({ color: 0x0b2a2e, emissive: 0x0d5a52,
+                                       shininess: 40, side: THREE.DoubleSide });
+      const mVisor = new THREE.MeshPhongMaterial({ color: 0x102030, emissive: 0x123a4e,
+                                       shininess: 30, side: THREE.DoubleSide });
+      /* E VIRADOS PARA O PILOTO. Os três mostradores antigos estavam na face
+         da FRENTE do painel, olhando para o nariz — invisíveis para quem
+         senta atrás dele. Nunca apareceu porque nada nesta cabine aparecia.
+         `rotation.set(0.38, PI, 0)`: o PI vira a face para trás e o 0,38
+         acompanha a inclinação da tábua. */
+      const praOPiloto = no => { no.rotation.set(0.38, Math.PI, 0); return no; };
+      for (const dx of [-8.5, 0, 8.5]){
+        const mostrador = praOPiloto(new THREE.Mesh(new THREE.CircleGeometry(2.6, 12), mVisor));
+        mostrador.position.set(dx, 37.6, 143.4); g.add(mostrador);
       }
-      const manche = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2, 16, 8), mPreto);
-      manche.position.set(0, 27, 128); manche.rotation.x = -0.2; g.add(manche);
+      for (const dx of [-5.6, 5.6]){
+        const telinha = praOPiloto(new THREE.Mesh(new THREE.PlaneGeometry(8.6, 6.2), mTela));
+        telinha.position.set(dx, 32.4, 144.9); g.add(telinha);
+      }
+      /* O MANCHE MUDOU DE LUGAR, e não foi enfeite. Manche no meio das pernas
+         fica exatamente na linha de visada de quem senta seis unidades acima
+         do chão da cabine — e o que se via na vista de dentro era um cabo
+         preto no meio da tela. Caça moderno resolveu isso primeiro: o F-16
+         pôs o manche no console DIREITO. Aqui é a mesma solução pela mesma
+         razão. */
+      const manche = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 11, 8), mPreto);
+      manche.position.set(11, 38, 124); manche.rotation.set(-0.16, 0, -0.1); g.add(manche);
     }
 
   }
@@ -10795,10 +10974,20 @@ function montaDragaoClassico(corCorpo, corDetalhe, corVidro, asasMoveis){
   }
 
   /* --- cabine --- */
+  const CP = MEDIDAS_DRAGAO.canopia;
   const bolha = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10, 0, Math.PI*2, 0, Math.PI/2), mVidro);
-  bolha.scale.set(36, 32, 56); bolha.position.set(0, 42, 78); g.add(bolha);
-  const aro = new THREE.Mesh(new THREE.TorusGeometry(1, 1, 4, 16), mAmarelo);
-  aro.scale.set(37, 57, 3); aro.rotation.x = Math.PI/2; aro.position.set(0, 42, 78); g.add(aro);
+  bolha.scale.set(CP.x, CP.y, CP.z); bolha.position.set(0, CP.cy, CP.cz); g.add(bolha);
+  /* O MESMO ARO GORDO QUE JÁ FOI CORRIGIDO NO CAÇA, e que ficou aqui.
+     `TorusGeometry(1, 1, …)` tem tubo do tamanho do raio: o furo do meio
+     fecha e o que sai é um DISCO. Escalado por 37 x 57, um prato amarelo de
+     74 por 114 em volta da cabine. De fora passava por gola de dragão; de
+     dentro, quando a vista de cabine passou a existir, o piloto estava
+     sentado num prato. Tubo fino, como no caça. */
+  const aro = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 6, 20), mAmarelo);
+  aro.scale.set(CP.x + 1, CP.z + 1, 3); aro.rotation.x = Math.PI/2;
+  aro.position.set(0, CP.cy, CP.cz); g.add(aro);
+  g.add(banheiraDaCabine(CP, new THREE.MeshPhongMaterial({ color: 0x12171e, shininess: 6,
+                                                          side: THREE.DoubleSide })));
 
   /* --- crista nas costas --- */
   for (let i = 0; i < 3; i++){
@@ -11429,7 +11618,20 @@ let CAMD = 820, CAM_CIMA = 270, CAM_INCL = 3*Math.PI/180;
    editar três números aqui — não é procurar onde a câmera é montada. */
 const VISTAS = [
   { nome:'FORA',   d: 820,  cima: 270, incl: 3 },
-  { nome:'CABINE', cabine: true },
+  /* A CABINE. Ela era a vista NUA: punha o olho no lugar do piloto e
+     escondia o avião inteiro, então sobrava o mundo e mais nada — nem
+     moldura, nem painel, nem nariz. Duas coisas a impediam de existir, e
+     nenhuma delas era falta de modelo:
+
+       1. `aviao.visible = !cockpit` apagava a máquina toda para não mostrar a
+          carcaça cortada ao meio pelo plano de corte;
+       2. o plano de corte em 40 unidades cortava mesmo — o painel está a 28
+          do olho e o manche a 18.
+
+     Resolvido o 2, o 1 deixa de ser necessário: com a lente começando em 8, o
+     que aparece é a cabine que já estava modelada. Só faltou a banheira, que
+     tapa o chão. */
+  { nome:'CABINE', cabine: true, perto: 8 },
   /* A CÂMERA DO CAPACETE — a do vídeo que ele mandou.
 
      É um F-16 com uma grande-angular montada ATRÁS E ACIMA da cabeça do
@@ -11437,9 +11639,10 @@ const VISTAS = [
      mãos, e o horizonte curva de tão aberto o ângulo. O que dá a alma daquilo
      não é a posição — é VER O AVIÃO EM VOLTA.
 
-     E é exatamente o que a nossa CABINE não faz: ela põe o olho do piloto no
-     lugar certo e esconde o avião (`aviao.visible = !cockpit`), então sobra
-     o mundo e mais nada. Vista nua.
+     (Quando escrevi isto, a CABINE era vista nua: punha o olho no lugar do
+     piloto e escondia o avião. Hoje não é mais — ela mostra o interior. As
+     duas passaram a ser o que sempre deviam: a cabine é de DENTRO, olhando
+     pelo vidro; esta é a câmera PRESA NO CAPACETE, vendo a máquina em volta.)
 
      Esta terceira fica presa aos eixos do avião como a cabine, mas recuada
      para trás do banco, um pouco acima, com o avião VISÍVEL e o campo de
@@ -11448,7 +11651,11 @@ const VISTAS = [
   /* Os três números saíram de varrer e OLHAR, não de calcular: a 20 atrás do
      olho, 14 acima e 110 de campo, o arco da canópia atravessa o topo da tela
      e a pista some por baixo dele — que é o enquadramento do vídeo. */
-  { nome:'CAPACETE', preso: true, tras: 20, cima: 14, fov: 110 }
+  /* `cima` caiu de 14 para 8 no dia em que o olho do piloto subiu de 40 para
+     46: estes números são MEDIDOS A PARTIR DO OLHO, então mexer no olho move
+     a câmera do capacete junto. Somando, ela continua exatamente onde estava
+     (54 de altura), que é o enquadramento do vídeo. */
+  { nome:'CAPACETE', preso: true, tras: 20, cima: 8, fov: 110 }
 ];
 let nVista = 0;
 function poeVista(n){
@@ -11906,6 +12113,22 @@ function poeCamera(dt){
     cam.fov += (fovQuer - cam.fov) * Math.min(1, dt*(turbinando ? 3.2 : 2.0));
     cam.updateProjectionMatrix();
   }
+  /* E O PLANO DE CORTE, que é o que sempre faltou para a cabine existir.
+
+     Ele vale 40 unidades para todo mundo, e 40 unidades à frente do olho é
+     DEPOIS do painel de instrumentos (28), do manche (18) e do trilho da
+     capota (4): dentro da cabine, o corte comia a cabine inteira. Não era
+     "não modelamos o interior" — o interior está ali desde sempre, com banco,
+     encosto, painel, três mostradores e manche. Era a lente que começava
+     depois dele.
+
+     Na vista de dentro ele desce para 8. O preço é precisão de profundidade
+     lá longe (o erro cresce com o quadrado da distância dividido pelo corte),
+     e por isso ele NÃO desce nas outras duas: a de fora não precisa, e a do
+     capacete tem o apoio de cabeça em cima da lente — é justamente o corte em
+     40 que a limpa. */
+  const perto = VISTAS[nVista].perto || CAM_PERTO;
+  if (cam.near !== perto){ cam.near = perto; cam.updateProjectionMatrix(); }
   cam.up.set(vista.C.x, vista.C.y, vista.C.z);
   cam.lookAt(camPos.x + vista.F.x*1000, camPos.y + vista.F.y*1000, camPos.z + vista.F.z*1000);
   cam.updateMatrixWorld();
@@ -14764,7 +14987,11 @@ function arruma(){
     C = { x: eixoC.x*c - eixoD.x*s, y: eixoC.y*c - eixoD.y*s, z: eixoC.z*c - eixoD.z*s };
   }
   poeMalha(aviao, aviaoX, aviaoY, aviaoZ, D, C, eixoF);
-  aviao.visible = !cockpit;
+  /* O AVIÃO NÃO SOME MAIS NA CABINE. Ele sumia porque a lente começava dentro
+     dele e o que se via era a carcaça aberta; com o corte em 8 a cabine
+     inteira aparece, e com ela o nariz à frente e a asa entrando pelos
+     cantos. Ver a própria máquina é metade da vista de dentro. */
+  aviao.visible = true;
   /* a asa varrendo: o pivô de cada lado gira para o seu lado */
   for (const no of aviao.userData.asas || []) no.rotation.y = no.userData.lado * enflecha;
   /* e as superfícies de comando mostrando a manobra */

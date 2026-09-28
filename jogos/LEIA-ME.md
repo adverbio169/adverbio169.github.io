@@ -117,8 +117,14 @@ borda de cima** = profundor, **apontar para o lado** = leme. O resto é toque.
 | vista | o que é |
 |---|---|
 | **FORA** | perseguição atrás do avião, a de sempre |
-| **CABINE** | o olho do piloto, sem o avião em volta |
-| **CAPACETE** | grande-angular logo atrás da canópia, com o avião visível: o arco da canópia atravessa o topo e o nariz estica à frente |
+| **CABINE** | de dentro, olhando pelo vidro: o arco do para-brisa, o painel aceso, os consoles, o manche à direita e o nariz à frente |
+| **CAPACETE** | grande-angular logo atrás da canópia: a mesma cabine vista de cima do banco, com o avião inteiro em volta |
+
+A cabine **não foi desenhada agora** — banco, painel, mostradores e manche já
+estavam no modelo desde sempre. O que faltava era caber na lente: o plano de
+corte da câmera vale 40 unidades e o painel está a 28 do olho. Cada vista
+declara o seu corte (`perto`), e a cabine usa 8. Ver
+[`COMO-FUNCIONA.md`](COMO-FUNCIONA.md), "A cabine por dentro".
 
 Os números de cada uma (distância, altura, inclinação, campo de visão) estão
 numa tabela só, `VISTAS`, no `aviao3d.modelo.html`. Mudar enquadramento é
@@ -208,6 +214,9 @@ scratchpad da sessão de trabalho. Os que importam, e o que cada um prova:
 | `arrasta.js` | o arrasto troca o formato **em cada lugar onde a mão pousa** — inclusive em cima da bola |
 | `visao.js` | o botão de vista cabe na faixa em três aparelhos e manda `t:visao` |
 | `pacote.js` | o pacote do jogo leva a vista (`cab`), interceptando o envio de verdade |
+| `cabine.js` | a vista de dentro existe: raio do olho em nove direções (bate na cabine embaixo, no céu em cima) **e** contagem de pixel escuro |
+| `cabfora.js` | e de fora nada do que entrou fura a lataria ou o vidro, em cinco ângulos |
+| `rotulo.js` | o rótulo cabe na coluna que tem, medindo o texto no momento em que ele é desenhado |
 
 **Lição cara, repetida:** asserção de estado não pega "desenhado num ramo que
 nunca roda". Quando o defeito é visual, **conte pixels**.
@@ -235,3 +244,9 @@ plausível no lugar errado.
   de teto 585. Só voando para saber.
 - **As duas janelas da TV andam grudadas** ao carrossel: não dá para escolher o
   formato de cada uma, como já dá no celular.
+- **`trem.js` acusa três falhas** e já acusava antes desta leva: rajada em
+  vagão e em locomotiva não tira vida nem dá ponto. Não é regressão nova; é
+  defeito do trem, esperando a vez.
+- **De cabine não se vê a pista na final.** O convés tapa de 12° para baixo, o
+  que é honesto (é a geometria do avião) mas atrapalha pousar. Quem pousa usa
+  a vista de fora, ou a página APROX. 
