@@ -7496,3 +7496,86 @@ silêncio.
 s.count(a)==1`) e que relaxei por ser "só um teste". Um teste que falha por
 estar desatualizado gasta o mesmo tempo que um defeito de verdade, e ainda
 ensina a desconfiar do vermelho — que é o pior estrago possível numa suíte.
+
+# Três do teste com a TV
+
+## O painel que "só piscava"
+
+> "Quando passo as coisas no controle — ATITUDE, SINÓT, MOTOR, MAPA... — não
+> muda o painel central do controle. Ele tipo só pisca."
+
+Era **eco**. Eu escolho MOTOR, o celular manda `t:'pag'` para a TV, e o pacote
+**seguinte** dela — montado antes de ela receber o pedido, porque o lento sai
+quatro vezes por segundo — ainda traz a página velha. A linha que sincroniza a
+janela com `carro` então desfazia a escolha. Trocar e voltar em 250 ms é
+exatamente um pisca.
+
+Enquanto a TV não confirmar a página pedida, o que ela manda é notícia velha e
+não manda em mim. Quando confirmar, volto a seguir — porque trocar de página
+**na TV** ainda deve arrastar o celular. E a trava tem prazo de três segundos:
+se a confirmação não vier (a TV caiu, o pedido se perdeu), ela se solta
+sozinha. Trava sem prazo é como um painel fica preso para sempre num estado
+que ninguém pediu.
+
+## O tanque de trinta e dois segundos
+
+> "Coloca mais combustível. O jogo deixou de ser aquele que pega combustível
+> inicialmente, agora parece mais um simulador."
+
+Ele está descrevendo o que o jogo virou. Com `GASTO = 3.0` o tanque durava
+**32 segundos** de cruzeiro — número que fazia sentido quando ficar sem
+combustível era o relógio da partida e havia tambores para colecionar. Numa
+sortida com 30 s de trânsito, 12 de alerta, combate e volta para pousar, esse
+tanque acaba antes do primeiro tiro.
+
+Agora são oito minutos de cruzeiro, três de pós-combustão contínua e vinte de
+marcha lenta. Continua sendo um limite — voar de A/B o tempo todo custa caro,
+e é isso que faz a manete significar alguma coisa.
+
+Os tambores **amarelos** saíram: um "+20%" num tanque de oito minutos é um
+item que não muda nada, e item que não muda nada é enfeite ocupando a rota. Os
+**azuis** ficaram, porque eles nunca foram combustível — são turbo e nitro
+cheio, prêmio por passar rente, que é a manobra que o jogo quer premiar.
+
+## A decolagem que grudava
+
+> "Parece que o avião gruda na pista e do nada desgruda."
+
+Medido, e o número é o argumento:
+
+```
+   t      vy   velocidade
+ 3.03      0         1100     <- grudado
+ 3.05      0         1106
+ 3.07    720         1112     <- o salto
+ 3.08    231         1162
+```
+
+Zero por um segundo inteiro; depois um pico de **720** num quadro (o
+`aviaoY += 12`, um teleporte) e um degrau para **253**.
+
+A causa: no chão a altura era uma **fórmula** — `piso + roda + sen(arfagem)` —
+e não o resultado de forças. O avião não subia porque as asas o levantavam;
+subia porque alguém mandou. E, solto, o modelo de ar calcula a subida direto
+da atitude (`sen(arfagem) × velocidade`), então o degrau era inevitável.
+
+Agora existe **sustentação**: quanto do peso as asas seguram, quadrática na
+velocidade e proporcional à rotação. Passando de um, a sobra vira velocidade
+vertical integrada quadro a quadro; o avião fica leve, as rodas deixam o chão
+e ele sai voando com a subida que **já tinha**.
+
+E solta quando essa subida chega a 80% do que o ar vai pedir — custa um
+décimo de segundo a mais de pista e fecha o degrau:
+
+```
+  último no chão: 195   primeiro no ar: 203
+  DEGRAU = 8 unidades/s (0,4 m/s)     antes: 253
+  pico na transição: nenhum           antes: 720
+```
+
+Puxar continua importando: puxando sai aos 3,4 s; sem puxar o avião só se
+sustenta sozinho aos 4,4 s, a 1,7 vez a velocidade de estol — que é o que
+acontece de verdade com um avião rápido demais para continuar no chão.
+
+A constante `DECOLA = 1.18` saiu junto: era a margem do limiar antigo, e
+constante sem uso é uma resposta a uma pergunta que ninguém faz mais.

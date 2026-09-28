@@ -932,7 +932,23 @@ const VET_V1 = 1400, VET_V2 = 3600;
    mínimo escrito na mão. */
 const VET_AUTORIDADE = 0.38;
 let vetArf = 0, vetGui = 0, vetRol = 0;   // onde o bocal está agora
-const RAIO_PEGA = 340, GASTO = 3.0, GASTO_TURBO = 4.6;
+/* O TANQUE, DEPOIS QUE O JOGO VIROU OUTRO
+
+   "Coloca mais combustível. O jogo deixou de ser aquele que pega combustível
+    inicialmente, agora parece mais um simulador. Então não precisa ter
+    combustível para pegar voando."
+
+   Ele está descrevendo o que o jogo virou. Com 3,0 %/s o tanque durava
+   TRINTA E DOIS SEGUNDOS de cruzeiro — número que só fazia sentido num jogo
+   de colecionar tambor, onde ficar sem combustível era o relógio da partida.
+   Numa sortida com trânsito de trinta segundos, doze de alerta, combate e
+   volta para pousar, esse tanque acaba antes do primeiro tiro.
+
+   Agora dura oito minutos de cruzeiro, três de pós-combustão contínua e vinte
+   de marcha lenta no chão. Continua sendo um limite — voar de A/B o tempo
+   todo ainda custa caro, e é isso que faz a manete significar alguma coisa —
+   mas deixou de ser o cronômetro do jogo. */
+const RAIO_PEGA = 340, GASTO = 0.20, GASTO_TURBO = 0.55;
 const DA_NORMAL = 20, DA_AZUL = 32, TURBO_SEG = 5;
 const RAIO_NUKE = 9000, RAIO_MIUDO = 170, RAIO_AVIAO = 430, RAIO_HELI = 400;
 /* --- O TREM -----------------------------------------------------------------
@@ -979,7 +995,10 @@ const PISTA_Y = CHAO + 8;                     // o asfalto, um palmo acima do ca
 const ESTOL = [560*VEL, 470*VEL, 390*VEL];    // sem flape, flape 1, flape 2
 const FLAP_TETO = [2400*VEL, 1500*VEL, 1150*VEL];  // o quanto cada flape deixa correr
 const TREM_TETO = 1400*VEL;                   // com o trem fora, o avião não corre
-const DECOLA = 1.18;                          // margem sobre o estol para sair do chão
+/* `DECOLA = 1.18` saiu: era a margem sobre o estol que o antigo LIMIAR de
+   decolagem usava, e não há mais limiar — agora quem tira o avião do chão é a
+   sustentação. Constante sem uso é uma resposta a uma pergunta que ninguém
+   faz mais, e daqui a um mês alguém a lê e acredita nela. */
 /* O limite de velocidade no toque fica ABAIXO do teto do trem (1400): assim
    chegar com a manete aberta e sem flape realmente estoura o pouso, e é
    preciso reduzir ou baixar flape. Com 1500 a conta era impossível de
@@ -1358,6 +1377,29 @@ function narizHa(idade){
   return h[h.length-1];
 }
 let arfChao=0, rumoChao=0;
+/* A DECOLAGEM DEIXOU DE SER UM LIMIAR.
+
+   "A decolagem ainda não tá legal, parece que o avião gruda na pista e do
+    nada desgruda."
+
+   Medido, ele estava certo e dava para ver o número: rolando com o nariz
+   erguido, a velocidade VERTICAL era 0 por um segundo inteiro; no quadro em
+   que `noChao` virava falso, ela saltava para 253 de uma vez — mais um pico
+   de 720 num único quadro, que era o `aviaoY += 12` teleportando o avião.
+   Grudado, e depois arrancado.
+
+   A causa: no chão a altura era uma FÓRMULA (`piso + roda + sin(arfagem)`),
+   não um resultado de forças. O avião não subia porque as asas o levantavam;
+   ele subia porque alguém mandou. E, solto, o modelo de ar calcula a subida
+   direto da atitude — então o degrau era inevitável.
+
+   Agora existe sustentação: quanto do peso as asas já seguram, quadrática na
+   velocidade e proporcional à rotação. Passando de um, sobra força para cima
+   e ela vira velocidade vertical de verdade, integrada quadro a quadro. O
+   avião fica leve, as rodas deixam o chão e ele SAI voando — com a subida que
+   já tinha, e não com uma que apareceu do nada. */
+let vyChao = 0, altChao = 0;
+const G_JOGO = 640;      // ver a âncora dos 9 g, no medidor de carga
 let estresse=0;
 let vida=100;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
@@ -1450,8 +1492,18 @@ function montaMapa(){
          para baixo: a maioria continua na altura de sempre — o jogo baixo não
          mudou — e uma minoria vive lá em cima, que é o que dá motivo para
          subir. */
+      /* SÓ OS AZUIS. O tambor amarelo era combustível, e combustível deixou
+         de ser escasso: um "+20%" num tanque de oito minutos é um item que
+         não muda nada, e item que não muda nada é enfeite que ocupa a rota.
+
+         O azul FICA porque ele nunca foi combustível: ele é turbo e nitro
+         cheio — um prêmio por passar rente, que é justamente a manobra que o
+         jogo quer premiar. Eram 18% dos tambores; agora são todos, e por
+         isso a contagem cai para um quinto, senão o céu fica cheio de
+         prêmio e prêmio comum não é prêmio. */
+      if (Math.random() > 0.20) continue;
       tambores.push({ x:tx, y: 1100 + Math.random()*Math.random()*(TETO*0.78), z:tz,
-                      azul: Math.random() < 0.18, pego:false, giro:Math.random()*6.28 });
+                      azul: true, pego:false, giro:Math.random()*6.28 });
       /* --- QUEM VOA E QUEM PAIRA ------------------------------------------
          "Não quero mais avião parado no mapa; se for parado que seja um
          helicóptero, os aviões de pontuação devem estar em movimento."
@@ -7177,7 +7229,22 @@ function rolaNoChao(dt, e){
      recalculado a cada quadro, então rolar do campo para a pista (ou o
      contrário) simplesmente funciona */
   noCampo = !sobreAPista(aviaoX, aviaoZ) && !sobreAvenida(aviaoX, aviaoZ);
-  aviaoY = pisoEm(aviaoX, aviaoZ) + RODA + Math.sin(arfChao)*150;
+
+  /* SUSTENTAÇÃO. Um, e o peso está todo nas asas.
+       · quadrática na velocidade, como manda a aerodinâmica;
+       · a rotação vale metade: parado no nariz baixo, a asa segura só 50% do
+         que seguraria rotacionada, e por isso É PRECISO PUXAR — decolar
+         continua sendo uma coisa que se faz, não que acontece;
+       · no estol (`velMin`) com rotação cheia dá exatamente 1, que é a
+         definição de velocidade mínima de voo. Antes o limiar era 1,18 vezes
+         o estol, um número escolhido à mão. */
+  const vE = velMin();
+  const sust = (voo*voo)/(vE*vE) * (0.50 + 0.50*(arfChao/ARF_CHAO));
+  if (sust > 1) vyChao += (sust - 1)*G_JOGO*dt;
+  else          vyChao = Math.max(0, vyChao - G_JOGO*dt*1.6);
+  altChao = Math.max(0, altChao + vyChao*dt);
+  if (altChao === 0) vyChao = 0;
+  aviaoY = pisoEm(aviaoX, aviaoZ) + RODA + Math.sin(arfChao)*150 + altChao;
   distancia += voo*dt;
   if (!infinito) combustivel -= dt * GASTO*(0.30 + 0.5*motor);
   if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
@@ -7197,18 +7264,28 @@ function rolaNoChao(dt, e){
     if (voo > 120) sacode(0.05 + 0.10*Math.min(1, voo/900));
   }
 
-  /* DECOLAR. A atitude já é a que o avião ganhou rotacionando, então sair do
-     chão não muda nada de posição: é só deixar de estar apoiado. Antes havia
-     um giro de 0,26 rad aplicado no instante da saída — era o "pulo" entre o
-     chão e o ar. */
-  const vDecola = velMin()*DECOLA;
-  if (voo >= vDecola && arfChao > ARF_CHAO*0.45){
+  /* DECOLAR é ter subido. Não há mais limiar de velocidade nem de manche: as
+     rodas saíram do chão quarenta unidades, então o avião está voando — e
+     entrega ao modelo de ar a velocidade vertical que ele já tinha. O
+     `aviaoY += 12` saiu junto: era um teleporte de doze unidades num quadro,
+     e aparecia na medição como um pico de 720. */
+  /* E SOLTA QUANDO A SUBIDA JÁ CASA. O modelo de ar calcula a subida da
+     atitude: `sen(arfagem) × velocidade`. Se eu soltar o avião com uma
+     velocidade vertical menor que essa, sobra um degrau — foi o que a medição
+     mostrou: 164 no chão contra 254 no primeiro quadro no ar.
+
+     Então espera-se a sustentação levar a subida a 80% do que o ar vai pedir.
+     Custa um décimo de segundo a mais de pista e faz a transição quase
+     desaparecer. O teto de 90 é o paraquedas: sem ele, uma atitude alta com
+     pouca velocidade poderia nunca alcançar o alvo e o avião ficaria
+     patinando a um metro do chão para sempre. */
+  const vyAr = Math.sin(arfChao)*voo;
+  if (altChao > 24 && (vyChao >= vyAr*0.80 || altChao > 90)){
     noChao = false;
     if (Missoes) Missoes.marca('decolar');
-    aviaoY += 12;
     Controles.bate('tocou');
     mostraAviso('NO AR! recolha o trem', '#7fd8ff', 1700);
-  } else if (voo >= vDecola && e.ver <= 0.05){
+  } else if (voo >= vE*1.25 && e.ver <= 0.05){
     mostraAviso('PUXE PARA DECOLAR', '#ffd257', 500);
   }
 
@@ -7567,7 +7644,8 @@ function atualiza(dt){
      número no instante em que puxa, e o que interessa depois é quanto se
      tirou do avião.
      ---------------------------------------------------------------------- */
-  const G_JOGO = 640;      // ver a âncora dos 9 g logo acima
+  /* içado para o escopo do módulo: a decolagem também precisa de gravidade,
+     e duplicar o número em dois lugares é garantir que um dia eles difiram */
   if (_fAnt && dt > 0.0005){
     const ax = (eixoF.x - _fAnt.x)/dt*voo,
           ay = (eixoF.y - _fAnt.y)/dt*voo,
@@ -7871,7 +7949,7 @@ function atualiza(dt){
     const dx = aviaoX-t.x, dy = aviaoY-t.y, dz = aviaoZ-t.z;
     if (dx*dx + dy*dy + dz*dz > RP2) continue;
     t.pego = true; someTambor(t); Controles.bate('pegou');
-    combustivel = Math.min(100, combustivel + (t.azul ? DA_AZUL : DA_NORMAL));
+    combustivel = Math.min(100, combustivel + DA_AZUL);
     if (t.azul){
       turbo = TURBO_SEG; clarao = 0.55; nitroCarga = 100;
       mostraAviso('TURBO AZUL!', '#7fd8ff', 1600);
@@ -11766,7 +11844,7 @@ function reinicia(){
     aviaoZ = PISTA_Z0 + 1200 + fila*5000;
     aviaoY = PISTA_Y + RODA;
     noChao = true; trem = true; flap = 1; motor = 0; voo = 0; parado = 0;
-    arfChao = 0; rumoChao = 0; rolChao = 0;
+    arfChao = 0; rumoChao = 0; rolChao = 0; vyChao = 0; altChao = 0;
   } else {
     const p = Batalha.ligada ? sorteiaNascimento() : null;
     aviaoX = p ? p.x : 0; aviaoZ = p ? p.z : 0; aviaoY = p ? p.y : 1500;

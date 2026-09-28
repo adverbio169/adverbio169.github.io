@@ -156,6 +156,7 @@ limpo" e "tem caça em cima de você" existem sempre doze segundos de aviso.
 | | |
 |---|---|
 | teto do avião | **585 m** |
+| tanque | ~8 min de cruzeiro, 3 de pós-combustão, 20 de marcha lenta |
 | chão | `CHAO = -700` em unidades de mundo; 1 m = `METRO` = 20 |
 | alcance do radar | **1,3 km** (`RADAR_ALC = 26000` unidades de mundo) |
 | rampa de aproximação | 3° |
@@ -188,6 +189,8 @@ scratchpad da sessão de trabalho. Os que importam, e o que cada um prova:
 | `multi.js` | as janelas multifunção e a troca de formato |
 | `adivivo.js` | a bola do horizonte se mexe (por pixel, não por estado) |
 | `radarpac.js` | o contato cai no lado certo do disco, na TV **e** no celular |
+| `decola.js` | a decolagem é contínua: mede a velocidade vertical quadro a quadro e cobra que o degrau na saída do chão seja pequeno |
+| `pisca.js` | o eco atrasado da TV não desfaz a escolha de formato feita no celular |
 | `monitor.js` | o arranjo de **computador**, com mouse de verdade: clicar escolhe missão, clicar numa aba pula, clicar carrega aproximação, arrastar troca página |
 | `arrasta.js` | o arrasto troca o formato **em cada lugar onde a mão pousa** — inclusive em cima da bola |
 | `visao.js` | o botão de vista cabe na faixa em três aparelhos e manda `t:visao` |

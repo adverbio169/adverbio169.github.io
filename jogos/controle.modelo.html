@@ -1515,11 +1515,37 @@ const Painel = {
   recebe(d){
     this.dado = d;
     if (typeof d.carro === 'number' && !this.arrastando){
+      /* O ECO. "Quando passo as coisas no controle... não muda o painel
+         central... ele tipo só pisca."
+
+         Era isto: eu escolho MOTOR, mando `t:'pag'` para a TV, e o pacote
+         SEGUINTE dela — montado antes de ela receber o pedido, porque o lento
+         sai quatro vezes por segundo — ainda traz a página velha. A linha
+         abaixo então desfazia a escolha. Trocar e voltar em 250 ms é
+         exatamente um PISCA.
+
+         Enquanto a TV não confirmar a página que pedi, o que ela manda é
+         notícia velha e não manda em mim. Quando confirmar, volto a seguir —
+         porque trocar de página NA TV ainda deve arrastar o celular.
+
+         E há desistência: se a confirmação não vier em três segundos (a TV
+         caiu, o pedido se perdeu), solto a trava. Trava sem prazo é como o
+         painel fica preso para sempre num estado que ninguém pediu. */
+      if (this._pedi !== null && this._pedi !== undefined){
+        if (d.carro === this._pedi || Date.now() - (this._pediQuando || 0) > 3000)
+          this._pedi = null;
+        else return;
+      }
       this.carro = d.carro;
       /* a TV trocou de página: a janela grande acompanha, desde que não
          esteja mostrando outra coisa por escolha de quem está aqui */
       if (MFD_PAGS.indexOf(this.janelas[1].fmt) >= 0) this.janelas[1].fmt = MFD_PAGS[d.carro];
     }
+  },
+  /* anota o que pedi à TV, para não obedecer ao próprio eco */
+  pedeTv(i){
+    this._pedi = i; this._pediQuando = Date.now();
+    enviaCtl({ t:'pag', c: i });
   },
   rola(n){
     if (this.telaCheia()){
@@ -1531,7 +1557,7 @@ const Painel = {
       return;
     }
     this.carro = ((this.carro + n) % MFD_PAGS.length + MFD_PAGS.length) % MFD_PAGS.length;
-    enviaCtl({ t:'pag', c: this.carro });
+    this.pedeTv(this.carro);
     try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
   },
   /* ======================= A GEOMETRIA DO PAINEL =======================
@@ -1580,7 +1606,7 @@ const Painel = {
     this.aprendeu();
     /* a TV segue a janela grande, quando ela mostra uma página de verdade */
     const i = MFD_PAGS.indexOf(this.janelas[1].fmt);
-    if (i >= 0 && i !== this.carro){ this.carro = i; enviaCtl({ t:'pag', c:i }); }
+    if (i >= 0 && i !== this.carro){ this.carro = i; this.pedeTv(i); }
     try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
   },
   guardaJanelas(){
