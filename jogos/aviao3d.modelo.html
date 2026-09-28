@@ -8699,6 +8699,17 @@ const MFD_PAGS = ['SINÓT', 'MOTOR', 'MAPA', 'TÁTIC', 'ARMAS', 'APROX', 'OBJET'
 /* e o nome curto, para quando a aba não tiver largura: seis palavras de cinco
    letras numa fita de 180 px ficam encostadas uma na outra e viram uma tarja */
 const MFD_CURTO = ['SIN', 'MOT', 'MAP', 'TAT', 'ARM', 'APR', 'OBJ', 'VOO'];
+/* O NOME DA PÓS-COMBUSTÃO, num lugar só.
+
+   Ela nasceu chamada "NITRO" — que é palavra de jogo de carro, não de avião —
+   e virou "pós-combustão" no teclado, no leia-me e nos avisos. Só que o
+   RÓTULO do mostrador continuou "NITRO" em cinco lugares: dois aqui e dois no
+   controle, mais o botão grande do celular. Foi o usuário que viu.
+
+   A lição é a de sempre neste arquivo: o mesmo texto escrito em cinco lugares
+   muda em quatro. Agora é uma constante, e o controle tem a cópia dela pelo
+   mesmo motivo que tem a cópia de MFD_PAGS. */
+const ROT_TURBO = 'PÓS-COMB';
 const MFD_TELA = '#070b0f', MFD_FIO = 'rgba(226,236,248,';
 /* O VIDRO, E POR QUE ELE DEIXOU DE SER PRETO
 
@@ -8936,7 +8947,11 @@ function mfdLinha(o, m, i, rot, val, cor, frac, corBar){
   const y = m.corpoY + m.corpoH*(i + 0.5)/6;
   const x = o.x + m.pad, w = o.w - m.pad*2;
   h2.textBaseline = 'middle';
-  h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
+  /* o rótulo cabe na coluna que ele TEM: a barra começa em 30% da largura, e
+     um rótulo de oito letras (PÓS-COMB) passava por baixo dela na janela
+     estreita do celular. Encolher é melhor que abreviar de novo. */
+  const fr = mfdFonteQueCabe(rot, '700', m.f, 'ui-monospace, monospace', w*0.28, m.f*0.6);
+  h2.font = '700 ' + fr.toFixed(1) + 'px ui-monospace, monospace';
   h2.textAlign = 'left'; h2.fillStyle = MFD_ROT;
   h2.fillText(rot, x, y);
   if (frac !== undefined){
@@ -8959,7 +8974,7 @@ function mfdPaginaMotor(o, m){
   const pot = turbinando ? 100 : Math.max(0, Math.min(100, motor*100));
   mfdLinha(o, m, 2, 'POT', turbinando ? 'A/B' : String(Math.round(pot)),
            turbinando ? MFD_AMBAR : MFD_CLARO, pot/100, turbinando ? MFD_AMBAR : MFD_VERDE);
-  mfdLinha(o, m, 3, 'NITRO', String(Math.round(nitroCarga)),
+  mfdLinha(o, m, 3, ROT_TURBO, String(Math.round(nitroCarga)),
            nitroCarga < 20 ? MFD_VERM : MFD_CLARO, nitroCarga/100,
            nitroCarga < 20 ? MFD_VERM : MFD_CIANO);
   /* A LISTA DE ALERTAS, embaixo dos parâmetros: é assim que um EICAS se
@@ -9135,7 +9150,10 @@ function mfdPaginaSinoptico(o, m){
   h2.textAlign = 'right';
   const dir = o.x + o.w - m.pad;
   const dirRot = (y, r2, v, cor) => {
-    h2.font = '700 ' + (m.f*0.92).toFixed(1) + 'px ui-monospace, monospace';
+    /* também encolhe: esta coluna é alinhada à direita e o que está à
+       esquerda dela é o desenho do avião, que não tem como sair do caminho */
+    const f2 = mfdFonteQueCabe(r2, '700', m.f*0.92, 'ui-monospace, monospace', o.w*0.30, m.f*0.6);
+    h2.font = '700 ' + f2.toFixed(1) + 'px ui-monospace, monospace';
     h2.fillStyle = MFD_ROT; h2.fillText(r2, dir, y);
     h2.font = '800 ' + m.fv.toFixed(1) + 'px ui-monospace, monospace';
     h2.fillStyle = cor; h2.fillText(v, dir, y + m.fv*1.05);
@@ -9146,7 +9164,7 @@ function mfdPaginaSinoptico(o, m){
     const pot = turbinando ? 100 : Math.round(motor*100);
     dirRot(m.corpoY + m.corpoH*0.16, 'POT', turbinando ? 'A/B' : pot + '%',
            turbinando ? MFD_AMBAR : MFD_CLARO);
-    dirRot(m.corpoY + m.corpoH*0.62, 'NITRO', Math.round(nitroCarga) + '%',
+    dirRot(m.corpoY + m.corpoH*0.62, ROT_TURBO, Math.round(nitroCarga) + '%',
            nitroCarga < 20 ? MFD_VERM : MFD_CIANO);
   } else {
     dirRot(m.corpoY + m.corpoH*0.16, 'TREM', trem ? 'FORA' : 'DENTRO',
@@ -9176,7 +9194,7 @@ function mfdAlertas(){
   if (combustivel < 20)               L.push(['COMBUSTÍVEL BAIXO', MFD_AMBAR]);
   if (Math.abs(cargaG) > 7.5)         L.push(['CARGA ALTA', MFD_AMBAR]);
   if (trem && voo/METRO > 150)        L.push(['TREM · VELOCIDADE', MFD_AMBAR]);
-  if (nitroCarga < 20)                L.push(['NITRO BAIXO', MFD_AMBAR]);
+  if (nitroCarga < 20)                L.push([ROT_TURBO + ' BAIXA', MFD_AMBAR]);
   if (!munInfinita && municao[arma] === 0) L.push(['SEM MUNIÇÃO', MFD_AMBAR]);
   return L;
 }
