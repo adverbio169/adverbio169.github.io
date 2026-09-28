@@ -7939,3 +7939,85 @@ por segundo. Agora desenha **três a dez por segundo** — as duas telas mais a
 fita — e não desenha as janelas 2D, que sumiram. São 30 contra 120. O que
 entra de novo é o envio de três texturas por atualização, algo como 1 MB/s.
 A vista de cabine ficou mais barata, não mais cara.
+
+---
+
+# Minimalista: o que estava grosso demais
+
+Três frases seguidas do usuário, e cada uma apontou um número errado:
+
+> *"esse tá muito grosso as coisas… tem que ser minimalista. não dá nem de
+> ver nada."*
+> *"esse tá muito longe… tá estranho."*
+
+## Não dava para ver nada porque o piloto estava sentado no chão
+
+O olho estava a 46 e o convés da cabine a 34: doze unidades. Tudo o que se
+apoia no convés — painel, coaming, consoles — nascia quase na linha do
+horizonte, e o mundo começava só acima disso. A cabine virou uma fresta.
+
+Duas mudanças, e as duas na MEDIDA, não no desenho:
+
+- a bolha cresceu **em altura**, não em largura: `canopia.y` de 24 para 29, o
+  teto passou de 54 para 59. De fora é uma capota de caça moderno; de dentro
+  é o espaço que faltava;
+- o olho subiu para **50**, vinte acima do convés.
+
+Vinte contra doze não parece muito escrito assim. Na tela é a diferença entre
+olhar por cima do painel e olhar por trás dele.
+
+## O painel alto não cabe em lente nenhuma
+
+O painel era uma tábua de 26 por 15 a 26 unidades do olho: **26° de arco só
+de painel**, quase metade de uma lente de 58°. Não havia altura de olho que
+resolvesse — ou ele aparecia inteiro e tapava o mundo, ou o mundo aparecia e
+ele caía pelo rodapé. Tentei as duas e as duas ficaram erradas.
+
+A saída é a que os caças de hoje já tinham achado: **larga e baixa**. A lona
+passou de 512x300 para 640x200, as duas telas ficaram lado a lado ocupando
+quase tudo, e sobrou uma coluna estreita no meio com três avisos redondos. O
+painel inteiro agora tem 21 por 6,6 — 14° de altura em vez de 26°, com as
+mesmas duas páginas do mesmo tamanho aparente.
+
+Minimalismo aqui não foi tirar informação: foi tirar a moldura em volta dela.
+
+## E a grossura, que era literal
+
+| peça | antes | agora |
+|---|---|---|
+| tubo da moldura da capota | 0,05 | 0,028 |
+| tubo escuro de dentro | 0,062 | 0,036 |
+| coaming | 27,5 x 1,7 x 9,5 | 23 x 0,8 x 4,6 |
+| fita de alarmes | 24 de largura | 14 |
+| consoles | 6 de altura | 4,4 |
+
+O arco da capota a 25 unidades do olho, com tubo 0,05, dava 4,6° de arco —
+cinquenta pixels de barra preta atravessando a tela. Com 0,028 dá 2,6°. A
+peça é a mesma; o que mudou é que ela virou moldura em vez de viga.
+
+## "Tá muito longe" — a câmera do capacete
+
+Vinte unidades atrás da cabeça com lente de 110° não é câmera de capacete: é
+drone atrás do avião. A cabine sai pequena lá na frente e o nariz ocupa meia
+tela. Oito atrás e 92° põe a lente logo atrás da cabeça, que é onde ela fica
+no vídeo que ele mandou.
+
+## A cabine mexe
+
+O detalhe mais barato que existe para uma cabine deixar de parecer maquete:
+**manche e manete acompanham o comando**. São dois grupos com pivô e duas
+linhas em `arruma()` — o manche inclina com `cmdArf`/`cmdRol`, a manete anda
+de marcha lenta a pós-combustão com `motor`. Os dois precisaram entrar na
+lista de peças que escapam da fusão de malhas, junto com aileron, profundor e
+leme.
+
+## Uma asserção que eu corrigi em vez de afrouxar
+
+O teste cobrava que um raio saindo do olho a 30° para baixo e 40° para o lado
+batesse na própria cabine. Com o piloto sentado alto ele passou a **não**
+bater — e está certo: de uma bolha, olhando para o lado e para baixo, vê-se
+por cima do trilho. Isso é a vista funcionando, não quebrando.
+
+O que a cabine tem de garantir é outra coisa: **não se vê o mundo pelo chão**.
+O raio foi para -55°, que é onde o chão está. Afrouxar teria sido trocar o
+`>0` por um `>=0`; corrigir foi perguntar a coisa certa.

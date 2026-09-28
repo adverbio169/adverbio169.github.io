@@ -9117,7 +9117,7 @@ const MEDIDAS_CACA = {
      na linha do horizonte e tapava o mundo inteiro abaixo dele. Em 46 ele
      fica doze acima do chão e oito abaixo do vidro, que é sentar na cabine em
      vez de deitar nela. */
-  cabine: { frente: 118, cima: 46 },
+  cabine: { frente: 118, cima: 50 },
   /* O ARCO recuou de 150 para 143 quando a vista de dentro passou a existir.
      Com ele em 150 — 32 à frente do olho — o topo da moldura caía a oito
      graus acima do horizonte, ou seja, EM CIMA da linha do horizonte: voando
@@ -9125,7 +9125,7 @@ const MEDIDAS_CACA = {
      ver. Recuado, o mesmo arco sobe para treze graus, e o horizonte passa
      folgado por baixo dele. De fora a diferença é o para-brisa ficar um
      tiquinho mais comprido. */
-  canopia: { x: 21, y: 24, z: 54, cy: 30, cz: 122, arco: 143 },
+  canopia: { x: 21, y: 29, z: 54, cy: 30, cz: 122, arco: 143 },
   jatos: [{ x: -26, y: -7, z: -252 }, { x: 26, y: -7, z: -252 }],
   fogo: { raio: 14, nucleo: 7.5, anel: 6.5 },
   ponta: null,                   // vem da tabela AD02, que é mais exata
@@ -9157,93 +9157,50 @@ const MEDIDAS_CACA = {
      abas: o que muda é só para onde o pincel aponta.
    ========================================================================== */
 /* onde cada tela viva mora dentro da lona, em pixel de lona */
-const PAINEL_LONA = { larg: 512, alt: 300 };
-const PAINEL_TELAS = [{ x: 48, y: 70, w: 174, h: 116 },
-                      { x: 290, y: 70, w: 174, h: 116 }];
+/* LARGA E BAIXA, e isto é resposta a uma crítica: "tá muito grosso as
+   coisas, tem que ser minimalista, não dá nem de ver nada".
+
+   O painel anterior era uma TÁBUA de 26 por 15 a 26 unidades do olho — 26° de
+   arco só de painel, metade da tela. Um painel alto nunca cabe numa lente de
+   58°: ou ele aparece inteiro e tapa o mundo, ou o mundo aparece e ele cai
+   pelo rodapé. A saída é a mesma que os caças de hoje acharam: uma faixa
+   LARGA e BAIXA logo abaixo do coaming, com as telas lado a lado e nada
+   sobrando em volta. Mesma informação, um terço da altura. */
+const PAINEL_LONA = { larg: 640, alt: 200 };
+const PAINEL_TELAS = [{ x: 34, y: 26, w: 236, h: 148 },
+                      { x: 370, y: 26, w: 236, h: 148 }];
 function lonaPainel(){
   const W = PAINEL_LONA.larg, H = PAINEL_LONA.alt;
   const desenha = (g, aceso) => {
-    const escreve = (t, x, y, tam, cor) => {
-      g.font = '700 ' + tam + 'px ui-monospace, monospace';
-      g.fillStyle = cor; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(t, x, y);
-    };
-    if (aceso){ g.fillStyle = '#000'; g.fillRect(0, 0, W, H); }
-    else {
-      const f = g.createLinearGradient(0, 0, 0, H);
-      f.addColorStop(0, '#333b44'); f.addColorStop(0.28, '#262d35');
-      f.addColorStop(1, '#161b21');
-      g.fillStyle = f; g.fillRect(0, 0, W, H);
-      g.strokeStyle = 'rgba(0,0,0,.42)'; g.lineWidth = 2;
-      for (const x of [30, 244, 268, 482]){ g.beginPath(); g.moveTo(x, 8); g.lineTo(x, H-8); g.stroke(); }
-      for (const y of [52, 240]){ g.beginPath(); g.moveTo(8, y); g.lineTo(W-8, y); g.stroke(); }
-      g.fillStyle = 'rgba(255,255,255,.09)';
-      for (const [x, y] of [[18,12],[W-18,12],[18,H-12],[W-18,H-12],[256,12],[256,H-12]]){
-        g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill();
-      }
-    }
-    /* --- a moldura das duas telas, com os botões de borda ----------------- */
-    if (!aceso) for (const t of PAINEL_TELAS){
-      g.fillStyle = '#0a0e12';
-      g.fillRect(t.x - 14, t.y - 12, t.w + 28, t.h + 40);
-      g.strokeStyle = '#4b5661'; g.lineWidth = 3;
-      g.strokeRect(t.x - 12.5, t.y - 10.5, t.w + 25, t.h + 37);
-      g.fillStyle = '#3d4751';
+    if (aceso){ g.fillStyle = '#000'; g.fillRect(0, 0, W, H); return; }
+    const f = g.createLinearGradient(0, 0, 0, H);
+    f.addColorStop(0, '#2b323a'); f.addColorStop(0.3, '#20262d'); f.addColorStop(1, '#13181d');
+    g.fillStyle = f; g.fillRect(0, 0, W, H);
+    /* --- moldura das duas telas, com os botões de borda ------------------- */
+    for (const t of PAINEL_TELAS){
+      g.fillStyle = '#080c10';
+      g.fillRect(t.x - 13, t.y - 11, t.w + 26, t.h + 22);
+      g.strokeStyle = '#49535e'; g.lineWidth = 2;
+      g.strokeRect(t.x - 11.5, t.y - 9.5, t.w + 23, t.h + 19);
+      g.fillStyle = '#39424c';
       for (let i = 0; i < 5; i++){
-        const yb = t.y + t.h*(i + 0.5)/5 - 8;
-        g.fillRect(t.x - 11, yb, 8, 16);
-        g.fillRect(t.x + t.w + 3, yb, 8, 16);
+        const yb = t.y + t.h*(i + 0.5)/5 - 9;
+        g.fillRect(t.x - 10, yb, 7, 18);
+        g.fillRect(t.x + t.w + 3, yb, 7, 18);
       }
-      for (let i = 0; i < 5; i++)
-        g.fillRect(t.x + t.w*(i + 0.5)/5 - 9, t.y + t.h + 9, 18, 8);
     }
-    /* --- a coluna do meio: dois mostradores de reserva e um teclado ------- */
-    for (const [cy2, rot] of [[86, 'VEL'], [146, 'ALT']]){
-      const cx = 256, r = 22;
-      if (!aceso){
-        g.fillStyle = '#0a0e12'; g.beginPath(); g.arc(cx, cy2, r + 5, 0, 7); g.fill();
-        g.strokeStyle = '#4b5661'; g.lineWidth = 2.5;
-        g.beginPath(); g.arc(cx, cy2, r + 3, 0, 7); g.stroke();
-      }
-      g.strokeStyle = aceso ? '#7de8ff' : '#1b3a44'; g.lineWidth = 1.6;
-      for (let a = 0; a < 360; a += 36){
-        const s2 = Math.sin(a*Math.PI/180), c2 = -Math.cos(a*Math.PI/180);
-        g.beginPath(); g.moveTo(cx + s2*r, cy2 + c2*r);
-        g.lineTo(cx + s2*r*0.78, cy2 + c2*r*0.78); g.stroke();
-      }
-      g.strokeStyle = aceso ? '#ffd257' : '#4a3c17'; g.lineWidth = 3;
-      const ang = rot === 'VEL' ? 2.2 : -1.1;
-      g.beginPath(); g.moveTo(cx, cy2);
-      g.lineTo(cx + Math.sin(ang)*r*0.72, cy2 - Math.cos(ang)*r*0.72); g.stroke();
-      if (!aceso) escreve(rot, cx, cy2 + r + 14, 11, '#7d8a97');
+    /* --- a coluna do meio: três avisos redondos e um teclado miúdo -------- */
+    for (let i = 0; i < 3; i++){
+      const cx = 320, cy = 44 + i*40;
+      g.fillStyle = '#0a0e12'; g.beginPath(); g.arc(cx, cy, 13, 0, 7); g.fill();
+      g.strokeStyle = '#49535e'; g.lineWidth = 2;
+      g.beginPath(); g.arc(cx, cy, 11.5, 0, 7); g.stroke();
+      g.fillStyle = ['#1b3a44', '#3a3419', '#1b3a2a'][i];
+      g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fill();
     }
-    if (!aceso) for (let i = 0; i < 9; i++){
-      const x = 236 + (i % 3)*14, y = 186 + Math.floor(i/3)*14;
-      g.fillStyle = '#39424c'; g.fillRect(x, y, 11, 11);
-    }
-    /* --- a fita de alarmes, em cima --------------------------------------- */
-    /* uma fita MORTA no alto do painel, só para a chapa não ficar vazia lá
-       em cima — a que o piloto lê é a viva, na cara do coaming */
-    const lamp = [['MESTRE', '#ff5a44', false], ['FOGO', '#ff5a44', false],
-                  ['HID', '#ffb43a', false], ['COMB', '#ffb43a', false],
-                  ['TREM', '#3fe070', true], ['ELE', '#3fe070', true]];
-    lamp.forEach(([txt, cor, on], i) => {
-      const w = 72, h = 30, x = 22 + i*78, y = 12;
-      if (!aceso){
-        g.fillStyle = '#0e1318'; g.fillRect(x, y, w, h);
-        g.strokeStyle = '#3f4954'; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, w - 2, h - 2);
-        escreve(txt, x + w/2, y + h/2, 13, on ? '#0e1318' : cor + '44');
-      } else if (on){
-        g.globalAlpha = 0.5; g.fillStyle = cor; g.fillRect(x + 3, y + 3, w - 6, h - 6);
-        g.globalAlpha = 1; escreve(txt, x + w/2, y + h/2, 13, '#04140a');
-      }
-    });
-    /* --- as chaves, embaixo ------------------------------------------------ */
-    if (!aceso) for (let i = 0; i < 11; i++){
-      const x = 26 + i*44;
-      g.fillStyle = '#0e1318'; g.fillRect(x, 250, 32, 34);
-      g.fillStyle = i % 3 === 0 ? '#95a0ad' : '#5c656f';
-      g.fillRect(x + 11, i % 2 ? 254 : 266, 10, 14);
+    for (let i = 0; i < 6; i++){
+      g.fillStyle = '#39424c';
+      g.fillRect(304 + (i % 2)*18, 156 + Math.floor(i/2)*14, 13, 10);
     }
   };
   const faz = (aceso) => {
@@ -9256,6 +9213,33 @@ function lonaPainel(){
   return { mapa: faz(false), brilho: faz(true) };
 }
 
+/* a lona dos CONSOLES: a face de cima das duas bancadas. Mesma ideia do
+   painel — chave, guarda vermelha e etiqueta custam um canvas de 448x64 e
+   nada de malha. */
+function lonaConsole(esq){
+  const W = 448, H = 64;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const f = g.createLinearGradient(0, 0, 0, H);
+  f.addColorStop(0, '#242b33'); f.addColorStop(1, '#171c22');
+  g.fillStyle = f; g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 2;
+  for (const x of [96, 232, 352]){ g.beginPath(); g.moveTo(x, 4); g.lineTo(x, H-4); g.stroke(); }
+  for (let i = 0; i < 12; i++){
+    const x = 16 + i*34;
+    if (esq && x > 90 && x < 240) continue;          // o vão da manete
+    g.fillStyle = '#0d1217'; g.fillRect(x, 16, 20, 32);
+    g.fillStyle = i % 3 === 0 ? '#9aa5b2' : '#59626d';
+    g.fillRect(x + 6, i % 2 ? 20 : 32, 8, 12);
+  }
+  g.fillStyle = '#7c2418'; g.fillRect(esq ? 384 : 24, 12, 40, 40);
+  g.fillStyle = '#c4402c'; g.fillRect(esq ? 390 : 30, 18, 28, 28);
+  if (esq){ g.fillStyle = '#05080b'; g.fillRect(100, 20, 128, 24);
+            g.strokeStyle = '#39424c'; g.lineWidth = 2; g.strokeRect(101, 21, 126, 22); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true;
+  return t;
+}
 let _lonaPainel = null;
 function materialDoPainel(){
   if (!_lonaPainel) _lonaPainel = lonaPainel();
@@ -10538,7 +10522,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        dentro do arco ainda vê a face de FORA dele. */
     /* e o TUBO afinou de 0,075 para 0,05: visto de dentro, a 25 unidades do
        olho, o de antes era uma barra de arquibancada. Moldura é moldura. */
-    const arco = new THREE.Mesh(new THREE.TorusGeometry(1, 0.05, 6, 20, Math.PI), mAmarelo);
+    const arco = new THREE.Mesh(new THREE.TorusGeometry(1, 0.028, 6, 20, Math.PI), mAmarelo);
     arco.scale.set(CP.x*k + 0.4, CP.y*k + 0.4, 3); arco.position.set(0, CP.cy, CP.arco); g.add(arco);
     /* O TAMANHO DO ESCURO é conta, não gosto. Ele tem de ser o mais interno
        nos dois sentidos e o mais externo em nenhum:
@@ -10549,7 +10533,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        centésimos). Na primeira tentativa o escuro era 5,5% menor e sobrava
        uma tarja amarela grossa por dentro — a 25 unidades do olho, 5% de 20
        é um dedo de tinta. */
-    const arcoI = new THREE.Mesh(new THREE.TorusGeometry(1, 0.062, 6, 20, Math.PI), mFosco);
+    const arcoI = new THREE.Mesh(new THREE.TorusGeometry(1, 0.036, 6, 20, Math.PI), mFosco);
     arcoI.scale.set((CP.x*k + 0.4)*0.985, (CP.y*k + 0.4)*0.985, 2.6);
     arcoI.position.set(0, CP.cy, CP.arco - 0.5); g.add(arcoI);
   }
@@ -10666,11 +10650,29 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          banco até o painel. De fora quase não se veem; de dentro são eles que
          fazem a cabine ter PAREDE em vez de ser um assento no meio do nada. */
       for (const lado of [-1, 1]){
-        const con = new THREE.Mesh(caixaViva(6, 6, 42, 1.6), mPreto);
-        con.position.set(lado*16, 34.5, 126); g.add(con);
-        const punho = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2, 12), mPreto);
-        punho.position.set(lado*16, 38, 114); g.add(punho);
+        const con = new THREE.Mesh(caixaViva(6.4, 4.4, 42, 1.2), mPreto);
+        con.position.set(lado*16, 33.4, 126); g.add(con);
+        /* a face de cima ganha a lona: sem ela o console é uma cunha preta */
+        const tampo = new THREE.Mesh(new THREE.PlaneGeometry(42, 6),
+                        new THREE.MeshPhongMaterial({ map: lonaConsole(lado < 0), shininess: 10 }));
+        tampo.rotation.set(-Math.PI/2, 0, lado < 0 ? Math.PI/2 : -Math.PI/2);
+        tampo.position.set(lado*16, 35.7, 126); g.add(tampo);
       }
+      /* --- A MANETE, e ela ANDA -------------------------------------------
+         Cabine parada é maquete. As duas peças que a mão do piloto move o
+         tempo todo são o manche e a manete, e as duas custam um grupo com
+         pivô mais uma linha em `arruma`. É o detalhe mais barato que existe
+         para a cabine deixar de parecer uma foto. */
+      const maneteG = new THREE.Group();
+      maneteG.position.set(-16, 34.6, 112);
+      {
+        const haste = new THREE.Mesh(caixaViva(3, 9, 2.6, 0.8), mPreto);
+        haste.position.set(0, 4, 0); maneteG.add(haste);
+        const bola = new THREE.Mesh(new THREE.SphereGeometry(2.6, 10, 8), mFosco);
+        bola.scale.set(1, 0.8, 1.25); bola.position.set(0, 8.6, 0); maneteG.add(bola);
+      }
+      g.add(maneteG);
+      comandos.manete = maneteG;
       const assento = new THREE.Mesh(caixaViva(17, 5, 23, 2.2), mFosco);
       assento.position.set(0, 36, 112); g.add(assento);
       /* o encosto tinha 30 de altura e o topo saía em y=50, acima da capota
@@ -10689,9 +10691,9 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          tábua. Os três mostradores antigos estavam na face da FRENTE,
          olhando para o nariz — invisíveis para quem senta atrás deles, e
          ninguém nunca notou porque nada nesta cabine aparecia. */
-      const PL = 26, PA = PL*PAINEL_LONA.alt/PAINEL_LONA.larg;
-      const caixaP = new THREE.Mesh(caixaViva(PL + 1.2, PA + 1.2, 4, 1.2), mEscuro);
-      caixaP.position.set(0, 34.7, 145.4); caixaP.rotation.x = 0.52; g.add(caixaP);
+      const PL = 21, PA = PL*PAINEL_LONA.alt/PAINEL_LONA.larg;
+      const caixaP = new THREE.Mesh(caixaViva(PL + 1, PA + 0.9, 3.2, 0.8), mEscuro);
+      caixaP.position.set(0, 38.38, 145.98); caixaP.rotation.x = 0.52; g.add(caixaP);
       const grupoP = new THREE.Group();
       grupoP.add(new THREE.Mesh(new THREE.PlaneGeometry(PL, PA), materialDoPainel()));
       const telasC = fazTelasCabine();
@@ -10713,7 +10715,10 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       /* a face de trás da caixa + meia unidade na normal dela. Com a caixa
          em (0; 36,2; 145,4) inclinada 0,52, a normal para o piloto é
          (0; 0,497; -0,868) e a face fica em (0; 37,19; 143,66). */
-      grupoP.position.set(0, 35.94, 143.23);
+      /* a chapa fica meia unidade à frente da face de trás da caixa; com a
+         caixa em (0; 38,38; 145,98), 3,2 de fundo e 0,52 de inclinação, a
+         normal para o piloto é (0; 0,497; -0,868). */
+      grupoP.position.set(0, 39.4, 144.2);
       grupoP.rotation.set(0.52, Math.PI, 0);
       g.add(grupoP);
       g.userData.telasCabine = telasC;
@@ -10722,8 +10727,8 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          — sem ela o painel acaba numa linha reta, com o mundo começando no
          mesmo pixel. A borda de cima da chapa está em (0; 42,5; 147); esta
          vem de lá para trás, na direção do piloto. */
-      const coam = new THREE.Mesh(caixaViva(27.5, 1.7, 9.5, 0.7), mPreto);
-      coam.position.set(0, 42.9, 142.6); coam.rotation.x = -0.07; g.add(coam);
+      const coam = new THREE.Mesh(caixaViva(23, 0.8, 4.6, 0.3), mPreto);
+      coam.position.set(0, 43.0, 144.0); coam.rotation.x = -0.07; g.add(coam);
       /* e a FITA DE ALARMES vai na cara do coaming, não no alto do painel:
          debaixo da aba ela ficava escondida, e em avião de verdade é ali que
          ela mora mesmo — na altura dos olhos, onde não dá para não ver.
@@ -10731,9 +10736,9 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          no pedaço onde a fita está pintada. */
       {
         const tt = telasC[telasC.length - 1];        // a última é a fita
-        const pl = new THREE.Mesh(new THREE.PlaneGeometry(24, 24*TIRA_CAB_A/TIRA_CAB_L),
+        const pl = new THREE.Mesh(new THREE.PlaneGeometry(14, 14*TIRA_CAB_A/TIRA_CAB_L),
                      new THREE.MeshBasicMaterial({ map: tt.tex, transparent: true }));
-        pl.position.set(0, 42.58, 137.7); pl.rotation.set(0.07, Math.PI, 0);
+        pl.position.set(0, 42.85, 141.6); pl.rotation.set(0.07, Math.PI, 0);
         g.add(pl);
       }
       /* O MANCHE MUDOU DE LUGAR, e não foi enfeite. Manche no meio das pernas
@@ -10742,8 +10747,19 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          preto no meio da tela. Caça moderno resolveu isso primeiro: o F-16
          pôs o manche no console DIREITO. Aqui é a mesma solução pela mesma
          razão. */
-      const manche = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 11, 8), mPreto);
-      manche.position.set(14, 38, 124); manche.rotation.set(-0.16, 0, -0.1); g.add(manche);
+      const mancheG = new THREE.Group();
+      mancheG.position.set(14, 32.6, 124);
+      {
+        const haste = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.9, 10, 8), mPreto);
+        haste.position.y = 5; mancheG.add(haste);
+        const pega = new THREE.Mesh(caixaViva(3.4, 5, 3.4, 1.2), mFosco);
+        pega.position.y = 11.4; mancheG.add(pega);
+        const gatilho = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 1.2), mBranco);
+        gatilho.position.set(0, 11.6, -2.2); mancheG.add(gatilho);
+      }
+      mancheG.rotation.set(-0.10, 0, -0.08);
+      g.add(mancheG);
+      comandos.manche = mancheG;
     }
 
   }
@@ -11474,7 +11490,8 @@ function montaDragao(corCorpo, corDetalhe, corVidro, asasMoveis, tipo){
   }
   /* solta o que se mexe, cozinha o resto, e devolve tudo para o lugar */
   const moveis = [...(U.asas||[]), U.comandos && U.comandos.profundor,
-                  U.comandos && U.comandos.leme, ...(U.rotores||[]),
+                  U.comandos && U.comandos.leme, U.comandos && U.comandos.manche,
+                  U.comandos && U.comandos.manete, ...(U.rotores||[]),
                   ...(U.bocais||[]), U.trem].filter(Boolean);
   /* e cada uma volta para o SEU pai, não para `g`. O leme não é filho de `g`:
      ele mora dentro da deriva, que é quem fica em pé. Com `g.remove(leme)` —
@@ -11490,7 +11507,9 @@ function montaDragao(corCorpo, corDetalhe, corVidro, asasMoveis, tipo){
   for (const asa of U.asas || []){
     for (const filho of asa.children) if (filho.type === 'Group') fundePorCor(filho);
   }
-  if (U.comandos){ fundePorCor(U.comandos.profundor); fundePorCor(U.comandos.leme); }
+  if (U.comandos){ fundePorCor(U.comandos.profundor); fundePorCor(U.comandos.leme);
+                   if (U.comandos.manche) fundePorCor(U.comandos.manche);
+                   if (U.comandos.manete) fundePorCor(U.comandos.manete); }
   for (const r of U.rotores || []) fundePorCor(r);
   if (U.trem) fundePorCor(U.trem);
   return g;
@@ -11926,7 +11945,12 @@ const VISTAS = [
      recortar o ASSOALHO da cabine, que fica a umas vinte unidades da lente.
      O piloto via o mundo passando por baixo do próprio banco. Foi o usuário
      que viu: "o do capacete tá vazando o assoalho". */
-  { nome:'CAPACETE', preso: true, tras: 20, cima: 8, fov: 110, perto: 10 }
+  /* "esse tá muito longe, tá estranho." Estava: vinte unidades atrás da
+     cabeça com uma lente de 110° põe a cabine pequena lá na frente e um
+     nariz enorme embaixo — parece drone atrás do avião, não câmera de
+     capacete. Dez atrás e 100° é logo atrás da cabeça, que é onde a câmera
+     do vídeo fica. */
+  { nome:'CAPACETE', preso: true, tras: 8, cima: 3, fov: 92, perto: 10 }
 ];
 let nVista = 0;
 function poeVista(n){
@@ -15276,6 +15300,16 @@ function arruma(){
     cmd.ailerons[0].rotation.x = -cmdRol * AIL_MAX;
     cmd.ailerons[1].rotation.x =  cmdRol * AIL_MAX;
     cmd.profundor.rotation.x = cmdArf * ARF_MAX;
+    /* O MANCHE SEGUE O COMANDO, não a superfície: quem senta na cabine vê a
+       própria mão. Puxar (cmdArf positivo, profundor subindo) inclina o
+       manche PARA TRÁS, que é -x. */
+    if (cmd.manche){
+      cmd.manche.rotation.x = -0.10 - cmdArf*0.34;
+      cmd.manche.rotation.z = -0.08 - cmdRol*0.30;
+    }
+    /* e a manete anda de marcha lenta (recuada) a pós-combustão (à frente) */
+    if (cmd.manete)
+      cmd.manete.rotation.x = -0.42 + (turbinando ? 1 : Math.max(0, Math.min(1, motor)))*0.92;
     /* LEME: a ponta dele vai para o MESMO lado para onde o nariz guina — é o
        leme que empurra a cauda para o outro lado. Também estava invertido, e
        também foi a prova que disse (`cmdsinal`), comparando para onde o nariz
@@ -18232,7 +18266,9 @@ function desenhaHUD(){
      outras teclas aprende essa no mesmo lugar. */
   if (jogando && !caindo){
     presoNoAviao();
-    const cx = W*0.5, y = H - Math.max(74, H*0.135);
+    /* na cabine o rodapé é o PAINEL: a fita de chamas sobe para não cair em
+       cima das telas do avião */
+    const cx = W*0.5, y = H - Math.max(74, H*(cockpit ? 0.30 : 0.135));
     const w = Math.max(4, W*0.0062), g = w*1.5;
     const largura = CONTRA_TOTAL*g - (g - w);
     h2.textAlign = 'right';

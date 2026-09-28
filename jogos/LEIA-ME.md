@@ -117,7 +117,7 @@ borda de cima** = profundor, **apontar para o lado** = leme. O resto é toque.
 | vista | o que é |
 |---|---|
 | **FORA** | perseguição atrás do avião, a de sempre |
-| **CABINE** | de dentro, olhando pelo vidro: o arco do para-brisa, o **painel digital do jogo nas telas do avião**, a fita de alarmes no coaming, os consoles e o manche à direita |
+| **CABINE** | de dentro, olhando pelo vidro: o arco fino do para-brisa, o **painel digital do jogo nas telas do avião** (largo e baixo, como caça moderno), a fita de alarmes no coaming, os consoles, e o manche e a manete que **se mexem com o comando** |
 | **CAPACETE** | grande-angular logo atrás da canópia: a mesma cabine vista de cima do banco, com o avião inteiro em volta |
 
 **Na cabine as duas janelas do HUD somem**: elas estão dentro do avião. As
@@ -253,9 +253,8 @@ plausível no lugar errado.
 - **`trem.js` acusa três falhas** e já acusava antes desta leva: rajada em
   vagão e em locomotiva não tira vida nem dá ponto. Não é regressão nova; é
   defeito do trem, esperando a vez.
-- **A cabine ainda está tosca**, e o usuário tem razão: os consoles são duas
-  cunhas sem desenho, não há manete de potência, e não há piloto. A técnica
-  para resolver é a mesma da lona do painel.
-- **De cabine não se vê a pista na final.** O convés tapa de 12° para baixo, o
-  que é honesto (é a geometria do avião) mas atrapalha pousar. Quem pousa usa
-  a vista de fora, ou a página APROX. 
+- **A cabine não tem piloto** — nem mãos no manche. É o que mais falta agora
+  que o resto se mexe.
+- **De cabine, na final, a pista fica baixa.** O painel tapa de uns 15° para
+  baixo. Dá para pousar de olho no HUD e na página APROX, mas quem quiser ver
+  a pista usa a vista de fora. 
