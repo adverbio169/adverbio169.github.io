@@ -2597,6 +2597,224 @@ const MEDIDAS_CACA = {
   pivo:  null
 };
 
+/* =============================================================================
+   O PAINEL DA CABINE: estrutura PINTADA, telas VIVAS
+
+   A primeira versão, com a cabine à vista, era uma tábua escura com três
+   discos e dois retângulos colados. Veredito do usuário, e com razão: "o
+   painel do cockpit tá uma merda". Aí veio a correção que mudou o desenho
+   todo: **"tem que colocar o nosso painel digital"**.
+
+   E é óbvio depois de dito. O jogo já tem um painel digital inteiro — oito
+   páginas, sinótico, mapa, tático, aproximação — desenhado a cada quadro numa
+   tela 2D. Pintar um painel de mentira ao lado dele seria construir um
+   segundo avião.
+
+   Então o painel é feito de duas partes, cada uma com a técnica certa:
+
+     A ESTRUTURA é pintada numa lona — moldura, botões de borda, parafusos,
+     fita de alarmes, chaves embaixo, mostradores de reserva. Detalhe pequeno
+     em geometria custa malha e fica grosseiro do mesmo jeito; em pintura
+     custa zero volume. É a mesma lição da pintura do avião.
+
+     AS TELAS são as páginas de verdade, redesenhadas num canvas fora da tela
+     e mandadas para a textura. Mesmo código, mesmos dados, mesma fita de
+     abas: o que muda é só para onde o pincel aponta.
+   ========================================================================== */
+/* onde cada tela viva mora dentro da lona, em pixel de lona */
+const PAINEL_LONA = { larg: 512, alt: 300 };
+const PAINEL_TELAS = [{ x: 48, y: 70, w: 174, h: 116 },
+                      { x: 290, y: 70, w: 174, h: 116 }];
+function lonaPainel(){
+  const W = PAINEL_LONA.larg, H = PAINEL_LONA.alt;
+  const desenha = (g, aceso) => {
+    const escreve = (t, x, y, tam, cor) => {
+      g.font = '700 ' + tam + 'px ui-monospace, monospace';
+      g.fillStyle = cor; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(t, x, y);
+    };
+    if (aceso){ g.fillStyle = '#000'; g.fillRect(0, 0, W, H); }
+    else {
+      const f = g.createLinearGradient(0, 0, 0, H);
+      f.addColorStop(0, '#333b44'); f.addColorStop(0.28, '#262d35');
+      f.addColorStop(1, '#161b21');
+      g.fillStyle = f; g.fillRect(0, 0, W, H);
+      g.strokeStyle = 'rgba(0,0,0,.42)'; g.lineWidth = 2;
+      for (const x of [30, 244, 268, 482]){ g.beginPath(); g.moveTo(x, 8); g.lineTo(x, H-8); g.stroke(); }
+      for (const y of [52, 240]){ g.beginPath(); g.moveTo(8, y); g.lineTo(W-8, y); g.stroke(); }
+      g.fillStyle = 'rgba(255,255,255,.09)';
+      for (const [x, y] of [[18,12],[W-18,12],[18,H-12],[W-18,H-12],[256,12],[256,H-12]]){
+        g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill();
+      }
+    }
+    /* --- a moldura das duas telas, com os botões de borda ----------------- */
+    if (!aceso) for (const t of PAINEL_TELAS){
+      g.fillStyle = '#0a0e12';
+      g.fillRect(t.x - 14, t.y - 12, t.w + 28, t.h + 40);
+      g.strokeStyle = '#4b5661'; g.lineWidth = 3;
+      g.strokeRect(t.x - 12.5, t.y - 10.5, t.w + 25, t.h + 37);
+      g.fillStyle = '#3d4751';
+      for (let i = 0; i < 5; i++){
+        const yb = t.y + t.h*(i + 0.5)/5 - 8;
+        g.fillRect(t.x - 11, yb, 8, 16);
+        g.fillRect(t.x + t.w + 3, yb, 8, 16);
+      }
+      for (let i = 0; i < 5; i++)
+        g.fillRect(t.x + t.w*(i + 0.5)/5 - 9, t.y + t.h + 9, 18, 8);
+    }
+    /* --- a coluna do meio: dois mostradores de reserva e um teclado ------- */
+    for (const [cy2, rot] of [[86, 'VEL'], [146, 'ALT']]){
+      const cx = 256, r = 22;
+      if (!aceso){
+        g.fillStyle = '#0a0e12'; g.beginPath(); g.arc(cx, cy2, r + 5, 0, 7); g.fill();
+        g.strokeStyle = '#4b5661'; g.lineWidth = 2.5;
+        g.beginPath(); g.arc(cx, cy2, r + 3, 0, 7); g.stroke();
+      }
+      g.strokeStyle = aceso ? '#7de8ff' : '#1b3a44'; g.lineWidth = 1.6;
+      for (let a = 0; a < 360; a += 36){
+        const s2 = Math.sin(a*Math.PI/180), c2 = -Math.cos(a*Math.PI/180);
+        g.beginPath(); g.moveTo(cx + s2*r, cy2 + c2*r);
+        g.lineTo(cx + s2*r*0.78, cy2 + c2*r*0.78); g.stroke();
+      }
+      g.strokeStyle = aceso ? '#ffd257' : '#4a3c17'; g.lineWidth = 3;
+      const ang = rot === 'VEL' ? 2.2 : -1.1;
+      g.beginPath(); g.moveTo(cx, cy2);
+      g.lineTo(cx + Math.sin(ang)*r*0.72, cy2 - Math.cos(ang)*r*0.72); g.stroke();
+      if (!aceso) escreve(rot, cx, cy2 + r + 14, 11, '#7d8a97');
+    }
+    if (!aceso) for (let i = 0; i < 9; i++){
+      const x = 236 + (i % 3)*14, y = 186 + Math.floor(i/3)*14;
+      g.fillStyle = '#39424c'; g.fillRect(x, y, 11, 11);
+    }
+    /* --- a fita de alarmes, em cima --------------------------------------- */
+    /* uma fita MORTA no alto do painel, só para a chapa não ficar vazia lá
+       em cima — a que o piloto lê é a viva, na cara do coaming */
+    const lamp = [['MESTRE', '#ff5a44', false], ['FOGO', '#ff5a44', false],
+                  ['HID', '#ffb43a', false], ['COMB', '#ffb43a', false],
+                  ['TREM', '#3fe070', true], ['ELE', '#3fe070', true]];
+    lamp.forEach(([txt, cor, on], i) => {
+      const w = 72, h = 30, x = 22 + i*78, y = 12;
+      if (!aceso){
+        g.fillStyle = '#0e1318'; g.fillRect(x, y, w, h);
+        g.strokeStyle = '#3f4954'; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, w - 2, h - 2);
+        escreve(txt, x + w/2, y + h/2, 13, on ? '#0e1318' : cor + '44');
+      } else if (on){
+        g.globalAlpha = 0.5; g.fillStyle = cor; g.fillRect(x + 3, y + 3, w - 6, h - 6);
+        g.globalAlpha = 1; escreve(txt, x + w/2, y + h/2, 13, '#04140a');
+      }
+    });
+    /* --- as chaves, embaixo ------------------------------------------------ */
+    if (!aceso) for (let i = 0; i < 11; i++){
+      const x = 26 + i*44;
+      g.fillStyle = '#0e1318'; g.fillRect(x, 250, 32, 34);
+      g.fillStyle = i % 3 === 0 ? '#95a0ad' : '#5c656f';
+      g.fillRect(x + 11, i % 2 ? 254 : 266, 10, 14);
+    }
+  };
+  const faz = (aceso) => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    desenha(c.getContext('2d'), aceso);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true;
+    return t;
+  };
+  return { mapa: faz(false), brilho: faz(true) };
+}
+
+let _lonaPainel = null;
+function materialDoPainel(){
+  if (!_lonaPainel) _lonaPainel = lonaPainel();
+  return new THREE.MeshPhongMaterial({ map: _lonaPainel.mapa, emissive: 0xffffff,
+    emissiveMap: _lonaPainel.brilho, shininess: 14, specular: 0x2a3038 });
+}
+
+/* =============================================================================
+   AS TELAS VIVAS
+
+   Cada uma é um canvas fora da tela virando textura. O truque que faz isto
+   caber em poucas linhas: as páginas do painel desenham num contexto guardado
+   numa variável (`h2`) e recebem a CAIXA onde devem caber como argumento.
+   Apontar `h2` para outro canvas e passar outra caixa é tudo o que é preciso
+   para a mesma página nascer dentro do avião.
+
+   Duas precauções:
+     - `mfdZona` registra onde o dedo pode tocar. Desenhar fora da tela não
+       pode criar zona nenhuma, senão o toque passa a acertar coisas que não
+       estão onde ele pensa. Daí o `_mfdMudo`.
+     - só redesenha quando a cabine está à vista, e a dez por segundo. Sessenta
+       vezes por segundo seria pagar o painel inteiro duas vezes por quadro
+       para ver um número mudar de 100 para 99.
+   ========================================================================== */
+const TELA_CAB_L = 384, TELA_CAB_A = 256, TIRA_CAB_L = 512, TIRA_CAB_A = 40;
+let telasCabine = null, _telaCabT = 0;
+function fazTelasCabine(){
+  const faz = (l, a, resto) => {
+    const c = document.createElement('canvas');
+    c.width = l; c.height = a;
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return Object.assign({ c, ctx: c.getContext('2d'), tex }, resto);
+  };
+  telasCabine = PAINEL_TELAS.map((_, i) => faz(TELA_CAB_L, TELA_CAB_A, { jan: i }));
+  telasCabine.push(faz(TIRA_CAB_L, TIRA_CAB_A, { tira: true }));
+  return telasCabine;
+}
+/* A FITA DE ALARMES DO COAMING, e ela é DE VERDADE.
+
+   Podia ser pintura — e foi, na primeira versão: seis quadradinhos com TREM e
+   ELE acesos para sempre. Só que a lista de alertas do jogo já existe
+   (`mfdAlertas`), já é ela que a página MOTOR mostra, e um anunciador que não
+   anuncia nada é enfeite. Custa um canvas de 512x40 redesenhado dez vezes por
+   segundo. */
+function pintaTiraAlarmes(g){
+  const W = TIRA_CAB_L, H = TIRA_CAB_A;
+  const A = mfdAlertas(), tem = t => A.some(a => a[0].indexOf(t) === 0);
+  const grave = A.some(a => a[1] === MFD_VERM);
+  const lamp = [['MESTRE', MFD_VERM, grave], ['ESTOL', MFD_VERM, tem('ESTOL')],
+                ['TERRENO', MFD_VERM, tem('TERRENO')], ['COMB', MFD_AMBAR, combustivel < 20],
+                ['TREM', MFD_VERDE, !!trem], ['TRAVA', MFD_VERM, travadoPor.size > 0]];
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, W, H);
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  lamp.forEach(([txt, cor, on], i) => {
+    const w = W/6 - 8, x = i*(W/6) + 4, y = 3, h = H - 6;
+    g.fillStyle = on ? cor : '#0d1217';
+    g.fillRect(x, y, w, h);
+    g.strokeStyle = on ? '#ffffff88' : '#39424c'; g.lineWidth = 2;
+    g.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    g.font = '800 17px ui-monospace, monospace';
+    g.fillStyle = on ? '#08120a' : cor + '33';
+    g.fillText(txt, x + w/2, y + h/2 + 1);
+  });
+}
+function atualizaTelasCabine(agora){
+  /* AS TELAS SÃO DO AVIÃO QUE ESTÁ NO CÉU, não as últimas que alguém montou.
+     `montaGaragem` monta o modelo mais de uma vez (a troca de avião, o
+     recomeço), e cada montagem criava um jogo novo de canvas e sobrescrevia a
+     variável do módulo. O avião ficava com as texturas da PRIMEIRA montagem e
+     o laço pintava as da última: duas telas pretas, com o canvas certo
+     desenhado e ninguém olhando para ele. Foi o teste que perguntou
+     `material.map === telasCabine[i].tex` e respondeu "não". */
+  telasCabine = aviao && aviao.userData.telasCabine;
+  if (!telasCabine) return;
+  if (!cockpit && !VISTAS[nVista].preso) return;      // ninguém está olhando
+  if (agora - _telaCabT < 100) return;                // dez por segundo bastam
+  _telaCabT = agora;
+  const ctxAntes = h2, kAntes = _mfdKAtual, mudoAntes = _mfdMudo;
+  _mfdMudo = true;
+  for (const t of telasCabine){
+    h2 = t.ctx;
+    h2.setTransform(1, 0, 0, 1, 0, 0);
+    h2.clearRect(0, 0, t.c.width, t.c.height);
+    try {
+      if (t.tira) pintaTiraAlarmes(h2);
+      else desenhaMFDEm({ x: 0, y: 0, w: TELA_CAB_L, h: TELA_CAB_A, k: t.jan }, t.jan, true);
+    } catch(e){}
+    t.tex.needsUpdate = true;
+  }
+  h2 = ctxAntes; _mfdKAtual = kAntes; _mfdMudo = mudoAntes;
+}
+
 /* --- FUNDIR O AVIÃO ---------------------------------------------------------
    O dragão ficou bonito e ficou CARO. Peça a peça ele tem 83 malhas contra as
    33 do caça — e malha, para a placa de vídeo, não custa pelo tamanho: custa
@@ -2683,16 +2901,33 @@ function fundePorCor(raiz){
       n += g2.attributes.position.count;
       return g2;
     });
+    /* --- E A UV, QUE ESTA FUNÇÃO JOGAVA FORA --------------------------------
+       Ela emendava posição e normal e mais nada. Durante um ano isso não fez
+       falta: nenhum material do avião tinha textura — a identidade dele toda
+       é cor de chapa. No dia em que o painel da cabine virou uma LONA com as
+       telas do jogo desenhadas nela, as duas telas apareceram como dois
+       retângulos de uma cor chapada só: sem coordenada de textura, o
+       sombreador amostra o mesmo texel para a peça inteira.
+
+       Custou uma hora de procurar no lugar errado (achei que a chapa estava
+       virada para trás, depois que estava enterrada dentro da caixa — esta
+       última era verdade também). Quem respondeu foi o teste perguntando
+       `material.map === a textura que eu pinto?` e, depois, olhar o que a
+       fusão copia. */
+    const temUV = partes.every(g2 => g2.attributes.uv);
     const pos = new Float32Array(n*3), nor = new Float32Array(n*3);
+    const uvs = temUV ? new Float32Array(n*2) : null;
     let k = 0;
     for (const g2 of partes){
       pos.set(g2.attributes.position.array, k*3);
       nor.set(g2.attributes.normal.array,   k*3);
+      if (temUV) uvs.set(g2.attributes.uv.array, k*2);
       k += g2.attributes.position.count;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('normal',   new THREE.BufferAttribute(nor, 3));
+    if (temUV) geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     geo.computeBoundingSphere();
     const malha = new THREE.Mesh(geo, mat);
     malha.castShadow = true;
@@ -3896,10 +4131,10 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          banco até o painel. De fora quase não se veem; de dentro são eles que
          fazem a cabine ter PAREDE em vez de ser um assento no meio do nada. */
       for (const lado of [-1, 1]){
-        const con = new THREE.Mesh(caixaViva(6, 6, 42, 1.6), mFosco);
-        con.position.set(lado*13, 34.5, 126); g.add(con);
+        const con = new THREE.Mesh(caixaViva(6, 6, 42, 1.6), mPreto);
+        con.position.set(lado*16, 34.5, 126); g.add(con);
         const punho = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2, 12), mPreto);
-        punho.position.set(lado*13, 38, 114); g.add(punho);
+        punho.position.set(lado*16, 38, 114); g.add(punho);
       }
       const assento = new THREE.Mesh(caixaViva(17, 5, 23, 2.2), mFosco);
       assento.position.set(0, 36, 112); g.add(assento);
@@ -3913,29 +4148,58 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          cima do vidro. É a mesma conta que já tinha corrigido o encosto. */
       const apoio = new THREE.Mesh(caixaViva(16, 7, 7, 2.4), mEscuro);
       apoio.position.set(0, 46.5, 96); g.add(apoio);
-      const painel = new THREE.Mesh(caixaViva(24, 14, 4, 1.4), mEscuro);
-      painel.position.set(0, 34, 146); painel.rotation.x = 0.38; g.add(painel);
-      /* OS MOSTRADORES ACENDEM. São três discos de 3,2 e duas telinhas, e o
-         que os faz existir não é o desenho — é a LUZ PRÓPRIA: painel apagado,
-         visto de dentro, é uma tábua preta; painel aceso é uma cabine. Custa
-         um material com `emissive` e nenhuma luz nova na cena. */
-      const mTela = new THREE.MeshPhongMaterial({ color: 0x0b2a2e, emissive: 0x0d5a52,
-                                       shininess: 40, side: THREE.DoubleSide });
-      const mVisor = new THREE.MeshPhongMaterial({ color: 0x102030, emissive: 0x123a4e,
-                                       shininess: 30, side: THREE.DoubleSide });
-      /* E VIRADOS PARA O PILOTO. Os três mostradores antigos estavam na face
-         da FRENTE do painel, olhando para o nariz — invisíveis para quem
-         senta atrás dele. Nunca apareceu porque nada nesta cabine aparecia.
-         `rotation.set(0.38, PI, 0)`: o PI vira a face para trás e o 0,38
-         acompanha a inclinação da tábua. */
-      const praOPiloto = no => { no.rotation.set(0.38, Math.PI, 0); return no; };
-      for (const dx of [-8.5, 0, 8.5]){
-        const mostrador = praOPiloto(new THREE.Mesh(new THREE.CircleGeometry(2.6, 12), mVisor));
-        mostrador.position.set(dx, 37.6, 143.4); g.add(mostrador);
-      }
-      for (const dx of [-5.6, 5.6]){
-        const telinha = praOPiloto(new THREE.Mesh(new THREE.PlaneGeometry(8.6, 6.2), mTela));
-        telinha.position.set(dx, 32.4, 144.9); g.add(telinha);
+      /* --- O PAINEL: uma chapa com a lona, e as telas vivas por cima -----
+         A INCLINAÇÃO É 0,38 rad e a face é a DE TRÁS. `rotation.set(0.38,
+         PI, 0)`: o PI vira a chapa para o piloto e o 0,38 acompanha a
+         tábua. Os três mostradores antigos estavam na face da FRENTE,
+         olhando para o nariz — invisíveis para quem senta atrás deles, e
+         ninguém nunca notou porque nada nesta cabine aparecia. */
+      const PL = 26, PA = PL*PAINEL_LONA.alt/PAINEL_LONA.larg;
+      const caixaP = new THREE.Mesh(caixaViva(PL + 1.2, PA + 1.2, 4, 1.2), mEscuro);
+      caixaP.position.set(0, 34.7, 145.4); caixaP.rotation.x = 0.52; g.add(caixaP);
+      const grupoP = new THREE.Group();
+      grupoP.add(new THREE.Mesh(new THREE.PlaneGeometry(PL, PA), materialDoPainel()));
+      const telasC = fazTelasCabine();
+      PAINEL_TELAS.forEach((t, i) => {
+        const w = t.w/PAINEL_LONA.larg*PL, h = t.h/PAINEL_LONA.alt*PA;
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+                    new THREE.MeshBasicMaterial({ map: telasC[i].tex }));
+        m.position.set(((t.x + t.w/2)/PAINEL_LONA.larg - 0.5)*PL,
+                       (0.5 - (t.y + t.h/2)/PAINEL_LONA.alt)*PA, 0.3);
+        grupoP.add(m);
+      });
+      /* A CHAPA FICA MEIA UNIDADE À FRENTE DA FACE, e a conta é esta: a
+         caixa está em (0,34,146) com 4 de fundo e inclinada 0,38, então a
+         face de trás dela é (0; 34,74; 144,15) e a normal que aponta para o
+         piloto é (0; 0,371; -0,927). Na primeira tentativa pus a chapa
+         exatamente em 144,1 — cinco centésimos DENTRO da caixa — e o painel
+         apareceu como uma tábua preta. Não era a face virada para o lado
+         errado, como eu suspeitei: era a chapa enterrada. */
+      /* a face de trás da caixa + meia unidade na normal dela. Com a caixa
+         em (0; 36,2; 145,4) inclinada 0,52, a normal para o piloto é
+         (0; 0,497; -0,868) e a face fica em (0; 37,19; 143,66). */
+      grupoP.position.set(0, 35.94, 143.23);
+      grupoP.rotation.set(0.52, Math.PI, 0);
+      g.add(grupoP);
+      g.userData.telasCabine = telasC;
+      /* O COAMING: a aba escura que corre por cima do painel, entre ele e o
+         vidro. É a peça mais barata da cabine e a que mais a faz parecer uma
+         — sem ela o painel acaba numa linha reta, com o mundo começando no
+         mesmo pixel. A borda de cima da chapa está em (0; 42,5; 147); esta
+         vem de lá para trás, na direção do piloto. */
+      const coam = new THREE.Mesh(caixaViva(27.5, 1.7, 9.5, 0.7), mPreto);
+      coam.position.set(0, 42.9, 142.6); coam.rotation.x = -0.07; g.add(coam);
+      /* e a FITA DE ALARMES vai na cara do coaming, não no alto do painel:
+         debaixo da aba ela ficava escondida, e em avião de verdade é ali que
+         ela mora mesmo — na altura dos olhos, onde não dá para não ver.
+         Não é textura nova: é a MESMA lona, recortada pelo `offset`/`repeat`
+         no pedaço onde a fita está pintada. */
+      {
+        const tt = telasC[telasC.length - 1];        // a última é a fita
+        const pl = new THREE.Mesh(new THREE.PlaneGeometry(24, 24*TIRA_CAB_A/TIRA_CAB_L),
+                     new THREE.MeshBasicMaterial({ map: tt.tex, transparent: true }));
+        pl.position.set(0, 42.58, 137.7); pl.rotation.set(0.07, Math.PI, 0);
+        g.add(pl);
       }
       /* O MANCHE MUDOU DE LUGAR, e não foi enfeite. Manche no meio das pernas
          fica exatamente na linha de visada de quem senta seis unidades acima
@@ -3944,7 +4208,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          pôs o manche no console DIREITO. Aqui é a mesma solução pela mesma
          razão. */
       const manche = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 11, 8), mPreto);
-      manche.position.set(11, 38, 124); manche.rotation.set(-0.16, 0, -0.1); g.add(manche);
+      manche.position.set(14, 38, 124); manche.rotation.set(-0.16, 0, -0.1); g.add(manche);
     }
 
   }
@@ -5120,7 +5384,14 @@ const VISTAS = [
      46: estes números são MEDIDOS A PARTIR DO OLHO, então mexer no olho move
      a câmera do capacete junto. Somando, ela continua exatamente onde estava
      (54 de altura), que é o enquadramento do vídeo. */
-  { nome:'CAPACETE', preso: true, tras: 20, cima: 8, fov: 110 }
+  /* E ELA TAMBÉM PRECISA DO CORTE CURTO. Eu tinha escrito, com toda a
+     confiança, que os 40 unidades da lente "limpam o apoio de cabeça de cima
+     da câmera" — nunca medi. O apoio está em y=46,5 e a câmera em 54: ela
+     passa POR CIMA dele, não dentro. O que os 40 faziam era outra coisa:
+     recortar o ASSOALHO da cabine, que fica a umas vinte unidades da lente.
+     O piloto via o mundo passando por baixo do próprio banco. Foi o usuário
+     que viu: "o do capacete tá vazando o assoalho". */
+  { nome:'CAPACETE', preso: true, tras: 20, cima: 8, fov: 110, perto: 10 }
 ];
 let nVista = 0;
 function poeVista(n){
@@ -8594,7 +8865,12 @@ function arruma(){
    Texto e linhas finas são o que o 2D faz melhor e mais barato. Então a cena
    é do three.js e a instrumentação continua sendo canvas, uma camada acima.
    ========================================================================== */
-const hud = document.getElementById('hud'), h2 = hud.getContext('2d');
+const hud = document.getElementById('hud');
+/* `h2` é LET, não const, e isto é a chave das telas da cabine: as páginas do
+   painel desenham em `h2` e recebem a caixa onde cabem como argumento, então
+   apontar `h2` para um canvas fora da tela faz a mesma página nascer dentro do
+   avião. Quem troca devolve no fim — `atualizaTelasCabine` é o único. */
+let h2 = hud.getContext('2d');
 let W=0, H=0, dpr=1;
 function redimensiona(){
   dpr = Math.min(window.devicePixelRatio || 1, qualidade >= 2 ? 2 : 1);
@@ -9897,7 +10173,13 @@ function mfdListaTeclas(){
    Guardo o número da JANELA junto: no computador há duas telas abertas, e a
    segunda a desenhar apagaria as zonas da primeira. */
 let _mfdKAtual = -1, _mfdZonas = [];
-function mfdZona(x, y, w, h, fn){ _mfdZonas.push({ k: _mfdKAtual, x, y, w, h, fn }); }
+/* desenhar FORA DA TELA não pode criar zona de toque: a página da cabine cai
+   num canvas de 384x256 e as coordenadas dela não são as da tela de ninguém */
+let _mfdMudo = false;
+function mfdZona(x, y, w, h, fn){
+  if (_mfdMudo) return;
+  _mfdZonas.push({ k: _mfdKAtual, x, y, w, h, fn });
+}
 function mfdTocaZonas(k, px, py){
   for (const z of _mfdZonas){
     if (z.k !== k) continue;
@@ -10488,9 +10770,15 @@ function mfdVidro(c, x, y, w, h, m){
 function desenhaMFD(k){
   const o = mfdOnde(k);
   if (!o) return;
-
-  /* ENCOLHIDA: só a alça e a fita de abas. */
-  if (mfdEncolhido){
+  desenhaMFDEm(o, k, false);
+}
+/* A CAIXA VEM DE FORA. Era `mfdOnde(k)` lá dentro, e por isso a página só
+   sabia nascer no canto da tela. Separado, o mesmo desenho serve para a
+   janela do HUD e para a textura da tela da cabine. */
+function desenhaMFDEm(o, k, cheio){
+  /* ENCOLHIDA: só a alça e a fita de abas. (Na cabine, nunca: a tela física
+     não encolhe.) */
+  if (mfdEncolhido && !cheio){
     const abas = Math.max(16, o.h - 16), alca = o.h - abas;
     mfdVidro(h2, o.x, o.y, o.w, o.h, { cab: 0, abas });
     const aw = Math.min(52, o.w*0.20), ah = Math.max(2, alca*0.16);
@@ -10578,7 +10866,14 @@ function mfdPintaAbas(o, abas, k){
   });
   h2.textAlign = 'left'; h2.textBaseline = 'alphabetic';
 }
-function desenhaTelas(){ _mfdZonas = []; desenhaMFD(0); desenhaMFD(1); }
+function desenhaTelas(){
+  _mfdZonas = [];
+  /* NA CABINE AS JANELAS SOMEM DA TELA, porque elas estão DENTRO do avião:
+     as duas telas do painel mostram exatamente estas duas páginas, ao vivo.
+     Desenhá-las de novo por cima seria tapar o painel com uma foto dele. */
+  if (cockpit) return;
+  desenhaMFD(0); desenhaMFD(1);
+}
 
 /* =============================================================================
    O HUD É VIDRO PRESO NO AVIÃO — NÃO É ÓCULOS
@@ -11823,6 +12118,7 @@ function quadro(t){
   ultimoT = t; sobrando += dt;
   while (sobrando > PASSO){ atualiza(PASSO); sobrando -= PASSO; }
   arruma();
+  atualizaTelasCabine(t);
   rend.render(cena, cam);
   desenhaHUD(); pinta();
   // se a máquina não estiver dando conta, desliga a sombra sozinha

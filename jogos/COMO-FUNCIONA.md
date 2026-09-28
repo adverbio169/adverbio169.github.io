@@ -7819,3 +7819,123 @@ nada do que entrou pode furar a lataria ou o vidro. É ela que mostra o ganho
 inesperado — **de fora, pelo vidro, agora se vê o banco, o apoio de cabeça, o
 console e o painel aceso**, que era o que o comentário de 2025 prometia e o
 modelo nunca entregou.
+
+---
+
+# O painel digital dentro do avião
+
+Veredito do teste anterior, e o mais útil que recebi até agora: *"tá
+melhorando. mas tem que refinar né. tá muito tosco tudo. o do capacete tá
+vazando o assoalho. o painel do cockpit tá uma merda."* E, no meio do
+conserto, a correção que mudou o desenho todo: *"tem que colocar o nosso
+painel digital."*
+
+## O assoalho vazando, e uma frase minha que era chute
+
+No commit anterior eu escrevi, com toda a confiança, que a vista do capacete
+tinha de manter o corte da lente em 40 porque *"ela tem o apoio de cabeça em
+cima da lente — é justamente o corte em 40 que a limpa"*.
+
+Nunca medi. O apoio de cabeça está em y=46,5 e a câmera do capacete em 54:
+ela passa **por cima** dele. O que os 40 faziam era outra coisa — recortar o
+ASSOALHO da cabine, que fica a umas vinte unidades da lente. O piloto via o
+mundo passando por baixo do próprio banco.
+
+Uma frase explicativa escrita sem medir é pior que nenhuma: ela parece
+conhecimento e vira lei. O corte da vista do capacete é 10.
+
+## Painel: estrutura pintada, telas vivas
+
+A primeira tentativa de painel foi geometria: uma tábua com três discos e dois
+retângulos. Ficou ruim pelo motivo que este arquivo já tinha escrito noutro
+contexto — *identidade em PINTURA custa zero volume; identidade em GEOMETRIA
+engorda*. Painel é feito de detalhe pequeno, e detalhe pequeno em blocos fica
+grosseiro e caro ao mesmo tempo.
+
+Então a estrutura virou uma **lona**: moldura, botões de borda, parafusos,
+chaves, mostradores de reserva, tudo desenhado num canvas de 512x300 e mapeado
+numa chapa só. Duas lonas, na verdade — a segunda tem tudo preto menos o que
+acende, e entra como `emissiveMap`: as telas brilham sozinhas, sem lâmpada
+nova na cena.
+
+E as **telas** são as páginas de verdade. Isto foi o pedido, e é óbvio depois
+de dito: o jogo já tem um painel digital inteiro, oito páginas, desenhado a
+cada quadro. Pintar um painel de mentira ao lado dele seria construir um
+segundo avião.
+
+O que tornou isso barato foi uma mudança de duas linhas:
+
+```js
+let h2 = hud.getContext('2d');       // era const
+function desenhaMFDEm(o, k, cheio)   // a caixa vem de FORA; era mfdOnde(k) lá dentro
+```
+
+Apontar `h2` para um canvas fora da tela e passar outra caixa faz a mesma
+página nascer dentro do avião. Mesmo código, mesmos dados, mesma fita de abas.
+Dez vezes por segundo, e só quando a cabine está à vista.
+
+Duas precauções que o refator exigiu: `mfdZona` não pode registrar zona de
+toque enquanto pinta fora da tela (`_mfdMudo`), e na vista de cabine as
+janelas 2D do HUD **somem** — elas estão dentro do avião agora, e desenhá-las
+por cima seria tapar o painel com uma foto dele.
+
+## Três defeitos em fila, e o terceiro estava em casa havia um ano
+
+O painel apareceu preto. Levei três medições:
+
+**1. A chapa estava enterrada.** Pus a lona em z=143,7 e a caixa estrutural
+tem a face de trás em 144,15 — cinco centésimos *dentro* dela. Eu tinha
+suspeitado de face virada para o lado errado; era mais burro que isso.
+
+**2. As texturas eram de outro avião.** `montaGaragem` monta o modelo mais de
+uma vez, e cada montagem criava um jogo novo de canvas, sobrescrevendo a
+variável do módulo. O avião no céu ficou com as texturas da primeira montagem
+e o laço pintava as da última: dois canvas certos, desenhados, e ninguém
+olhando para eles. Quem respondeu foi o teste perguntando
+`material.map === a textura que eu pinto?` — "não". As telas agora são lidas
+de `aviao.userData`, que é de quem está voando.
+
+**3. `fundePorCor` jogava a UV fora.** Esta é a boa. A função que funde as
+malhas do avião por cor — a que fez a cena caber num celular — emenda
+`position` e `normal` e mais nada. Durante um ano isso não fez falta:
+**nenhum material do avião tinha textura**, a identidade dele toda é cor de
+chapa. No dia em que o painel virou uma lona, as duas telas apareceram como
+dois retângulos de uma cor chapada: sem coordenada de textura, o sombreador
+amostra o mesmo texel para a peça inteira.
+
+Defeito latente de um ano, invisível até o primeiro uso, e encontrado não por
+olhar o painel — por ler o que a fusão copia.
+
+## A fita de alarmes é de verdade
+
+A fita do coaming (MESTRE · ESTOL · TERRENO · COMB · TREM · TRAVA) começou
+pintada, com dois quadradinhos acesos para sempre. Ficou bonita e mentirosa.
+A lista de alertas do jogo já existe — é a mesma que a página MOTOR mostra —
+então a fita virou uma terceira textura viva, 512x40, dez vezes por segundo.
+Anunciador que não anuncia é enfeite.
+
+O teste conta pixel aceso em dois estados, limpo e feio: 0 → 4.784. Se fosse
+pintura, os dois dariam o mesmo número.
+
+## O que ainda está tosco
+
+O usuário tem razão no geral, e vale registrar o que sobra: os consoles ainda
+são duas cunhas escuras sem desenho nenhum; não há manete de potência à
+esquerda; o nariz visto do capacete é uma chapa grande e chapada; e a cabine
+não tem piloto. Nada disso é difícil — é a mesma técnica da lona, aplicada de
+novo.
+
+## E o custo?
+
+Tentei medir quadros por segundo nas três vistas e a medição não presta: o
+navegador dos testes desenha por software, a uns três quadros por segundo em
+qualquer vista, e ainda por cima acelerando ao longo da corrida (a primeira
+vista medida sai sempre pior). Joguei o script fora em vez de guardar um
+número bonito e falso.
+
+A conta, que é curta, diz o contrário do que o medo sugere. Antes, na cabine,
+o jogo desenhava **duas páginas por quadro** para as janelas 2D: 120 páginas
+por segundo. Agora desenha **três a dez por segundo** — as duas telas mais a
+fita — e não desenha as janelas 2D, que sumiram. São 30 contra 120. O que
+entra de novo é o envio de três texturas por atualização, algo como 1 MB/s.
+A vista de cabine ficou mais barata, não mais cara.
