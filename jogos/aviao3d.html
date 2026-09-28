@@ -11414,6 +11414,59 @@ let camPos = new THREE.Vector3(), camF={x:0,y:0,z:1}, camC={x:0,y:1,z:0}, camD={
    Os dois números abaixo são medidos, não chutados — ver a régua em
    COMO-FUNCIONA. */
 let CAMD = 820, CAM_CIMA = 270, CAM_INCL = 3*Math.PI/180;
+/* AS VISTAS SÃO UMA LISTA, NÃO UM SIM/NÃO.
+
+   Eram duas, num booleano `cockpit`, e trocar era negá-lo. Pedido: uma
+   terceira. Com booleano isso vira um `if` em cada um dos dez lugares que
+   perguntam "é cabine?"; com lista, vira uma linha de tabela.
+
+   `cockpit` CONTINUA existindo e continua sendo lido por esses dez lugares —
+   ele só deixou de ser a fonte e passou a ser DERIVADO. Trocar a base sem
+   trocar quem a lê é o que faz esta mudança caber em três pontos.
+
+   Os números de cada vista externa são a distância atrás, a altura acima e a
+   inclinação para baixo da câmera. Mudar o enquadramento de qualquer uma é
+   editar três números aqui — não é procurar onde a câmera é montada. */
+const VISTAS = [
+  { nome:'FORA',   d: 820,  cima: 270, incl: 3 },
+  { nome:'CABINE', cabine: true },
+  /* A CÂMERA DO CAPACETE — a do vídeo que ele mandou.
+
+     É um F-16 com uma grande-angular montada ATRÁS E ACIMA da cabeça do
+     piloto: aparecem o arco da canópia dos dois lados, o painel, o HUD e as
+     mãos, e o horizonte curva de tão aberto o ângulo. O que dá a alma daquilo
+     não é a posição — é VER O AVIÃO EM VOLTA.
+
+     E é exatamente o que a nossa CABINE não faz: ela põe o olho do piloto no
+     lugar certo e esconde o avião (`aviao.visible = !cockpit`), então sobra
+     o mundo e mais nada. Vista nua.
+
+     Esta terceira fica presa aos eixos do avião como a cabine, mas recuada
+     para trás do banco, um pouco acima, com o avião VISÍVEL e o campo de
+     visão bem aberto. O nariz comprido na frente e a asa entrando pelos
+     cantos são o que faz a velocidade ser sentida. */
+  /* Os três números saíram de varrer e OLHAR, não de calcular: a 20 atrás do
+     olho, 14 acima e 110 de campo, o arco da canópia atravessa o topo da tela
+     e a pista some por baixo dele — que é o enquadramento do vídeo. */
+  { nome:'CAPACETE', preso: true, tras: 20, cima: 14, fov: 110 }
+];
+let nVista = 0;
+function poeVista(n){
+  nVista = ((n % VISTAS.length) + VISTAS.length) % VISTAS.length;
+  const v = VISTAS[nVista];
+  cockpit = !!v.cabine;
+  /* só as vistas de PERSEGUIÇÃO mexem nestes três. A do capacete não tem `d`
+     nem `incl`, e a versão anterior atribuía `undefined` a CAMD e NaN a
+     CAM_INCL — o que estragava a vista FORA na volta e punha NaN na rotação
+     da câmera. O meu próprio teste imprimiu "820 vs undefined" e eu deixei
+     passar, porque a asserção só pedia que fossem DIFERENTES. Asserção frouxa
+     é pior que asserção nenhuma: ela dá um verde. */
+  if (v.d !== undefined){
+    CAMD = v.d; CAM_CIMA = v.cima; CAM_INCL = (v.incl || 0)*Math.PI/180;
+  }
+  esqueceRadar();
+  mostraAviso('VISTA ' + v.nome, '#9fd8ff', 900);
+}
 
 function giraPar(u, v, ang){
   const c = Math.cos(ang), s = Math.sin(ang);
@@ -11759,14 +11812,19 @@ function olhaComACabeca(){
   return { F, C, D: vcruz(C, F) };
 }
 function poeCamera(dt){
-  if (cockpit){
+  const vAtual = VISTAS[nVista];
+  if (cockpit || vAtual.preso){
     camF = eixoF; camC = eixoC; camD = eixoD;
     /* o olho do piloto do AD-02: 118 à frente do centro e 40 acima, que é onde
-       está a cabeça no banco — antes eram 40 e 26, a cabine do dragão */
+       está a cabeça no banco — antes eram 40 e 26, a cabine do dragão.
+       A do capacete sai do mesmo ponto e recua, que é como a câmera de verdade
+       fica: atrás e acima da cabeça. */
     const olho = MEDIDAS.cabine;
-    camPos.set(aviaoX + eixoF.x*olho.frente + eixoC.x*olho.cima,
-               aviaoY + eixoF.y*olho.frente + eixoC.y*olho.cima,
-               aviaoZ + eixoF.z*olho.frente + eixoC.z*olho.cima);
+    const fr = olho.frente - (vAtual.tras || 0);
+    const ci = olho.cima + (vAtual.cima || 0);
+    camPos.set(aviaoX + eixoF.x*fr + eixoC.x*ci,
+               aviaoY + eixoF.y*fr + eixoC.y*ci,
+               aviaoZ + eixoF.z*fr + eixoC.z*ci);
   } else {
     /* ------------------------------------------------------------------
        A CÂMERA ERA O ATRASO.
@@ -11840,7 +11898,10 @@ function poeCamera(dt){
      mundo nas bordas passa a correr muito mais depressa que no meio, que é
      exatamente o que o olho lê como "estou acelerando". Vai e volta macio —
      abrir de repente enjoa. */
-  const fovQuer = turbinando ? CAM_FOV_TURBO : CAM_FOV;
+  /* o campo de visão é da VISTA: a do capacete é grande-angular, e é dela
+     que vem a sensação de estar dentro de uma máquina rápida */
+  const fovBase = VISTAS[nVista].fov || CAM_FOV;
+  const fovQuer = turbinando ? fovBase + (CAM_FOV_TURBO - CAM_FOV) : fovBase;
   if (Math.abs(cam.fov - fovQuer) > 0.05){
     cam.fov += (fovQuer - cam.fov) * Math.min(1, dt*(turbinando ? 3.2 : 2.0));
     cam.updateProjectionMatrix();
@@ -18105,7 +18166,7 @@ document.addEventListener('keydown', e => {
   if (e.key==='3') trocaArma('metralha');
   if (e.key==='q'||e.key==='Q') mfdRola(-1);    // as duas teclas rolam a MESMA
   if (e.key==='e'||e.key==='E') mfdRola(+1);    // fita, uma para cada lado
-  if (e.key==='v'||e.key==='V'){ cockpit = !cockpit; esqueceRadar(); }
+  if (e.key==='v'||e.key==='V'){ poeVista(nVista + 1); }
   /* C liga; com o olhar já ligado, C recalibra o "reto" — que é o que se quer
      apertar no meio do jogo, depois de se acomodar melhor na cadeira */
   if (e.key==='c'||e.key==='C'){ if (Cabeca.ligada) Cabeca.centraliza(); else Cabeca.liga(); }
@@ -18290,7 +18351,7 @@ addEventListener('touchend', e => {
 }, {passive:true});
 addEventListener('touchcancel', () => { if (mfdGesto) mfdSolta(); }, {passive:true});
 
-$('btVisao').onclick = () => { cockpit = !cockpit; esqueceRadar(); };
+$('btVisao').onclick = () => { poeVista(nVista + 1); };
 /* e o mesmo no computador, com o rato: clicar na aba troca, e arrastar rola —
    quem vê uma fileira de abas tenta clicar nela antes de procurar a tecla */
 addEventListener('mousedown', e => { if (jogando) mfdPega(e.clientX, e.clientY); });
@@ -19117,7 +19178,7 @@ const Tripulacao = {
       case 'apx': aproxSel = (d.i === null || d.i === undefined) ? null
                              : { i: d.i >> 1, s: (d.i & 1) ? -1 : 1 };
                   break;
-      case 'visao': cockpit = !cockpit; esqueceRadar(); break;
+      case 'visao': poeVista(d.v === undefined ? nVista + 1 : d.v); break;
       /* AS FUNÇÕES DE VISUALIZAÇÃO, PELO CELULAR. Elas moravam só em botões
          da tela do jogo — e quem joga com a TV a três metros não alcança
          botão de tela. O celular É o painel, então o painel manda nelas.
@@ -19339,6 +19400,9 @@ function mandaEstado(){
     sorF: Sortida.fase,
     cab: cockpit ? 1 : 0,        // em que vista a tela está, para o botão do celular
                                  // não ser um interruptor cego
+    vis: nVista, visN: VISTAS.map(v => v.nome),
+                                 // a LISTA vai junto: o celular não precisa
+                                 // saber de cor quantas vistas existem
     qual: qualidade,             // 0 baixo, 1 médio, 2 alto
     /* 0 sem câmera nesta tela · 1 tem câmera e está desligado · 2 ligado e
        achando o rosto · 3 ligado e perdeu o rosto. O celular precisa dos

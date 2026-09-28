@@ -79,7 +79,7 @@ confusão nasce de mexer no arranjo errado.
 | **G** | trem de pouso |
 | **F** | flapes |
 | **espaço** | atirar |
-| **V** | trocar a vista |
+| **V** | trocar a vista (FORA → CABINE → CAPACETE → …) |
 | **1 2 3** | trocar de arma |
 | **Z** | chamas de defesa |
 | **C** | olhar com a cabeça (precisa de câmera) |
@@ -105,12 +105,24 @@ borda de cima** = profundor, **apontar para o lado** = leme. O resto é toque.
 | alvo designado | página **TÁTIC**, toca no contato |
 | arma | desliza no poço ARMAMENTO |
 | trem e flape | página **SINÓT**, toca no desenho do avião |
-| trocar a vista (cabine/fora) | botão **👁** na faixa de cima do controle |
+| trocar a vista | botão **👁** na faixa de cima do controle (cicla as três) |
 | qualidade do desenho | botão **◉** na mesma faixa (alto → médio → baixo) |
 | olhar com a cabeça | botão **🧠** na mesma faixa (precisa de câmera **na tela do jogo**) |
 | descarregar a aproximação | toca no cabeçalho dela |
 
 ---
+
+## As três vistas
+
+| vista | o que é |
+|---|---|
+| **FORA** | perseguição atrás do avião, a de sempre |
+| **CABINE** | o olho do piloto, sem o avião em volta |
+| **CAPACETE** | grande-angular logo atrás da canópia, com o avião visível: o arco da canópia atravessa o topo e o nariz estica à frente |
+
+Os números de cada uma (distância, altura, inclinação, campo de visão) estão
+numa tabela só, `VISTAS`, no `aviao3d.modelo.html`. Mudar enquadramento é
+editar três números — não é procurar onde a câmera é montada.
 
 ## O painel
 
@@ -191,6 +203,7 @@ scratchpad da sessão de trabalho. Os que importam, e o que cada um prova:
 | `radarpac.js` | o contato cai no lado certo do disco, na TV **e** no celular |
 | `decola.js` | a decolagem é contínua: mede a velocidade vertical quadro a quadro e cobra que o degrau na saída do chão seja pequeno |
 | `pisca.js` | o eco atrasado da TV não desfaz a escolha de formato feita no celular |
+| `vistas.js` | as três vistas existem, pintam quadros diferentes, **V** cicla e o pacote leva qual é |
 | `monitor.js` | o arranjo de **computador**, com mouse de verdade: clicar escolhe missão, clicar numa aba pula, clicar carrega aproximação, arrastar troca página |
 | `arrasta.js` | o arrasto troca o formato **em cada lugar onde a mão pousa** — inclusive em cima da bola |
 | `visao.js` | o botão de vista cabe na faixa em três aparelhos e manda `t:visao` |
@@ -198,6 +211,12 @@ scratchpad da sessão de trabalho. Os que importam, e o que cada um prova:
 
 **Lição cara, repetida:** asserção de estado não pega "desenhado num ramo que
 nunca roda". Quando o defeito é visual, **conte pixels**.
+
+**A terceira:** antes de fotografar um `<canvas>`, **desenhe**. Sem o laço de
+animação rodando (ligar `jogando` na mão não o inicia — quem o inicia é
+`comeca()`), a tela guarda o último quadro e a foto mostra um estado que já
+não existe. Três screenshots seguidas me mostraram a câmera no lugar errado
+enquanto a medição dizia o lugar certo — e a medição estava certa.
 
 **A outra, igualmente cara:** quando algo é desenhado com a origem transladada
 (cada janela do painel é), tudo o que o desenho **guardar** precisa sair em

@@ -7579,3 +7579,68 @@ acontece de verdade com um avião rápido demais para continuar no chão.
 
 A constante `DECOLA = 1.18` saiu junto: era a margem do limiar antigo, e
 constante sem uso é uma resposta a uma pergunta que ninguém faz mais.
+
+# A terceira vista, e como eu consegui ver o vídeo
+
+Ele mandou um link de YouTube Shorts e pediu a câmera daquele vídeo. Este
+container não tem saída para a web: WebFetch no youtube, `curl` no youtu.be e
+no `noembed`, o leitor `r.jina.ai`, os espelhos invidious e até a miniatura no
+`i.ytimg.com` — todos negados pelo proxy. O teste de controle fechou a
+questão: WebFetch na **Wikipédia** também é negado, ou seja, não é o YouTube,
+é a rede.
+
+Aí ele gravou a tela e mandou o mp4. E daí deu:
+
+- o `ffmpeg` do Playwright (`/opt/pw-browsers/ffmpeg-1011`) é uma build
+  reduzida: recusou o arquivo (*"Invalid data"*), porque não traz demuxer de
+  mp4/h264;
+- o Chromium do Playwright também não decodifica H.264 —
+  `canPlayType('video/mp4; codecs="avc1.42E01E"')` devolve string vazia;
+- mas **o PyPI está liberado no proxy**, e `pip install imageio-ffmpeg` traz um
+  ffmpeg 7.0 completo dentro do wheel. Um quadro por segundo, folha de contato,
+  e o vídeo fica legível.
+
+Vale guardar: quando a rede está fechada, os índices de pacote (`pypi.org`,
+`registry.npmjs.org`) costumam estar abertos, e muita ferramenta chega por ali.
+
+## O que o vídeo mostra
+
+*"Incredible Cockpit View | F-16 Fighting Falcon"* — uma grande-angular
+montada **atrás e acima da cabeça do piloto**: o arco da canópia dos dois
+lados, o painel e o HUD embaixo, as mãos do piloto, e o horizonte curvando de
+tão aberto o ângulo.
+
+O detalhe que importa: **vê-se o avião em volta**. E é exatamente o que a
+nossa CABINE não faz — ela põe o olho no lugar certo e some com o avião
+(`aviao.visible = !cockpit`), então sobra o mundo e mais nada. Vista nua.
+
+## De booleano para lista
+
+`cockpit` era um sim/não, e trocar era negá-lo. Uma terceira vista com
+booleano viraria um `if` em cada um dos dez lugares que perguntam "é cabine?".
+Virou uma lista, `VISTAS`, e `cockpit` passou a ser **derivado** — continua
+sendo lido pelos mesmos dez lugares, só deixou de ser a fonte. Trocar a base
+sem trocar quem a lê é o que fez a mudança caber em três pontos.
+
+A do capacete fica presa aos eixos do avião como a cabine, recuada 20 atrás do
+olho, 14 acima, com 110° de campo e o avião **visível**.
+
+## Dois enganos meus, e os dois foram de instrumento
+
+**O primeiro: uma asserção frouxa deu verde num defeito.** `poeVista` fazia
+`CAMD = v.d` para toda vista que não fosse cabine — e a do capacete não tem
+`d`. Resultado: `CAMD = undefined` e `CAM_INCL = NaN`, estragando a vista FORA
+na volta. O teste imprimiu literalmente `FORA e CINEMA enquadram diferente:
+820 vs undefined` e **passou**, porque eu só pedira que fossem diferentes.
+Asserção frouxa é pior que asserção nenhuma: ela dá um verde. Agora pede
+`Number.isFinite` e o valor exato.
+
+**O segundo: fotografei um canvas que ninguém desenhou.** Três screenshots
+seguidas mostraram a câmera longe, atrás do avião, enquanto a medição dizia
+que ela estava a 76 unidades do centro, dentro da fuselagem. A medição estava
+certa: eu ligava `jogando = true` na mão sem chamar `comeca()`, então o laço
+de animação nunca começava, e o `waitForTimeout` fotografava o **último quadro
+desenhado** — a vista anterior.
+
+Gastei seis tentativas discutindo com uma imagem velha. A regra, agora no
+leia-me: **antes de fotografar um canvas, desenhe.**

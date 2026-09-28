@@ -932,7 +932,10 @@ function conectar(codigo){
         for (const id of ['btVisao','btQual','btOlho']){
           const e = $(id); if (e) e.style.display = d.jogando ? '' : 'none';
         }
-        if ($('visaoTxt')) $('visaoTxt').textContent = d.cab ? 'CABINE' : 'FORA';
+        /* o nome vem da TV junto com a lista: acrescentar uma quarta vista
+           lá não exige tocar aqui */
+        if ($('visaoTxt')) $('visaoTxt').textContent =
+          (d.visN && d.visN[d.vis]) || (d.cab ? 'CABINE' : 'FORA');
         if ($('qualTxt'))  $('qualTxt').textContent =
           ['BAIXO','MÉDIO','ALTO'][d.qual === undefined ? 2 : d.qual];
         const bo = $('btOlho');
