@@ -15823,8 +15823,8 @@ function mfdPaginaEscolha(o, m){
      com letra maior, leva só a primeira. */
   h2.font = '800 ' + (m.f*0.72).toFixed(1) + 'px system-ui, sans-serif';
   h2.textAlign = 'center'; h2.fillStyle = MFD_ROT;
-  const rod = 'TOQUE PARA ESCOLHER · DECOLE PARA COMEÇAR';
-  h2.fillText(h2.measureText(rod).width <= w ? rod : 'TOQUE PARA ESCOLHER',
+  const rod = mfdVerbo() + ' PARA ESCOLHER · DECOLE PARA COMEÇAR';
+  h2.fillText(h2.measureText(rod).width <= w ? rod : mfdVerbo() + ' PARA ESCOLHER',
               x + w/2, m.corpoY + m.corpoH*0.95);
   h2.textAlign = 'left';
 }
@@ -15996,6 +15996,11 @@ function mfdPaginaVoo(o, m){
 const PAG_TECLAS = 'SINÓT';
 function mfdModoDedo(){ return document.body.classList.contains('dedos'); }
 function mfdTemTeclas(nome){ return mfdModoDedo() && nome === PAG_TECLAS; }
+/* TOQUE ou CLIQUE, conforme o que a pessoa tem na mão. Num monitor o rodapé
+   dizia "TOQUE PARA CARREGAR" para quem só tem mouse — instrução que descreve
+   um gesto impossível é pior que instrução nenhuma, porque a pessoa procura o
+   gesto. */
+function mfdVerbo(){ return mfdModoDedo() ? 'TOQUE' : 'CLIQUE'; }
 function mfdPagDaCaixa(o, nome){
   return nome !== undefined ? nome
        : (o && o.k !== undefined) ? MFD_PAGS[mfdPagDe(o.k + 1)] : '';
@@ -16310,7 +16315,18 @@ function mfdAproxLista(o, m){
     /* a distância à direita, e a proa entre elas: é por estes dois números
        que se escolhe uma cabeceira, e sem eles a lista seria um menu cego */
     h2.font = '700 ' + (m.f*0.86).toFixed(1) + 'px ui-monospace, monospace';
-    h2.textAlign = 'right'; h2.fillStyle = q.dist < 0 ? MFD_FRACO : MFD_CLARO;
+    /* A LINHA NÃO APAGA MAIS. O cinza vinha de `dist < 0` — a distância ao
+       longo do eixo, que fica negativa quando a cabeceira já ficou para trás
+       — e na coluna passou a estar a distância em LINHA RETA, que é sempre
+       positiva. Resultado no monitor: três das quatro cabeceiras cinzas
+       mostrando números perfeitamente bons, inclusive a que o » recomendava a
+       60 m de distância. Cor dizendo "indisponível" sobre número dizendo
+       "60m" é a tela se contradizendo.
+
+       As quatro são escolhíveis, então as quatro se leem igual. Qual delas
+       exige dar meia-volta continua dito pela PROA ao lado — que é o dado, e
+       não uma cor. */
+    h2.textAlign = 'right'; h2.fillStyle = MFD_CLARO;
     const dtxt = q.reta > 1500 ? (Math.round(q.reta/100)/10 + 'km')
                                : (Math.round(q.reta) + 'm');
     h2.fillText(dtxt, x + w, y);
@@ -16319,8 +16335,8 @@ function mfdAproxLista(o, m){
   }
   h2.font = '800 ' + (m.f*0.72).toFixed(1) + 'px system-ui, sans-serif';
   h2.textAlign = 'center'; h2.fillStyle = MFD_ROT;
-  const rod = 'TOQUE PARA CARREGAR · » É A SUGERIDA';
-  h2.fillText(h2.measureText(rod).width <= w ? rod : 'TOQUE PARA CARREGAR',
+  const rod = mfdVerbo() + ' PARA CARREGAR · » É A SUGERIDA';
+  h2.fillText(h2.measureText(rod).width <= w ? rod : mfdVerbo() + ' PARA CARREGAR',
               x + w/2, m.corpoY + m.corpoH*0.95);
   h2.textAlign = 'left';
 }
@@ -19227,6 +19243,8 @@ function mandaEstado(){
                                  q.id === sortidaId ? 1 : 0, q.lema])
             : null,
     sorF: Sortida.fase,
+    cab: cockpit ? 1 : 0,        // em que vista a tela está, para o botão do celular
+                                 // não ser um interruptor cego
     alertas: mfdAlertas().map(a => [a[0], a[1] === MFD_VERM ? 2 : 1]),
     mapa: contatosDoRadar(), apx: aproxParaOCelular() });
 }

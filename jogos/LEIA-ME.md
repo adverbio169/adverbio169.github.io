@@ -84,7 +84,10 @@ confusão nasce de mexer no arranjo errado.
 | **Z** | chamas de defesa |
 | **C** | olhar com a cabeça (precisa de câmera) |
 
-O painel responde ao mouse: arrastar troca de página, clicar numa aba vai direto.
+O painel responde ao mouse: arrastar troca de página, clicar numa aba vai
+direto, clicar numa linha escolhe (missão, cabeceira, alvo). Os rodapés dizem
+**CLIQUE** no computador e **TOQUE** no celular — é o mesmo texto, escolhido
+pelo aparelho.
 
 ### No celular
 
@@ -102,6 +105,7 @@ borda de cima** = profundor, **apontar para o lado** = leme. O resto é toque.
 | alvo designado | página **TÁTIC**, toca no contato |
 | arma | desliza no poço ARMAMENTO |
 | trem e flape | página **SINÓT**, toca no desenho do avião |
+| trocar a vista (cabine/fora) | botão **👁** na faixa de cima do controle |
 | descarregar a aproximação | toca no cabeçalho dela |
 
 ---
@@ -182,6 +186,10 @@ scratchpad da sessão de trabalho. Os que importam, e o que cada um prova:
 | `multi.js` | as janelas multifunção e a troca de formato |
 | `adivivo.js` | a bola do horizonte se mexe (por pixel, não por estado) |
 | `radarpac.js` | o contato cai no lado certo do disco, na TV **e** no celular |
+| `monitor.js` | o arranjo de **computador**, com mouse de verdade: clicar escolhe missão, clicar numa aba pula, clicar carrega aproximação, arrastar troca página |
+| `arrasta.js` | o arrasto troca o formato **em cada lugar onde a mão pousa** — inclusive em cima da bola |
+| `visao.js` | o botão de vista cabe na faixa em três aparelhos e manda `t:visao` |
+| `pacote.js` | o pacote do jogo leva a vista (`cab`), interceptando o envio de verdade |
 
 **Lição cara, repetida:** asserção de estado não pega "desenhado num ramo que
 nunca roda". Quando o defeito é visual, **conte pixels**.

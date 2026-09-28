@@ -423,8 +423,18 @@ body.paisagem #controle.ver,
   body.paisagem #estadoRede, body.paisagem #posto{
               position:fixed;z-index:4;margin:0;transform:none;
               border:0;box-shadow:none;background:transparent}
-  body.paisagem #horizonte{border-radius:50%;overflow:hidden;
+  /* A BOLA NÃO PEGA O DEDO. Ela é IRMÃ do painel no documento, não filha —
+     então o toque que cai nela não sobe para o painel, e a janela da esquerda
+     não recebia nem foco nem arrasto. Relato: "os painéis não estão mudando
+     no controle, tem que conseguir passar com o arrasta".
+
+     `pointer-events:none` é a correção certa e não um remendo: a bola é um
+     MOSTRADOR, não um comando. Quem manda na janela é a janela, e o dedo
+     atravessa o vidro até ela. O mesmo não vale para o seletor de arma, a
+     manete e o gatilho — esses são comandos e ficam com os toques deles. */
+  body.paisagem #horizonte{border-radius:50%;overflow:hidden;pointer-events:none;
               box-shadow:inset 0 0 0 1px rgba(99,216,255,.30)}
+  body.paisagem #horizonte *{pointer-events:none}
   body.paisagem .armas{display:flex;align-items:center;justify-content:center;
               border-radius:8px;background:rgba(4,14,21,.35)}
   body.paisagem #nitro, body.paisagem #acel{border-radius:6px;overflow:hidden;
@@ -462,6 +472,17 @@ body.paisagem #controle.ver,
      estado da ligação. O resto aparece quando a engrenagem pede. */
   body.paisagem.voando:not(.ajustes) #btComecar,
   body.paisagem.voando:not(.ajustes) #giroLinha{display:none}
+  /* A VISÃO SOBE PARA A FAIXA DE CABEÇA. Ela estava junto de "girar", atrás
+     da engrenagem, tratada como ajuste — e não é: trocar de cabine para fora
+     se faz VOANDO, várias vezes, como o Calibrar. Relato: "tem que colocar as
+     funções de visualização nele". */
+  body.paisagem #btVisao{position:fixed;z-index:6;display:flex;
+              align-items:center;justify-content:center;gap:5px;
+              border:1px solid rgba(99,216,255,.28);border-radius:7px;
+              background:rgba(4,14,21,.45);color:#cfe8ff;font:700 11.5px/1 inherit;
+              padding:0 9px;cursor:pointer;white-space:nowrap}
+  body.paisagem #btVisao b{color:#9fd4ff;font-weight:800;letter-spacing:.5px}
+  #btVisao{display:none}
   body.paisagem.voando.ajustes #btAjustes{background:rgba(92,200,255,.18);
               border-color:rgba(92,200,255,.55)}
   body.paisagem #giroLinha button{font-size:11.5px;padding:0 10px;
@@ -573,6 +594,7 @@ body.paisagem #controle.ver,
     <button class="bt sec pouso" id="btFlap">FLAPE</button>
   </div>
   <button id="btAjustes" title="mostrar os ajustes" aria-label="mostrar os ajustes">&#9881;</button>
+  <button id="btVisao" title="trocar a vista">&#128065; <b id="visaoTxt">FORA</b></button>
   <div id="giroLinha">asas: <b id="giroTxt">&hellip;</b>
     <button id="btGiro">girar</button>
     <button id="btVisaoC">cabine</button></div>
@@ -879,6 +901,11 @@ function conectar(codigo){
            por outro. */
         document.body.classList.toggle('voando', !!d.jogando);
         if (!d.jogando) document.body.classList.remove('ajustes');
+        /* a visão vem da TV: sem isso o botão seria um interruptor cego, que
+           diz "FORA" depois de a pessoa ter trocado a vista pelo teclado */
+        const bv = $('btVisao');
+        if (bv){ bv.style.display = d.jogando ? '' : 'none';
+                 $('visaoTxt').textContent = d.cab ? 'CABINE' : 'FORA'; }
       }
     });
     conn.on('close', () => { estadoRede('nao', 'a TV desconectou'); Tremor.calaTudo(); });
@@ -1641,9 +1668,19 @@ const Painel = {
              li.style.height = hb + 'px'; li.style.right = 'auto'; li.style.bottom = 'auto';
              li.querySelectorAll('.bt').forEach(b => { b.style.height = hb + 'px';
                                                        b.style.lineHeight = hb + 'px'; }); }
+    /* a visão fica logo depois do Calibrar: os dois são de voo, e os dois
+       ficam onde a mão esquerda alcança sem cobrir instrumento */
+    const bv = document.getElementById('btVisao');
+    if (bv && getComputedStyle(bv).display !== 'none'){
+      const lr = li ? li.getBoundingClientRect() : { right: xe };
+      bv.style.left = (lr.right + 5) + 'px'; bv.style.top = yb + 'px';
+      bv.style.height = hb + 'px';
+    }
     const gl = document.getElementById('giroLinha');
     if (gl && getComputedStyle(gl).display !== 'none'){
-      const lr = li ? li.getBoundingClientRect() : { right: xe };
+      const ant = (bv && getComputedStyle(bv).display !== 'none') ? bv
+                : (li || null);
+      const lr = ant ? ant.getBoundingClientRect() : { right: xe };
       gl.style.left = (lr.right + 6) + 'px'; gl.style.top = yb + 'px';
       gl.style.height = hb + 'px';
       gl.querySelectorAll('button').forEach(b => { b.style.height = hb + 'px'; });
@@ -3319,6 +3356,10 @@ function medeDeitado(){
   document.body.classList.toggle('paisagem', alt <= 520);
 }
 
+$('btVisao').onclick = () => {
+  enviaCtl({ t: 'visao' });
+  try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
+};
 $('btAjustes').onclick = () => {
   document.body.classList.toggle('ajustes');
   try { navigator.vibrate && navigator.vibrate(10); } catch(e){}

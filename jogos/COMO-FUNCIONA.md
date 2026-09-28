@@ -7343,3 +7343,101 @@ janela, que é a única coordenada útil para quem está de fora.
 Vale reparar em como ele apareceu: não foi revisão, foi **rodar tudo por outro
 motivo**. Suíte que só roda quando se mexe na área da mudança não pega dívida
 de coordenada.
+
+# Dois defeitos que só apareceram num monitor
+
+Ele testou no computador e mandou ler o leia-me. O arquivo afirmava três
+coisas sobre o arranjo de monitor que eu nunca tinha provado — clicar escolhe,
+clicar numa aba pula, arrastar troca página. Escrevi o `monitor.js` para
+verificar, com mouse de verdade: **as nove afirmações se sustentam.**
+
+Mas a foto da tela mostrou outras duas coisas, e as duas são minhas.
+
+## "TOQUE PARA CARREGAR" num computador
+
+O rodapé das páginas de escolha manda tocar. Num monitor não há o que tocar, e
+**instrução que descreve um gesto impossível é pior que instrução nenhuma** —
+a pessoa para e procura o gesto. Agora o verbo sai do aparelho: `mfdVerbo()`
+devolve TOQUE no modo dedo e CLIQUE no resto.
+
+## A tela se contradizendo
+
+Na lista de cabeceiras, três das quatro linhas estavam **cinzas** — inclusive
+a que o `»` recomendava, a 60 metros. O cinza vinha de `dist < 0`, a distância
+ao longo do eixo de pouso, que fica negativa quando a cabeceira já ficou para
+trás.
+
+Só que eu tinha trocado o número mostrado por `reta`, a distância em linha
+reta, que é sempre positiva — e deixei a **cor** lendo o número antigo. O
+resultado é uma célula dizendo "60m" numa linha pintada de "indisponível".
+
+Este é o mesmo erro de sempre, na sua forma mais barata de cometer: mudei o
+que a coluna **mostra** e esqueci o que a coluna **significa**. Quando um
+valor deixa de ser exibido, todo mundo que dependia dele tem de ser
+reexaminado — inclusive a cor.
+
+As quatro são escolhíveis, então as quatro se leem igual. Qual exige dar
+meia-volta continua dito pela PROA ao lado, que é um dado e não uma cor.
+
+## O que NÃO era defeito
+
+A página ARMAS lista três armas e eu quase relatei uma quarta faltando. São
+três mesmo: `bomba`, `missil`, `metralha` — e `bomba` se chama **NUCLEAR** na
+tela. Conferir antes de acusar custou uma linha de `grep`.
+
+# O mostrador que engolia o dedo
+
+> "O controle do jogo no celular ficou muito top. Tem que colocar as funções
+> de visualização nele, e tbm os painéis não tão mudando no controle. Tem que
+> conseguir passar com o arrasta."
+
+## O defeito
+
+A janela da esquerda não trocava de formato — nem por arrasto, nem por toque.
+A causa não estava no gesto: estava em **quem recebia o dedo**.
+
+Os instrumentos são elementos de HTML **irmãos** do painel no documento, não
+filhos. Um toque que cai na bola do horizonte vai para `adiLona` e **não sobe**
+para `#painelTela`, onde moram os ouvintes do gesto. O teste mediu isso
+diretamente, com `elementFromPoint`:
+
+```
+em meio da janela grande  o dedo acerta: CANVAS      → arrasto funciona
+em meio da bola           o dedo acerta: adiLona     → arrasto morre aqui
+```
+
+E a janela da esquerda é justamente a que tem a bola ocupando quase todo o
+poço. Em cima dela, nada funcionava.
+
+## A correção certa, e por que não é remendo
+
+`pointer-events: none` na bola. Ela é um **mostrador**, não um comando: não há
+nada nela para apertar, e o dedo deve atravessar o vidro até a janela que a
+contém. Quem manda na janela é a janela.
+
+O mesmo **não** vale para o seletor de arma, as manetes e o gatilho — esses
+são comandos e ficam com os toques deles. A regra que sai daqui é simples:
+*dentro do painel, o que mostra deixa passar; o que comanda, pega.*
+
+## E a vista subiu para a faixa de cabeça
+
+"Colocar as funções de visualização nele." Trocar de cabine para fora estava
+junto de "girar", atrás da engrenagem, tratada como **ajuste** — e não é:
+troca-se de vista voando, várias vezes, como o Calibrar.
+
+Agora é um botão fixo na faixa, com um olho e o estado ao lado. E o estado vem
+da TV, num campo novo do pacote (`cab`): sem ele o botão seria um
+**interruptor cego**, dizendo "FORA" depois de a pessoa ter trocado a vista
+pelo teclado.
+
+## Um teste que eu quase deixei mentir
+
+Escrevi uma asserção "o texto segue a TV" que fazia isto: escrevia `CABINE` no
+elemento à mão e depois conferia que estava escrito `CABINE`. Não prova nada —
+prova que `textContent` funciona.
+
+Tirei, e provei a metade que dá para provar de verdade: `pacote.js` troca
+`Tripulacao.envia` por uma função que guarda o objeto, chama `mandaEstado()`
+com `cockpit` falso e verdadeiro, e lê o campo. **Interceptar a saída** é o
+que mostra o conteúdo; ler o texto do fonte só mostra que alguém digitou a
+linha.
