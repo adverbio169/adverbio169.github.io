@@ -319,6 +319,58 @@ contagem de chamadas, de triângulos e de geometrias.
 
 ---
 
+## A cabine pintada do dragão
+
+A cabine do dragão deixou de ser feita de malha: ela agora é uma **ilustração
+fixa na tela**, com a área de vidro recortada. O mundo 3D aparece pelo buraco,
+o HUD é desenhado por cima, e as três telas pretas da arte recebem os
+instrumentos de verdade — combustível, alvos, pista, alcance —, pintados ao
+vivo a cada quadro.
+
+Foi o dono que achou o caminho, depois de cinco levas tentando esculpir uma
+cabine com caixa arredondada e tinta chapada: *"eu mandei a foto da porra de
+uma cabine para você, era só copiar"*. Ele tinha razão. Fica igual à
+referência porque **é** a referência.
+
+**Onde mora:** `jogos/cabine-lucas.webp` é a arte; `CABINE_PINTADA`,
+`CAB_PINT_TELAS`, `usaCabinePintada()` e `desenhaCabinePintada()` em
+`jogos/aviao3d.modelo.html`; `montar.py` embute a imagem no HTML como data URI,
+pela mesma razão do three.js — o jogo tem de abrir sem depender de mais nada.
+
+**Como se faz uma nova:** a arte vem com toda a área de vidro em **magenta
+chapado** (#FF00FF) e as telas em **preto chapado**, sem HUD e sem texto. O
+recorte é feito fora do jogo, por `scratchpad/cabines/exporta.js`, que troca o
+magenta por transparência de verdade e grava WebP. As frações das três telas
+saem de `scratchpad/cabines/acha-telas.js`, que varre as regiões pretas da
+imagem — medidas, não estimadas. O prompt usado para gerar a arte está no
+histórico da conversa.
+
+**Peso:** 84 KB. Em PNG seriam 1,8 MB. O jogo montado foi de 1.681 para
+1.802 KB.
+
+**Como desfazer:** `CABINE_PINTADA = false` devolve a cabine de malha, que
+continua inteira no código. Apagar `jogos/cabine-lucas.webp` faz o mesmo
+sozinho: sem a imagem o jogo cai na de malha e avisa na montagem.
+
+**O que ela ainda não faz:** não gira quando você vira a cabeça (é uma
+pintura); só o dragão tem a sua, e o caça continua com a cabine de malha; e os
+botões do canto da tela ainda ficam por cima dela.
+
+### E a cabine de malha melhorou junto
+- A lona do painel era 700x178 — proporção de tarja. Com 29 unidades de
+  largura isso dava 7,4 de altura, e nenhuma cor nem luz salva sete unidades.
+  Agora é 700x300, com três telas no lugar de duas.
+- A vista de cabine **nunca teve inclinação de câmera**: havia um
+  `if (!cockpit && CAM_INCL)` que a excluía de propósito, e por isso painel,
+  manche e console ficavam todos abaixo da linha de visão, fora do quadro.
+  São 7 graus, escolhidos varrendo e olhando.
+- `CAM_INCL` só era escrito pelas vistas de perseguição, então a vista do
+  capacete vinha **herdando** os 3 graus que a vista de fora deixava na
+  variável. Agora toda vista escreve o seu, e o capacete declara os 3 que já
+  tinha na prática.
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
