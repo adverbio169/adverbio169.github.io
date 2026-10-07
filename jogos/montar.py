@@ -15,7 +15,18 @@ este script. As bibliotecas ficam embutidas para cada página ser um arquivo só
 Uso:  python3 montar.py            (precisa de node_modules com peerjs e
                                      qrcode-generator: npm install peerjs qrcode-generator)
 """
-import os, sys
+import os, sys, base64
+
+def imagem(nome):
+    """A arte da cabine vai EMBUTIDA, pela mesma razão do three.js: o jogo tem
+    de abrir sem depender de mais nada. WebP com transparência, ~83 KB — em
+    PNG seriam 1,8 MB, e em base64 dentro do HTML, 2,4 MB."""
+    cam = os.path.join(AQUI, nome)
+    if not os.path.exists(cam):
+        print('aviso: falta jogos/%s — o jogo cai na cabine 3D' % nome)
+        return ''
+    dados = base64.b64encode(open(cam, 'rb').read()).decode('ascii')
+    return 'data:image/webp;base64,' + dados
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 os.chdir(AQUI)
@@ -68,7 +79,8 @@ if os.path.exists(tres_cam):
     t3 = open('aviao3d.modelo.html', encoding='utf-8').read()
     t3 = (t3.replace('<script>/* THREE */</script>', '<script>' + seguro(tres) + '</script>')
             .replace('__PEERJS__', seguro(peer))
-            .replace('__QRCODE__', seguro(qr)))
+            .replace('__QRCODE__', seguro(qr))
+            .replace('__CABINE_LUCAS__', imagem('cabine-lucas.webp')))
     open('aviao3d.html', 'w', encoding='utf-8').write(t3)
     print('aviao3d.html: %d KB   (three.js embutido: %d KB)' % (len(t3)//1024, len(tres)//1024))
 else:

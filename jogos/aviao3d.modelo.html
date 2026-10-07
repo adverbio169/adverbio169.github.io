@@ -2824,6 +2824,84 @@ const PAINEL_TELAS = CABINE_NOVA
   ? [{ x: 36, y: 74, w: 192, h: 144 }, { x: 254, y: 58, w: 192, h: 176 },
      { x: 472, y: 74, w: 192, h: 144 }]
   : [{ x: 34, y: 26, w: 236, h: 148 }, { x: 370, y: 26, w: 236, h: 148 }];
+/* =============================================================================
+   A CABINE PINTADA
+
+   Cinco levas tentando esculpir uma cabine de caça com caixa arredondada e
+   tinta chapada, e o dono repetindo "ainda está feio". Ele tinha razão, e a
+   saída foi dele: "eu mandei a foto da porra de uma cabine para você, era só
+   copiar".
+
+   Então é isso. A cabine é uma ILUSTRAÇÃO, fixa na tela, com o vidro
+   recortado — o mundo 3D aparece pelo buraco e o HUD é desenhado por cima.
+   A arte vem com a área de vidro em magenta chapado e o recorte já foi feito
+   fora daqui (scratchpad/cabines/exporta.js), então o que entra no jogo é um
+   WebP com transparência de verdade: 83 KB, contra 2,4 MB se fosse PNG.
+
+   O que se ganha: a cabine fica igual à referência, porque É a referência.
+   O que se perde: ela não gira quando a cabeça vira. Daí `CAB_PINT_GIRO`.
+
+   As três telas pretas da arte recebem os instrumentos de verdade, desenhados
+   ao vivo por cima. As frações abaixo foram MEDIDAS na própria imagem, por
+   varredura das regiões pretas (scratchpad/cabines/acha-telas.js), não no
+   olhômetro — e por isso são frações: a arte é redimensionada para a tela. */
+const CABINE_PINTADA = true;
+const CAB_PINT_SRC = '__CABINE_LUCAS__';
+/* esquerda, centro, direita — x, y, largura e altura em fração da imagem */
+const CAB_PINT_TELAS = [
+  { x: 0.3033, y: 0.5479, w: 0.0995, h: 0.1507 },
+  { x: 0.4329, y: 0.5103, w: 0.1343, h: 0.1884 },
+  { x: 0.5972, y: 0.5479, w: 0.0979, h: 0.1541 }
+];
+let _cabPint = null, _cabPintOk = false;
+function cabinePintada(){
+  if (!CABINE_PINTADA) return null;
+  if (!_cabPint){
+    _cabPint = new Image();
+    _cabPint.onload = () => { _cabPintOk = _cabPint.naturalWidth > 0; };
+    _cabPint.src = CAB_PINT_SRC;        // no modelo é um marcador: não carrega,
+  }                                     // e aí o jogo cai na cabine 3D sozinho
+  return _cabPintOk ? _cabPint : null;
+}
+/* ela só entra na vista de CABINE. A do capacete mostra o avião em volta, e
+   uma ilustração fixa ali seria uma parede. */
+function usaCabinePintada(){ return !!(cockpit && cabinePintada()); }
+/* "cobrir": a arte é 2,17:1 e a tela do celular deitado é 2,16 — encaixa
+   quase exata. Em monitor, que é mais quadrado, sobra largura e ela é
+   cortada pelos lados, que é onde a arte tem menos coisa. */
+function caixaCabinePintada(img){
+  const e = Math.max(W/img.naturalWidth, H/img.naturalHeight);
+  const l = img.naturalWidth*e, a = img.naturalHeight*e;
+  return { x: (W - l)/2, y: (H - a)/2, l: l, a: a };
+}
+function desenhaCabinePintada(){
+  const img = usaCabinePintada() ? cabinePintada() : null;
+  if (!img) return;
+  presoNaTela();
+  const c = caixaCabinePintada(img);
+  h2.drawImage(img, c.x, c.y, c.l, c.a);
+  if (!jogando || caindo) return;
+  /* os instrumentos vivos, dentro das três telas pretas da arte. `_mfdMudo`
+     porque elas não são tocáveis: são uma pintura. O dedo manda nas telas
+     pelas janelas 2D e pelo teclado, como já mandava nas do painel 3D. */
+  const escAntes = _mfdEscala, fisAntes = _mfdFisico, mudoAntes = _mfdMudo;
+  /* 1,85 é a escala das telas do painel 3D, e ali a textura tem 474x214
+     PIXELS DE TEXTURA. Aqui a tela é desenhada direto na tela do aparelho e
+     tem uns 113 de largura no celular deitado: a mesma escala transborda o
+     rótulo por cima do valor. O corpo de letra já acompanha a altura da
+     caixa (`o.h*0.060*_mfdEscala`); o que faltava era parar de multiplicar
+     por um número pensado para outra caixa. */
+  _mfdEscala = 1.15; _mfdFisico = true; _mfdMudo = true;
+  try {
+    for (let i = 0; i < CAB_PINT_TELAS.length; i++){
+      const t = CAB_PINT_TELAS[i];
+      desenhaMFDEm({ x: c.x + t.x*c.l, y: c.y + t.y*c.a,
+                     w: t.w*c.l, h: t.h*c.a, k: i }, i, true, true);
+    }
+  } catch(e){}
+  _mfdEscala = escAntes; _mfdFisico = fisAntes; _mfdMudo = mudoAntes;
+}
+
 function lonaPainel(){
   if (CABINE_NOVA) return lonaPainelNova();
   const W = PAINEL_LONA.larg, H = PAINEL_LONA.alt;
@@ -13260,6 +13338,10 @@ function desenhaHUD(){
     h2.fillText('TESTE · ' + quais + ' sem fim (tecla ' + teclas + ')', 16,
                 Math.max(Batalha.ligada && Batalha.quantos() > 1 ? 378 : 370, H*0.34));
   }
+  /* POR ÚLTIMO, de propósito: o painel é opaco e fica na frente do piloto,
+     então ele TEM de tapar o que o HUD desenhou atrás dele. Desenhado antes,
+     a fita da bússola e a escada de altura apareciam por cima da chapa. */
+  desenhaCabinePintada();
 }
 
 /* --- painel em HTML --- */
@@ -13678,7 +13760,12 @@ function quadro(t){
   ultimoT = t; sobrando += dt;
   while (sobrando > PASSO){ atualiza(PASSO); sobrando -= PASSO; }
   arruma();
-  atualizaTelasCabine(t);
+  /* com a cabine pintada no ar, a de malha não é desenhada nem atualizada:
+     ela ficaria exatamente atrás da ilustração, custando triângulo e as três
+     texturas de tela por quadro para não aparecer. */
+  const pint = usaCabinePintada();
+  if (aviao) aviao.visible = !pint;
+  if (!pint) atualizaTelasCabine(t);
   rend.render(cena, cam);
   desenhaHUD(); pinta();
   // se a máquina não estiver dando conta, desliga a sombra sozinha
