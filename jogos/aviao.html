@@ -438,7 +438,26 @@ function grausParaEixo(graus, maximo, zonaMorta){
    ========================================================================== */
 /* normaliza um ângulo em graus para o intervalo -180..180 — mora aqui dentro
    de propósito: o núcleo é copiado para as versões de TV, e lá também precisa */
-function voltaCurta(g){ while (g > 180) g -= 360; while (g < -180) g += 360; return g; }
+/* Sem laço: com 1e18 eram 2,8e15 voltas e com Infinity o laço nunca saía —
+   valor vindo da rede congelava a aba da TV. Resto (%) dá o mesmo resultado
+   para entrada normal, inclusive nas bordas (180 fica 180, -180 fica -180). */
+function voltaCurta(g){
+  if (typeof g !== 'number' || !isFinite(g)) return 0;
+  let r = g % 360;
+  if (r > 180) r -= 360; else if (r < -180) r += 360;
+  return r + 0;                  // + 0 tira o -0 que o resto deixa para múltiplos de 360 negativos
+}
+/* Tudo que chega pela rede é palavra de estranho: campo ausente, controle de
+   versão antiga ou brincadeira dão undefined/NaN/texto, e UM NaN em
+   Controle.volante apagava o avião inteiro em 60 passos. Número finito DENTRO
+   da faixa entra; o resto vira o padrão (centro) — prender na faixa trocaria
+   lixo por comando no talo. Mora aqui, no núcleo, porque as duas versões de TV
+   o copiam; aviao3d.modelo.html tem a sua própria cópia, de propósito: são
+   dois arranjos, montados de partes diferentes. */
+function numeroDeRede(x, min, max, padrao){
+  if (typeof x !== 'number' || !isFinite(x) || x < min || x > max) return padrao;
+  return x;
+}
 
 const CAMD     = 750;      // distância da câmera até o avião (visão de fora)
 const CHAO     = -700;     // altura do solo
@@ -1004,7 +1023,14 @@ function quadro4(a,b,c,d,cor){
 const SOL_RUMO = 0.9;
 const SOL_DIR  = { x: Math.sin(SOL_RUMO), z: Math.cos(SOL_RUMO) };
 const SOL_ALT  = 0.30;            // seno da altura do sol acima do horizonte
-function anguloCurto(a){ while (a > Math.PI) a -= 6.283185; while (a < -Math.PI) a += 6.283185; return a; }
+/* Mesma razão de voltaCurta: o laço antigo não saía com número enorme ou Infinity.
+   O 6.283185 (e não 2π exato) fica como era, para o resultado não mudar. */
+function anguloCurto(a){
+  if (typeof a !== 'number' || !isFinite(a)) return 0;
+  let r = a % 6.283185;
+  if (r > Math.PI) r -= 6.283185; else if (r < -Math.PI) r += 6.283185;
+  return r + 0;
+}
 
 function desenhaCeu(){
   atualizaHorizonte();

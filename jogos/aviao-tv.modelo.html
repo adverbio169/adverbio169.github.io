@@ -808,18 +808,20 @@ const Tripulacao = {
     m.ultimo = Date.now();
     if (d.t === 'eixo'){
       if (m.papel === 'piloto'){
-        Controle.volante = d.v; Controle.manche = d.m; Controle.leme = d.r || 0;
+        Controle.volante = numeroDeRede(d.v, -180, 180, 0);
+        Controle.manche  = numeroDeRede(d.m, -180, 180, 0);
+        Controle.leme    = numeroDeRede(d.r, -1, 1, 0);
         Controle.modo = 'sensor'; Controle.ultimo = Date.now();
         Controle.ultimoMov = Date.now();      // o leme vem pronto: não centra sozinho
         // acelerador e nitro viajam junto com os eixos, 30x por segundo: no
         // canal não confiável, repetir sai mais barato que garantir entrega
-        if (d.p !== undefined) motor = Math.max(0, Math.min(1, d.p));
+        if (d.p !== undefined) motor = numeroDeRede(d.p, 0, 1, motor);
         nitroBotao = !!d.n;
         if (pausado) retoma();
       } else {
         // o artilheiro move a TORRE, dentro do cone
-        miraX = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (d.v/45) * MIRA_MAX));
-        miraY = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (d.m/30) * MIRA_MAX));
+        miraX = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (numeroDeRede(d.v, -180, 180, 0)/45) * MIRA_MAX));
+        miraY = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (numeroDeRede(d.m, -180, 180, 0)/30) * MIRA_MAX));
       }
       return;
     }
@@ -869,8 +871,9 @@ function ligaCanalDaTela(){
     if (!d || !d.t) return;
     if (Tripulacao.membros.length) return;        // a sala já cuida disso
     if (d.t === 'eixo'){
-      Controle.volante = d.v; Controle.manche = d.m; Controle.modo = 'sensor'; Controle.ultimo = Date.now();
-      if (d.p !== undefined) motor = Math.max(0, Math.min(1, d.p));
+      Controle.volante = numeroDeRede(d.v, -180, 180, 0); Controle.manche = numeroDeRede(d.m, -180, 180, 0);
+      Controle.modo = 'sensor'; Controle.ultimo = Date.now();
+      if (d.p !== undefined) motor = numeroDeRede(d.p, 0, 1, motor);
       nitroBotao = !!d.n;
       if (pausado) retoma();
       return;

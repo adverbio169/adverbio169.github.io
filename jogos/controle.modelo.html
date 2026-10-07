@@ -640,7 +640,15 @@ __PEERJS__
 
    A parte do sensor (Controle) é a mesma dos outros jogos.
    ========================================================================== */
-function voltaCurta(g){ while (g > 180) g -= 360; while (g < -180) g += 360; return g; }
+/* Sem laço: com 1e18 eram 2,8e15 voltas e com Infinity o laço nunca saía —
+   valor vindo da rede congelava a aba da TV. Resto (%) dá o mesmo resultado
+   para entrada normal, inclusive nas bordas (180 fica 180, -180 fica -180). */
+function voltaCurta(g){
+  if (typeof g !== 'number' || !isFinite(g)) return 0;
+  let r = g % 360;
+  if (r > 180) r -= 360; else if (r < -180) r += 360;
+  return r + 0;                  // + 0 tira o -0 que o resto deixa para múltiplos de 360 negativos
+}
 /* curso de comando com folga no meio: 0 dentro da folga, cresce até 1 no talo */
 function grausParaEixo(graus, maximo, zonaMorta){
   const s = Math.sign(graus), v = Math.abs(graus);

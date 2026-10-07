@@ -238,6 +238,87 @@ plausível no lugar errado.
 
 ---
 
+## Leva: os travamentos e os vazamentos (o "lote 1")
+
+Uma leva inteira de defeito, não de enfeite. Nada aqui muda o que o jogo
+parece; tudo muda o que ele faz quando dá errado. Saiu de uma revisão do
+jogo inteiro, e passou por duas rodadas de conserto com uma revisão
+adversarial no meio.
+
+**O que entrou, e onde mora** (tudo em `jogos/aviao3d.modelo.html` salvo
+onde disser outra coisa):
+
+- **`LEME_MIN`/`LEME_MAX` passaram a existir.** Eram usadas como globais e só
+  existiam em `controle.modelo.html`. Todo celular lançava `ReferenceError`
+  umas 60 vezes por segundo no `devicemotion`, antes mesmo de tocar em
+  "Jogar", e o leme por deslize nunca tinha funcionado. Agora são
+  propriedades de `Controle`, com os mesmos valores do controle (1,3 e 7,0).
+- **`voltaCurta` e `anguloCurto` não travam mais.** Eram `while (g > 180) g -= 360;`
+  — com um valor enorme ou infinito, o laço não termina e a aba congela de
+  vez. Agora saem por `%`, e devolvem 0 se a entrada não for número finito.
+  O mesmo conserto entrou em `aviao.html` (linhas 441 e 1007), que é a fonte
+  que a `montar.py` copia para a TV, e em `controle.modelo.html`.
+- **A entrada de rede é validada.** `numeroDeRede(x, min, max, padrao)`
+  filtra `d.v`, `d.m`, `d.r`, `d.p`, `visao` e `flap` do piloto e do
+  artilheiro. Um pacote estragado virava NaN, e em 60 passos a posição, a
+  proa, a atitude e os eixos eram todos NaN, sem volta a não ser
+  reiniciando. `endireitaEixos()` ganhou a mesma defesa. O mesmo filtro
+  entrou em `tv.modelo.html` (linha 381).
+- **O botão do sensor não roda o jogo duas vezes.** O sensor do Android leva
+  até 5 s para acordar e a tela não dizia nada: a pessoa tocava de novo e
+  duas cadeias de quadros ficavam vivas. Agora o botão sai de uso e mostra
+  "esperando o sensor… N s", e a trava `lacoVivo` cobre todos os pontos que
+  pedem quadro. E se o sensor acordar depois de a pessoa desistir e tocar em
+  "dedo", o jogo **não reinicia** mais a partida em andamento: só passa para
+  o sensor.
+- **Combustível e munição infinitos desligados.** Estavam ligados no que foi
+  publicado — as teclas I e M de teste continuavam valendo e tiravam toda a
+  pressão do jogo.
+- **Geometria deixou de vazar.** `liberaNo`/`liberaNos` liberam geometria e
+  material antes de cada `cena.remove` nas sete funções que remontam o mundo
+  (`montaPista`, `montaRuas`, `montaAlvos`, `montaNuvens`, `montaGaragem`,
+  `montaTrafego`, `montaTrilhos`), sem tocar no que outra peça ainda usa.
+  Eram +15 geometrias por partida e +47 por troca de avião. A textura das
+  nuvens passou a ser uma só, para sempre, e os inimigos liberam os
+  materiais que clonam.
+- **Trocar de aba pausa.** Antes o motor continuava roncando e o avião caía
+  sem ninguém olhando. Agora o jogo para, o motor desliga e o tom de alvo
+  travado e o alarme calam junto — senão o telefone apitava até você voltar.
+  Ao voltar, a orientação é reavaliada: girar o celular com a aba escondida
+  não religa mais o jogo atrás da tela "gire o celular".
+- **O celular abre em médio.** Antes abria em alto em qualquer aparelho (422
+  chamadas de desenho e 408 mil triângulos, contra 333 e 232 mil no médio).
+  A queda automática agora desce um degrau por vez até o baixo.
+- **Sua escolha de qualidade vence.** Se você mexeu no botão alguma vez, a
+  queda automática não desfaz mais. Quando ela quereria descer e não desce,
+  aparece um aviso âmbar uma vez por partida.
+- **A fita de páginas pelo celular passou a funcionar.** O jogo testava o
+  campo errado da mensagem (`m.c`, que é a conexão, em vez de `d.c`), então
+  rolar as páginas pelo controle nunca tinha feito nada.
+
+**Como desfazer.** Cada item é independente e pequeno; o conjunto inteiro sai
+com `git revert` do commit desta leva. Se for só um:
+
+- infinitos de volta: `infinito` e `munInfinita` em `let` perto da linha 1430;
+- celular em alto de novo: o bloco de abertura da qualidade, no fim do script;
+- pausa ao trocar de aba: o ouvinte de `visibilitychange` com a trava
+  `pausadoDeAba`;
+- a queda automática voltar a mandar: tirar a consulta a `qualidadeSalva()`.
+
+**A prova.** `scratchpad/lote1.js`, 147 asserções, terminando em `FALHAS: 0`.
+Cada bloco foi rodado também contra a montagem anterior e **reprova** lá —
+asserção que passa nos dois lados não prova nada. Os testes antigos
+continuam verdes (`quadros.js` e `ad02-jogo.js` falham por ambiente, como já
+falhavam).
+
+**O que não foi provado aqui:** som em aparelho real, sensor real de Android
+ou iPhone, o pedido de permissão do iOS, o ganho de quadros de abrir em médio
+e a memória de vídeo de verdade. A renderização desta máquina é por software:
+quadros por segundo medidos aqui não valem nada, por isso tudo foi medido em
+contagem de chamadas, de triângulos e de geometrias.
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".

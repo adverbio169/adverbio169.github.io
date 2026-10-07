@@ -7085,7 +7085,15 @@ var qrcode = function() {
 <script>
 /* normaliza um ângulo em graus para -180..180. Mora aqui em cima de propósito:
    o Controle usa isto na primeira leitura do sensor, antes de tudo. */
-function voltaCurta(g){ while (g > 180) g -= 360; while (g < -180) g += 360; return g; }
+/* Sem laço: com 1e18 eram 2,8e15 voltas e com Infinity o laço nunca saía —
+   valor vindo da rede congelava a aba da TV. Resto (%) dá o mesmo resultado
+   para entrada normal, inclusive nas bordas (180 fica 180, -180 fica -180). */
+function voltaCurta(g){
+  if (typeof g !== 'number' || !isFinite(g)) return 0;
+  let r = g % 360;
+  if (r > 180) r -= 360; else if (r < -180) r += 360;
+  return r + 0;                  // + 0 tira o -0 que o resto deixa para múltiplos de 360 negativos
+}
 
 const Controle = {
   modo: 'nenhum',
@@ -7099,6 +7107,9 @@ const Controle = {
   _cima: {x:0, y:1, z:0},        // "para cima do mundo" visto pelo aparelho
   _g: {x:0, y:0, z:0}, _temG: false, _ouvindoMov: false,
   _aFiltro: 0, _chute: 0, _quieto: 1, _janela: 0, _dir: 0, ultimoMov: 0,
+  // eram globais que só existem em aviao.html/controle.html: aqui davam
+  // ReferenceError a cada devicemotion e o plano B do leme nunca rodou
+  LEME_MIN: 1.3, LEME_MAX: 7.0,
 
   temSensor(){ return typeof DeviceOrientationEvent !== 'undefined'; },
   precisaPermissao(){
@@ -7313,9 +7324,9 @@ const Controle = {
        SILÊNCIO ANTES: um empurrão começa depois de a mão estar parada; a
        freada vem colada no empurrão, sem sossego nenhum no meio. */
     this._janela = Math.max(0, this._janela - dtReal);
-    if (Math.abs(af) > LEME_MIN){
+    if (Math.abs(af) > this.LEME_MIN){
       const dir = af > 0 ? 1 : -1;
-      const forca = Math.min(1, (Math.abs(af) - LEME_MIN) / (LEME_MAX - LEME_MIN));
+      const forca = Math.min(1, (Math.abs(af) - this.LEME_MIN) / (this.LEME_MAX - this.LEME_MIN));
       if (this._quieto >= 0.09){          // vinha de mão parada: é gesto novo
         this._dir = dir; this._chute = dir*forca;
         this._janela = 0.13;              // ainda dá para pegar o pico dele
@@ -7360,21 +7371,6 @@ function giraPar(u, v, ang){
   return [ {x:u.x*c + v.x*s, y:u.y*c + v.y*s, z:u.z*c + v.z*s},
            {x:v.x*c - u.x*s, y:v.y*c - u.y*s, z:v.z*c - u.z*s} ];
 }
-
-/* Depois de muitas rotações os três eixos escorregam e deixam de ser
-   perpendiculares. Isto os endireita a cada quadro — é barato e evita o avião
-   ir "derretendo" depois de uns minutos de manobra. */
-function endireitaEixos(){
-  eixoF = vnorm(eixoF);
-  eixoC = vnorm(vsub(eixoC, vmul(eixoF, vponto(eixoC, eixoF))));
-  eixoD = vcruz(eixoC, eixoF);
-  rumo = Math.atan2(eixoF.x, eixoF.z);
-  cosR = Math.cos(rumo); senR = Math.sin(rumo);
-  arfagem = Math.asin(Math.max(-1, Math.min(1, eixoF.y)));
-  // inclinação = quanto o teto da cabine está torto em relação ao céu
-  inclinacao = Math.atan2(-eixoD.y, eixoC.y) * 180/Math.PI;   // + = asa direita para baixo
-}
-
 
 /* =============================================================================
    PARTE 2 — O MUNDO (os mesmos números do jogo em 2D, para o voo ficar igual)
@@ -7943,7 +7939,10 @@ let subida = 0;            // metros por segundo para cima, alisado, para o alt�
 /* o fator de carga e as duas agulhas de memória do acelerômetro */
 let cargaG = 1, gMax = 1, gMin = 1, _fAnt = null;
 let jogando=false, caindo=false, giroQueda=0, vq=0, motivoQueda='';
-let cockpit=false, infinito=true, munInfinita=true, qualidade=2;
+/* combustível e munição infinitos são teclas de teste (I e M): estavam ligados
+   por engano no jogo publicado e tiravam a única pressão dele (alarme, gongo,
+   pane seca, escolha de arma). Começam desligados; as teclas continuam. */
+let cockpit=false, infinito=false, munInfinita=false, qualidade=2;
 /* a torre do copiloto: desvio da mira em relação ao nariz, dentro de um cone */
 let miraX=0, miraY=0, temArtilheiro=false;
 const MIRA_MAX = 0.42;
@@ -7977,15 +7976,24 @@ function direcaoDoOlhar(){
 }
 let tecla={esq:false,dir:false,cima:false,baixo:false,lemeE:false,lemeD:false,mais:false,menos:false};
 let toqueX=0, toqueY=0, usandoToque=false;
-try { if (new URLSearchParams(location.search).get('infinito') === '0') infinito = false; } catch(e){}
-/* MUNIÇÃO INFINITA, no mesmo molde do combustível: ligada para testar, e
-   `?municao=0` no endereço devolve as balas contadas. Sem isso não dá para
-   ficar meia hora provando o míssil perseguidor — acabam as oito e o teste
-   acaba junto. */
-try { if (new URLSearchParams(location.search).get('municao') === '0') munInfinita = false; } catch(e){}
+try { if (new URLSearchParams(location.search).get('infinito') === '1') infinito = true; } catch(e){}
+/* MUNIÇÃO INFINITA, no mesmo molde do combustível: desligada no jogo publicado,
+   e `?municao=1` no endereço liga. Sem isso não dá para ficar meia hora provando
+   o míssil perseguidor — acabam as oito e o teste acaba junto. */
+try { if (new URLSearchParams(location.search).get('municao') === '1') munInfinita = true; } catch(e){}
 try { recorde = parseInt(localStorage.getItem('aviao.recorde') || '0', 10) || 0; } catch(e){}
 
+/* Depois de muitas rotações os três eixos escorregam e deixam de ser
+   perpendiculares. Isto os endireita a cada quadro — é barato e evita o avião
+   ir "derretendo" depois de uns minutos de manobra. */
+/* sem alocar: roda a cada quadro. Number.isFinite, e não o isFinite global, que aceita texto */
+function eixoFinito(v){ return !!v && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z); }
 function endireitaEixos(){
+  // eixo que deixou de ser finito não se conserta normalizando: sem isto o
+  // NaN passava de um quadro para o outro e o avião sumia sem volta
+  if (!(eixoFinito(eixoF) && eixoFinito(eixoC) && eixoFinito(eixoD))){
+    eixoF = {x:0, y:0, z:1}; eixoC = {x:0, y:1, z:0}; eixoD = {x:1, y:0, z:0};
+  }
   eixoF = vnorm(eixoF);
   eixoC = vnorm(vsub(eixoC, vmul(eixoF, vponto(eixoC, eixoF))));
   eixoD = vcruz(eixoC, eixoF);
@@ -8297,6 +8305,44 @@ const CINZAS = [[96,100,105],[86,90,95],[104,107,110],[78,83,88],
 const QUINTAIS = [[88,116,72],[102,128,80],[76,104,64],[126,124,96],
                   [118,106,84],[95,122,76],[134,128,104],[84,110,70]];
 let chao = null;
+/* Tirar da cena não libera a memória da placa de vídeo: geometria e material
+   ficam lá até alguém chamar `dispose()`. Sete funções remontavam sem isto, e
+   cada `reinicia()` deixava ~15 geometrias para trás (cada troca de avião,
+   ~47): seis cliques levaram a cena de 185 para 466.
+
+   O que ainda está em uso por outra peça da cena NÃO se libera — o dragão e o
+   tráfego são clones de `modeloInimigo`, com geometria e material emprestados
+   dele. Por isso a conta do que sobra na cena vem antes, UMA vez por chamada
+   (26 nuvens são uma chamada, e não 26 varreduras da cena), e `tambem` lista
+   as raízes guardadas fora dela (os modelos-molde). O Sprite não entra na
+   geometria: ela é uma só, de todos os sprites do three.js. A textura de um
+   material liberado vai junto, pela mesma regra (cada troca para o caça deixava
+   4 texturas de canvas na placa); a das nuvens é uma só para sempre. */
+function liberaNos(nos, tambem){
+  const saem = new Set(nos.filter(Boolean));
+  if (!saem.size) return;
+  const matsDe = o => o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+  const TEX = ['map', 'emissiveMap', 'alphaMap', 'bumpMap', 'normalMap', 'specularMap', 'lightMap', 'aoMap'];
+  const texDe = m => { const t = []; for (const k of TEX) if (m[k] && m[k].isTexture) t.push(m[k]); return t; };
+  const emUso = new Set();
+  const anota = o => {
+    if (saem.has(o)) return;
+    if (o.geometry) emUso.add(o.geometry);
+    for (const m of matsDe(o)){ emUso.add(m); for (const t of texDe(m)) emUso.add(t); }
+    for (const f of o.children) anota(f);
+  };
+  for (const f of cena.children) anota(f);
+  for (const r of tambem || []) if (r) anota(r);
+  for (const no of saem) no.traverse(o => {
+    if (o.geometry && !o.isSprite && !emUso.has(o.geometry)){ o.geometry.dispose(); emUso.add(o.geometry); }
+    for (const m of matsDe(o)) if (!emUso.has(m)){
+      m.dispose(); emUso.add(m);
+      for (const t of texDe(m)) if (!emUso.has(t)){ t.dispose(); emUso.add(t); }
+    }
+    if (o.isInstancedMesh) o.dispose();
+  });
+}
+function liberaNo(no, tambem){ liberaNos([no], tambem); }
 function montaChao(){
   if (chao){ cena.remove(chao); chao.geometry.dispose(); }
   /* A cor tem que ser POR CÉLULA. Pintando por vértice, a placa interpola
@@ -8346,7 +8392,7 @@ function montaChao(){
    aponta para o norte, e por isso se chama 36. */
 let pista = null;
 function montaPista(){
-  if (pista) cena.remove(pista);
+  if (pista){ liberaNo(pista); cena.remove(pista); }
   pista = new THREE.Group();
   /* uma pista é desenhada SEMPRE deitada no eixo Z, em torno da origem, e o
      grupo dela é que gira e se muda para o lugar. Assim o desenho não sabe de
@@ -8394,7 +8440,7 @@ function montaPista(){
    diferente é decalque, e decalque se descola. */
 let ruas = null;
 function montaRuas(){
-  if (ruas) cena.remove(ruas);
+  if (ruas){ liberaNo(ruas); cena.remove(ruas); }
   ruas = new THREE.Group();
   /* um retângulo deitado no chão, dado o centro, a direção e as duas medidas */
   const tira = (arr, cx, cz, dx, dz, meiaC, meia, y) => {
@@ -8967,7 +9013,7 @@ function someTambor(t){
 /* --- ALVOS: depósitos de combustível, com anel piscando ------------------- */
 let alvoGrupo = null;
 function montaAlvos(){
-  if (alvoGrupo) cena.remove(alvoGrupo);
+  if (alvoGrupo){ liberaNo(alvoGrupo); cena.remove(alvoGrupo); }
   alvoGrupo = new THREE.Group();
   const matT = new THREE.MeshLambertMaterial({ color: 0xc94f3d });
   const matA = new THREE.MeshBasicMaterial({ color: 0xff6a5a, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
@@ -8991,17 +9037,22 @@ function montaAlvos(){
 }
 
 /* --- NUVENS: cartões virados para a câmera ------------------------------- */
+/* UMA textura para sempre: era um CanvasTexture novo (e o seu <canvas>) por
+   `montaNuvens()`, isto é, por partida, e `liberaNo` não solta textura */
+let texNuvem = null;
 function texturaNuvem(){
+  if (texNuvem) return texNuvem;
   const c = document.createElement('canvas'); c.width = c.height = 128;
   const x = c.getContext('2d');
   const g = x.createRadialGradient(64,64,4, 64,64,62);
   g.addColorStop(0,'rgba(255,255,255,.95)'); g.addColorStop(0.45,'rgba(255,255,255,.55)');
   g.addColorStop(1,'rgba(255,255,255,0)');
   x.fillStyle = g; x.fillRect(0,0,128,128);
-  const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
+  texNuvem = new THREE.CanvasTexture(c); texNuvem.needsUpdate = true; return texNuvem;
 }
 let nuvens = [];
 function montaNuvens(){
+  liberaNos(nuvens.map(n => n.no));
   for (const n of nuvens) cena.remove(n.no);
   nuvens = [];
   const mat = new THREE.SpriteMaterial({ map: texturaNuvem(), transparent: true, opacity: 0.85, depthWrite: false });
@@ -11678,9 +11729,12 @@ function montaDragao(corCorpo, corDetalhe, corVidro, asasMoveis, tipo){
 let aviao = null, tremNo = null, flapNos = [], jatos = [], MEDIDAS = MEDIDAS_CACA;
 let RODA = MEDIDAS_CACA.roda;
 let modeloInimigo = null, modeloOutro = null;
+/* os moldes de antes da troca de avião: só podem ser liberados depois que
+   `montaTrafego()` trocar os clones que ainda os usam (ver o fim dela) */
+let moldesVelhos = [];
 
 function montaGaragem(){
-  if (aviao) cena.remove(aviao);
+  if (aviao){ liberaNo(aviao); cena.remove(aviao); }
   aviao = montaDragao(0x1f5fd0, 0xffd42a, 0x16325c, true);
   cena.add(aviao);
   MEDIDAS = aviao.userData.medidas;
@@ -11737,6 +11791,7 @@ function montaGaragem(){
   }
   /* os outros aviões do céu seguem a escolha: um céu de dragões com um caça no
      meio (ou o contrário) não é um mundo, é um bug que parece proposital */
+  moldesVelhos.push(modeloInimigo, modeloOutro);
   modeloInimigo = montaDragao(0xc9402f, 0xffb03a, 0x4a1f1a);
   modeloOutro = montaDragao(0x4a9f6a, 0xffd42a, 0x16325c, true);
   modeloOutro.userData = { medidas: modeloOutro.userData.medidas };
@@ -11808,6 +11863,7 @@ for (const o of []) {}
    desde quando não havia inimigo nenhum no jogo. Agora há, e duas coisas
    diferentes não podem ter o mesmo nome. */
 function montaTrafego(){
+  liberaNos(trafego, [modeloInimigo, modeloOutro]);
   for (const n of trafego) cena.remove(n);
   trafego.length = 0;
   for (const o of obstaculos){
@@ -11826,6 +11882,11 @@ function montaTrafego(){
     const n = o.tipo === 'locomotiva' ? montaLocomotiva() : montaVagao(o.iVagao);
     o.no = n; cena.add(n); trafego.push(n);
   }
+  /* trocar de avião reatribui os dois moldes, e os antigos (15 + 73 geometrias)
+     nunca vão à cena, então nada os liberava. Agora os clones velhos já saíram
+     (acima); o que ainda tiver clone vivo, de caça ou de outro jogador, fica
+     protegido pela conta de "em uso" e sai quando o clone sair (`Inimigos.limpa`). */
+  if (moldesVelhos.length){ liberaNos(moldesVelhos, [modeloInimigo, modeloOutro]); moldesVelhos = []; }
 }
 
 /* --- O TREM, peça por peça --------------------------------------------------
@@ -11883,7 +11944,7 @@ function montaLocomotiva(){
    com os dormentes, que é o mesmo truque da cidade. */
 let viaFerrea = null;
 function montaTrilhos(){
-  if (viaFerrea) cena.remove(viaFerrea);
+  if (viaFerrea){ liberaNo(viaFerrea); cena.remove(viaFerrea); }
   viaFerrea = new THREE.Group();
   const mT = new THREE.MeshLambertMaterial({ color: 0x6b6257 });
   const mD = new THREE.MeshLambertMaterial({ color: 0x4a4038 });
@@ -15617,7 +15678,14 @@ function redimensiona(){
 window.addEventListener('resize', redimensiona);
 window.addEventListener('orientationchange', () => setTimeout(redimensiona, 250));
 
-function anguloCurto(a){ while (a > Math.PI) a -= 6.283185; while (a < -Math.PI) a += 6.283185; return a; }
+/* Mesma razão de voltaCurta: o laço antigo não saía com número enorme ou Infinity.
+   O 6.283185 (e não 2π exato) fica como era, para o resultado não mudar. */
+function anguloCurto(a){
+  if (typeof a !== 'number' || !isFinite(a)) return 0;
+  let r = a % 6.283185;
+  if (r > Math.PI) r -= 6.283185; else if (r < -Math.PI) r += 6.283185;
+  return r + 0;
+}
 function longe(x,z){ return Math.hypot(x-aviaoX, z-aviaoZ); }
 function maisPerto(lista, filtro){
   let m = null, d = 1e12;
@@ -18949,7 +19017,33 @@ function pinta(){
 /* --- o laço --- */
 let ultimoT = 0, sobrando = 0, quadros = 0, tQuadro = 0, fps = 60, ruins = 0;
 const PASSO = 1/60;
+/* Há um quadro pedido ao navegador (ou rodando)? Sem isto, dois toques no
+   botão do sensor — que no Android lento fica até 5 s sem mudar nada na tela —
+   chamavam `comeca()` duas vezes, e cada chamada abria a sua cadeia de
+   requestAnimationFrame: física e desenho em dobro, para sempre. Também cobre
+   pausa e retomada antes de o quadro pendente disparar. A trava vale do
+   pedido até a entrada do quadro, e não até o fim dele: se `quadro` lançar
+   exceção ela já está solta, e o próximo `comeca()` consegue religar o laço. */
+let avisouQueda = false;     // o aviso de "desenho pesado" sai uma vez por partida (zera em `comeca`)
+let lacoVivo = false;
+let lacoId = 0;
+function pedeQuadro(){
+  if (lacoVivo) return;
+  lacoVivo = true;
+  lacoId = requestAnimationFrame(quadro);
+}
+/* Os caminhos de RETOMADA (começar, virar o celular, voltar à aba, voltar o
+   sinal) não confiam na trava: se o navegador perdeu a fila de rAF — o iOS
+   suspende a página escondida e pode fazer isso —, `lacoVivo` ficaria preso em
+   true e nada mais religaria o laço, com `jogando` true e o jogo congelado.
+   Cancela o pedido pendente (se houver) e pede um novo: sempre uma cadeia só. */
+function religaQuadro(){
+  cancelAnimationFrame(lacoId);
+  lacoVivo = false;
+  pedeQuadro();
+}
 function quadro(t){
+  lacoVivo = false;
   if (!jogando) return;
   const dt = Math.min(0.1, (t-ultimoT)/1000 || PASSO);
   sacudida *= Math.pow(0.02, dt);              // o susto desce sozinho
@@ -18962,17 +19056,38 @@ function quadro(t){
   // se a máquina não estiver dando conta, desliga a sombra sozinha
   /* Rebaixar o desenho sozinho só depois de uns segundos ruins seguidos: nos
      primeiros quadros a página ainda está montando textura e geometria, e
-     medir ali dava sempre "lento" mesmo em máquina boa. E nunca desce abaixo
-     do médio sozinho — quem faz isso é o botão. */
+     medir ali dava sempre "lento" mesmo em máquina boa. Desce um degrau por
+     vez, até o baixo: parava no médio, e o celular que engasgava no médio
+     engasgava para sempre (o `ruins` zera a cada descida, para o degrau
+     seguinte também pedir duas janelas ruins). Subir é com o botão. */
   quadros++;
   if (t - tQuadro > 2000){
     fps = quadros/((t - tQuadro)/1000); quadros = 0; tQuadro = t;
-    if (fps < 34 && qualidade === 2){ ruins++; if (ruins >= 2) poeQualidade(1); }
+    if (fps < 34 && qualidade > 0){
+      ruins++;
+      if (ruins >= 2){
+        ruins = 0;
+        /* quem escolheu no botão manda: a queda automática desfazia, sem avisar,
+           o "alto" que a pessoa pediu de propósito. O preço é um celular fraco
+           preso no alto — por isso o aviso, uma vez por partida, dizendo onde baixar. */
+        if (qualidadeSalva() === null) poeQualidade(qualidade - 1);
+        else if (!avisouQueda){
+          avisouQueda = true;
+          mostraAviso('desenho pesado — baixe no botão "' + ['baixo','médio','alto'][qualidade] + '"', '#ffc046', 3200);
+        }
+      }
+    }
     else ruins = 0;
   }
-  requestAnimationFrame(quadro);
+  pedeQuadro();
 }
-function poeQualidade(q){
+/* a escolha que a pessoa fez no botão (0, 1 ou 2), ou null se nunca mexeu */
+function qualidadeSalva(){
+  let v = null;
+  try { v = localStorage.getItem('aviao3d.qualidade'); } catch(e){}
+  return (v === '0' || v === '1' || v === '2') ? +v : null;
+}
+function poeQualidade(q, calado){
   qualidade = q;
   rend.shadowMap.enabled = q >= 2;
   cena.traverse(o => { if (o.isMesh){ o.castShadow = q >= 2 && o.userData.sombra !== false; } });
@@ -18992,7 +19107,7 @@ function poeQualidade(q){
   if (matCasa){ matCasa.map = q >= 1 ? lonaCasaT : null; matCasa.needsUpdate = true; }
   $('btQual').textContent = ['baixo','médio','alto'][q];
   redimensiona();
-  mostraAviso('desenho: ' + ['baixo','médio','alto'][q], '#9fd8ff', 900);
+  if (!calado) mostraAviso('desenho: ' + ['baixo','médio','alto'][q], '#9fd8ff', 900);
 }
 
 /* =============================================================================
@@ -19201,7 +19316,11 @@ $('btVisao').onclick = () => { poeVista(nVista + 1); };
 addEventListener('mousedown', e => { if (jogando) mfdPega(e.clientX, e.clientY); });
 addEventListener('mousemove', e => { if (mfdGesto) mfdArrasta(e.clientX, e.clientY); });
 addEventListener('mouseup',   e => { if (mfdGesto) mfdSolta(e.clientX, e.clientY); });
-$('btQual').onclick = () => poeQualidade((qualidade + 2) % 3);
+// o botão é uma escolha da pessoa e fica guardada; a queda automática não
+$('btQual').onclick = () => {
+  poeQualidade((qualidade + 2) % 3);
+  try { localStorage.setItem('aviao3d.qualidade', String(qualidade)); } catch(e){}
+};
 
 /* --- o botão da cabeça ------------------------------------------------------
    Ele só existe onde faz sentido: computador com câmera. No celular o aparelho
@@ -19349,7 +19468,8 @@ function comeca(){
   $('capa').style.display = 'none';
   redimensiona();
   ultimoT = performance.now(); sobrando = 0; tQuadro = ultimoT; quadros = 0;
-  requestAnimationFrame(quadro);
+  avisouQueda = false;
+  religaQuadro();
 }
 function fim(){
   jogando = false;
@@ -19742,7 +19862,7 @@ function olhaOrientacao(){
   else if (!emPe && pausadoDePe){
     pausadoDePe = false; jogando = true; Motor.liga();
     ultimoT = performance.now(); sobrando = 0; tQuadro = ultimoT; quadros = 0;
-    requestAnimationFrame(quadro);
+    religaQuadro();
   }
   redimensiona();
 }
@@ -19802,10 +19922,22 @@ setInterval(() => {
 $('convite').addEventListener('click', e => { e.stopPropagation(); mostraSala(true); });
 
 $('btSensor').onclick = async () => {
+  const bt = $('btSensor'), textoBt = bt.textContent;
+  if (bt.disabled) return;
   ligaAudio();
-  try { await Controle.ligarSensor(); telaCheia();
-        Dedos.mostra(Tripulacao.membros.length === 0); comeca(); }
+  // o sensor do Android leva até 5 s para acordar e a tela não mudava nada:
+  // a pessoa tocava de novo. Enquanto espera, o botão fica fora de uso.
+  const esperando = s => { bt.disabled = true; bt.textContent = 'esperando o sensor… ' + Math.floor(s) + ' s'; };
+  esperando(0);                  // já vale durante o pedido de permissão do iOS
+  try { await Controle.ligarSensor(esperando); telaCheia();
+        Dedos.mostra(Tripulacao.membros.length === 0);
+        /* o sensor pode acordar DEPOIS de a pessoa desistir e tocar em "dedo": o
+           jogo já está no ar, e `comeca()` reinicia a partida (963 m → 0). Se já
+           joga, só passa para o sensor, que `ligarSensor` já calibrou. */
+        usandoToque = false;
+        if (!jogando && !estaPausado()) comeca(); }
   catch(e){ erro(e.message + ' Dá para jogar com o dedo ou com o teclado.'); }
+  finally { bt.disabled = false; bt.textContent = textoBt; }
 };
 /* --- O DIAGNÓSTICO DO TREMOR ------------------------------------------------
    "Nem no Android está vibrando" — e no Android o `navigator.vibrate` é
@@ -19939,6 +20071,19 @@ function desenhaQR(canvas, texto){
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) c2.fillRect(off + c*cel, off + r*cel, cel, cel);
 }
 
+/* Tudo que chega pela rede é palavra de estranho: campo ausente, controle de
+   versão antiga ou brincadeira dão undefined/NaN/texto, e UM NaN em
+   Controle.volante apagava o avião inteiro em 60 passos (posição, rumo e eixos
+   viravam NaN, sem exceção e sem volta). Número finito DENTRO da faixa entra;
+   o resto vira o padrão (o centro). Prender na faixa trocaria lixo por
+   comando no talo: v = 1e18 viraria tonel cheio. A faixa é a do que o
+   controle de verdade manda (voltaCurta e toFixed lá na origem), então nenhum
+   comando legítimo cai fora dela. */
+function numeroDeRede(x, min, max, padrao){
+  if (typeof x !== 'number' || !isFinite(x) || x < min || x > max) return padrao;
+  return x;
+}
+
 const Tripulacao = {
   membros: [],
   entra(c){
@@ -19981,17 +20126,19 @@ const Tripulacao = {
     m.ultimo = Date.now();
     if (d.t === 'eixo'){
       if (m.papel === 'piloto'){
-        Controle.volante = d.v; Controle.manche = d.m; Controle.leme = d.r || 0;
+        Controle.volante = numeroDeRede(d.v, -180, 180, 0);
+        Controle.manche  = numeroDeRede(d.m, -180, 180, 0);
+        Controle.leme    = numeroDeRede(d.r, -1, 1, 0);
         // acelerador e nitro viajam junto com os eixos, 30x por segundo
-        if (d.p !== undefined) motor = Math.max(0, Math.min(1, d.p));
+        if (d.p !== undefined) motor = numeroDeRede(d.p, 0, 1, motor);
         nitroBotao = !!d.n;
         Controle.modo = 'sensor'; Controle.ultimo = Date.now();
         Controle.ultimoMov = Date.now();
         usandoToque = false;
         if (pausado) retoma();
       } else {
-        miraX = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (d.v/45) * MIRA_MAX));
-        miraY = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (d.m/30) * MIRA_MAX));
+        miraX = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (numeroDeRede(d.v, -180, 180, 0)/45) * MIRA_MAX));
+        miraY = Math.max(-MIRA_MAX, Math.min(MIRA_MAX, (numeroDeRede(d.m, -180, 180, 0)/30) * MIRA_MAX));
       }
       return;
     }
@@ -20000,11 +20147,15 @@ const Tripulacao = {
       case 'oi':    this.mostra(); mandaEstado(); break;
       /* o celular rolou a fita: as três janelas são a MESMA fita, então a TV
          obedece e devolve o estado para todos ficarem no mesmo ponto */
-      case 'pag':   if (typeof m.c === 'number'){
-                      mfdCarro = ((m.c % MFD_PAGS.length) + MFD_PAGS.length) % MFD_PAGS.length;
+      /* o índice vem em `d.c` (controle.modelo.html: `enviaCtl({ t:'pag', c: i })`).
+         Isto testava `m.c`, que é a CONEXÃO — nunca um número —, e a fita nunca
+         rolava pelo celular. Índice inteiro dentro da lista, ou nada: um 1,5
+         faria `MFD_PAGS[1.5]` ficar indefinido na tela. */
+      case 'pag':   if (Number.isInteger(d.c) && d.c >= 0 && d.c < MFD_PAGS.length){
+                      mfdCarro = d.c;
                       mandaEstado();
                     } break;
-      case 'botao': if (d.b === 'comecar' && !jogando && !pausado) comeca(); break;
+      case 'botao': if (d.b === 'comecar' && !jogando && !estaPausado()) comeca(); break;
       case 'arma':  trocaArma(d.a); break;
       case 'fogo':  atirando = !!d.v; break;
       /* o celular manda o ÍNDICE do contato, não o alvo: a lista é da TV, e é
@@ -20022,7 +20173,7 @@ const Tripulacao = {
       case 'apx': aproxSel = (d.i === null || d.i === undefined) ? null
                              : { i: d.i >> 1, s: (d.i & 1) ? -1 : 1 };
                   break;
-      case 'visao': poeVista(d.v === undefined ? nVista + 1 : d.v); break;
+      case 'visao': poeVista(d.v === undefined ? nVista + 1 : Math.round(numeroDeRede(d.v, 0, 99, nVista))); break;
       /* AS FUNÇÕES DE VISUALIZAÇÃO, PELO CELULAR. Elas moravam só em botões
          da tela do jogo — e quem joga com a TV a três metros não alcança
          botão de tela. O celular É o painel, então o painel manda nelas.
@@ -20045,7 +20196,7 @@ const Tripulacao = {
       case 'zerar': if (Cabeca.ligada){ Cabeca.centraliza();
                       mostraAviso('OLHAR RECENTRADO', '#7fd8ff', 800); } break;
       case 'trem':  if (m.papel === 'piloto') mexeTrem(d.v); break;
-      case 'flap':  if (m.papel === 'piloto') mexeFlap(d.v); break;
+      case 'flap':  if (m.papel === 'piloto') mexeFlap(d.v === undefined ? undefined : Math.round(numeroDeRede(d.v, 0, 2, flap))); break;
     }
   },
   /* Só manda para quem JÁ abriu. Mandar antes disso faz o PeerJS soltar um
@@ -20199,6 +20350,42 @@ const Controles = {
 };
 document.addEventListener('visibilitychange', () => { if (document.hidden) Controles.calaTudo(); });
 addEventListener('pagehide', () => Controles.calaTudo());
+/* --- A ABA SAIU DE FOCO: o jogo pausa, e o som cala ----------------------------
+   Só o tremor do controle era calado. Trocando de app no celular o rAF para,
+   mas o ganho do motor ficava congelado onde estava e os osciladores seguiam:
+   ronco de turbina para sempre — e ao voltar `jogando` ainda era true, com o
+   avião caído enquanto ninguém olhava. É o mesmo caminho da tela em pé
+   (`olhaOrientacao`), com uma trava própria: `pausa()` não serve, porque a
+   próxima mensagem do controle a desfaz (`if (pausado) retoma()`), escondida
+   ou não. Cala também o que o `pausa()` cala (estol, buffet, alarmes). */
+let pausadoDeAba = false;
+/* as três pausas do jogo — sem sinal do controle, tela em pé, aba escondida —
+   somadas: quem quiser saber se "parado" é de propósito pergunta aqui */
+function estaPausado(){ return pausado || pausadoDePe || pausadoDeAba; }
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden){
+    if (!jogando) return;
+    pausadoDeAba = true; jogando = false; Motor.desliga();
+    if (estolando){ estolando = false; somEstol(false); }
+    estresse = 0; somBuffet(0); sacudidaFixa = 0;
+    Alarmes.zera();
+    /* os dois tons que não têm dono fora do laço: o alerta de míssil e o tom de
+       alvo travado seguiam tocando com a aba escondida — é o conjunto do `fim()` */
+    Mira.solta(); MiraTiro.solta();
+    travadoPor.clear(); somAlerta(false);
+  } else if (pausadoDeAba){
+    pausadoDeAba = false;
+    /* o aparelho pode ter girado ENQUANTO a aba estava escondida: `olhaOrientacao`
+       só prende o jogo quando `jogando` está true, e aqui já não estava. Reavalia
+       agora, e se estiver em pé deixa preso por ela */
+    olhaOrientacao();
+    if (document.body.classList.contains('empe')){ pausadoDePe = true; return; }
+    if (jogando || pausadoDePe) return;     // `olhaOrientacao` já religou, ou ainda segura
+    jogando = true; Motor.liga();
+    ultimoT = performance.now(); sobrando = 0; tQuadro = ultimoT; quadros = 0;
+    religaQuadro();
+  }
+});
 
 function mandaEstado(){
   Tripulacao.envia({ t:'estado', jogando, acabou: !jogando, dist: Math.round(distancia/METRO),
@@ -20370,8 +20557,9 @@ function pausa(){
 function retoma(){
   if (!pausado) return;
   pausado = false; jogando = true; Motor.liga();
-  ultimoT = performance.now(); sobrando = 0;
-  requestAnimationFrame(quadro);
+  // a janela de fps também: uma pausa longa não pode contar como quadro lento
+  ultimoT = performance.now(); sobrando = 0; tQuadro = ultimoT; quadros = 0;
+  religaQuadro();
 }
 setInterval(() => Tripulacao.varre(), 1000);
 setInterval(() => { if (Tripulacao.membros.length) mandaEstado(); }, 250);
@@ -20485,6 +20673,9 @@ const Inimigos = {
   lista: [], _nascer: 0, ligados: true, cota: 0, abatidos: 0,
 
   limpa(){
+    /* cada caça clona o material de cada malha (para a cor); sem liberar, ~15 por
+       caça ficavam na placa a cada partida. A geometria é do molde: protegida. */
+    liberaNos(this.lista.map(c => c.no), [modeloInimigo]);
     for (const c of this.lista) if (c.no) cena.remove(c.no);
     for (const b of this.balas) cena.remove(b.no);
     this.lista.length = 0; this.balas.length = 0;
@@ -20551,7 +20742,7 @@ const Inimigos = {
       /* longe demais: some. Um caça a sessenta quilômetros não está em
          combate, está ocupando memória e enchendo o radar. */
       if (d > 72000){
-        cena.remove(c.no); this.lista.splice(i, 1);
+        liberaNo(c.no, [modeloInimigo]); cena.remove(c.no); this.lista.splice(i, 1);
         /* e a cota VOLTA. Sem isto, um caça que desistiu e sumiu no horizonte
            gastava uma das quatro vidas da sortida sem nunca ter sido combatido
            — e "abater 4 caças" virava impossível, com o céu vazio e nenhuma
@@ -20660,7 +20851,7 @@ const Inimigos = {
       const dAgora = Math.hypot(aviaoX - c.x, aviaoY - c.y, aviaoZ - c.z);
       if (dAgora < RAIO_AVIAO*1.7){
         explode(c.x, c.y, c.z, 1.6);
-        cena.remove(c.no); this.lista.splice(i, 1);
+        liberaNo(c.no, [modeloInimigo]); cena.remove(c.no); this.lista.splice(i, 1);
         derruba('bateu');
         continue;
       }
@@ -20727,7 +20918,7 @@ const Inimigos = {
         return true;
       }
       explode(c.x, c.y, c.z, 1.6);
-      cena.remove(c.no);
+      liberaNo(c.no, [modeloInimigo]); cena.remove(c.no);
       this.lista.splice(i, 1);
       pontos += 400;
       this.abatidos++;
@@ -21130,6 +21321,18 @@ abrirSala();
 /* desenha uma primeira imagem parada atrás da capa, para não abrir preto */
 montaMapa(); montaChao(); montaPista(); montaRuas(); montaCidade(); montaTelhados(); montaCasas(); montaTambores(); montaAlvos();
 montaTrilhos(); montaTrafego(); montaNuvens();
+/* A QUALIDADE COM QUE O JOGO ABRE. Em celular o ALTO engasga (no viewport de
+   iPhone 14: 422 ordens de desenho e 408 mil triângulos por quadro, mais o
+   passe de sombra, contra 333 e 232 mil no médio), e a queda automática só
+   chega depois de 4 s ruins. Aparelho de toque começa no MÉDIO. Quem já
+   escolheu no botão volta com a escolha dele, qualquer que seja. */
+(function(){
+  let q = qualidade;
+  const salva = qualidadeSalva();
+  if (salva !== null) q = salva;
+  else if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) q = 1;
+  if (q !== qualidade) poeQualidade(q, true);
+})();
 aviaoY = 2200; poeCamera(1); arruma(); redimensiona();
 rend.render(cena, cam);
 </script>
