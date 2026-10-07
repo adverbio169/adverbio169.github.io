@@ -2875,17 +2875,43 @@ function usaCabinePintada(){
 }
 /* "cobrir": a arte é 2,17:1 e a tela do celular deitado é 2,16 — encaixa
    quase exata. Em monitor, que é mais quadrado, sobra largura e ela é
-   cortada pelos lados, que é onde a arte tem menos coisa. */
+   cortada pelos lados, que é onde a arte tem menos coisa.
+
+   O 1,03 é FOLGA PARA O TREMOR: desenhada no tamanho exato, a cabine sacudindo
+   descobriria uma tira de mundo na borda a cada quadro. Três por cento de
+   sobra é mais do que o maior sacolejo precisa. */
 function caixaCabinePintada(img){
-  const e = Math.max(W/img.naturalWidth, H/img.naturalHeight);
+  const e = Math.max(W/img.naturalWidth, H/img.naturalHeight)*1.03;
   const l = img.naturalWidth*e, a = img.naturalHeight*e;
   return { x: (W - l)/2, y: (H - a)/2, l: l, a: a };
+}
+/* O TREMOR DA CABINE.
+
+   "A cabine tem que tremer igual ao caça." Tinha razão, e o motivo é que na
+   cabine de malha ela TREMIA de graça: o sacolejo mexe a posição da CÂMERA
+   (7137), e a cabine de malha é um objeto da cena — a câmera tremendo sacode
+   a imagem dela junto. A pintada está colada na tela do navegador, fora da
+   cena, então ficava parada enquanto o mundo sacudia atrás. Metade da imagem
+   dizia "levei um tranco" e a outra metade dizia "não levei".
+
+   Aqui o mesmo sacolejo é convertido para PIXEL, e não chutado: `a` são as
+   mesmas unidades de mundo que a câmera usa; a 26 unidades do olho, que é
+   onde o painel está, isso subtende `a/26` radianos; e um radiano vale
+   `H/(2*tan(fov/2))` pixels. É a projeção em perspectiva, a mesma conta que
+   o deslocamento do HUD já faz. */
+function tremorDaCabine(){
+  const tr = Math.max(sacudida, sacudidaFixa);
+  if (tr <= 0.002) return { x: 0, y: 0 };
+  const a = tr*tr*70;
+  const px = (a/26)/(2*Math.tan(cam.fov*Math.PI/360))*H;
+  return { x: (Math.random()-0.5)*px, y: (Math.random()-0.5)*px };
 }
 function desenhaCabinePintada(){
   const img = usaCabinePintada() ? cabinePintada() : null;
   if (!img) return;
   presoNaTela();
-  const c = caixaCabinePintada(img);
+  const c = caixaCabinePintada(img), tre = tremorDaCabine();
+  c.x += tre.x; c.y += tre.y;        // as telas vão junto: são parte dela
   h2.drawImage(img, c.x, c.y, c.l, c.a);
   if (!jogando || caindo) return;
   /* os instrumentos vivos, dentro das três telas pretas da arte. `_mfdMudo`

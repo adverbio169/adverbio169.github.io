@@ -345,16 +345,29 @@ saem de `scratchpad/cabines/acha-telas.js`, que varre as regiões pretas da
 imagem — medidas, não estimadas. O prompt usado para gerar a arte está no
 histórico da conversa.
 
-**Peso:** 84 KB. Em PNG seriam 1,8 MB. O jogo montado foi de 1.681 para
-1.802 KB.
+**Peso:** 203 KB, no tamanho original da arte (1846 px) e em qualidade alta —
+a 1266 px ela era esticada em monitor e saía borrada. Em PNG seriam 1,8 MB. O
+jogo montado foi de 1.681 para 1.963 KB.
 
 **Como desfazer:** `CABINE_PINTADA = false` devolve a cabine de malha, que
 continua inteira no código. Apagar `jogos/cabine-lucas.webp` faz o mesmo
 sozinho: sem a imagem o jogo cai na de malha e avisa na montagem.
 
-**O que ela ainda não faz:** não gira quando você vira a cabeça (é uma
-pintura); só o dragão tem a sua, e o caça continua com a cabine de malha; e os
-botões do canto da tela ainda ficam por cima dela.
+**Ela treme com o avião.** Na cabine de malha isso era de graça: o sacolejo
+mexe a posição da CÂMERA, e a cabine de malha é um objeto da cena. A pintada
+está colada na tela, fora da cena, então ficava parada enquanto o mundo
+sacudia atrás — metade da imagem dizia "levei um tranco" e a outra metade
+dizia que não. `tremorDaCabine()` converte o mesmo sacolejo para pixel pela
+projeção em perspectiva (a 26 unidades do olho, que é onde o painel está), e a
+arte é desenhada com 3% de folga para o tremor não descobrir a borda.
+Provado em `scratchpad/tremor.js`, que mede o conteúdo do quadro: parada sem
+motivo, seis quadros diferentes com motivo, e parada de novo quando o motivo
+acaba.
+
+**O que ela ainda não faz:** o manche é pintado e não se mexe; os botões
+pintados não fazem nada; não gira quando você vira a cabeça; só o dragão tem a
+sua, e o caça continua com a cabine de malha; e os botões do canto da tela
+ainda ficam por cima dela.
 
 ### E a cabine de malha melhorou junto
 - A lona do painel era 700x178 — proporção de tarja. Com 29 unidades de
