@@ -384,6 +384,53 @@ ainda ficam por cima dela.
 
 ---
 
+## O céu ficou alto e o estol afrouxou
+
+> "Melhora a experiência de voo. Tá com muita restrição de queda. Deixe mais
+> livre."
+
+**O teto foi de 550 para 3.000 metros.** A faixa de voo inteira tinha 585 m —
+menos que a altura de dois prédios do mapa — e dava para encostar no teto numa
+subida só. Pior: o "AR RAREFEITO" não era aviso, era uma parede, com o avião
+travado em `aviaoY = TETO`.
+
+Agora o limite não é mais parede. Acima do **teto de serviço** (1.500 m) o
+motor entrega cada vez menos, até 45% no limite: a subida fica pesada e acaba
+sozinha quando a potência deixa de pagar o custo dela. Abaixo disso nada mudou
+— e o teto de serviço sozinho já é quase três vezes a faixa de voo antiga.
+
+`TETO_CENA` é novo e guarda a altura antiga: é até onde o mundo é POVOADO
+(tambores, helicópteros, aviões parados, caça inimigo). Subido junto com o
+teto, o céu de cima ficaria vazio e a subida não teria o que encontrar.
+
+**O estol afrouxou um degrau.** `SUBIDA_CUSTO` foi de 5.800 para 5.200 e
+`AFUNDA` de 900 para 680. A escada medida, com manete de cruzeiro, segurando o
+ângulo por 6 segundos:
+
+| ângulo | antes  | agora |
+|--------|--------|-------|
+| 45°    | 1752   | 1921  |
+| 55°    | 1492   | 1688  |
+| 65°    | 1289   | 1507  |
+| 75°    | 1151   | 1383  |
+| 90°    | ESTOLA | 1312  |
+
+Ou seja: agora dá para subir na vertical com potência de cruzeiro. A nota
+anterior deste arquivo dizia que 5.200 "apagava a gravidade do jogo" — e
+dizia certo. **Foi escolha do dono, não descuido**, e fica registrado para
+quem vier depois não "consertar" de volta sem saber.
+
+**O que continua doendo:** puxar 40° com a manete fechada ainda estola. Era a
+condição que eu não deixaria cair, porque é o erro de verdade.
+
+**Como desfazer:** `SUBIDA_CUSTO` volta a 5800, `AFUNDA` a 900*VEL, `TETO` a
+11000, e some o bloco do ar rarefeito. Cada um é independente.
+
+**Medido em** `scratchpad/voo-livre.js`, que roda a montagem publicada e a nova
+lado a lado e imprime a tabela acima — a escada não foi sentida, foi medida.
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".

@@ -7380,7 +7380,25 @@ function giraPar(u, v, ang){
    no meio de qualquer manobra vertical. Subiu para 11.000: 585 metros de
    coluna de ar, o dobro, e as nuvens (que moram entre 4.200 e 9.400) passam a
    ficar DENTRO do espaço de voo em vez de serem enfeite inalcançável. */
-const CHAO = -700, TETO = 11000;
+/* O TETO FOI DE 11.000 PARA 60.000. "Melhora a experiência de voo. Tá com
+   muita restrição de queda. Deixe mais livre."
+
+   Com 11.000 a faixa inteira de voo tinha 585 metros — menos que a altura de
+   dois prédios do mapa —, e dava para encostar no teto numa subida só. O
+   "AR RAREFEITO" não era um aviso: era uma parede, com o avião TRAVADO em
+   `aviaoY = TETO`.
+
+   Agora são 3.035 metros, e o limite deixou de ser parede: acima do teto de
+   SERVIÇO o motor entrega cada vez menos, e a subida acaba sozinha quando a
+   potência não paga mais o custo dela. É o que acontece num avião de verdade,
+   e é a diferença entre bater numa tampa e ficar sem fôlego.
+
+   `TETO_CENA` é outra coisa e continua onde estava: é a altura em que o mundo
+   é POVOADO — tambores, helicópteros, aviões parados, caça inimigo. Subido
+   junto, o céu de cima ficaria vazio e a subida não teria o que encontrar. */
+const CHAO = -700, TETO = 60000;
+const TETO_SERVICO = 30000;        // daqui para cima o ar rareia, de verdade
+const TETO_CENA = 11000;           // até onde o mundo tem coisas dentro
 /* ===========================================================================
    O MULTIPLICADOR DE VELOCIDADE
 
@@ -7575,7 +7593,11 @@ const TAXA_ESTERCA = 0.85;                    // o leme esterça no chão
 const ACEL_CHAO = 145*VEL, FREIO_CHAO = 330*VEL;
 /* O quanto o avião AFUNDA na faixa de estresse, antes do estol declarado.
    Escala com a velocidade do jogo: é uma velocidade, como as outras. */
-const AFUNDA = 900*VEL;
+/* 900 PASSOU A 680: é o quanto o avião afunda na faixa em que a asa ainda
+   segura mas já reclama. O afundamento continua existindo — é ele que faz o
+   voo lento ter peso em vez de ser mágica —, só deixou de ser o bastante para
+   decidir a partida sozinho antes de o estol sequer chegar. */
+const AFUNDA = 680*VEL;
 /* --- AS PISTAS DO MAPA -----------------------------------------------------
    Eram quatro constantes soltas descrevendo UMA pista. Viraram uma tabela, e
    com ela o mapa ganhou um segundo aeroporto sem que nada mais precisasse
@@ -7936,6 +7958,7 @@ let vida=100;
 let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
 let subida = 0;            // metros por segundo para cima, alisado, para o altímetro
+let avisouRarefeito = false;
 /* o fator de carga e as duas agulhas de memória do acelerômetro */
 let cargaG = 1, gMax = 1, gMin = 1, _fAnt = null;
 let jogando=false, caindo=false, giroQueda=0, vq=0, motivoQueda='';
@@ -8045,7 +8068,7 @@ function montaMapa(){
          isso a contagem cai para um quinto, senão o céu fica cheio de
          prêmio e prêmio comum não é prêmio. */
       if (Math.random() > 0.20) continue;
-      tambores.push({ x:tx, y: 1100 + Math.random()*Math.random()*(TETO*0.78), z:tz,
+      tambores.push({ x:tx, y: 1100 + Math.random()*Math.random()*(TETO_CENA*0.78), z:tz,
                       azul: true, pego:false, giro:Math.random()*6.28 });
       /* --- QUEM VOA E QUEM PAIRA ------------------------------------------
          "Não quero mais avião parado no mapa; se for parado que seja um
@@ -8067,7 +8090,7 @@ function montaMapa(){
       if (sorte < 0.26){
         const tipo = sorte < 0.17 ? 'aviao' : 'helicoptero';
         obstaculos.push({ tipo,
-          x: tx + (Math.random()-0.5)*3000, y: 900 + Math.random()*Math.random()*(TETO*0.72),
+          x: tx + (Math.random()-0.5)*3000, y: 900 + Math.random()*Math.random()*(TETO_CENA*0.72),
           z: tz + (Math.random()-0.5)*3000, fase: Math.random()*6.28,
           deriva:(Math.random()-0.5)*300, rumo: Math.random()*6.283,
           /* o avião de rota vai de 900 a 1700 — abaixo do jogador, para dar
@@ -16109,7 +16132,14 @@ function atualiza(dt){
     aviaoZ = Math.max(-MAPA, Math.min(MAPA, aviaoZ));
     mostraAviso('FIM DO MAPA — DÊ MEIA-VOLTA', '#ffb86b', 900);
   }
-  if (aviaoY > TETO){ aviaoY = TETO; mostraAviso('AR RAREFEITO', '#9fd8ff', 900); }
+  /* o teto duro continua existindo, mas agora é uma rede de segurança lá no
+     alto, não o fim do voo: quem chega nele já vinha sem força há muito. O
+     aviso saiu daqui e passou a sair na entrada do ar rarefeito, que é onde a
+     informação serve para alguma coisa. */
+  if (aviaoY > TETO) aviaoY = TETO;
+  if (aviaoY > TETO_SERVICO && !avisouRarefeito){
+    avisouRarefeito = true; mostraAviso('AR RAREFEITO — O MOTOR PERDE FORÇA', '#9fd8ff', 1400);
+  } else if (aviaoY < TETO_SERVICO - 3000) avisouRarefeito = false;
 
   /* ----------------------------------------------------------------------
      O TOQUE. Em cima da pista o solo é o asfalto e dá para pousar; fora
@@ -16168,6 +16198,15 @@ function atualiza(dt){
   // trem fora e flape baixado ARRASTAM: o avião simplesmente não corre mais
   vooAlvo = Math.min(vooAlvo, FLAP_TETO[flap] || FLAP_TETO[0]);
   if (trem) vooAlvo = Math.min(vooAlvo, TREM_TETO);
+  /* O AR RAREFEITO. Antes do teto de serviço nada muda — e o teto de serviço
+     sozinho já é cinco vezes a faixa de voo que o jogo tinha. Daí para cima o
+     motor entrega menos, até 45% no limite: a subida vai ficando pesada e
+     acaba onde a potência deixa de pagar o custo dela, em vez de acabar numa
+     tampa invisível. */
+  if (aviaoY > TETO_SERVICO){
+    const r = Math.min(1, (aviaoY - TETO_SERVICO)/(TETO - TETO_SERVICO));
+    vooAlvo *= 1 - r*0.55;
+  }
   /* --- O DEGRAU ENTRE A PISTA E O CÉU -----------------------------------------
      "Parece que estou grudado no chão, e quando decola do nada parece um
      foguete. É muito discrepante."
@@ -16241,7 +16280,12 @@ function atualiza(dt){
      subir na VERTICAL sem consequência. 5.800 mantém a subida vertical como
      coisa de manete cheia, deixa 55° passar com aviso e mata dos 70° para
      cima. */
-  const SUBIDA_CUSTO = 5800;
+  /* 5.800 PASSOU A 5.200, e o dono sabe o que está comprando. A tabela acima
+     é minha e diz que 5.200 "apagava a gravidade do jogo", porque deixa subir
+     na vertical com manete de cruzeiro. Ele pediu justamente isso: "deixe mais
+     livre", depois de marcar "estolar menos". O julgamento é dele; a nota fica
+     aqui para quem vier depois saber que foi escolha, não descuido. */
+  const SUBIDA_CUSTO = 5200;
   voo -= SUBIDA_CUSTO * eixoF.y * dt;
   /* o mergulho ganha velocidade, mas não sem fim: acima do turbo o avião
      entraria em números que nenhuma outra parte do jogo espera */
@@ -21970,7 +22014,7 @@ const Inimigos = {
     if (!modeloInimigo || this.lista.length >= CACA_MAX) return;
     const ang = Math.random()*6.283, d = 26000 + Math.random()*14000;
     const x = aviaoX + Math.sin(ang)*d, z = aviaoZ + Math.cos(ang)*d;
-    const y = Math.max(CHAO + 2200, Math.min(TETO*0.8, aviaoY + (Math.random()-0.5)*6000));
+    const y = Math.max(CHAO + 2200, Math.min(TETO_CENA*0.8, aviaoY + (Math.random()-0.5)*6000));
     const no = modeloInimigo.clone(true);
     no.scale.setScalar(1.3);
     no.traverse(m => { if (m.isMesh && m.material && m.material.color)
@@ -22097,7 +22141,7 @@ const Inimigos = {
       c.vel += (alvoVel - c.vel)*Math.min(1, dt*0.7);
       c.x += c.F.x*c.vel*dt; c.y += c.F.y*c.vel*dt; c.z += c.F.z*c.vel*dt;
       if (c.y < CHAO + 1400){ c.y = CHAO + 1400; c.F.y = Math.abs(c.F.y); c.F = vnorm(c.F); }
-      if (c.y > TETO) c.y = TETO;
+      if (c.y > TETO_CENA) c.y = TETO_CENA;
 
       /* ---- ATIRA?  E o ângulo que conta é o da ANTECIPAÇÃO, não o meu.
 
