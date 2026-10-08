@@ -2876,15 +2876,61 @@ const CAB_PINT_TELAS = [
   { x: 0.4329, y: 0.5103, w: 0.1343, h: 0.1884 },
   { x: 0.5972, y: 0.5479, w: 0.0979, h: 0.1541 }
 ];
+/* AS PEÇAS QUE SE MEXEM.
+
+   "Cada ação nossa tem que algo se mexendo lá... o trem de pouso, acelerar,
+   freiar, flaps, tudo tem que mover na cabine."
+
+   Uma pintura é uma folha só, então cada peça que se mexe precisa existir
+   SEPARADA. A arte veio em quatro imagens: a cabine sem as peças, e o manche,
+   as manetes e a alavanca de flape cada um na sua.
+
+   As caixas abaixo são em FRAÇÃO da imagem, e foram escolhidas olhando — as
+   peças voltaram redesenhadas em outra escala, não recortadas no lugar, então
+   não havia de onde LER a posição. Estão marcadas como escolha, não medida.
+
+   A manopla do trem não veio, e por isso o trem ainda não mexe nada aqui. */
+const CAB_PINT_PECAS = {
+  /* o manche encolheu e desceu depois da foto de perto: a 0,096 de largura e
+     começando em 0,600 o punho tapava os alvos e a distância da pista na tela
+     do meio. Ele continua na frente do painel, que é onde um manche fica —
+     só deixou de comer a informação. */
+  manche:  { arq: '__CABINE_LUCAS_MANCHE__',  x: 0.452, y: 0.672, w: 0.078, h: 0.328 },
+  manetes: { arq: '__CABINE_LUCAS_MANETES__', x: 0.205, y: 0.660, w: 0.140, h: 0.280 },
+  flape:   { arq: '__CABINE_LUCAS_FLAPE__',   x: 0.660, y: 0.690, w: 0.075, h: 0.210 }
+};
 let _cabPint = null, _cabPintOk = false;
+const _cabPeca = {};
 function cabinePintada(){
   if (!CABINE_PINTADA) return null;
   if (!_cabPint){
     _cabPint = new Image();
     _cabPint.onload = () => { _cabPintOk = _cabPint.naturalWidth > 0; };
     _cabPint.src = CAB_PINT_SRC;        // no modelo é um marcador: não carrega,
-  }                                     // e aí o jogo cai na cabine 3D sozinho
+    for (const k of Object.keys(CAB_PINT_PECAS)){   // e aí o jogo cai na 3D
+      const im = new Image(); im.src = CAB_PINT_PECAS[k].arq;
+      _cabPeca[k] = im;
+    }
+  }
   return _cabPintOk ? _cabPint : null;
+}
+/* desenha uma peça na caixa dela, com uma transformação em volta de um pivô.
+   O pivô é o PÉ da peça (embaixo, no meio): é onde manche, manete e alavanca
+   são presos de verdade, e girar em volta de outro ponto faz a peça deslizar
+   em vez de articular. */
+function pecaDaCabine(nome, c, transforma){
+  const im = _cabPeca[nome];
+  if (!im || !im.naturalWidth) return;
+  const a = CAB_PINT_PECAS[nome];
+  const e = Math.min(a.w*c.l/im.naturalWidth, a.h*c.a/im.naturalHeight);
+  const w = im.naturalWidth*e, h = im.naturalHeight*e;
+  const x = c.x + a.x*c.l + (a.w*c.l - w)/2;
+  const y = c.y + a.y*c.a + (a.h*c.a - h);
+  const px = x + w/2, py = y + h;            // o pé
+  h2.save();
+  h2.translate(px, py); transforma(w, h); h2.translate(-px, -py);
+  h2.drawImage(im, x, y, w, h);
+  h2.restore();
 }
 /* Ela só entra na vista de CABINE: a do capacete mostra o avião em volta, e
    uma ilustração fixa ali seria uma parede.
@@ -2936,26 +2982,51 @@ function desenhaCabinePintada(){
   const c = caixaCabinePintada(img), tre = tremorDaCabine();
   c.x += tre.x; c.y += tre.y;        // as telas vão junto: são parte dela
   h2.drawImage(img, c.x, c.y, c.l, c.a);
-  if (!jogando || caindo) return;
-  /* os instrumentos vivos, dentro das três telas pretas da arte. `_mfdMudo`
-     porque elas não são tocáveis: são uma pintura. O dedo manda nas telas
-     pelas janelas 2D e pelo teclado, como já mandava nas do painel 3D. */
-  const escAntes = _mfdEscala, fisAntes = _mfdFisico, mudoAntes = _mfdMudo;
-  /* 1,85 é a escala das telas do painel 3D, e ali a textura tem 474x214
-     PIXELS DE TEXTURA. Aqui a tela é desenhada direto na tela do aparelho e
-     tem uns 113 de largura no celular deitado: a mesma escala transborda o
-     rótulo por cima do valor. O corpo de letra já acompanha a altura da
-     caixa (`o.h*0.060*_mfdEscala`); o que faltava era parar de multiplicar
-     por um número pensado para outra caixa. */
-  _mfdEscala = 1.15; _mfdFisico = true; _mfdMudo = true;
-  try {
-    for (let i = 0; i < CAB_PINT_TELAS.length; i++){
-      const t = CAB_PINT_TELAS[i];
-      desenhaMFDEm({ x: c.x + t.x*c.l, y: c.y + t.y*c.a,
-                     w: t.w*c.l, h: t.h*c.a, k: i }, i, true, true);
-    }
-  } catch(e){}
-  _mfdEscala = escAntes; _mfdFisico = fisAntes; _mfdMudo = mudoAntes;
+
+  /* AS TELAS VÊM ANTES DAS PEÇAS, e a ordem não é gosto: o manche fica NA
+     FRENTE do painel, e as telas estão EMBUTIDAS nele. Desenhadas depois,
+     elas pintavam por cima do punho — o manche inclinava certo e só aparecia
+     do cano para baixo. Foi a foto de perto que mostrou. */
+  if (jogando && !caindo){
+    /* os instrumentos vivos, dentro das três telas pretas da arte. `_mfdMudo`
+       porque elas não são tocáveis: são uma pintura. O dedo manda nas telas
+       pelas janelas 2D e pelo teclado, como já mandava nas do painel 3D. */
+    const escAntes = _mfdEscala, fisAntes = _mfdFisico, mudoAntes = _mfdMudo;
+    /* 1,85 é a escala das telas do painel 3D, e ali a textura tem 474x214
+       PIXELS DE TEXTURA. Aqui a tela é desenhada direto na tela do aparelho e
+       tem uns 113 de largura no celular deitado: a mesma escala transborda o
+       rótulo por cima do valor. O corpo de letra já acompanha a altura da
+       caixa (`o.h*0.060*_mfdEscala`); o que faltava era parar de multiplicar
+       por um número pensado para outra caixa. */
+    _mfdEscala = 1.15; _mfdFisico = true; _mfdMudo = true;
+    try {
+      for (let i = 0; i < CAB_PINT_TELAS.length; i++){
+        const t = CAB_PINT_TELAS[i];
+        desenhaMFDEm({ x: c.x + t.x*c.l, y: c.y + t.y*c.a,
+                       w: t.w*c.l, h: t.h*c.a, k: i }, i, true, true);
+      }
+    } catch(e){}
+    _mfdEscala = escAntes; _mfdFisico = fisAntes; _mfdMudo = mudoAntes;
+  }
+  /* --- AS PEÇAS, CADA UMA NO SEU COMANDO ---------------------------------
+     As amplitudes são pequenas de propósito. O olho percebe movimento muito
+     antes de perceber quanto: um manche que anda meia tela vira brinquedo, e
+     um que inclina doze graus vira avião. */
+  const e = (jogando && !caindo) ? eixos() : { lat: 0, ver: 0 };
+  /* o manche: rola girando no pé, e cabra encurtando — puxado, ele vem na
+     direção do olho, e de frente isso é a peça parecer mais baixa. */
+  pecaDaCabine('manche', c, () => {
+    h2.rotate(-(e.lat || 0) * 0.21);
+    h2.scale(1, 1 - (e.ver || 0) * 0.12);
+  });
+  /* as manetes correm para a FRENTE do console quando a potência sobe, e o
+     console foge para cima e para a direita na perspectiva — então o passeio
+     tem as duas componentes. A pós-combustão leva ao batente. */
+  const pot = Math.min(1, (motor || 0) + (turbinando ? 0.18 : 0));
+  pecaDaCabine('manetes', c, (w, h) => h2.translate(w*0.16*pot, -h*0.13*pot));
+  /* a alavanca de flape desce girando no pé, um degrau por posição */
+  pecaDaCabine('flape', c, () => h2.rotate((flapAnim || 0) * 0.17));
+
 }
 
 function lonaPainel(){

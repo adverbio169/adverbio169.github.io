@@ -345,7 +345,8 @@ saem de `scratchpad/cabines/acha-telas.js`, que varre as regiões pretas da
 imagem — medidas, não estimadas. O prompt usado para gerar a arte está no
 histórico da conversa.
 
-**Peso:** 203 KB, no tamanho original da arte (1846 px) e em qualidade alta —
+**Peso:** 258 KB nas quatro imagens (base 193, manche 30, manetes 24, flape 11),
+no tamanho original da arte (1846 px) e em qualidade alta —
 a 1266 px ela era esticada em monitor e saía borrada. Em PNG seriam 1,8 MB. O
 jogo montado foi de 1.681 para 1.963 KB.
 
@@ -364,10 +365,40 @@ Provado em `scratchpad/tremor.js`, que mede o conteúdo do quadro: parada sem
 motivo, seis quadros diferentes com motivo, e parada de novo quando o motivo
 acaba.
 
-**O que ela ainda não faz:** o manche é pintado e não se mexe; os botões
-pintados não fazem nada; não gira quando você vira a cabeça; só o dragão tem a
-sua, e o caça continua com a cabine de malha; e os botões do canto da tela
-ainda ficam por cima dela.
+### As peças que se mexem
+
+> "Cada ação nossa tem que algo se mexendo lá... o trem de pouso, acelerar,
+> freiar, flaps, tudo tem que mover na cabine."
+
+Uma pintura é uma folha só, então cada peça que se mexe tem de existir
+separada. A arte veio em quatro imagens — a cabine **sem** as peças, mais o
+manche, as manetes e a alavanca de flape — e o jogo as empilha:
+
+| peça | comando | o que faz |
+|------|---------|-----------|
+| manche | `eixos().lat` e `.ver` | gira no pé ao rolar, encurta ao cabrar |
+| manetes | `motor` e `turbinando` | correm para a frente do console; pós-combustão leva ao batente |
+| flape | `flapAnim` | desce girando no pé, um degrau por posição |
+
+**A ordem de desenho importa e custou uma foto para eu ver:** base → telas
+vivas → peças. O manche fica NA FRENTE do painel e as telas estão EMBUTIDAS
+nele; desenhadas depois das peças, elas pintavam por cima do punho e o manche
+só aparecia do cano para baixo.
+
+**As caixas de cada peça são escolha, não medida.** As peças voltaram
+redesenhadas em outra escala e outro lugar — não recortadas no lugar —, então
+não havia de onde ler a posição: foram postas olhando, e o manche encolheu
+depois de uma foto de perto mostrar que o punho tapava os alvos e a distância
+da pista na tela do meio.
+
+Provado em `scratchpad/pecas.js`, que mede pixel na região de cada peça: cada
+comando mexe a SUA peça e **não mexe nenhuma outra**, e o mesmo comando duas
+vezes dá a mesma imagem.
+
+**O que ela ainda não faz:** a manopla do trem não veio na arte, então o trem
+ainda não mexe nada na cabine; os outros botões pintados não fazem nada; ela
+não gira quando você vira a cabeça; só o dragão tem a sua, e o caça continua
+com a cabine de malha; e os botões do canto da tela ainda ficam por cima dela.
 
 ### E a cabine de malha melhorou junto
 - A lona do painel era 700x178 — proporção de tarja. Com 29 unidades de

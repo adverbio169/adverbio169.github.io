@@ -80,7 +80,10 @@ if os.path.exists(tres_cam):
     t3 = (t3.replace('<script>/* THREE */</script>', '<script>' + seguro(tres) + '</script>')
             .replace('__PEERJS__', seguro(peer))
             .replace('__QRCODE__', seguro(qr))
-            .replace('__CABINE_LUCAS__', imagem('cabine-lucas.webp')))
+            .replace('__CABINE_LUCAS__', imagem('cabine-lucas.webp'))
+            .replace('__CABINE_LUCAS_MANCHE__', imagem('cabine-lucas-manche.webp'))
+            .replace('__CABINE_LUCAS_MANETES__', imagem('cabine-lucas-manetes.webp'))
+            .replace('__CABINE_LUCAS_FLAPE__', imagem('cabine-lucas-flape.webp')))
     open('aviao3d.html', 'w', encoding='utf-8').write(t3)
     print('aviao3d.html: %d KB   (three.js embutido: %d KB)' % (len(t3)//1024, len(tres)//1024))
 else:
