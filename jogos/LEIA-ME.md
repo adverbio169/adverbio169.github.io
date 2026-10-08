@@ -420,11 +420,43 @@ melhor que a de malha que a troca de cor vale o preço. Quando o caça tiver a
 arte dele, é só escolher a imagem pelo `tipoDeAviao` dentro de
 `usaCabinePintada()`.
 
+### O acelerador mudou de endereço
+
+A barra de potência do celular ficava na borda direita, **por cima da
+cabine**, repetindo o que as manetes pintadas e a tela MOTOR já mostram. Era
+o "HUD passando por cima do painel".
+
+Apagá-la deixaria o celular sem acelerador, então ela virou uma **zona
+invisível em cima da própria manete desenhada**: o dedo arrasta a alavanca que
+está ali, e a alavanca anda. É o mesmo controle de sempre, com o mesmo código
+de arrasto — só mudaram o endereço e a aparência (`aceleradorNaManete()` e a
+classe `naCabine`).
+
+Dois detalhes que só apareceram testando:
+
+- `valorDoDedo` decide pela FORMA da caixa se o arrasto é vertical ou
+  horizontal. Com respiro igual dos quatro lados a zona saía mais larga que
+  alta, e o acelerador virou horizontal: tocar no alto da alavanca deixava a
+  potência em 0,49. O respiro é desigual de propósito — pouco nos lados,
+  bastante em cima e mais embaixo.
+- A zona é presa à tela. A sobra de baixo caía fora do visível, e alvo de dedo
+  fora da tela não só não existe como encolhe a parte útil do curso, porque o
+  valor é lido em fração da caixa inteira.
+- A arrumação roda **antes** de qualquer saída da função: trocando para a
+  vista de fora, a zona ficava pregada em cima do nada e a barra sumida para
+  sempre.
+
+Provado em `scratchpad/acel.js`: a zona contém a manete, está em pé, não passa
+da tela, tocar no alto leva a potência a 0,96 e embaixo a 0,04, a alavanca
+desenhada anda junto, e sair da cabine devolve a barra ao canto.
+
+**O PÓS-COMB continua no canto esquerdo**, e de propósito: ele é um botão que
+se segura, e a pintura não tem equivalente dele. A regra foi tirar o que a
+cabine já mostra, e a cabine não mostra como ligar a pós-combustão.
+
 **O que ela ainda não faz:** a manopla do trem não veio na arte, então o trem
-ainda não mexe nada na cabine; os outros botões pintados não fazem nada; e os
-controles de toque do celular (PÓS-COMB, METRALHADORA, DEFESA, FOGO e a barra
-de potência) são desenhados por cima dela — são botões e precisam ficar
-alcançáveis, mas cobrem a cabine e ainda não foram repensados.
+ainda não mexe nada na cabine; os outros botões pintados não fazem nada; e
+PÓS-COMB, METRALHADORA, DEFESA e FOGO continuam desenhados por cima dela.
 
 ### E a cabine de malha melhorou junto
 - A lona do painel era 700x178 — proporção de tarja. Com 29 unidades de

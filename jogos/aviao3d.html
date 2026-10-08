@@ -155,6 +155,16 @@
   .dedoM{overflow:hidden;
          width:min(13vw,58px);height:min(56vh,200px);top:46%;transform:translateY(-50%)}
   #dAcel{right:calc(8px + env(safe-area-inset-right))}
+  /* O ACELERADOR EM CIMA DA MANETE PINTADA. "O HUD do cockpit tava passando
+     por cima do painel" — e era isto: a barra de potência cobria a cabine e
+     dizia a mesma coisa que as manetes pintadas e a tela MOTOR já dizem.
+     Em vez de apagar o controle (no celular não haveria mais como acelerar),
+     ele fica TRANSPARENTE e é movido para cima da própria manete: você
+     arrasta a alavanca que está desenhada ali, e ela anda junto. */
+  #dAcel.naCabine{background:none;border:none;box-shadow:none;
+                  -webkit-backdrop-filter:none;backdrop-filter:none;
+                  transform:none}
+  #dAcel.naCabine > i, #dAcel.naCabine > span{display:none}
   #dNitro{left:calc(8px + env(safe-area-inset-left));display:flex;align-items:center;justify-content:center}
   #dAcelBarra{position:absolute;left:0;right:0;bottom:0;height:70%;
               background:linear-gradient(0deg,rgba(94,255,154,.28),rgba(94,255,154,.52));
@@ -9541,9 +9551,13 @@ function cabinePintadaOpacidade(){
 }
 function desenhaCabinePintada(){
   const img = usaCabinePintada() ? cabinePintada() : null;
-  if (!img) return;
-  const op = cabinePintadaOpacidade();
-  if (op <= 0.004) return;
+  const op = img ? cabinePintadaOpacidade() : 0;
+  /* a arrumação do acelerador vem ANTES de qualquer saída: sem isto, trocar
+     para a vista de fora deixava a zona invisível pregada em cima do nada e
+     a barra de potência sumida para sempre — a função saía cedo e nunca
+     chegava na limpeza. */
+  aceleradorNaManete(img ? caixaCabinePintada(img) : null, op);
+  if (!img || op <= 0.004) return;
   presoNaTela();
   const c = caixaCabinePintada(img), tre = tremorDaCabine();
   c.x += tre.x + hudDX; c.y += tre.y + hudDY;   // presa no avião, como o HUD
@@ -9594,6 +9608,55 @@ function desenhaCabinePintada(){
   /* a alavanca de flape desce girando no pé, um degrau por posição */
   pecaDaCabine('flape', c, () => h2.rotate((flapAnim || 0) * 0.17));
   h2.globalAlpha = 1;
+}
+/* O ACELERADOR DE DEDO MUDA DE ENDEREÇO.
+
+   A barra de potência do celular ficava colada na borda direita, por cima da
+   cabine, repetindo o que as manetes pintadas e a tela MOTOR já mostram. Em
+   vez de apagá-la — e deixar o celular sem acelerador —, ela vira uma zona
+   INVISÍVEL por cima da própria manete desenhada: o dedo arrasta a alavanca
+   que está ali, e a alavanca anda. O controle é o mesmo de sempre, com o
+   mesmo código de arrasto; só o endereço e a aparência mudaram.
+
+   `valorDoDedo` já decide sozinho se lê o arrasto na vertical ou na
+   horizontal, pela forma da caixa — e a caixa da manete é mais alta que
+   larga, então continua vertical, como a barra era. */
+function aceleradorNaManete(c, op){
+  const el = document.getElementById('dAcel');
+  if (!el) return;
+  /* só quando a cabine está mesmo à vista e o dedo é quem manda */
+  if (op < 0.6 || !document.body.classList.contains('dedos')){
+    if (el.classList.contains('naCabine')){
+      el.classList.remove('naCabine');
+      el.style.left = el.style.top = el.style.width = el.style.height = '';
+    }
+    return;
+  }
+  const a = CAB_PINT_PECAS.manetes;
+  /* O RESPIRO É DESIGUAL DE PROPÓSITO, e isso vem de um teste que reprovou.
+     `valorDoDedo` decide pela FORMA DA CAIXA se o arrasto é vertical ou
+     horizontal (`r.height >= r.width`). A caixa da manete, com respiro igual
+     dos quatro lados, saía 183 por 153 — mais larga que alta —, e o
+     acelerador virou horizontal: tocar no alto da alavanca deixava a potência
+     em 0,49, porque ele estava lendo o X.
+
+     Pouco respiro nos lados, muito em cima e mais ainda embaixo: a caixa fica
+     em pé, o arrasto volta a ser vertical, e a sobra de baixo cai no banco,
+     que é lugar morto. Em cima ela encosta na borda do painel, onde não há
+     nada que o dedo comande. */
+  const fx = 0.012*c.l, fcima = 0.055*c.a, fbaixo = 0.155*c.a;
+  /* e a zona não passa da tela: a sobra de baixo caía fora do visível, e
+     alvo de dedo fora da tela é alvo que não existe — pior, ele encolhe a
+     parte ÚTIL do curso, porque o valor é lido em fração da caixa inteira. */
+  let topo = c.y + a.y*c.a - fcima;
+  let alt  = a.h*c.a + fcima + fbaixo;
+  if (topo < 0){ alt += topo; topo = 0; }
+  alt = Math.min(alt, H - topo);
+  el.classList.add('naCabine');
+  el.style.left   = (c.x + a.x*c.l - fx) + 'px';
+  el.style.top    = topo + 'px';
+  el.style.width  = (a.w*c.l + fx*2) + 'px';
+  el.style.height = alt + 'px';
 }
 
 function lonaPainel(){
