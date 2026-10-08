@@ -2935,12 +2935,14 @@ function pecaDaCabine(nome, c, transforma){
 /* Ela só entra na vista de CABINE: a do capacete mostra o avião em volta, e
    uma ilustração fixa ali seria uma parede.
 
-   E só no AVIÃO DELA. A arte é a cabine do Lucas, azul e amarela como o
-   dragão por fora; mostrá-la dentro do caça seria entrar num avião cinza e
-   sentar num azul. Cada avião precisa da sua, e enquanto não tiver, cai na
-   cabine de malha — que é o que esta chave faz. */
+   Ela valia só no dragão, porque a arte é a cabine do Lucas e eu achei que
+   sentar num interior azul dentro de um caça cinza ia destoar. O dono pediu
+   para pôr no caça também, e vendo as duas lado a lado ele tem razão: a
+   pintada é tão melhor que a de malha que a troca de cor vale o preço.
+   Quando o caça tiver a arte dele, é só escolher a imagem pelo `tipoDeAviao`
+   aqui dentro. */
 function usaCabinePintada(){
-  return !!(cockpit && tipoDeAviao === 'dragao' && cabinePintada());
+  return !!(cockpit && cabinePintada());
 }
 /* "cobrir": a arte é 2,17:1 e a tela do celular deitado é 2,16 — encaixa
    quase exata. Em monitor, que é mais quadrado, sobra largura e ela é
@@ -2975,12 +2977,42 @@ function tremorDaCabine(){
   const px = (a/26)/(2*Math.tan(cam.fov*Math.PI/360))*H;
   return { x: (Math.random()-0.5)*px, y: (Math.random()-0.5)*px };
 }
+/* QUANTO DA CABINE PINTADA AINDA APARECE, virando a cabeça.
+
+   "Testei no modo mover cabeça: o cockpit tava indo junto ao olhar para o
+   lado." Ia mesmo, e a causa é de uma linha: ela era desenhada com
+   `presoNaTela()`, colada na tela do navegador. O mundo girava, o HUD girava
+   com o nariz, e ela ficava parada — metade da imagem dizia "virei a cabeça"
+   e a outra metade dizia que não. É a MESMA contradição que este arquivo já
+   tinha diagnosticado para o HUD, e que deu o `presoNoAviao()`.
+
+   Agora ela anda junto com o avião, pelo mesmo deslocamento. Mas uma pintura
+   é CHATA: não tem lateral para mostrar. Virando muito, o certo seria ver o
+   console lateral, a longarina, o ombro do banco — e não existe nada disso na
+   folha. Então ela desaparece.
+
+   Os números saíram de olhar a foto: com o sumiço começando em 18° a cabine
+   ficava FANTASMA a 25°, com o chão aparecendo através da chapa do painel —
+   e painel transparente é pior que painel parado. Ela fica inteira até 26°,
+   que é onde o deslocamento ainda a mantém quase toda no quadro, e some entre
+   26° e 42°, rápido o bastante para a transparência não virar um estado em
+   que se jogue. */
+function cabinePintadaOpacidade(){
+  if (!Cabeca.ligada) return 1;
+  const a = Math.hypot(Cabeca.x || 0, (Cabeca.y || 0)*0.7);
+  if (a <= 26) return 1;
+  if (a >= 42) return 0;
+  return 1 - (a - 26)/16;
+}
 function desenhaCabinePintada(){
   const img = usaCabinePintada() ? cabinePintada() : null;
   if (!img) return;
+  const op = cabinePintadaOpacidade();
+  if (op <= 0.004) return;
   presoNaTela();
   const c = caixaCabinePintada(img), tre = tremorDaCabine();
-  c.x += tre.x; c.y += tre.y;        // as telas vão junto: são parte dela
+  c.x += tre.x + hudDX; c.y += tre.y + hudDY;   // presa no avião, como o HUD
+  h2.globalAlpha = op;
   h2.drawImage(img, c.x, c.y, c.l, c.a);
 
   /* AS TELAS VÊM ANTES DAS PEÇAS, e a ordem não é gosto: o manche fica NA
@@ -3026,7 +3058,7 @@ function desenhaCabinePintada(){
   pecaDaCabine('manetes', c, (w, h) => h2.translate(w*0.16*pot, -h*0.13*pot));
   /* a alavanca de flape desce girando no pé, um degrau por posição */
   pecaDaCabine('flape', c, () => h2.rotate((flapAnim || 0) * 0.17));
-
+  h2.globalAlpha = 1;
 }
 
 function lonaPainel(){

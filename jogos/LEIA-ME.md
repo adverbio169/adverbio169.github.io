@@ -395,10 +395,36 @@ Provado em `scratchpad/pecas.js`, que mede pixel na região de cada peça: cada
 comando mexe a SUA peça e **não mexe nenhuma outra**, e o mesmo comando duas
 vezes dá a mesma imagem.
 
+### Virando a cabeça
+
+Ela era desenhada **colada na tela do navegador**. O mundo girava, o HUD
+girava com o nariz, e ela ficava parada — metade da imagem dizia "virei a
+cabeça" e a outra metade dizia que não. É a mesma contradição que este arquivo
+já tinha diagnosticado para o HUD, e que deu o `presoNoAviao()`.
+
+Agora ela anda junto com o avião, pelo mesmo deslocamento. E some ao virar
+muito, porque uma pintura é chata e não tem lateral para mostrar: inteira até
+26°, sumindo entre 26° e 42°. Os 26° vieram de olhar a foto — começando em 18°
+ela ficava **fantasma** a 25°, com o chão aparecendo através da chapa do
+painel, e painel transparente é pior que painel parado.
+
+Provado em `scratchpad/olhar.js`, que mede o painel com e **sem** a cabine:
+a 15° os dois quadros diferem (ela está lá), a 50° são idênticos (ela saiu
+inteira). Comparar brilho com o mundo não serviria — a 14.000 de altura o
+mundo é mais escuro que o painel, e a minha primeira asserção reprovou por
+supor o contrário.
+
+**O caça também usa a cabine pintada** agora. Ela valia só no dragão porque a
+arte é a do Lucas, azul e amarela; vendo as duas lado a lado, a pintada é tão
+melhor que a de malha que a troca de cor vale o preço. Quando o caça tiver a
+arte dele, é só escolher a imagem pelo `tipoDeAviao` dentro de
+`usaCabinePintada()`.
+
 **O que ela ainda não faz:** a manopla do trem não veio na arte, então o trem
-ainda não mexe nada na cabine; os outros botões pintados não fazem nada; ela
-não gira quando você vira a cabeça; só o dragão tem a sua, e o caça continua
-com a cabine de malha; e os botões do canto da tela ainda ficam por cima dela.
+ainda não mexe nada na cabine; os outros botões pintados não fazem nada; e os
+controles de toque do celular (PÓS-COMB, METRALHADORA, DEFESA, FOGO e a barra
+de potência) são desenhados por cima dela — são botões e precisam ficar
+alcançáveis, mas cobrem a cabine e ainda não foram repensados.
 
 ### E a cabine de malha melhorou junto
 - A lona do painel era 700x178 — proporção de tarja. Com 29 unidades de
