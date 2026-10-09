@@ -385,11 +385,24 @@ vivas → peças. O manche fica NA FRENTE do painel e as telas estão EMBUTIDAS
 nele; desenhadas depois das peças, elas pintavam por cima do punho e o manche
 só aparecia do cano para baixo.
 
-**As caixas de cada peça são escolha, não medida.** As peças voltaram
-redesenhadas em outra escala e outro lugar — não recortadas no lugar —, então
-não havia de onde ler a posição: foram postas olhando, e o manche encolheu
-depois de uma foto de perto mostrar que o punho tapava os alvos e a distância
-da pista na tela do meio.
+**As caixas de cada peça são escolha, não medida** — as peças voltaram
+redesenhadas em outra escala e outro lugar, não recortadas no lugar, então não
+havia de onde ler a posição. Mas a segunda leitura foi feita com uma GRADE por
+cima da arte (`scratchpad/grade.html`), não no olhômetro, e ela mostrou três
+coisas:
+
+- o manche estava centrado em 0,491 e o eixo da cabine é 0,500 — um por cento
+  à esquerda, o bastante para parecer torto;
+- as manetes começavam em 0,660, mas a superfície do console esquerdo só
+  começa perto de 0,86: elas **flutuavam**, encostando na moldura da tela da
+  esquerda em vez de pousadas na bancada;
+- a alavanca de flape estava em 0,660, que ainda é painel — o vão dela começa
+  depois de 0,70.
+
+O manche também encolheu, depois de uma foto de perto mostrar que o punho
+tapava os alvos e a distância da pista na tela do meio. E o curso dele foi de
+12° para **23°**: doze graus é o curso de um manche de verdade e é pouco demais
+para ler numa tela de celular com a peça medindo oito por cento da largura.
 
 Provado em `scratchpad/pecas.js`, que mede pixel na região de cada peça: cada
 comando mexe a SUA peça e **não mexe nenhuma outra**, e o mesmo comando duas
@@ -442,6 +455,12 @@ Dois detalhes que só apareceram testando:
 - A zona é presa à tela. A sobra de baixo caía fora do visível, e alvo de dedo
   fora da tela não só não existe como encolhe a parte útil do curso, porque o
   valor é lido em fração da caixa inteira.
+- **A caixa é garantida em pé por construção**, não por sorte. Ajustar o
+  respiro no olhômetro não resolveu: consertada uma vez, ela voltou a ficar
+  deitada quando a caixa da manete desceu para o console e encolheu, e o
+  acelerador travou em 0,5 de novo. Agora a altura é o que for maior entre o
+  desenho com respiro e 1,25 vez a largura, crescendo para cima, onde sobra
+  painel e não há nada que o dedo comande.
 - A arrumação roda **antes** de qualquer saída da função: trocando para a
   vista de fora, a zona ficava pregada em cima do nada e a barra sumida para
   sempre.

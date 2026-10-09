@@ -2905,9 +2905,23 @@ const CAB_PINT_PECAS = {
      começando em 0,600 o punho tapava os alvos e a distância da pista na tela
      do meio. Ele continua na frente do painel, que é onde um manche fica —
      só deixou de comer a informação. */
-  manche:  { arq: '__CABINE_LUCAS_MANCHE__',  x: 0.452, y: 0.672, w: 0.078, h: 0.328 },
-  manetes: { arq: '__CABINE_LUCAS_MANETES__', x: 0.205, y: 0.660, w: 0.140, h: 0.280 },
-  flape:   { arq: '__CABINE_LUCAS_FLAPE__',   x: 0.660, y: 0.690, w: 0.075, h: 0.210 }
+  /* Segunda leitura destas caixas, com uma GRADE por cima da arte
+     (scratchpad/grade.html) em vez do olhômetro da primeira vez. O que a
+     grade mostrou:
+
+       · o manche estava centrado em 0,491, e o eixo da cabine é 0,500 —
+         um por cento à esquerda, o bastante para parecer torto;
+       · as manetes começavam em 0,660, mas a SUPERFÍCIE do console esquerdo
+         só começa perto de 0,86: elas flutuavam no ar, encostando na moldura
+         da tela da esquerda em vez de estarem pousadas na bancada;
+       · a alavanca de flape estava em 0,660, que ainda é painel — o vão dela
+         no console direito começa depois de 0,70.
+
+     As três agora terminam perto do rodapé da arte, que é onde o console
+     encosta na beirada do quadro. */
+  manche:  { arq: '__CABINE_LUCAS_MANCHE__',  x: 0.461, y: 0.672, w: 0.078, h: 0.328 },
+  manetes: { arq: '__CABINE_LUCAS_MANETES__', x: 0.195, y: 0.775, w: 0.125, h: 0.200 },
+  flape:   { arq: '__CABINE_LUCAS_FLAPE__',   x: 0.700, y: 0.800, w: 0.070, h: 0.175 }
 };
 let _cabPint = null, _cabPintOk = false;
 const _cabPeca = {};
@@ -3061,9 +3075,15 @@ function desenhaCabinePintada(){
   const e = (jogando && !caindo) ? eixos() : { lat: 0, ver: 0 };
   /* o manche: rola girando no pé, e cabra encurtando — puxado, ele vem na
      direção do olho, e de frente isso é a peça parecer mais baixa. */
+  /* O CURSO CRESCEU: 0,21 rad eram 12°, e o dono disse que "mexe pouco".
+     Doze graus é mais ou menos o curso de um manche de verdade, e é pouco
+     DEMAIS para ler numa tela de celular com a peça medindo oito por cento
+     da largura. 0,40 rad são 23°: exagero honesto, do mesmo tipo que faz o
+     aileron do avião abrir mais do que abriria na vida real para a manobra
+     se ver de fora. A arfagem foi junto, de 12% para 20% de encurtamento. */
   pecaDaCabine('manche', c, () => {
-    h2.rotate(-(e.lat || 0) * 0.21);
-    h2.scale(1, 1 - (e.ver || 0) * 0.12);
+    h2.rotate(-(e.lat || 0) * 0.40);
+    h2.scale(1, 1 - (e.ver || 0) * 0.20);
   });
   /* as manetes correm para a FRENTE do console quando a potência sobe, e o
      console foge para cima e para a direita na perspectiva — então o passeio
@@ -3110,17 +3130,28 @@ function aceleradorNaManete(c, op){
      que é lugar morto. Em cima ela encosta na borda do painel, onde não há
      nada que o dedo comande. */
   const fx = 0.012*c.l, fcima = 0.055*c.a, fbaixo = 0.155*c.a;
-  /* e a zona não passa da tela: a sobra de baixo caía fora do visível, e
-     alvo de dedo fora da tela é alvo que não existe — pior, ele encolhe a
-     parte ÚTIL do curso, porque o valor é lido em fração da caixa inteira. */
-  let topo = c.y + a.y*c.a - fcima;
-  let alt  = a.h*c.a + fcima + fbaixo;
-  if (topo < 0){ alt += topo; topo = 0; }
-  alt = Math.min(alt, H - topo);
+  /* A CAIXA É GARANTIDA EM PÉ, por construção e não por sorte.
+
+     Ajustar o respiro no olhômetro não resolve: na primeira vez a zona saiu
+     183 por 153, consertei, e aí a caixa da manete desceu para o console e
+     encolheu — a zona virou 130 por 107 e o acelerador voltou a ser
+     horizontal, com a potência travada em 0,5. É o mesmo defeito duas vezes,
+     e a causa é depender de uma proporção que outro ajuste pode mudar.
+
+     Então: a largura é a da alavanca mais um fio; a base desce até onde a
+     alavanca acaba (ou até o rodapé da tela, o que vier antes); e a ALTURA é
+     o que for maior entre o desenho com respiro e 1,25 vez a largura. O
+     crescimento sai para cima, onde sobra painel e não há nada que o dedo
+     comande. */
+  const larg = a.w*c.l + fx*2;
+  const base = Math.min(H, c.y + (a.y + a.h)*c.a + fbaixo);
+  let alt = Math.max(a.h*c.a + fcima + fbaixo, larg*1.25);
+  let topo = base - alt;
+  if (topo < 0){ topo = 0; alt = base; }
   el.classList.add('naCabine');
   el.style.left   = (c.x + a.x*c.l - fx) + 'px';
   el.style.top    = topo + 'px';
-  el.style.width  = (a.w*c.l + fx*2) + 'px';
+  el.style.width  = larg + 'px';
   el.style.height = alt + 'px';
 }
 
