@@ -399,6 +399,16 @@ coisas:
 - a alavanca de flape estava em 0,660, que ainda é painel — o vão dela começa
   depois de 0,70.
 
+E uma terceira leitura, com os consoles **ampliados**
+(`scratchpad/zoom.html`), trouxe a informação que faltava desde o começo: **a
+base não tem vão nenhum.** Ao remover as peças, o desenho preencheu os dois
+consoles inteiros de chave. Não existe lugar "certo" onde encaixar, e onde
+quer que se ponha, a peça pousa em cima de interruptor. O critério deixou de
+ser "achar o buraco" e passou a ser **onde uma manete e uma alavanca de flape
+são montadas de verdade**: na borda interna do console, junto do fio de luz
+azul. Para a cabine ficar perfeita nesse ponto seria preciso pedir ao desenho
+uma base com placas lisas e vazias onde as peças se encaixam.
+
 O manche também encolheu, depois de uma foto de perto mostrar que o punho
 tapava os alvos e a distância da pista na tela do meio. E o curso dele foi de
 12° para **23°**: doze graus é o curso de um manche de verdade e é pouco demais

@@ -2920,8 +2920,19 @@ const CAB_PINT_PECAS = {
      As três agora terminam perto do rodapé da arte, que é onde o console
      encosta na beirada do quadro. */
   manche:  { arq: '__CABINE_LUCAS_MANCHE__',  x: 0.461, y: 0.672, w: 0.078, h: 0.328 },
-  manetes: { arq: '__CABINE_LUCAS_MANETES__', x: 0.195, y: 0.775, w: 0.125, h: 0.200 },
-  flape:   { arq: '__CABINE_LUCAS_FLAPE__',   x: 0.700, y: 0.800, w: 0.070, h: 0.175 }
+  /* TERCEIRA leitura, e desta vez com os consoles AMPLIADOS (scratchpad/
+     zoom.html). Ela trouxe a informação que faltava desde o começo: a base
+     NÃO TEM VÃO NENHUM. Ao remover as peças, o desenho preencheu os dois
+     consoles inteiros de chave — não existe lugar "certo" onde encaixar, e
+     onde quer que se ponha, a peça pousa em cima de interruptor.
+
+     Então o critério deixou de ser "achar o buraco" e passou a ser "onde uma
+     manete e uma alavanca de flape são montadas de verdade": na BORDA INTERNA
+     do console, a que fica virada para o piloto, junto do fio de luz azul.
+     Na segunda tentativa elas estavam no meio da bancada e encostando no
+     rodapé do quadro, que é onde o dono as circulou de vermelho. */
+  manetes: { arq: '__CABINE_LUCAS_MANETES__', x: 0.215, y: 0.745, w: 0.115, h: 0.185 },
+  flape:   { arq: '__CABINE_LUCAS_FLAPE__',   x: 0.690, y: 0.780, w: 0.062, h: 0.150 }
 };
 let _cabPint = null, _cabPintOk = false;
 const _cabPeca = {};
