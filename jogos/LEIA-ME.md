@@ -479,9 +479,27 @@ Provado em `scratchpad/acel.js`: a zona contém a manete, está em pé, não pas
 da tela, tocar no alto leva a potência a 0,96 e embaixo a 0,04, a alavanca
 desenhada anda junto, e sair da cabine devolve a barra ao canto.
 
-**O PÓS-COMB continua no canto esquerdo**, e de propósito: ele é um botão que
-se segura, e a pintura não tem equivalente dele. A regra foi tirar o que a
-cabine já mostra, e a cabine não mostra como ligar a pós-combustão.
+### Os botões saíram de cima do painel
+
+> "Retira os botões de cima do painel."
+
+Apagar o controle não dava: no celular deitado o polegar vive nas duas pontas
+de baixo, que é justamente onde a cabine está — levar o FOGO para o meio da
+tela deixaria o jogo pior de jogar. Então o que sai é o **desenho**. Dentro da
+cabine, `#dedos` ganha a classe `semCara`: o vidro, a borda, a sombra e o
+texto de PÓS-COMB, DEFESA, FOGO e da caixa da arma somem, e a **área continua
+respondendo exatamente no mesmo lugar**. Ao encostar, o botão reaparece, para
+o dedo saber que pegou.
+
+Um aviso sai **uma vez por partida** na primeira vez que a cabine aparece:
+botão invisível que ninguém avisou é botão perdido.
+
+Provado em `scratchpad/invisivel.js`, que não se contenta com "não é
+desenhado": ele pergunta ao navegador quem está no ponto do botão
+(`elementFromPoint`) — invisível não pode virar inalcançável — e depois
+**aperta cada um**. O FOGO é de segurar, e a primeira versão do teste
+reprovou um botão que funcionava porque usava um toque curto, que liga e
+desliga antes de dar para medir.
 
 **O que ela ainda não faz:** a manopla do trem não veio na arte, então o trem
 ainda não mexe nada na cabine; os outros botões pintados não fazem nada; e

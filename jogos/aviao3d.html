@@ -165,6 +165,26 @@
                   -webkit-backdrop-filter:none;backdrop-filter:none;
                   transform:none}
   #dAcel.naCabine > i, #dAcel.naCabine > span{display:none}
+  /* OS BOTÕES SAEM DE CIMA DO PAINEL. "Retira os botões de cima do painel."
+     Apagar o controle não dá: no celular deitado o polegar vive nas duas
+     pontas de baixo, que é justamente onde a cabine está — levar o FOGO para
+     o meio da tela deixaria o jogo pior de jogar. Então o que sai é o
+     DESENHO: o vidro, a borda, a sombra e o texto somem, e a área continua
+     respondendo exatamente no mesmo lugar.
+     Ao encostar, o botão reaparece — para o dedo saber que pegou. */
+  #dedos.semCara > #dNitro, #dedos.semCara > #dFogo,
+  #dedos.semCara > #dChama, #dedos.semCara > #dArma{
+    background:none;border-color:transparent;box-shadow:none;
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+    color:transparent;transition:opacity .12s}
+  #dedos.semCara > #dNitro > *, #dedos.semCara > #dChama > *,
+  #dedos.semCara > #dArma > *{opacity:0}
+  #dedos.semCara > #dNitro.ligado, #dedos.semCara > #dFogo:active,
+  #dedos.semCara > #dChama:active, #dedos.semCara > #dArma.trocou{
+    background-color:rgba(10,16,24,.62);border-color:var(--fio);
+    color:#dff1ff}
+  #dedos.semCara > #dNitro.ligado > *, #dedos.semCara > #dChama:active > *,
+  #dedos.semCara > #dArma.trocou > *{opacity:1}
   #dNitro{left:calc(8px + env(safe-area-inset-left));display:flex;align-items:center;justify-content:center}
   #dAcelBarra{position:absolute;left:0;right:0;bottom:0;height:70%;
               background:linear-gradient(0deg,rgba(94,255,154,.28),rgba(94,255,154,.52));
@@ -7969,6 +7989,7 @@ let pontos=0, alvosDestruidos=0, alvosTotal=0, venceu=false;
 let arma='bomba', municao={}, recarga=0, atirando=false;
 let subida = 0;            // metros por segundo para cima, alisado, para o altímetro
 let avisouRarefeito = false;
+let avisouSemCara = false;   // o recado dos botões invisíveis sai uma vez por partida
 /* o fator de carga e as duas agulhas de memória do acelerômetro */
 let cargaG = 1, gMax = 1, gMin = 1, _fAnt = null;
 let jogando=false, caindo=false, giroQueda=0, vq=0, motivoQueda='';
@@ -9654,6 +9675,21 @@ function desenhaCabinePintada(){
    larga, então continua vertical, como a barra era. */
 function aceleradorNaManete(c, op){
   const el = document.getElementById('dAcel');
+  const caixa = document.getElementById('dedos');
+  /* os outros botões de dedo deixam de ser desenhados junto com a chegada da
+     cabine, e voltam a aparecer quando ela sai */
+  const semCara = op >= 0.6 && document.body.classList.contains('dedos');
+  if (caixa && caixa.classList.contains('semCara') !== semCara){
+    caixa.classList.toggle('semCara', semCara);
+    /* UMA VEZ POR PARTIDA, e só na primeira vez que a cabine aparece: botão
+       invisível que ninguém avisou é botão perdido. O texto diz onde cada
+       coisa ficou, e some sozinho. */
+    if (semCara && !avisouSemCara){
+      avisouSemCara = true;
+      mostraAviso('OS BOTÕES CONTINUAM NO MESMO LUGAR — só não são mais desenhados',
+                  '#9fd8ff', 3200);
+    }
+  }
   if (!el) return;
   /* só quando a cabine está mesmo à vista e o dedo é quem manda */
   if (op < 0.6 || !document.body.classList.contains('dedos')){
@@ -21003,7 +21039,7 @@ function comeca(){
   $('capa').style.display = 'none';
   redimensiona();
   ultimoT = performance.now(); sobrando = 0; tQuadro = ultimoT; quadros = 0;
-  avisouQueda = false;
+  avisouQueda = false; avisouSemCara = false;
   religaQuadro();
 }
 function fim(){
