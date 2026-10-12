@@ -220,6 +220,10 @@ scratchpad da sessão de trabalho. Os que importam, e o que cada um prova:
 | `cabine.js` | a vista de dentro existe: raio do olho em nove direções (bate na cabine embaixo, no céu em cima), contagem de pixel escuro, as telas do painel pintadas, e a fita de alarmes acendendo com o estado |
 | `cabfora.js` | e de fora nada do que entrou fura a lataria ou o vidro, em cinco ângulos |
 | `rotulo.js` | o rótulo cabe na coluna que tem, medindo o texto no momento em que ele é desenhado |
+| `tv3d.js` | **o celular como controle do jogo 3D, de ponta a ponta**: duas abas de verdade e um PeerJS local, do QR até decolar, rolar, recolher o trem e atirar |
+| `acesa.js` | a tela não apaga no meio do voo — contra a API de verdade, mais a recusa simulada |
+| `pista.js` | sonda: a corrida na pista, para saber quem segura a velocidade (resposta: ninguém) |
+| `fumaca.js` | a cabine pintada continua inteira depois de mexer em `comeca()`/`fim()` |
 
 **Lição cara, repetida:** asserção de estado não pega "desenhado num ramo que
 nunca roda". Quando o defeito é visual, **conte pixels**.
@@ -564,6 +568,96 @@ condição que eu não deixaria cair, porque é o erro de verdade.
 
 **Medido em** `scratchpad/voo-livre.js`, que roda a montagem publicada e a nova
 lado a lado e imprime a tabela acima — a escada não foi sentida, foi medida.
+
+---
+
+## O celular como controle do jogo 3D (e a tela que não apaga)
+
+> "Me manda o link para colocar na TV"
+
+**Não precisou ser construído: já estava pronto.** O jogo 3D fala o mesmo
+protocolo do jogo 2D, e o `controle.html` que já existia conecta nele sem uma
+linha de mudança — está escrito na própria página, perto de `const Tripulacao`.
+Vale mais que no 2D, aliás: ali o celular manda inclinação, acelerador, arma e
+gatilho; aqui ele manda também **trem, flape, defesa, vista, qualidade do
+desenho e o olhar com a cabeça**.
+
+Como se liga: a TV abre `aviao3d.html`, que já abre uma sala com um código de
+quatro letras e desenha o QR. O celular lê o QR, cai em
+`controle.html?sala=XXXX` com a sala preenchida, e toca em CONECTAR. O primeiro
+celular é o **piloto**; um segundo entra como **artilheiro**.
+
+O que eu fiz foi **provar**, e consertar o que a prova achou.
+
+### A prova: `tv3d.js`
+
+Nada de simular o rádio. Um servidor PeerJS local (`broker.js`, o pacote
+`peer`) e o jogo apontado para ele com `?servidor=127.0.0.1:9000` — o
+parâmetro já existia. Duas abas de navegador de verdade, uma com a TV e outra
+com o celular, conversando. Vinte e oito verificações, do QR desenhado até
+fechar o celular e o jogo pausar.
+
+Inclusive a **decolagem inteira pelo celular**: acelerar, passar da velocidade
+de estol, puxar o manche, sair do chão.
+
+### Duas falhas que eram do teste, não do jogo
+
+A primeira versão reprovou o **rolamento** e o **trem de pouso**. Os dois
+estavam certos: o avião ainda estava **no chão**, onde as rodas seguram as
+asas niveladas e `mexeTrem` recusa recolher ("no chão, não!"). O teste passou
+a decolar antes de cobrar.
+
+A segunda reprovou a corrida na pista com `voo > 1500` — número meu, inventado.
+Medido sozinho em `pista.js`, o avião passa do estol em 8 s e decola a 1862,
+com nada segurando a velocidade. Quem sabe qual é a velocidade de voo é o
+jogo: o teste agora pergunta `velMin()`.
+
+E ainda assim falhava, porque **25 s de relógio não são 25 s de jogo**: `dt` é
+limitado a 0,1 s por quadro, então com duas abas em renderização por software o
+tempo do jogo corre umas 2,5 vezes mais devagar. O orçamento também não podia
+ser chutado.
+
+### O defeito de verdade: a tela apagando no meio do voo
+
+O teste acusou um erro sem dono no celular, e ele era real.
+
+`try { navigator.wakeLock.request('screen') } catch(e){}` **não pega nada**:
+`request()` devolve promessa, e a recusa escapa do `try`. O `catch` era
+enfeite. Pior: o bloqueio é **solto pelo navegador** quando a aba esconde e
+nunca voltava — bastava trocar de aba uma vez para a tela voltar a apagar pelo
+resto da partida.
+
+E o buraco maior, que é justo o desta leva: **o jogo 3D não pedia bloqueio
+nenhum**. Ele é o que vai para a TV, onde ninguém toca na tela — para o
+aparelho, é uma pessoa que foi embora, e o descanso entra no meio da partida.
+
+Agora existe `TelaAcesa` (o mesmo objeto nos três arquivos): pede ao começar,
+solta ao acabar, e **pede de novo quando a aba reaparece** — mas só se alguém
+tinha pedido antes, senão a capa ficaria com a tela presa à toa.
+
+Onde está: `TelaAcesa` em `aviao3d.modelo.html` (chamado em `comeca()` e
+`fim()`), em `controle.modelo.html` e em `aviao-tv.modelo.html` (chamado ao
+conectar). **Para desfazer:** apague o objeto e as chamadas; no 3D some o
+bloqueio (volta como era), nos outros dois volte a linha única.
+
+Provado em `acesa.js` — contra a **API de verdade**, que existe sim neste
+navegador. Minha primeira sonda disse que não existia e estava errada: ela
+rodou em `about:blank`, que não é contexto seguro. Servido em `127.0.0.1` a
+trava é um `WakeLockSentinel` de verdade. Outro tropeço do mesmo dia:
+`navigator.wakeLock = {...}` **não cola** (acessor nativo, não gravável,
+falha calada fora do modo estrito) — quem substitui é `Object.defineProperty`.
+
+### Cuidado ao reconstruir: as versões das bibliotecas
+
+O container reiniciou e levou o `node_modules`. Reinstalado solto, o
+`montar.py` gerou páginas **4 KB menores** — era `peerjs` 1.5.5 no lugar da
+1.5.4 publicada, e `qrcode-generator` 2.0.4 (que mudou `qrcode.js` de lugar,
+para `dist/`) no lugar da 1.4.4.
+
+Fixadas em **`peerjs@1.5.4`** e **`qrcode-generator@1.4.4`**, o `tv.html`
+reconstruído saiu **byte a byte igual** ao publicado — que é a prova de que as
+versões batem. Use isso como conferência sempre que reconstruir: um arquivo
+que você não tocou tem de sair com `delta=0`.
 
 ---
 

@@ -14496,6 +14496,47 @@ function reinicia(){
   poeCamera(1);
   Motor.liga();
 }
+/* =============================================================================
+   A TELA NÃO PODE APAGAR NO MEIO DO VOO
+
+   Quem joga na TV não toca em NADA na TV: o controle é o celular. Para o
+   aparelho que desenha o jogo isso é uma pessoa que foi embora, e em dois
+   minutos ele escurece a tela ou entra na proteção. O bloqueio de tela é o
+   jeito de dizer "estou sendo usado" sem toque nenhum.
+
+   DUAS COISAS QUE O PEDIDO DE UMA LINHA NÃO FAZIA:
+
+   1. `try/catch` NÃO pega promessa recusada. `request()` devolve promessa, e
+      negada — aba escondida, economia de bateria — ela estourava como erro
+      sem dono. O `catch` em volta era enfeite. Agora o `await` fica dentro
+      do try, que é o único jeito de o try valer para a recusa.
+
+   2. O bloqueio é SOLTO sozinho quando a aba esconde, e não volta quando ela
+      reaparece. Bastava trocar de aba uma vez e a tela voltava a apagar pelo
+      resto da partida. Agora ele é pedido de novo ao reaparecer — mas só se
+      alguém tinha pedido antes, senão a tela ficaria acesa na capa também.
+   ========================================================================== */
+const TelaAcesa = {
+  trava: null, querendo: false,
+  async pede(){
+    this.querendo = true;
+    if (!navigator.wakeLock || this.trava) return;
+    try {
+      const t = await navigator.wakeLock.request('screen');
+      this.trava = t;
+      t.addEventListener('release', () => { if (this.trava === t) this.trava = null; });
+    } catch(e){ this.trava = null; }      // negado não é motivo para barulho
+  },
+  solta(){
+    this.querendo = false;
+    const t = this.trava; this.trava = null;
+    if (!t) return;
+    try { const p = t.release(); if (p && p.catch) p.catch(() => {}); } catch(e){}
+  }
+};
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && TelaAcesa.querendo) TelaAcesa.pede();
+});
 function comeca(){
   /* Também aqui, e não só nos botões: quando o "Começar" vem do celular pela
      rede, este é o único ponto do código da TELA que sabe que o jogo começou. */
@@ -14505,10 +14546,12 @@ function comeca(){
   redimensiona();
   ultimoT = performance.now(); sobrando = 0; tQuadro = ultimoT; quadros = 0;
   avisouQueda = false; avisouSemCara = false;
+  TelaAcesa.pede();          // na TV ninguém toca na tela: ela apagaria sozinha
   religaQuadro();
 }
 function fim(){
   jogando = false;
+  TelaAcesa.solta();         // acabou: a tela pode dormir como qualquer outra
   /* O laço para aqui, e com ele os `passo()` que desligariam o tom sozinhos:
      ganhar a missão com o alvo travado deixava o alarme tocando na tela de
      fim, para sempre. */

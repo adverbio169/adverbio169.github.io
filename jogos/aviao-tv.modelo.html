@@ -967,11 +967,52 @@ let seq = 0, latencia = null, ultimoPong = 0, combAntes = 100, jogandoAntes = fa
 function estadoRede(classe, txt){ $('estadoRede').className = 'estado ' + classe; $('estadoRedeTxt').textContent = txt; }
 function vibra(ms){ try { navigator.vibrate && navigator.vibrate(ms); } catch(e){} }
 
+/* =============================================================================
+   A TELA NÃO PODE APAGAR NO MEIO DO VOO
+
+   Quem joga na TV não toca em NADA na TV: o controle é o celular. Para o
+   aparelho que desenha o jogo isso é uma pessoa que foi embora, e em dois
+   minutos ele escurece a tela ou entra na proteção. O bloqueio de tela é o
+   jeito de dizer "estou sendo usado" sem toque nenhum.
+
+   DUAS COISAS QUE O PEDIDO DE UMA LINHA NÃO FAZIA:
+
+   1. `try/catch` NÃO pega promessa recusada. `request()` devolve promessa, e
+      negada — aba escondida, economia de bateria — ela estourava como erro
+      sem dono. O `catch` em volta era enfeite. Agora o `await` fica dentro
+      do try, que é o único jeito de o try valer para a recusa.
+
+   2. O bloqueio é SOLTO sozinho quando a aba esconde, e não volta quando ela
+      reaparece. Bastava trocar de aba uma vez e a tela voltava a apagar pelo
+      resto da partida. Agora ele é pedido de novo ao reaparecer — mas só se
+      alguém tinha pedido antes, senão a tela ficaria acesa na capa também.
+   ========================================================================== */
+const TelaAcesa = {
+  trava: null, querendo: false,
+  async pede(){
+    this.querendo = true;
+    if (!navigator.wakeLock || this.trava) return;
+    try {
+      const t = await navigator.wakeLock.request('screen');
+      this.trava = t;
+      t.addEventListener('release', () => { if (this.trava === t) this.trava = null; });
+    } catch(e){ this.trava = null; }      // negado não é motivo para barulho
+  },
+  solta(){
+    this.querendo = false;
+    const t = this.trava; this.trava = null;
+    if (!t) return;
+    try { const p = t.release(); if (p && p.catch) p.catch(() => {}); } catch(e){}
+  }
+};
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && TelaAcesa.querendo) TelaAcesa.pede();
+});
 function ligaCanalDoControle(){
   Canal.aoAbrir = () => {
     estadoRede('ok', Canal.tipo === 'cast' ? 'conectado na TV' : 'conectado na sala ' + $('codigoEntrada').value);
     Canal.envia({ t: 'oi' });
-    try { navigator.wakeLock && navigator.wakeLock.request('screen'); } catch(e){}
+    TelaAcesa.pede();
   };
   Canal.aoFechar = () => estadoRede('nao', 'a tela do jogo desconectou');
   Canal.aoDado = d => {
