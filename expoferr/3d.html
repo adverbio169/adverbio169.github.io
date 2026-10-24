@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Expoferr 2025 Setor 1 em 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: canvas 3D em tela cheia; barra de título no topo, busca e legenda flutuantes, ficha do estande embaixo.
+   Visual único (maquete diurna) por escolha: cores explícitas, sem variação de tema. */
+:root{
+  --ground:#e9e4d2; --ink:#1f2a1c; --muted:#5d6656; --panel:rgba(255,253,246,.94);
+  --line:#d6cfb6; --accent:#f2b705; --accent-ink:#3a2c00;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);overflow:hidden}
+#scene{position:fixed;inset:0;touch-action:none}
+.top{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;
+  padding-top:calc(env(safe-area-inset-top,0px) + 10px);padding-bottom:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:linear-gradient(var(--panel),rgba(255,253,246,0));pointer-events:none}
+.top>*{pointer-events:auto}
+.brand{display:flex;flex-direction:column;line-height:1;margin-right:auto;min-width:0}
+.brand b{font-family:var(--display);font-size:1.6rem;letter-spacing:.01em;text-wrap:balance}
+.brand b em{font-style:normal;background:var(--accent);color:var(--accent-ink);padding:0 .25em;border-radius:3px}
+.brand span{font-size:.78rem;color:var(--muted);margin-top:4px;letter-spacing:.06em;text-transform:uppercase}
+.tools{display:flex;gap:6px;flex-wrap:wrap}
+input,button{font:inherit;font-size:.9rem;border:1px solid var(--line);background:#fffdf6;color:var(--ink);border-radius:8px;padding:7px 10px}
+button{cursor:pointer;font-weight:600}
+button:hover{background:#fff4cc}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#q{width:11rem}
+.legend{position:fixed;z-index:4;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:.78rem;max-width:15rem}
+.legend h2{font-family:var(--display);font-size:.95rem;margin:0 0 6px;letter-spacing:.06em;text-transform:uppercase}
+.legend ul{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+.legend li{display:flex;gap:7px;align-items:center}
+.legend i{width:12px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,.25);flex:none}
+#legToggle{display:none}
+.card{position:fixed;z-index:6;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
+  width:min(19rem,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c,#999);
+  border-radius:10px;padding:12px 14px}
+.card .num{font-family:var(--display);font-size:2rem;line-height:1;font-variant-numeric:tabular-nums}
+.card .name{font-weight:600;font-size:1.05rem;margin-top:2px}
+.card .cat{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
+.card .x{position:absolute;top:6px;right:6px;border:0;background:transparent;font-size:1.1rem;padding:4px 8px}
+.hint{position:fixed;z-index:3;right:max(16px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 70px);
+  font-size:.75rem;color:var(--muted);background:var(--panel);padding:4px 8px;border-radius:6px}
+#msg{position:fixed;z-index:7;left:50%;top:40%;transform:translateX(-50%);background:var(--panel);padding:12px 16px;border-radius:10px;border:1px solid var(--line)}
+@media (max-width:640px){
+  .brand b{font-size:1.3rem}
+  #q{width:8.5rem}
+  .legend{max-width:calc(100% - 32px)}
+  .legend ul{display:none}
+  .legend.open ul{display:grid;grid-template-columns:1fr 1fr}
+  .legend h2{margin:0}
+  #legToggle{display:inline}
+  .legend{cursor:pointer}
+  .hint{display:none}
+  .card{bottom:calc(env(safe-area-inset-bottom,0px) + 64px)}
+}
+</style>
+
+<div id="scene" aria-label="Maquete 3D do Setor 1 de Negócios da Expoferr 2025"></div>
+
+<header class="top">
+  <div class="brand"><b><em>44ª</em> Expoferr 2025</b><span>Setor 1 · Negócios · maquete 3D</span></div>
+  <div class="tools">
+    <input id="q" type="search" placeholder="Nº ou nome do estande" aria-label="Buscar estande">
+    <button id="go">Buscar</button>
+    <button id="top">Planta</button>
+    <button id="reset">Perspectiva</button>
+  </div>
+</header>
+
+<p class="hint">Arraste para girar · role ou pince para zoom · toque num estande</p>
+
+<aside class="legend" id="legend">
+  <h2>Áreas <span id="legToggle">▾</span></h2>
+  <ul id="legList"></ul>
+</aside>
+
+<div class="card" id="card" hidden>
+  <button class="x" id="close" aria-label="Fechar">✕</button>
+  <div class="num" id="cNum"></div>
+  <div class="name" id="cName"></div>
+  <div class="cat" id="cCat"></div>
+</div>
+<div id="msg" hidden>Não foi possível carregar o 3D neste aparelho.</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+if(!window.THREE){document.getElementById('msg').hidden=false;return;}
+
+/* Categorias da legenda do croqui */
+const CAT={
+  agro:{n:'Agropecuária / fazendas',c:'#7ddc8f'},
+  banco:{n:'Bancos e financeiras',c:'#8fd3f2'},
+  conc:{n:'Concessionárias',c:'#3550d8'},
+  serv:{n:'Serviço / comércio',c:'#f2a3b3'},
+  patr:{n:'Patrocinadores',c:'#2bb3e6'},
+  bar:{n:'Bar / restaurante',c:'#c486e6'},
+  maq:{n:'Máquinas / implementos',c:'#b9bdb4'},
+  inst:{n:'Institucional',c:'#f4e66a'},
+  anim:{n:'Animais expositor',c:'#c9c9c4'},
+  wc:{n:'Banheiros',c:'#d93a2b'}
+};
+const legList=document.getElementById('legList');
+Object.values(CAT).forEach(k=>{const li=document.createElement('li');li.innerHTML='<i style="background:'+k.c+'"></i>'+k.n;legList.appendChild(li);});
+document.getElementById('legend').addEventListener('click',e=>{if(innerWidth<=640)e.currentTarget.classList.toggle('open');});
+
+/* Dados: [nº, nome, categoria, x, y, largura, profundidade, altura] em pixels do croqui */
+const S=[];
+function st(n,name,cat,x,y,w,d,h){S.push({n:String(n),name,cat,x,y,w:w||22,d:d||20,h:h||9});}
+
+// Faixa de máquinas (lado esquerdo)
+st('03','Mardisa / Toyolex','maq',300,238,120,40,4);
+st('04','Porto Caminhões (Iveco)','maq',285,290,130,50,4);
+st('05','Rudell (XCMG)','maq',245,352,130,55,4);
+st('06','Agrolucas','maq',215,410,120,45,4);
+st('07','Rolatrek (Stara)','maq',275,495,110,65,4);
+st('08','Mamore (Case)','maq',285,560,110,60,4);
+st('09','Green Máquinas','maq',285,645,110,75,4);
+st('10','Facilitti','maq',275,712,110,40,4);
+st('11','Coopercarne','serv',320,745,30,22,10);
+st('12','Agrobatto','maq',335,397,60,22,4);
+st('13','Bamaq SA','maq',335,372,60,22,4);
+st('14','Scania','maq',430,455,55,40,4);
+st('15','Agrosol','maq',410,330,40,90,4);
+st('16','Rezende Caminhões','maq',440,275,70,30,4);
+st('18','Real Equip','maq',575,182,22,22,9);
+st('19','Medeiros Drones','maq',575,207,22,22,9);
+st('20','Turbo Center','maq',575,233,22,22,9);
+st('01','Meu Buteco','bar',450,140,40,20,10);
+st('02','Comercialização','inst',390,175,22,22,9);
+st('','Ecoponto','inst',652,92,24,26,8);
+st('94','Haras OF','agro',770,98,80,22,8);
+st('98','Espaço Servidor','inst',910,102,45,22,9);
+st('99','Limpeza','inst',995,102,45,22,9);
+st('96','Rancho Lobo','agro',802,152,45,22,8);
+st('97','Haras HSA','agro',898,152,60,22,8);
+st('95','Fazendinha','agro',722,185,40,110,3);
+// Concessionárias
+['Mitsubishi','Ford','BV Loc.','R Motors','Fiat','Nissan','Renault','Yamaha','Chevrolet'].forEach((m,i)=>st('C'+(i+1),m,'conc',690,312+i*18.5,90,13,7));
+// Estandes de animais (verdes)
+st('93','Brahman','agro',825,335,20,20,7);st('92.1','Tabapuã','agro',758,335,20,20,7);
+st('92','Toscana','agro',785,372,20,20,7);st('91','São Pedro','agro',763,410,20,20,7);
+st('90','Triângulo','agro',826,410,20,20,7);st('88','Laguna','agro',760,490,20,20,7);
+st('87','Barra do V.','agro',826,530,20,20,7);st('87.1','Elite Agro','agro',828,500,12,14,7);
+st('86','Octávio Portella','agro',740,548,20,20,7);st('89','Expositor 89','anim',830,452,18,20,7);
+st('101.1','Casa Pecuarista','agro',872,295,20,20,7);st('93.1','Agro Molinari','agro',955,295,20,20,7);
+st('101','PT. Sem.','anim',876,450,18,18,7);
+// Comércio central
+const small=[[22,'Daniel Baterias',518,490],[23,'Banana Chips',463,505],[24,'Estande 24',475,505],[25,'Estande 25',488,505],
+ [34,'CRB',463,512],[35,'Estande 35',476,512],[37,'Guth',425,525],[38,'Soluthi',433,556],[39,'Café St. Clara',451,556],
+ [40,'Vista Home (Dalle)',467,556],[41,'Vista Home (Dalle)',483,556],[42,'Unicenter',516,556],[43,'Amazing',533,556],
+ [44,'Dante',550,556],[45,'Dante',566,556],[47,'JL',545,490]];
+small.forEach(a=>st(a[0],a[1],'serv',a[2],a[3],13,14,7));
+[[54,'Gold Safe'],[53,'Stamp Art'],[52,'Marilú Arm.'],[51,'Aurora Tech'],[50,'GPPIR'],[49,'50Sol'],[48,'SN Net'],['47.1','Estande 47.1'],[46,'Nunes Solar']]
+ .forEach((a,i)=>st(a[0],a[1],a[0]==='47.1'?'serv':'serv',483+i*16,585,13,14,7));
+st('56','Ariaggi / Orthodontic','serv',412,578,20,20,8);st('57','Brasferro','serv',412,603,20,20,8);
+st('58','San Seb.','serv',412,628,20,20,8);st('59','Palma Plan','serv',437,628,22,22,8);
+st('60','Solutech','serv',462,628,22,22,8);st('61','Patrocinador 61','patr',512,632,22,22,8);
+st('62','Buritizal','patr',538,632,22,22,8);st('63','Caixa','banco',565,632,22,22,8);
+st('64','Soluções P. Solar','serv',593,632,22,22,8);st('65','Eneva','serv',620,632,22,22,8);
+st('66','CTG Nova Querência','inst',700,615,90,45,12);
+st('67','Arena da Imprensa','inst',810,612,48,70,14);
+// Fileira de baixo
+[['68','Serra Verde','serv'],['69','Aprosoja','serv'],['70','Basa','banco'],['71','Embrapa','patr'],['72','Coparr','serv'],
+ ['73','Granterra','serv'],['74','MAPA','inst'],['75','Combitrans','serv'],['76','Patrocinador 76','patr'],['77','Ademicon','serv'],
+ ['78','Viva Comb.','serv'],['79','Conab','inst']].forEach((a,i)=>st(a[0],a[1],a[2],406+i*27,690,22,22,8));
+st('80','Governo de RR','inst',735,690,24,28,9);st('81','Setrabes','inst',762,690,24,22,8);
+st('82','Carnes e Cortes','serv',815,690,22,22,8);st('83','JCO','serv',840,690,22,22,8);
+st('84','Shopp Bat.','serv',908,690,22,22,8);st('84.1',"Galenu's",'serv',930,700,20,20,8);
+st('85','Cambará Mad.','serv',958,690,22,22,8);st('85.1','PH (Splash)','serv',985,690,22,22,8);
+st('102','Tangará','serv',875,632,22,22,8);st('103','Maqcampo','serv',942,632,22,22,8);st('104','Amazon Piso','serv',968,632,22,22,8);
+st('','Suínos','anim',900,580,25,70,10);
+st('','Equoterapia','inst',830,728,90,22,6);
+// Lado direito
+st('','Arena do Leilão','inst',1022,255,55,55,22);
+st('','Leilão · curral','anim',1110,255,85,48,5);
+st('','Estacionamento do leilão','maq',1090,180,190,50,0.6);
+st('133','Cepal','serv',1022,350,30,22,9);st('108','Rota do Agro','inst',1016,425,24,22,9);
+st('106','Arena do Conhecimento','inst',1018,560,24,44,12);
+[['109','Solartech / Techfrio'],['110','Coop. Roraimel'],['111','Pulveriza Drones'],['112','Sifra']].forEach((a,i)=>st(a[0],a[1],'serv',1018+i*24,625,22,22,8));
+st('113','Agricultura Familiar','inst',1140,600,22,62,10);st('114','Agricultura Familiar','inst',1185,590,24,82,10);
+st('115','Landrin','serv',1230,625,22,22,8);st('116','Bela Biju','serv',1255,625,22,22,8);st('117','Rô Var.','serv',1280,625,22,22,8);
+st('','IATER','inst',1062,350,22,16,8);st('','IATER','inst',1162,350,22,16,8);
+st('118','Arena de Alimentação','bar',1172,725,250,36,9);
+st('','Administração','inst',932,250,30,22,10);
+
+/* Pavilhões hexagonais */
+const HEX=[[615,215,'Seapão'],[675,215,'Pavilhão'],[738,215,'Cavalos'],[800,215,'Pavilhão'],[860,215,'Pavilhão'],
+ [785,255,'Cavalos'],[770,298,'Moenda'],[798,335,'Gado'],[818,372,'Gado'],[795,412,'Gado'],[800,455,'Gado'],
+ [790,495,'Gado'],[772,535,'Gado'],[880,330,'Ovinos'],[880,410,'Caprinos'],[915,370,'Móveis Rústicos (100)'],
+ [915,455,'Apoio Técnico'],[890,255,'Pavilhão'],[620,535,'Restaurante 2'],[680,535,'Pavilhão'],[670,190,'Pavilhão']];
+
+/* Cena */
+const host=document.getElementById('scene');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+host.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color('#cfe3ea');
+scene.fog=new THREE.Fog('#cfe3ea',1400,2600);
+const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,1,6000);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.maxPolarAngle=Math.PI*0.47;controls.minDistance=60;controls.maxDistance=2200;
+
+scene.add(new THREE.HemisphereLight('#ffffff','#9a8f6a',0.75));
+const sun=new THREE.DirectionalLight('#fff3d6',0.85);
+sun.position.set(-500,700,300);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-800,right:800,top:600,bottom:-600,near:10,far:2000});
+scene.add(sun);
+
+const P=(x,y)=>[x-660,y-455]; // pixel do croqui → cena
+const mat=c=>new THREE.MeshLambertMaterial({color:c});
+const pickable=[];
+
+// Chão
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(1500,1050),mat('#d9d3b8'));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+const grass=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),mat('#b7c79a'));
+grass.rotation.x=-Math.PI/2;grass.position.y=-0.5;scene.add(grass);
+
+// Vias
+const road=mat('#8b8a83');
+function strip(x1,y1,x2,y2,w){const [a,b]=P(x1,y1),[c,d]=P(x2,y2);const len=Math.hypot(c-a,d-b);
+  const m=new THREE.Mesh(new THREE.BoxGeometry(len,0.6,w),road);m.position.set((a+c)/2,0.3,(b+d)/2);
+  m.rotation.y=-Math.atan2(d-b,c-a);m.receiveShadow=true;scene.add(m);}
+strip(400,118,1300,118,14);strip(960,118,960,770,14);strip(395,665,1000,665,12);strip(395,760,1300,760,14);
+strip(380,240,380,790,12);strip(240,170,560,95,14);strip(30,860,400,790,12);strip(150,470,330,190,10);
+strip(560,140,560,290,10);strip(740,300,740,470,8);strip(995,140,995,780,10);
+
+// Área Sebrae
+(function(){const [x,z]=P(540,370);
+  const disk=new THREE.Mesh(new THREE.CylinderGeometry(95,95,2,64),mat('#f4e66a'));disk.position.set(x,1,z);disk.receiveShadow=true;scene.add(disk);
+  const tent=new THREE.Mesh(new THREE.ConeGeometry(70,26,32,1,true),new THREE.MeshLambertMaterial({color:'#fffbe8',side:THREE.DoubleSide}));
+  tent.position.set(x,32,z);tent.castShadow=true;scene.add(tent);
+  for(let i=0;i<8;i++){const a=i/8*Math.PI*2;const p=new THREE.Mesh(new THREE.CylinderGeometry(1,1,20,6),mat('#777'));p.position.set(x+Math.cos(a)*68,10,z+Math.sin(a)*68);scene.add(p);}
+  const stage=new THREE.Mesh(new THREE.BoxGeometry(30,6,22),mat('#c9b84a'));stage.position.set(x+60,4,z);stage.castShadow=true;scene.add(stage);
+  pickable.push(Object.assign(disk,{userData:{n:'17',name:'Sebrae · área de 4.300,84 m²',cat:'inst'}}));
+})();
+
+// Estandes
+S.forEach(s=>{const [x,z]=P(s.x,s.y);const c=CAT[s.cat].c;
+  const m=new THREE.Mesh(new THREE.BoxGeometry(s.w,s.h,s.d),mat(c));
+  m.position.set(x,s.h/2,z);m.castShadow=s.h>2;m.receiveShadow=true;m.userData=s;scene.add(m);pickable.push(m);
+  if(s.h<=4&&s.cat==='maq'){ // lote de máquinas: galpão + máquinas
+    const g=new THREE.Mesh(new THREE.BoxGeometry(Math.min(30,s.w*.35),12,Math.min(20,s.d*.5)),mat('#e8e6df'));
+    g.position.set(x-s.w*.28,s.h+6,z);g.castShadow=true;scene.add(g);
+    for(let i=0;i<3;i++){const v=new THREE.Mesh(new THREE.BoxGeometry(10,6,6),mat(['#2e7d32','#d2691e','#f2b705'][i]));
+      v.position.set(x+s.w*.05+i*13,s.h+3,z+(i%2?5:-5));v.castShadow=true;scene.add(v);}
+  }else if(s.h>=7&&s.w<=26){ // tenda com teto em duas águas
+    const r=new THREE.Mesh(new THREE.ConeGeometry(Math.max(s.w,s.d)*.72,5,4),mat('#fbfaf5'));
+    r.position.set(x,s.h+2.5,z);r.rotation.y=Math.PI/4;r.castShadow=true;scene.add(r);
+  }
+});
+// Pavilhões
+HEX.forEach(h=>{const [x,z]=P(h[0],h[1]);const isRest=h[2].startsWith('Rest');const isRust=h[2].startsWith('Móveis');
+  const col=isRest?CAT.bar.c:isRust?CAT.serv.c:'#d7d6cf';
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(27,27,8,6),mat(col));base.position.set(x,4,z);base.castShadow=base.receiveShadow=true;
+  base.userData={n:isRest?'31':isRust?'100':'',name:h[2],cat:isRest?'bar':isRust?'serv':'anim'};scene.add(base);pickable.push(base);
+  const roof=new THREE.Mesh(new THREE.ConeGeometry(30,10,6),mat('#a9a79c'));roof.position.set(x,13,z);roof.castShadow=true;scene.add(roof);
+});
+
+// Árvores (IATER e entorno)
+const trunk=mat('#7a5a3a'),leaf=mat('#3f8f3a'),leaf2=mat('#5aa84a');
+function tree(px,py,s){const [x,z]=P(px,py);s=s||1;
+  const t=new THREE.Mesh(new THREE.CylinderGeometry(.8*s,1*s,6*s,5),trunk);t.position.set(x,3*s,z);scene.add(t);
+  const l=new THREE.Mesh(new THREE.SphereGeometry(5*s,7,6),Math.random()<.5?leaf:leaf2);l.position.set(x,9*s,z);l.castShadow=true;scene.add(l);}
+let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+for(let i=0;i<110;i++)tree(1100+rnd()*200,380+rnd()*160,0.8+rnd()*.5);
+for(let i=0;i<40;i++)tree(1060+rnd()*60,390+rnd()*60,0.7);
+[[330,130],[350,155],[300,190],[320,215],[480,190],[495,210],[680,640],[730,600],[745,620],[900,550],[925,550],[960,90],[975,95],[930,90],
+ [430,290],[410,250],[575,130],[605,130],[350,440],[350,600],[350,700],[1240,380],[1270,400],[1300,420]].forEach(t=>tree(t[0],t[1],1.1));
+
+// Banheiros
+[[490,105],[650,125],[878,92],[940,150],[935,470],[960,505],[905,495],[865,620],[1012,300],[572,758],[880,742],[1020,745],[1045,745]]
+ .forEach(w=>{const [x,z]=P(w[0],w[1]);const m=new THREE.Mesh(new THREE.BoxGeometry(6,8,6),mat(CAT.wc.c));m.position.set(x,4,z);m.castShadow=true;
+  m.userData={n:'WC',name:'Banheiro',cat:'wc'};scene.add(m);pickable.push(m);});
+
+// Rótulos
+function label(text,px,py,y,size,strong){const cv=document.createElement('canvas');const ctx=cv.getContext('2d');
+  const fs=48;ctx.font='700 '+fs+'px "Barlow Condensed", Arial Narrow, sans-serif';const w=Math.ceil(ctx.measureText(text).width)+24;
+  cv.width=w;cv.height=fs+20;ctx.font='700 '+fs+'px "Barlow Condensed", Arial Narrow, sans-serif';
+  ctx.fillStyle=strong?'rgba(31,42,28,.88)':'rgba(255,253,246,.9)';ctx.beginPath();
+  if(ctx.roundRect)ctx.roundRect(0,0,cv.width,cv.height,12);else ctx.rect(0,0,cv.width,cv.height);ctx.fill();
+  ctx.fillStyle=strong?'#fff':'#1f2a1c';ctx.textBaseline='middle';ctx.fillText(text,12,cv.height/2+2);
+  const tex=new THREE.CanvasTexture(cv);tex.minFilter=THREE.LinearFilter;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true}));
+  const h=size;sp.scale.set(h*cv.width/cv.height,h,1);const [x,z]=P(px,py);sp.position.set(x,y,z);sp.renderOrder=10;scene.add(sp);return sp;}
+const numLabels=[];
+function buildLabels(){
+  [['SEBRAE',540,370,50],['Área das Concessionárias',690,290,24],['Arena do Leilão',1022,255,36],['IATER',1180,460,30],
+   ['Arena de Alimentação',1172,725,24],['Agricultura Familiar',1162,545,24],['Entrada principal',290,160,22],
+   ['Entrada autoridades',40,850,18],['Área serviços · máquinas',260,560,22]].forEach(a=>label(a[0],a[1],a[2],a[3],13,true));
+  S.forEach(s=>{if(!s.n||s.n.startsWith('C'))return;numLabels.push(label(s.n,s.x,s.y,s.h+(s.h>=7?10:9),7,false));});
+  ['Mitsubishi','Ford','BV Loc.','R Motors','Fiat','Nissan','Renault','Yamaha','Chevrolet'].forEach((m,i)=>numLabels.push(label(m,740,312+i*18.5,10,6,false)));
+}
+(document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(buildLabels);
+
+// Câmera
+const target0=new THREE.Vector3(40,0,10);
+function view(kind){
+  if(kind==='top'){camera.position.set(40,1300,11);}else{camera.position.set(-380,640,820);}
+  controls.target.copy(target0);controls.update();}
+view(innerWidth<640?'top':'persp');
+if(innerWidth<640){camera.position.set(40,1700,11);controls.update();}
+document.getElementById('top').onclick=()=>view('top');
+document.getElementById('reset').onclick=()=>view('persp');
+
+// Seleção
+const card=document.getElementById('card'),ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
+let sel=null,selEmis=null;
+function select(obj){
+  if(sel){sel.material.emissive&&sel.material.emissive.setHex(selEmis);}
+  sel=obj;if(!obj){card.hidden=true;return;}
+  obj.material=obj.material.clone();selEmis=obj.material.emissive.getHex();obj.material.emissive.setHex(0x553300);
+  const u=obj.userData;card.style.setProperty('--c',CAT[u.cat].c);
+  document.getElementById('cNum').textContent=u.n?(u.n.startsWith('C')?'Concessionária':'Nº '+u.n):'Área';
+  document.getElementById('cName').textContent=u.name;document.getElementById('cCat').textContent=CAT[u.cat].n;card.hidden=false;}
+let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
+renderer.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>6)return;
+  mouse.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(mouse,camera);
+  const hit=ray.intersectObjects(pickable)[0];select(hit?hit.object:null);});
+document.getElementById('close').onclick=()=>select(null);
+
+// Busca
+function norm(t){return String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/^0+(?=\d)/,'');}
+let fly=null;
+function search(){const q=norm(document.getElementById('q').value.trim());if(!q)return;
+  const m=pickable.find(o=>o.userData.n&&norm(o.userData.n)===q)||pickable.find(o=>norm(o.userData.name).includes(q));
+  if(!m){card.hidden=false;card.style.setProperty('--c','#999');document.getElementById('cNum').textContent='—';
+    document.getElementById('cName').textContent='Nada encontrado para "'+document.getElementById('q').value+'"';document.getElementById('cCat').textContent='Tente o número ou parte do nome';return;}
+  select(m);const t=m.position.clone();t.y=0;
+  const off=new THREE.Vector3(-90,170,180);fly={t0:performance.now(),fromT:controls.target.clone(),fromP:camera.position.clone(),toT:t,toP:t.clone().add(off)};}
+document.getElementById('go').onclick=search;
+document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')search();});
+
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+(function loop(now){requestAnimationFrame(loop);
+  if(fly){let k=reduce?1:Math.min(1,(now-fly.t0)/900);k=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    controls.target.lerpVectors(fly.fromT,fly.toT,k);camera.position.lerpVectors(fly.fromP,fly.toP,k);if(k>=1)fly=null;}
+  const d=camera.position.distanceTo(controls.target);numLabels.forEach(l=>l.visible=d<900);
+  controls.update();renderer.render(scene,camera);})();
+})();
+</script>
+
+</html>
