@@ -661,6 +661,46 @@ que você não tocou tem de sair com `delta=0`.
 
 ---
 
+## A grande revisão — lote 1: os defeitos graves de voo e de combate
+
+> "Revisa aí o jogo que tô tentando fazer. Deixa ele top. Retira os bugs."
+
+Cinco revisores independentes foram soltos sobre o jogo, cada um numa zona.
+Dois entregaram antes de o limite de uso da conta cortar os outros três (voo e
+combate): 27 achados, **todos reproduzidos rodando o jogo** — os scripts deles
+estão em `scratchpad/revisao/voo/` e `scratchpad/revisao/combate/`, e os
+relatórios inteiros em `scratchpad/specs/revisao-voo.md` e `revisao-combate.md`.
+
+O que entrou neste lote (tudo em `aviao3d.modelo.html`):
+
+| defeito | causa | onde mora o conserto |
+|---|---|---|
+| depois da 1ª decolagem, todo toque na pista **relançava o avião** (com 30% de manete: 69 "pousos" e 28 mil pontos em 8 s) | `altChao`/`vyChao` nunca zeravam | `aterra()` zera; `rolagemDePouso` tira a asa na corrida de pouso; pouso só conta depois de 3 s de voo (`tNoAr`) |
+| buzina de estol, ronco e tremor **presos no chão** depois de tocar em buffet | só eram desligados no ramo do ar | `calaAsa()`, chamada por `derruba()` e `aterra()` |
+| toda morte terminava com **"Acabou o combustível"** | `motivoQueda` era usado como trava e apagava o motivo | `quedaAcabou`; `fim()` ganhou os motivos que faltavam |
+| com as rodas no chão **o mundo congelava** (caças, balas, alerta, trem, tráfego) e não se batia em prédio | um `return` antes do fim de `atualiza` | `passoDoMundo(dt)`, chamada do ar e do chão |
+| míssil **não travava** e metralhadora não dava solução nos caças da máquina | `Inimigos.lista` não entrava no buscador | `inimigosRede()`; caça ganha `vx/vy/vz` e `vivo = false` ao sair |
+| míssil **atravessava o chão** e os prédios, e destruía alvo de chão passando a 450 m | `atingeAlvo` só mede x e z | ramo do míssil em `atualizaTiros` |
+| míssil em jogador de rede tirava **135, não 45** | três recados de dano pelo mesmo acerto | `estouraMissil(..., direto)` e `atingeAr(..., semGente)` |
+| tiro no vagão feria **o vizinho** (era a pendência do `trem.js`) | volume de acerto cilíndrico maior que o passo entre vagões | caixa alinhada ao trilho em `atingeAr` |
+| a nuclear não atingia os caças da máquina | lista não era varrida | `nuclear()` |
+| trocar de sortida chamava os caças do BOMBARDEIO com 0/8 | o gatilho lia o contador do voo | `Sortida.alvos0` |
+
+Prova: os scripts dos próprios revisores (`revisao/combate/varios.js`,
+`revisao/voo/t3.js`) rodados antes e depois; a régua `envelope.js` mostra o voo
+**idêntico** ao de antes (este lote não mexe na física); `fumaca.js`, `acesa.js`
+e `tv3d.js` com `FALHAS: 0`.
+
+**Para desfazer:** `git revert` do commit deste lote. Não há chave: são defeitos.
+
+**Ficou para os lotes seguintes** (confirmado pelos revisores, ainda não feito):
+caças que matam por abalroamento e quase não ferem na bala; voar abaixo de 45 m
+é imunidade; caças não enxergam prédio; não existe vitória de sortida; pane seca
+é explosão instantânea; o critério de toque aceita mergulho; e a física inteira
+(ver a régua em `scratchpad/envelope-antes.json`).
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
@@ -670,9 +710,6 @@ que você não tocou tem de sair com `delta=0`.
   de teto 585. Só voando para saber.
 - **As duas janelas da TV andam grudadas** ao carrossel: não dá para escolher o
   formato de cada uma, como já dá no celular.
-- **`trem.js` acusa três falhas** e já acusava antes desta leva: rajada em
-  vagão e em locomotiva não tira vida nem dá ponto. Não é regressão nova; é
-  defeito do trem, esperando a vez.
 - **Não se vê o bico do avião da cabine**, e não é defeito: o topo do casco
   cai a 20° abaixo da linha do olho e o painel ocupa de 14° a 34°. No vídeo
   do F-16 que serviu de referência também não se vê. Levantar o nariz oito

@@ -1447,6 +1447,12 @@ let arfChao=0, rumoChao=0;
    avião fica leve, as rodas deixam o chão e ele SAI voando — com a subida que
    já tinha, e não com uma que apareceu do nada. */
 let vyChao = 0, altChao = 0;
+/* `rolagemDePouso`: do toque até a arremetida ou até perder velocidade, o peso
+   está nas RODAS e a asa não levanta o avião de volta. `tNoAr`: há quanto
+   tempo ele voa desde o último contato — pouso só é pouso depois de um voo.
+   `quedaAcabou`: a trava de "já explodi no chão", que antes era o próprio
+   `motivoQueda` e por isso apagava o motivo (ver `atualizaQueda`). */
+let rolagemDePouso = false, tNoAr = 99, quedaAcabou = false;
 const G_JOGO = 640;      // ver a âncora dos 9 g, no medidor de carga
 let estresse=0;
 let vida=100;
@@ -8514,7 +8520,7 @@ function pegaNaNuclear(x, z){
    o fim do mundo a cada tiro.
    ------------------------------------------------------------------------ */
 const NUKE_MISSIL = 0.22;                  // fração da nuclear grande
-function estouraMissil(x, y, z){
+function estouraMissil(x, y, z, direto){
   clarao = Math.max(clarao, 0.5);
   bolaDeFogo(x, y, z, 235);
   /* Os raios aqui são pequenos de propósito. O estouro antigo soltava bolas de
@@ -8534,13 +8540,20 @@ function estouraMissil(x, y, z){
   const f = Math.max(0, 1 - d/(RAIO_NUKE*NUKE_MISSIL*2.2));
   if (f > 0.02){ sacode(0.2 + f*0.6); Controles.bate('explode'); }
   // e leva junto quem estiver colado, como uma nuclear pequena faria
+  /* UM MÍSSIL, UM DANO. O acerto direto já mandou os 45; este laço mandava
+     mais 45 a quem estivesse perto, e o `atingeAr` do fim passava pela
+     batalha de novo e mandava o terceiro. Medido: três recados, 135 de dano
+     contra 100 de vida — um míssil matava sempre, e segurar a trava ou soltar
+     a contramedida não mudava nada. Quem levou o impacto direto não leva o
+     estouro; e o estouro que ninguém levou de frente fere uma vez só. */
+  if (direto) return;
   const raio = RAIO_NUKE*NUKE_MISSIL;
   for (const o of Batalha.outros.values()){
     if (o.vivo === false) continue;
     if (Math.hypot(o.x-x, o.y-y, o.z-z) < raio)
       Batalha.paraTodos({ t:'tiro', para:o.id, de:Batalha.eu, dano:DANO.missil }, null);
   }
-  atingeAr(x, y, z, raio*0.5, DANO.missil);
+  atingeAr(x, y, z, raio*0.5, DANO.missil, true);
 }
 
 function sacodeNuclear(x, z){
@@ -8566,6 +8579,13 @@ function nuclear(x, z){
   for (const o of obstaculos){
     if (!o.vivo) continue;
     if ((o.x-x)*(o.x-x) + (o.z-z)*(o.z-z) < R2*0.5){ o.vivo = false; if (o.no) o.no.visible = false; pontos += 50; }
+  }
+  /* "a nuclear não escolhe: quem estiver no raio leva" — e os caças da máquina
+     não levavam. Passam pelo caminho de sempre (`acerta`), para o abate contar
+     ponto e objetivo; a cópia da lista é porque `acerta` tira o morto dela. */
+  for (const c of Inimigos.lista.slice()){
+    if ((c.x-x)*(c.x-x) + (c.z-z)*(c.z-z) < R2*0.5 && c.y < CHAO + 3000)
+      Inimigos.acerta(c.x, c.y, c.z, 1, DANO.bomba);
   }
   if (alvosDestruidos >= alvosTotal && alvosTotal > 0){ venceu = true; Motor.desliga(); fim(); return; }
   if ((aviaoX-x)*(aviaoX-x) + (aviaoZ-z)*(aviaoZ-z) < R2*0.36 && aviaoY < CHAO + 3000) derruba('nuclear');
@@ -9067,16 +9087,27 @@ function atingeAlvo(x, z, raio){
    O tiro que não mata solta faísca e faz barulho — acertar tem de ser
    sentido, mesmo quando não derruba. */
 const CHAPA = { aviao: 26, helicoptero: 18, locomotiva: 40, vagao: 24 };
-function atingeAr(x, y, z, raio, dano){
+function atingeAr(x, y, z, raio, dano, semGente){
   // gente de verdade primeiro: e o alvo que interessa numa batalha
-  if (Batalha.acerta(x, y, z, raio, dano || 10)) return true;
+  // (`semGente`: o estouro do míssil já avisou os jogadores por conta própria)
+  if (!semGente && Batalha.acerta(x, y, z, raio, dano || 10)) return true;
   if (typeof Inimigos !== 'undefined' && Inimigos.acerta(x, y, z, raio, dano || 10)) return true;
   for (const o of obstaculos){
     if (!o.vivo) continue;
     const r = (o.tipo === 'aviao' ? RAIO_AVIAO
              : o.tipo === 'helicoptero' ? RAIO_HELI
              : o.iVagao !== undefined ? RAIO_VAGAO : RAIO_MIUDO) + raio;
-    if (Math.abs(o.y-y) < r && Math.hypot(o.x-x, o.z-z) < r){
+    /* O VAGÃO É UMA CAIXA COMPRIDA, não um cilindro. O volume de acerto era um
+       cilindro de 1.240 de diâmetro em volta de uma caixa de 340 por 900, com
+       os vagões a 1.160 um do outro: os volumes se engoliam. Mirando ao longo
+       do trilho quem levava os primeiros tiros era o VIZINHO — mirava-se na
+       locomotiva por trás e o vagão 1 morria antes de ela perder chapa. Era
+       isto o "rajada no vagão não tira vida": tirava, do vagão errado. */
+    const pegou = o.iVagao !== undefined
+      ? Math.abs(o.x-x) < 170 + raio*0.6 && Math.abs(o.z-z) < VAGAO_COMP/2 + 60
+        && Math.abs(o.y-y) < 150 + raio*0.6
+      : Math.abs(o.y-y) < r && Math.hypot(o.x-x, o.z-z) < r;
+    if (pegou){
       if (o.chapa === undefined) o.chapa = CHAPA[o.tipo] || 12;
       o.chapa -= (dano || 10);
       if (o.chapa > 0){
@@ -9156,9 +9187,24 @@ function atualizaTiros(dt){
         f.scale.set(1, 0.8 + Math.random()*0.5, 1);
         f.material.opacity = 0.6 + Math.random()*0.35;
       }
-      if (atingeAr(b.x,b.y,b.z,260,DANO.missil) || atingeAlvo(b.x,b.z,300)) b.morto = true;
+      /* O MÍSSIL TEM ALTURA. `atingeAlvo` só mede x e z: um míssil sem trava,
+         passando a 450 m de altura por cima de um alvo de chão, destruía o
+         alvo. E não havia teste de chão nem de prédio — disparado em mergulho
+         ele descia trinta e quatro mil unidades terra adentro e só estourava
+         no fim da vida. Agora alvo de chão só morre com o míssil lá embaixo,
+         o asfalto para o míssil, e a fachada também. */
+      let direto = false;
+      if (atingeAr(b.x,b.y,b.z,260,DANO.missil)){ b.morto = true; direto = true; }
+      else if (b.y < CHAO + 700 && atingeAlvo(b.x,b.z,300)){ b.morto = true; direto = true; }
+      else if (b.y <= CHAO){ b.y = CHAO + 40; b.morto = true; }
+      else {
+        for (const p2 of predios){
+          if (!p2.vivo || b.y > CHAO + p2.h) continue;
+          if (Math.abs(p2.x-b.x) < p2.w/2 && Math.abs(p2.z-b.z) < p2.d/2){ b.morto = true; break; }
+        }
+      }
       if (b.vida <= 0) b.morto = true;
-      if (b.morto) estouraMissil(b.x, b.y, b.z);
+      if (b.morto) estouraMissil(b.x, b.y, b.z, direto);
     } else if (b.tipo === 'nuke'){
       /* Voa reto e rápido, com um fio de gravidade só para a trajetória não
          ser uma régua. Estoura no chão OU no primeiro prédio que encontrar —
@@ -9229,15 +9275,27 @@ function atualizaTiros(dt){
 /* --- A QUEDA E O PASSO DO JOGO ------------------------------------------- */
 function derruba(motivo){
   if (caindo) return;
-  caindo = true; noChao = false; motivoQueda = motivo; vq = 0;
-  if (estolando){ estolando = false; somEstol(false); Controles.treme('estol', false); }
-  estresse = 0; somBuffet(0); sacudidaFixa = 0;
-  Controles.treme('buffet', false); Controles.treme('metralha', false);
+  caindo = true; noChao = false; motivoQueda = motivo; vq = 0; quedaAcabou = false;
+  calaAsa();
+  Controles.treme('metralha', false);
   Controles.bate('bateu');
   sacode(0.7);
   explode(aviaoX, aviaoY, aviaoZ, motivo === 'combustivel' ? 0.6 : 1.4);
   mostraAviso(motivo === 'combustivel' ? 'ACABOU O COMBUSTÍVEL'
-            : motivo === 'abatido' ? 'ABATIDO!' : 'BATEU!', '#ff8080', 1400);
+            : motivo === 'abatido' ? 'ABATIDO!'
+            : motivo === 'nuclear' ? 'PEGO PELA PRÓPRIA BOMBA!' : 'BATEU!', '#ff8080', 1400);
+}
+/* A ASA SE CALA. Buzina de estol, ronco do buffet, tremor de câmera e o tremor
+   no celular são coisa de asa trabalhando no limite — e só eram desligados no
+   ramo do AR. Quem tocava a pista em buffet ou estolado levava tudo isso para
+   o chão e ficava com a buzina tocando com o avião parado (medido: parado,
+   `estolando` verdadeiro e sacudida de 0,56). Um lugar só, para a queda, o
+   toque e quem mais precisar. */
+function calaAsa(){
+  if (estolando){ estolando = false; somEstol(false); Controles.treme('estol', false); }
+  ladoEstol = 0;
+  estresse = 0; somBuffet(0); sacudidaFixa = 0;
+  Controles.treme('buffet', false);
 }
 function atualizaQueda(dt){
   giroQueda += dt*3.4;
@@ -9255,7 +9313,11 @@ function atualizaQueda(dt){
   Batalha.passo(dt);
   if (aviaoY <= CHAO + 120){
     aviaoY = CHAO + 120;
-    if (motivoQueda !== 'acabou'){ explode(aviaoX, aviaoY, aviaoZ, 2.0); motivoQueda = 'acabou'; Motor.desliga(); setTimeout(fim, 900); }
+    /* A trava era o próprio motivo: `motivoQueda = 'acabou'`. E a tela de fim
+       lia 'acabou' como combustível — então TODA morte terminava com o título
+       "Acabou o combustível", fosse prédio, chão, caça ou a própria bomba. A
+       trava ganhou variável dela e o motivo chega inteiro ao fim. */
+    if (!quedaAcabou){ quedaAcabou = true; explode(aviaoX, aviaoY, aviaoZ, 2.0); Motor.desliga(); setTimeout(fim, 900); }
   }
 }
 
@@ -9275,6 +9337,16 @@ function atualizaQueda(dt){
    ========================================================================== */
 function aterra(queda, onde){      // onde: 'pista' | 'avenida' | 'campo'
   noChao = true;
+  /* O TOQUE ZERA A DECOLAGEM ANTERIOR. `altChao` e `vyChao` são a altura e a
+     subida das rodas na corrida, e só eram zeradas ao nascer na pista. Depois
+     da primeira decolagem ficavam com o valor da saída (58 e 203, medido) — e
+     a regra de soltar do chão já nascia verdadeira no pouso seguinte: o avião
+     tocava, ganhava os pontos e era relançado dois quadros depois. Com 30% de
+     manete virava laço: 69 "pousos" e 28 mil pontos em oito segundos. */
+  altChao = 0; vyChao = 0; rolagemDePouso = true;
+  calaAsa();
+  const valeu = tNoAr >= 3;      // encostar a roda duas vezes seguidas é um pouso só
+  tNoAr = 0;
   const campo = onde === 'campo';
   noCampo = campo;
   aviaoY = pisoEm(aviaoX, aviaoZ) + RODA;
@@ -9293,16 +9365,18 @@ function aterra(queda, onde){      // onde: 'pista' | 'avenida' | 'campo'
   endireitaEixos();
   parado = 0;
   const macio = queda < 240;
-  pousos++;
+  if (valeu) pousos++;
   const TAB = { pista:   { bom:400, ruim:150, txt:['POUSO DE MANUAL! +', 'POUSOU! +'] },
                 avenida: { bom:520, ruim:200, txt:['POUSO NA AVENIDA! +',  'POUSOU NA AVENIDA! +'] },
                 campo:   { bom:250, ruim: 80, txt:['POUSO NO CAMPO! +',    'POUSOU NO CAMPO! +'] } };
   const t = TAB[onde] || TAB.pista;
   const ganho = macio ? t.bom : t.ruim;
-  pontos += ganho;
   Controles.bate('tocou'); sacode(campo ? 0.34 : (macio ? 0.10 : 0.28));
-  mostraAviso(t.txt[macio ? 0 : 1] + ganho, macio ? '#7fffa8' : '#ffd257', 1800);
-  if (Missoes) Missoes.pousou(onde, pistaPerto(aviaoX, aviaoZ).nome);
+  if (valeu){
+    pontos += ganho;
+    mostraAviso(t.txt[macio ? 0 : 1] + ganho, macio ? '#7fffa8' : '#ffd257', 1800);
+    if (Missoes) Missoes.pousou(onde, pistaPerto(aviaoX, aviaoZ).nome);
+  }
   solta(aviaoX, pisoEm(aviaoX, aviaoZ) + 40, aviaoZ, campo ? 22 : 14,
         campo ? 0xbba06a : 0xd8d8d8, 40, 260);
   bip(220, 0.10, 'square', 0.05);
@@ -9413,7 +9487,12 @@ function rolaNoChao(dt, e){
          definição de velocidade mínima de voo. Antes o limiar era 1,18 vezes
          o estol, um número escolhido à mão. */
   const vE = velMin();
-  const sust = (voo*voo)/(vE*vE) * (0.50 + 0.50*(arfChao/ARF_CHAO));
+  /* na corrida de POUSO a asa não levanta: quem tocou acima de 1,4 vez o estol
+     com o nariz nivelado tinha sustentação maior que o peso e quicava de volta
+     para o ar. Arremeter (meia manete ou mais) ou perder velocidade devolve a
+     asa — o toque-e-arremetida continua existindo, e agora é uma escolha. */
+  if (rolagemDePouso && (motor >= 0.5 || turbinando || voo < vE*0.8)) rolagemDePouso = false;
+  const sust = rolagemDePouso ? 0 : (voo*voo)/(vE*vE) * (0.50 + 0.50*(arfChao/ARF_CHAO));
   if (sust > 1) vyChao += (sust - 1)*G_JOGO*dt;
   else          vyChao = Math.max(0, vyChao - G_JOGO*dt*1.6);
   altChao = Math.max(0, altChao + vyChao*dt);
@@ -9454,8 +9533,8 @@ function rolaNoChao(dt, e){
      pouca velocidade poderia nunca alcançar o alvo e o avião ficaria
      patinando a um metro do chão para sempre. */
   const vyAr = Math.sin(arfChao)*voo;
-  if (altChao > 24 && (vyChao >= vyAr*0.80 || altChao > 90)){
-    noChao = false;
+  if (sust > 1 && altChao > 24 && (vyChao >= vyAr*0.80 || altChao > 90)){
+    noChao = false; tNoAr = 0;
     if (Missoes) Missoes.marca('decolar');
     Controles.bate('tocou');
     mostraAviso('NO AR! recolha o trem', '#7fd8ff', 1700);
@@ -9473,9 +9552,7 @@ function rolaNoChao(dt, e){
                              : 'ACELERE (W) E PUXE PARA DECOLAR', '#9fd8ff', 2200);
   } else parado = 0;
 
-  poeCamera(dt);
-  atualizaTiros(dt);
-  Batalha.passo(dt);
+  passoDoMundo(dt);
   Motor.ajusta();
 }
 
@@ -9520,6 +9597,7 @@ function atualiza(dt){
 
   const e = eixos();
   if (noChao){ rolaNoChao(dt, e); return; }
+  tNoAr += dt;
   /* ---------------------------------------------------------------------
      AILERON: velocidade de rolagem, não ângulo de rolagem.
 
@@ -10129,6 +10207,25 @@ function atualiza(dt){
   if (combustivel <= 0){ combustivel = 0; derruba('combustivel'); return; }
 
   distancia += voo*dt;
+  passoDoMundo(dt);
+}
+/* =============================================================================
+   O MUNDO NÃO PARA QUANDO AS RODAS TOCAM
+
+   Tudo daqui para baixo era o fim de `atualiza`, depois de um
+   `if (noChao){ rolaNoChao(dt, e); return; }`. Ou seja: com as rodas no chão
+   NADA disto rodava. Medido, cinco segundos pousado com um caça no ar: o caça
+   andou zero, a bala dele ficou parada no ar, a contagem do alerta ficou em
+   doze, o trem não saiu do lugar, os aviões de rota ficaram pendurados no céu
+   da primeira tela. Pousar era imunidade total — o contrário de "leve pressa"
+   — e, de carona, rolando no chão não se batia em prédio nenhum: dava para
+   atravessar uma torre na avenida.
+
+   Agora é uma função só, chamada do ar e do chão. Ninguém ataca antes da
+   decolagem do mesmo jeito: na fase SOLO o céu não aceita caça
+   (`Sortida.teto()` é zero), e o rasante já se recusa a contar no chão.
+   ========================================================================== */
+function passoDoMundo(dt){
   if (Missoes) Missoes.passo(dt);
   Sortida.passo(dt);
   poeCamera(dt);
@@ -13791,6 +13888,7 @@ function escolheSortida(id){
   try { localStorage.setItem('aviao3d.sortida', id); } catch(e){}
   if (Missoes) Missoes.zera();
   Sortida.zera();
+  Sortida.alvos0 = alvosDestruidos;
   if (typeof Inimigos !== 'undefined') Inimigos.limpa();
   mostraAviso('SORTIDA: ' + Sortida.atual().nome, '#9fd8ff', 2000);
   bip(620, 0.08, 'square', 0.05);
@@ -13799,9 +13897,13 @@ function escolheSortida(id){
 
 const Sortida = {
   fase: 'solo', t: 0, tAlerta: 0, exposto: 0, alto: 0,
+  /* os alvos que JÁ tinham caído quando esta sortida começou: trocar de
+     PATRULHA para BOMBARDEIO com três alvos no chão chamava os caças com 0/8,
+     contra o lema ("na terceira explosão") e contra a ordem escrita na tela */
+  alvos0: 0,
 
   atual(){ return SORTIDAS.find(q => q.id === sortidaId) || SORTIDAS[0]; },
-  zera(){ this.fase = 'solo'; this.t = 0; this.tAlerta = 0; this.exposto = 0; this.alto = 0; },
+  zera(){ this.fase = 'solo'; this.t = 0; this.tAlerta = 0; this.exposto = 0; this.alto = 0; this.alvos0 = 0; },
   quente(){ return this.fase === 'quente'; },
   /* quantos caças o céu aceita AGORA. Fora da fase quente, zero — e é só isto
      que o `Inimigos.passo` precisa saber. */
@@ -13880,7 +13982,7 @@ const Sortida = {
 
     let bateu = false;
     if (c.gatilho === 'altura')  bateu = this.alto > c.alt;
-    if (c.gatilho === 'alvos')   bateu = alvosDestruidos >= (c.quantos || 3);
+    if (c.gatilho === 'alvos')   bateu = alvosDestruidos - this.alvos0 >= (c.quantos || 3);
     if (c.gatilho === 'exposto') bateu = this.exposto > (c.tempo || 4);
     if (bateu) this.alerta();
   },
@@ -14463,7 +14565,9 @@ function reinicia(){
   // que se aperta no jogo ser a mais destrutiva (e, na pista, fatal)
   arma = 'metralha'; recarga = 0; atirando = false; leme = 0; miraX = 0; miraY = 0;
   municao = {}; for (const k in ARMAS) municao[k] = ARMAS[k].municao;
-  caindo = false; giroQueda = 0; vq = 0; clarao = 0; motivoQueda = '';
+  caindo = false; giroQueda = 0; vq = 0; clarao = 0; motivoQueda = ''; quedaAcabou = false;
+  /* valem para os dois começos (pista e ar), e não só para o da pista */
+  vyChao = 0; altChao = 0; rolagemDePouso = false; tNoAr = noChao ? 0 : 99;
   for (const b of bombas) cena.remove(b.no); bombas = [];
   for (const t of tiros) cena.remove(t.no); tiros = [];
   for (const f of faiscas) cena.remove(f.no); faiscas = [];
@@ -14565,9 +14669,14 @@ function fim(){
   const m = Math.round(distancia/METRO);
   if (m > recorde){ recorde = m; try{ localStorage.setItem('aviao.recorde', String(m)); }catch(e){} }
   const t = venceu ? 'Missão cumprida! Todos os alvos no chão.'
-          : motivoQueda === 'combustivel' || motivoQueda === 'acabou' ? 'Acabou o combustível'
+          : motivoQueda === 'combustivel' ? 'Acabou o combustível'
           : motivoQueda === 'predio' ? 'Bateu num prédio'
           : motivoQueda === 'chao' ? 'Mergulhou no chão'
+          : motivoQueda === 'abatido' ? 'Abatido em combate'
+          : motivoQueda === 'bateu' ? 'Colidiu com um caça'
+          : motivoQueda === 'aviao' ? 'Bateu num avião de rota'
+          : motivoQueda === 'helicoptero' ? 'Bateu num helicóptero'
+          : motivoQueda === 'locomotiva' || motivoQueda === 'vagao' ? 'Bateu no trem'
           : motivoQueda === 'nuclear' ? 'Largou a nuclear voando baixo demais' : 'O avião caiu';
   document.querySelector('#capa h1').textContent = t;
   const p = $('placar');
@@ -15755,7 +15864,7 @@ const Inimigos = {
     /* cada caça clona o material de cada malha (para a cor); sem liberar, ~15 por
        caça ficavam na placa a cada partida. A geometria é do molde: protegida. */
     liberaNos(this.lista.map(c => c.no), [modeloInimigo]);
-    for (const c of this.lista) if (c.no) cena.remove(c.no);
+    for (const c of this.lista){ c.vivo = false; if (c.no) cena.remove(c.no); }
     for (const b of this.balas) cena.remove(b.no);
     this.lista.length = 0; this.balas.length = 0;
     this._nascer = 0; this.cota = 0; this.abatidos = 0;
@@ -15821,7 +15930,7 @@ const Inimigos = {
       /* longe demais: some. Um caça a sessenta quilômetros não está em
          combate, está ocupando memória e enchendo o radar. */
       if (d > 72000){
-        liberaNo(c.no, [modeloInimigo]); cena.remove(c.no); this.lista.splice(i, 1);
+        c.vivo = false; liberaNo(c.no, [modeloInimigo]); cena.remove(c.no); this.lista.splice(i, 1);
         /* e a cota VOLTA. Sem isto, um caça que desistiu e sumiu no horizonte
            gastava uma das quatro vidas da sortida sem nunca ter sido combatido
            — e "abater 4 caças" virava impossível, com o céu vazio e nenhuma
@@ -15892,6 +16001,8 @@ const Inimigos = {
                     : d > 16000 ? VOO_BASE*1.45 : VOO_BASE*0.95;
       c.vel += (alvoVel - c.vel)*Math.min(1, dt*0.7);
       c.x += c.F.x*c.vel*dt; c.y += c.F.y*c.vel*dt; c.z += c.F.z*c.vel*dt;
+      // a velocidade, para a metralhadora poder dar a dianteira
+      c.vx = c.F.x*c.vel; c.vy = c.F.y*c.vel; c.vz = c.F.z*c.vel;
       if (c.y < CHAO + 1400){ c.y = CHAO + 1400; c.F.y = Math.abs(c.F.y); c.F = vnorm(c.F); }
       if (c.y > TETO_CENA) c.y = TETO_CENA;
 
@@ -15930,7 +16041,7 @@ const Inimigos = {
       const dAgora = Math.hypot(aviaoX - c.x, aviaoY - c.y, aviaoZ - c.z);
       if (dAgora < RAIO_AVIAO*1.7){
         explode(c.x, c.y, c.z, 1.6);
-        liberaNo(c.no, [modeloInimigo]); cena.remove(c.no); this.lista.splice(i, 1);
+        c.vivo = false; liberaNo(c.no, [modeloInimigo]); cena.remove(c.no); this.lista.splice(i, 1);
         derruba('bateu');
         continue;
       }
@@ -15997,6 +16108,7 @@ const Inimigos = {
         return true;
       }
       explode(c.x, c.y, c.z, 1.6);
+      c.vivo = false;
       liberaNo(c.no, [modeloInimigo]); cena.remove(c.no);
       this.lista.splice(i, 1);
       pontos += 400;
@@ -16301,9 +16413,15 @@ const Batalha = {
   nRede: 0
 };
 /* o buscador do míssil também enxerga gente de verdade */
+/* E OS CAÇAS DA MÁQUINA. Eles não estavam aqui: `Inimigos.lista` só era lida
+   pelo HUD e pelo radar. Contra o único inimigo aéreo do jogo solo o míssil era
+   foguete burro e a metralhadora não dava solução de tiro — medido: caça parado
+   oito mil à frente por três segundos, nada trava; um avião de rota no mesmo
+   ponto, trava. Na DEFESA AÉREA os oito mísseis só acertavam por sorte. */
 function inimigosRede(){
   const r = [];
   for (const o of Batalha.outros.values()) if (o.vivo !== false) r.push(o);
+  for (const c of Inimigos.lista) if (c.vivo !== false) r.push(c);
   return r;
 }
 function meuNome(){
