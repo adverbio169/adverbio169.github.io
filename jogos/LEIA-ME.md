@@ -701,6 +701,85 @@ caças que matam por abalroamento e quase não ferem na bala; voar abaixo de 45 
 
 ---
 
+## A grande revisão — lote 2: a física refeita ("Física 2")
+
+> "Refaça a física."
+
+**O que era.** Um avião-flecha: a velocidade *perseguia* um número da manete em
+0,4 s, subir descontava uma taxa fixa, e o chão tinha uma aceleração e o ar
+outra, sete vezes maior. Inclinar não virava. Medido antes de mexer, na build
+publicada (`scratchpad/envelope-antes.json`, régua em `scratchpad/envelope.js`).
+
+**O que é.** A velocidade sai de **uma conta só, a mesma no chão e no ar**:
+
+    dv/dt = RITMO × ( empuxo − arrasto − arrasto induzido − peso na subida )
+
+e a inclinação passou a curvar a trajetória. A *gramática do comando* não
+mudou (manche manda taxa, mesmas curvas e zonas mortas): foi afinada com o dono
+em várias rodadas. Plano e constantes vieram do revisor de voo
+(`scratchpad/specs/revisao-voo.md`), que as derivou das velocidades de hoje.
+
+| medição | antes | agora |
+|---|---|---|
+| velocidade nivelada, manete 30 / 50 / 70 / 100% | 2048 / 2720 / 3392 / 4400 | 2065 / 2723 / 3392 / 4400 |
+| inclinar 60° e **soltar** o manche | 0 °/s, 0,5 g (uma reta inclinada) | **19 °/s, nivelado, 2,0 g** |
+| inclinar 45° e soltar | 0 °/s | 10,9 °/s, nariz não cai |
+| de faca (90°), mão solta, 3 s | voa de lado para sempre | o nariz cai 22° |
+| curva de 60° puxando tudo, 5 s | a velocidade **sobe** 3392 → 3781; 11,7 g | **cai** 3310 → 2075; 7,1 g |
+| subida de impulso (cruzeiro, manete fechada, 60°) | estola em 0,6 s | estola em 3,5 s |
+| ganhar 500 de cruzeiro com manete cheia | 0,28 s | 2,3 s |
+| perder 1000 de cruzeiro fechando a manete | 0,23 s | 1,6 s |
+| aceleração logo depois / logo antes de sair do chão | 7,2 vezes | **0,65** |
+| sai do chão (manete cheia, meio manche) | 3,8 s | 3,3 s |
+| 10% de manete no chão | decola sozinho em 14 s | táxi a 607 |
+| manete cheia sem puxar | decola sozinho | não decola |
+| tanque seco | explode no ar (e parado na pista) | motor apaga, **plana**; a 10° de nariz baixo voa a 1273 |
+| sair do estol (manete cheia, mão solta) | — | 0,9 s |
+| looping de cruzeiro | 4,3 s | 4,6 s |
+| rolagem com comando cheio | 194 °/s | 195 °/s |
+
+Mais três coisas que deixaram de ser defeito de passagem: o **afundamento**
+perto do estol virou velocidade de verdade (`vAfunda` — o variômetro, o alarme
+de solo e a régua do toque agora enxergam; cair estolado não rende mais "POUSO
+DE MANUAL"); a régua do toque olha o **nariz** ("DE NARIZ NO CHÃO!" abaixo de
+12°); e o **leme** perde força com a velocidade em vez de mandar 31 °/s
+estolado.
+
+**Onde mora:** o bloco "FÍSICA 2" logo depois de `ACEL_CHAO` (constantes
+`F2_*`, `giraMotorF2`, `aceleraF2`); em `atualiza()` os trechos marcados
+`if (FISICA2)` (autoridade do profundor, "INCLINAR VIRA", leme, afundamento,
+pane seca); em `rolaNoChao()` o motor único e a base de sustentação.
+
+**Os botões que valem a pena conhecer:**
+- `F2_RITMO` (2,0) — o "peso" do avião. Multiplica empuxo, arrasto e gravidade
+  juntos: encurta ou alonga todos os tempos sem mexer em nenhuma velocidade de
+  regime. Achou a manete lenta? Suba. Achou nervoso? Desça.
+- `F2_K_IND` (0,28) — quanto a curva apertada cobra em velocidade.
+- `F2_FREIO_AR` (1,5) — o freio aerodinâmico que abre com a manete fechada.
+
+**Para desfazer tudo:** `const FISICA2 = false;`. O modelo antigo continua
+inteiro nos ramos `else`.
+
+**Prova:** `envelope.js` (antes contra a build publicada, depois contra esta);
+`voo2.js` — pousa de verdade na pista com flape 2 e trem e para, sai do estol,
+plana sem motor, vira pela inclinação, táxi, e mede o salto de aceleração na
+saída do chão; mais `fumaca.js`, `acesa.js`, `tv3d.js` (o celular decola o
+avião de ponta a ponta) e os scripts dos revisores, todos com `FALHAS: 0`.
+
+**Um erro meu, registrado:** a primeira régua de subida saía de 20.000 e em
+vinte segundos estava a 50.000, no ar rarefeito — e eu li "nariz a 60° fica
+pendurado sem subir" como se fosse o avião. Era o motor sem fôlego lá em cima.
+Em densidade constante o modelo antigo subia na vertical sem problema. A régua
+agora prende a altitude quando o que se mede é regime.
+
+**O que esta fase NÃO fez** (a "fase B" do revisor): o vetor velocidade
+continua colado no nariz, então não há ângulo de ataque de verdade nem
+derrapagem. O estol ainda é por velocidade, com as regras que o dono pediu
+(histerese, asa que larga, nariz que cai para a terra, mais manso perto do
+chão).
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
