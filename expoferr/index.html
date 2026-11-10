@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mapa Expoferr · Operações PMRR</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* Protótipo no padrão visual do Operações (azul PMRR + dourado). */
+:root{--azul:#173f7a;--azul2:#24589e;--ouro:#d9a520;--bg:#eef1f6;--card:#fff;--ink:#16233a;--muted:#5b6880;--line:#d9dfe9;
+  --ok:#2f9e57;--inc:#e0a21b;--sem:#d63b2f;--lib:#2c6bd6;--agu:#97a0ad}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);display:flex;flex-direction:column}
+header{background:linear-gradient(90deg,#123563,var(--azul2));color:#fff;padding:10px 16px;border-bottom:3px solid var(--ouro);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header b{font-size:1.15rem}
+header small{display:block;opacity:.8;font-size:.72rem;letter-spacing:.05em;text-transform:uppercase}
+header .sp{flex:1}
+.btn{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:6px 11px;cursor:pointer;font-weight:600;text-decoration:none;display:inline-block}
+header .btn{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.35)}
+.btn.on{background:var(--ouro);color:#2b2000;border-color:var(--ouro)}
+.btn:focus-visible{outline:2px solid var(--ouro);outline-offset:2px}
+main{flex:1;display:flex;min-height:0}
+#map{flex:1;min-width:0}
+aside{width:320px;background:var(--card);border-left:1px solid var(--line);overflow:auto;padding:14px;display:flex;flex-direction:column;gap:14px}
+h3{margin:0 0 6px;font-size:.78rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center}
+.kpi b{display:block;font-size:1.4rem;font-variant-numeric:tabular-nums}
+.kpi span{font-size:.7rem;color:var(--muted)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+label.l{display:block;font-size:.78rem;color:var(--muted);margin-top:6px}
+input[type=range]{width:100%}
+input[type=text],select{font:inherit;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
+.lista{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.lista li{display:flex;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.lista li:hover{background:#f5f7fb}
+.dot{width:11px;height:11px;border-radius:50%;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.leg{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:.78rem}
+.leg i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.2)}
+.nota{font-size:.75rem;color:var(--muted)}
+.tag{font-size:.65rem;background:#fff3cd;color:#6b4e00;border-radius:4px;padding:1px 5px;margin-left:auto}
+.lbl{background:rgba(255,255,255,.92);border:0;box-shadow:none;font-weight:700;font-size:10px;padding:0 3px;color:#16233a}
+.lbl:before{display:none}
+.lbl.big{background:rgba(22,35,58,.85);color:#fff;font-size:11px;padding:1px 5px}
+.posto{width:22px;height:22px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5);display:grid;place-items:center;color:#fff;font:700 10px system-ui}
+#ajuste[hidden],#formPosto[hidden]{display:none}
+@media (max-width:760px){main{flex-direction:column}aside{width:auto;border-left:0;border-top:1px solid var(--line);max-height:45vh}}
+</style>
+</head>
+<body>
+<header>
+  <div><b>45º Expoferr Show 2026</b><small>Operações · PMRR · mapa do parque</small></div>
+  <div class="sp"></div>
+  <button class="btn" id="bSat">Satélite</button>
+  <button class="btn" id="bRua">Ruas</button>
+  <a class="btn" href="3d.html">Ver em 3D</a>
+</header>
+<main>
+  <div id="map" aria-label="Mapa do Parque de Exposições"></div>
+  <aside>
+    <section>
+      <h3>Dia D · postos</h3>
+      <div class="kpis">
+        <div class="kpi"><b id="kOk">0</b><span>guarnecidos</span></div>
+        <div class="kpi"><b id="kInc">0</b><span>incompletos</span></div>
+        <div class="kpi"><b id="kSem">0</b><span>sem apresentação</span></div>
+      </div>
+    </section>
+    <section>
+      <h3>Postos de policiamento</h3>
+      <div class="row">
+        <button class="btn" id="bAdd">+ Posto no mapa</button>
+        <button class="btn" id="bExp">Copiar postos (JSON)</button>
+      </div>
+      <form id="formPosto" hidden>
+        <label class="l" for="pNome">Nome do posto</label><input type="text" id="pNome" required>
+        <label class="l" for="pSit">Situação</label>
+        <select id="pSit"><option value="agu">Aguardando</option><option value="ok">Guarnecido</option><option value="inc">Incompleto</option><option value="sem">Sem apresentação</option></select>
+        <div class="row" style="margin-top:8px"><button class="btn on" type="submit">Salvar</button><button class="btn" type="button" id="pDel">Remover</button><button class="btn" type="button" id="pCan">Cancelar</button></div>
+      </form>
+      <ul class="lista" id="lista" style="margin-top:8px"></ul>
+      <p class="nota" id="dica">Toque em "+ Posto no mapa" e depois no lugar do posto. Os postos com a etiqueta "exemplo" são só ilustração.</p>
+    </section>
+    <section>
+      <h3>Camadas</h3>
+      <div class="row">
+        <label><input type="checkbox" id="cPlanta" checked> Planta da feira</label>
+        <label><input type="checkbox" id="cRot" checked> Números</label>
+        <label><input type="checkbox" id="cPostos" checked> Postos</label>
+        <label><input type="checkbox" id="cLimite"> Limite do parque (OSM)</label>
+      </div>
+      <div class="leg" id="leg" style="margin-top:8px"></div>
+    </section>
+    <section>
+      <h3>Encaixe da planta</h3>
+      <p class="nota">O croqui não tem coordenadas. A planta foi encaixada pelo círculo do Sebrae e pelo galpão da Arena de Alimentação na imagem de satélite. Ajuste até as vias baterem com o satélite.</p>
+      <button class="btn" id="bAj">Ajustar posição</button>
+      <div id="ajuste" hidden>
+        <label class="l" for="rRot">Rotação: <b id="vRot"></b>°</label><input type="range" id="rRot" min="-180" max="180" step="0.5">
+        <label class="l" for="rEsc">Escala: <b id="vEsc"></b> m por px do croqui</label><input type="range" id="rEsc" min="0.25" max="0.8" step="0.005">
+        <p class="nota">Arraste o alvo amarelo no centro da planta para mover.</p>
+        <div class="row"><button class="btn" id="bCopCal">Copiar calibração</button><button class="btn" id="bResCal">Voltar ao padrão</button></div>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+const CAT={agro:{n:'Agropecuária / fazendas',c:'#7ddc8f'},banco:{n:'Bancos e financeiras',c:'#8fd3f2'},conc:{n:'Concessionárias',c:'#3550d8'},
+ serv:{n:'Serviço / comércio',c:'#f2a3b3'},patr:{n:'Patrocinadores',c:'#2bb3e6'},bar:{n:'Bar / restaurante',c:'#c486e6'},
+ maq:{n:'Máquinas / implementos',c:'#b9bdb4'},inst:{n:'Institucional',c:'#f4e66a'},anim:{n:'Animais expositor',c:'#c9c9c4'},wc:{n:'Banheiros',c:'#d93a2b'}};
+const SIT={ok:{n:'Guarnecido',c:'#2f9e57'},inc:{n:'Incompleto',c:'#e0a21b'},sem:{n:'Sem apresentação',c:'#d63b2f'},agu:{n:'Aguardando',c:'#97a0ad'}};
+const leg=document.getElementById('leg');Object.values(CAT).forEach(k=>leg.insertAdjacentHTML('beforeend','<span><i style="background:'+k.c+'"></i>'+k.n+'</span>'));
+
+/* Dados: [nº, nome, categoria, x, y, largura, profundidade, altura] em pixels do croqui */
+const S=[];
+function st(n,name,cat,x,y,w,d,h){S.push({n:String(n),name,cat,x,y,w:w||22,d:d||20,h:h||9});}
+
+// Faixa de máquinas (lado esquerdo)
+st('03','Mardisa / Toyolex','maq',300,238,120,40,4);
+st('04','Porto Caminhões (Iveco)','maq',285,290,130,50,4);
+st('05','Rudell (XCMG)','maq',245,352,130,55,4);
+st('06','Agrolucas','maq',215,410,120,45,4);
+st('07','Rolatrek (Stara)','maq',275,495,110,65,4);
+st('08','Mamore (Case)','maq',285,560,110,60,4);
+st('09','Green Máquinas','maq',285,645,110,75,4);
+st('10','Facilitti','maq',275,712,110,40,4);
+st('11','Coopercarne','serv',320,745,30,22,10);
+st('12','Agrobatto','maq',335,397,60,22,4);
+st('13','Bamaq SA','maq',335,372,60,22,4);
+st('14','Scania','maq',430,455,55,40,4);
+st('15','Agrosol','maq',410,330,40,90,4);
+st('16','Rezende Caminhões','maq',440,275,70,30,4);
+st('18','Real Equip','maq',575,182,22,22,9);
+st('19','Medeiros Drones','maq',575,207,22,22,9);
+st('20','Turbo Center','maq',575,233,22,22,9);
+st('01','Meu Buteco','bar',450,140,40,20,10);
+st('02','Comercialização','inst',390,175,22,22,9);
+st('','Ecoponto','inst',652,92,24,26,8);
+st('94','Haras OF','agro',770,98,80,22,8);
+st('98','Espaço Servidor','inst',910,102,45,22,9);
+st('99','Limpeza','inst',995,102,45,22,9);
+st('96','Rancho Lobo','agro',802,152,45,22,8);
+st('97','Haras HSA','agro',898,152,60,22,8);
+st('95','Fazendinha','agro',722,185,40,110,3);
+// Concessionárias
+['Mitsubishi','Ford','BV Loc.','R Motors','Fiat','Nissan','Renault','Yamaha','Chevrolet'].forEach((m,i)=>st('C'+(i+1),m,'conc',690,312+i*18.5,90,13,7));
+// Estandes de animais (verdes)
+st('93','Brahman','agro',825,335,20,20,7);st('92.1','Tabapuã','agro',758,335,20,20,7);
+st('92','Toscana','agro',785,372,20,20,7);st('91','São Pedro','agro',763,410,20,20,7);
+st('90','Triângulo','agro',826,410,20,20,7);st('88','Laguna','agro',760,490,20,20,7);
+st('87','Barra do V.','agro',826,530,20,20,7);st('87.1','Elite Agro','agro',828,500,12,14,7);
+st('86','Octávio Portella','agro',740,548,20,20,7);st('89','Expositor 89','anim',830,452,18,20,7);
+st('101.1','Casa Pecuarista','agro',872,295,20,20,7);st('93.1','Agro Molinari','agro',955,295,20,20,7);
+st('101','PT. Sem.','anim',876,450,18,18,7);
+// Comércio central
+const small=[[22,'Daniel Baterias',518,490],[23,'Banana Chips',463,505],[24,'Estande 24',475,505],[25,'Estande 25',488,505],
+ [34,'CRB',463,512],[35,'Estande 35',476,512],[37,'Guth',425,525],[38,'Soluthi',433,556],[39,'Café St. Clara',451,556],
+ [40,'Vista Home (Dalle)',467,556],[41,'Vista Home (Dalle)',483,556],[42,'Unicenter',516,556],[43,'Amazing',533,556],
+ [44,'Dante',550,556],[45,'Dante',566,556],[47,'JL',545,490]];
+small.forEach(a=>st(a[0],a[1],'serv',a[2],a[3],13,14,7));
+[[54,'Gold Safe'],[53,'Stamp Art'],[52,'Marilú Arm.'],[51,'Aurora Tech'],[50,'GPPIR'],[49,'50Sol'],[48,'SN Net'],['47.1','Estande 47.1'],[46,'Nunes Solar']]
+ .forEach((a,i)=>st(a[0],a[1],a[0]==='47.1'?'serv':'serv',483+i*16,585,13,14,7));
+st('56','Ariaggi / Orthodontic','serv',412,578,20,20,8);st('57','Brasferro','serv',412,603,20,20,8);
+st('58','San Seb.','serv',412,628,20,20,8);st('59','Palma Plan','serv',437,628,22,22,8);
+st('60','Solutech','serv',462,628,22,22,8);st('61','Patrocinador 61','patr',512,632,22,22,8);
+st('62','Buritizal','patr',538,632,22,22,8);st('63','Caixa','banco',565,632,22,22,8);
+st('64','Soluções P. Solar','serv',593,632,22,22,8);st('65','Eneva','serv',620,632,22,22,8);
+st('66','CTG Nova Querência','inst',700,615,90,45,12);
+st('67','Arena da Imprensa','inst',810,612,48,70,14);
+// Fileira de baixo
+[['68','Serra Verde','serv'],['69','Aprosoja','serv'],['70','Basa','banco'],['71','Embrapa','patr'],['72','Coparr','serv'],
+ ['73','Granterra','serv'],['74','MAPA','inst'],['75','Combitrans','serv'],['76','Patrocinador 76','patr'],['77','Ademicon','serv'],
+ ['78','Viva Comb.','serv'],['79','Conab','inst']].forEach((a,i)=>st(a[0],a[1],a[2],406+i*27,690,22,22,8));
+st('80','Governo de RR','inst',735,690,24,28,9);st('81','Setrabes','inst',762,690,24,22,8);
+st('82','Carnes e Cortes','serv',815,690,22,22,8);st('83','JCO','serv',840,690,22,22,8);
+st('84','Shopp Bat.','serv',908,690,22,22,8);st('84.1',"Galenu's",'serv',930,700,20,20,8);
+st('85','Cambará Mad.','serv',958,690,22,22,8);st('85.1','PH (Splash)','serv',985,690,22,22,8);
+st('102','Tangará','serv',875,632,22,22,8);st('103','Maqcampo','serv',942,632,22,22,8);st('104','Amazon Piso','serv',968,632,22,22,8);
+st('','Suínos','anim',900,580,25,70,10);
+st('','Equoterapia','inst',830,728,90,22,6);
+// Lado direito
+st('','Arena do Leilão','inst',1022,255,55,55,22);
+st('','Leilão · curral','anim',1110,255,85,48,5);
+st('','Estacionamento do leilão','maq',1090,180,190,50,0.6);
+st('133','Cepal','serv',1022,350,30,22,9);st('108','Rota do Agro','inst',1016,425,24,22,9);
+st('106','Arena do Conhecimento','inst',1018,560,24,44,12);
+[['109','Solartech / Techfrio'],['110','Coop. Roraimel'],['111','Pulveriza Drones'],['112','Sifra']].forEach((a,i)=>st(a[0],a[1],'serv',1018+i*24,625,22,22,8));
+st('113','Agricultura Familiar','inst',1140,600,22,62,10);st('114','Agricultura Familiar','inst',1185,590,24,82,10);
+st('115','Landrin','serv',1230,625,22,22,8);st('116','Bela Biju','serv',1255,625,22,22,8);st('117','Rô Var.','serv',1280,625,22,22,8);
+st('','IATER','inst',1062,350,22,16,8);st('','IATER','inst',1162,350,22,16,8);
+st('118','Arena de Alimentação','bar',1172,725,250,36,9);
+st('','Administração','inst',932,250,30,22,10);
+
+/* Pavilhões hexagonais */
+const HEX=[[615,215,'Seapão'],[675,215,'Pavilhão'],[738,215,'Cavalos'],[800,215,'Pavilhão'],[860,215,'Pavilhão'],
+ [785,255,'Cavalos'],[770,298,'Moenda'],[798,335,'Gado'],[818,372,'Gado'],[795,412,'Gado'],[800,455,'Gado'],
+ [790,495,'Gado'],[772,535,'Gado'],[880,330,'Ovinos'],[880,410,'Caprinos'],[915,370,'Móveis Rústicos (100)'],
+ [915,455,'Apoio Técnico'],[890,255,'Pavilhão'],[620,535,'Restaurante 2'],[680,535,'Pavilhão'],[670,190,'Pavilhão']];
+
+
+
+/* Calibração: centro do croqui (px 655,455) → lat/lng, rotação e escala */
+const PADRAO={lat:2.893321,lng:-60.705408,rot:-163.9,esc:0.43};
+const ls={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+let cal=Object.assign({},PADRAO,ls.get('expoferr_cal_v2')||{});
+function geo(x,y){const E=(x-655)*cal.esc,N=-(y-455)*cal.esc,t=cal.rot*Math.PI/180;
+  const e=E*Math.cos(t)-N*Math.sin(t),n=E*Math.sin(t)+N*Math.cos(t);
+  return [cal.lat+n/111320,cal.lng+e/(111320*Math.cos(cal.lat*Math.PI/180))];}
+function inv(lat,lng){const n=(lat-cal.lat)*111320,e=(lng-cal.lng)*111320*Math.cos(cal.lat*Math.PI/180),t=-cal.rot*Math.PI/180;
+  const E=e*Math.cos(t)-n*Math.sin(t),N=e*Math.sin(t)+n*Math.cos(t);return [E/cal.esc+655,-N/cal.esc+455];}
+
+const map=L.map('map',{zoomControl:true,maxZoom:20}).setView([PADRAO.lat,PADRAO.lng],17);
+const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,attribution:'Imagem © Esri'});
+const rua=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,maxNativeZoom:19,attribution:'© OpenStreetMap'});
+function base(b){[sat,rua].forEach(l=>map.removeLayer(l));b.addTo(map);
+  document.getElementById('bSat').classList.toggle('on',b===sat);document.getElementById('bRua').classList.toggle('on',b===rua);}
+base(sat);document.getElementById('bSat').onclick=()=>base(sat);document.getElementById('bRua').onclick=()=>base(rua);
+
+const limite=L.polygon([[2.8883422,-60.7135729],[2.8917392,-60.7020185],[2.8959259,-60.7034497],[2.8930386,-60.7127657]],{color:'#fff',weight:2,dashArray:'6 6',fill:false});
+const planta=L.layerGroup().addTo(map),rot=L.layerGroup().addTo(map);
+
+function rect(s){const hw=s.w/2,hd=s.d/2;return [[s.x-hw,s.y-hd],[s.x+hw,s.y-hd],[s.x+hw,s.y+hd],[s.x-hw,s.y+hd]].map(p=>geo(p[0],p[1]));}
+function hexa(x,y,r){const a=[];for(let i=0;i<6;i++){const t=i*Math.PI/3+Math.PI/6;a.push(geo(x+r*Math.cos(t),y+r*Math.sin(t)));}return a;}
+function circ(x,y,r){const a=[];for(let i=0;i<48;i++){const t=i/48*Math.PI*2;a.push(geo(x+r*Math.cos(t),y+r*Math.sin(t)));}return a;}
+const VIAS=[[400,118,1300,118],[960,118,960,770],[395,665,1000,665],[395,760,1300,760],[380,240,380,790],[240,170,560,95],[30,860,400,790],[150,470,330,190],[560,140,560,290],[995,140,995,780]];
+const BIG=[['SEBRAE',540,370],['Concessionárias',690,290],['Arena do Leilão',1022,225],['IATER',1180,460],['Arena de Alimentação',1172,725],['Entrada principal',290,160],['Entrada autoridades',40,850]];
+function pop(u){return '<b>'+(u.n?(u.n.startsWith('C')?'Concessionária':'Nº '+u.n):'Área')+'</b><br>'+u.name+'<br><small>'+CAT[u.cat].n+'</small>';}
+function desenhar(){planta.clearLayers();rot.clearLayers();
+  VIAS.forEach(v=>L.polyline([geo(v[0],v[1]),geo(v[2],v[3])],{color:'#6c6a64',weight:5,opacity:.55,interactive:false}).addTo(planta));
+  L.polygon(circ(540,370,95),{color:'#b9a52a',weight:1,fillColor:CAT.inst.c,fillOpacity:.75}).bindPopup(pop({n:'17',name:'Sebrae · área de 4.300,84 m²',cat:'inst'})).addTo(planta);
+  HEX.forEach(h=>{const r=h[2].startsWith('Rest'),m=h[2].startsWith('Móveis');
+    L.polygon(hexa(h[0],h[1],27),{color:'#666',weight:1,fillColor:r?CAT.bar.c:m?CAT.serv.c:'#d7d6cf',fillOpacity:.85})
+     .bindPopup(pop({n:r?'31':m?'100':'',name:h[2],cat:r?'bar':m?'serv':'anim'})).addTo(planta);});
+  S.forEach(s=>{L.polygon(rect(s),{color:'#333',weight:.8,fillColor:CAT[s.cat].c,fillOpacity:s.h<1?.35:.88}).bindPopup(pop(s)).addTo(planta);
+    if(s.n&&!s.n.startsWith('C')&&s.h>=1)L.tooltip({permanent:true,direction:'center',className:'lbl'}).setLatLng(geo(s.x,s.y)).setContent(s.n).addTo(rot);});
+  BIG.forEach(b=>L.tooltip({permanent:true,direction:'center',className:'lbl big'}).setLatLng(geo(b[1],b[2])).setContent(b[0]).addTo(rot));
+  alvo.setLatLng([cal.lat,cal.lng]);
+  postos.forEach(p=>p.mk.setLatLng(geo(p.x,p.y)));
+}
+function rotVis(){const on=document.getElementById('cRot').checked&&map.getZoom()>=18;on?map.addLayer(rot):map.removeLayer(rot);}
+map.on('zoomend',rotVis);
+
+/* Alvo de arraste para mover a planta */
+const alvo=L.marker([cal.lat,cal.lng],{draggable:true,icon:L.divIcon({className:'',html:'<div style="width:26px;height:26px;border-radius:50%;border:4px solid #f2b705;background:rgba(242,183,5,.25)"></div>',iconSize:[26,26]})});
+alvo.on('drag',e=>{const ll=e.target.getLatLng();cal.lat=ll.lat;cal.lng=ll.lng;desenhar();});
+alvo.on('dragend',()=>ls.set('expoferr_cal_v2',cal));
+
+/* Postos (pixel do croqui, para acompanharem a planta) */
+const EXEMPLO=[{nome:'Portaria · entrada principal',sit:'ok',x:300,y:175},{nome:'Entrada autoridades',sit:'ok',x:45,y:835},
+ {nome:'Arena do Leilão',sit:'inc',x:1022,y:290},{nome:'Arena de Alimentação',sit:'agu',x:1100,y:745},{nome:'Base PM · Sebrae',sit:'ok',x:630,y:370},
+ {nome:'Concessionárias',sit:'sem',x:640,y:470}];
+let postos=(ls.get('expoferr_postos')||EXEMPLO.map(p=>Object.assign({ex:true},p))).map(p=>Object.assign({},p));
+const camPost=L.layerGroup().addTo(map);
+function icone(p){return L.divIcon({className:'',iconSize:[22,22],html:'<div class="posto" style="background:'+SIT[p.sit].c+'">PM</div>'});}
+function salvarPostos(){ls.set('expoferr_postos',postos.map(p=>({nome:p.nome,sit:p.sit,x:p.x,y:p.y,ex:p.ex})));}
+function montarPostos(){camPost.clearLayers();
+  postos.forEach(p=>{p.mk=L.marker(geo(p.x,p.y),{icon:icone(p),draggable:true,title:p.nome}).addTo(camPost)
+    .bindTooltip(p.nome+' · '+SIT[p.sit].n);
+    p.mk.on('click',()=>editar(p));
+    p.mk.on('dragend',e=>{const q=inv(e.target.getLatLng().lat,e.target.getLatLng().lng);p.x=q[0];p.y=q[1];salvarPostos();});});
+  const c={ok:0,inc:0,sem:0};postos.forEach(p=>{if(c[p.sit]!=null)c[p.sit]++;});
+  kOk.textContent=c.ok;kInc.textContent=c.inc;kSem.textContent=c.sem;
+  const ul=document.getElementById('lista');ul.innerHTML='';
+  postos.forEach(p=>{const li=document.createElement('li');li.innerHTML='<span class="dot" style="background:'+SIT[p.sit].c+'"></span><span></span>'+(p.ex?'<span class="tag">exemplo</span>':'');
+    li.children[1].textContent=p.nome+' · '+SIT[p.sit].n;li.onclick=()=>{map.setView(geo(p.x,p.y),19);editar(p);};ul.appendChild(li);});}
+
+let editando=null,modoAdd=false;const f=document.getElementById('formPosto');
+function editar(p){editando=p;pNome.value=p.nome;pSit.value=p.sit;f.hidden=false;pDel.hidden=false;pNome.focus();}
+bAdd.onclick=()=>{modoAdd=!modoAdd;bAdd.classList.toggle('on',modoAdd);map.getContainer().style.cursor=modoAdd?'crosshair':'';};
+map.on('click',e=>{if(!modoAdd)return;modoAdd=false;bAdd.classList.remove('on');map.getContainer().style.cursor='';
+  const q=inv(e.latlng.lat,e.latlng.lng);const p={nome:'Novo posto',sit:'agu',x:q[0],y:q[1]};postos.push(p);montarPostos();editar(p);pDel.hidden=false;});
+f.onsubmit=e=>{e.preventDefault();if(!editando)return;editando.nome=pNome.value.trim()||'Posto';editando.sit=pSit.value;editando.ex=false;
+  f.hidden=true;salvarPostos();montarPostos();editando=null;};
+pCan.onclick=()=>{f.hidden=true;editando=null;};
+pDel.onclick=()=>{postos=postos.filter(p=>p!==editando);f.hidden=true;editando=null;salvarPostos();montarPostos();};
+function copiar(txt,btn){const done=()=>{const o=btn.textContent;btn.textContent='Copiado';setTimeout(()=>btn.textContent=o,1500);};
+  if(navigator.clipboard)navigator.clipboard.writeText(txt).then(done,()=>prompt('Copie:',txt));else prompt('Copie:',txt);}
+bExp.onclick=()=>copiar(JSON.stringify(postos.map(p=>{const g=geo(p.x,p.y);return {nome:p.nome,situacao:SIT[p.sit].n,lat:+g[0].toFixed(6),lng:+g[1].toFixed(6)};}),null,1),bExp);
+
+/* Ajuste */
+const aj=document.getElementById('ajuste');
+function syncAj(){rRot.value=cal.rot;rEsc.value=cal.esc;vRot.textContent=(+cal.rot).toFixed(1);vEsc.textContent=(+cal.esc).toFixed(3);}
+bAj.onclick=()=>{aj.hidden=!aj.hidden;bAj.classList.toggle('on',!aj.hidden);aj.hidden?map.removeLayer(alvo):alvo.addTo(map);syncAj();};
+rRot.oninput=()=>{cal.rot=+rRot.value;syncAj();desenhar();ls.set('expoferr_cal_v2',cal);};
+rEsc.oninput=()=>{cal.esc=+rEsc.value;syncAj();desenhar();ls.set('expoferr_cal_v2',cal);};
+bCopCal.onclick=()=>copiar(JSON.stringify({lat:+cal.lat.toFixed(6),lng:+cal.lng.toFixed(6),rot:cal.rot,esc:cal.esc}),bCopCal);
+bResCal.onclick=()=>{cal=Object.assign({},PADRAO);ls.set('expoferr_cal_v2',cal);syncAj();desenhar();};
+
+/* Camadas */
+cPlanta.onchange=()=>cPlanta.checked?map.addLayer(planta):map.removeLayer(planta);
+cRot.onchange=rotVis;
+cPostos.onchange=()=>cPostos.checked?map.addLayer(camPost):map.removeLayer(camPost);
+cLimite.onchange=()=>cLimite.checked?map.addLayer(limite):map.removeLayer(limite);
+
+montarPostos();desenhar();rotVis();
+map.fitBounds(L.latLngBounds([geo(0,60),geo(1310,880)]));
+})();
+</script>
+</body>
+</html>
