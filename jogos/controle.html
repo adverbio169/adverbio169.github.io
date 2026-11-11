@@ -2035,7 +2035,7 @@ const Painel = {
        para trás as linhas de sortida da última vez — zonas fantasma, que só
        não pegam ninguém hoje porque quem toca confere o formato antes. Limpar
        aqui é fechar a porta antes de alguém entrar por ela. */
-    if (fmt !== 'OBJET'){ this.sorZonas = null; this.sorLinha = null; }
+    if (fmt !== 'OBJET'){ this.sorZonas = null; this.sorLinha = null; this.sorMais = null; }
     if (fmt !== 'APROX'){ this.apxZonas = null; this.apxCab = null; }
     if (fmt === 'ATITUDE'){
       const fr = this.faixaRot(r);
@@ -2277,8 +2277,17 @@ const Painel = {
      onde o plano de voo se carrega. O celular não tem a lista — ela vem no
      pacote — e devolve o ÍNDICE do que o dedo tocou, como faz com a
      designação de alvo. */
+  /* DEZ SORTIDAS: a lista é paginada, cinco por vez, igual à da tela do jogo
+     (ver `mfdPaginaEscolha` lá). A página é daqui — o botão "MAIS MISSÕES"
+     não manda nada para a TV — e abre na da escolhida. Cada linha traz as
+     estrelas da melhor marca (L[i][4]) e a escolhida traz as duas pontas da
+     linha de cima do briefing (L[i][5] e L[i][6]). */
+  sorPag: -1,
   escolha(c, m, d){
     const x = m.pad, w = m.W - m.pad*2, L = d.sorL || [];
+    /* cinco por página onde cabem; num painel baixo, três, com a linha alta
+       o bastante para o polegar */
+    const POR = m.corpoH < 130 ? 3 : 5, passoL = 0.52/POR, nPag = Math.max(1, Math.ceil(L.length/POR));
     c.textBaseline = 'middle'; c.textAlign = 'left';
     c.font = '800 ' + Math.max(9, m.cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
     const lgNome = c.measureText('OBJET').width;
@@ -2286,38 +2295,61 @@ const Painel = {
     c.fillStyle = MFD_AMBAR;
     c.fillText('SELEÇÃO', m.pad + lgNome + m.f*1.3, m.cab*0.60);
     this.sorZonas = [];
-    let lema = '';
-    for (let i = 0; i < L.length; i++){
-      const y = m.corpoY + m.corpoH*(0.10 + i*0.135), alt = m.corpoH*0.128;
+    let iSel = L.findIndex(q => q[2]); if (iSel < 0) iSel = 0;
+    if (this.sorPag < 0 || this.sorPag >= nPag) this.sorPag = Math.floor(iSel/POR);
+    const i0 = this.sorPag*POR;
+    for (let k = 0; k < POR && i0 + k < L.length; k++){
+      const i = i0 + k;
+      const y = m.corpoY + m.corpoH*(0.016 + passoL*(k + 0.5)), alt = m.corpoH*passoL*0.96;
       const sel = !!L[i][2];
-      if (sel) lema = L[i][3] || '';
       this.sorZonas.push({ i, y: y - alt/2, h: alt });
       if (sel){
         c.fillStyle = 'rgba(99,216,255,.17)';
         c.fillRect(m.pad*0.4, y - alt/2, m.W - m.pad*0.8, alt);
-        c.fillStyle = MFD_CIANO;
-        c.fillRect(m.pad*0.4, y - alt/2, Math.max(2, m.pad*0.22), alt);
       }
+      c.fillStyle = L[i][1] ? MFD_VERM : MFD_VERDE;           // vermelho: tem caça
+      c.fillRect(m.pad*0.4, y - Math.min(alt, m.f*1.5)*0.36, Math.max(2, m.pad*0.26), Math.min(alt, m.f*1.5)*0.72);
+      const e = L[i][4] || 0;
+      c.font = '800 ' + (m.f*0.92).toFixed(1) + 'px system-ui, sans-serif';
+      c.textAlign = 'right';
+      const lgE = c.measureText('★★★').width;
+      c.fillStyle = 'rgba(143,163,184,.30)'; c.fillText('★★★', x + w, y);
+      if (e > 0){ c.fillStyle = '#ffd257'; c.fillText('★★★'.slice(0, e), x + w - lgE*(3 - e)/3, y); }
       c.font = '800 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
       c.textAlign = 'left'; c.fillStyle = sel ? MFD_CIANO : MFD_ROT;
       if (sel) this.aceso(c, MFD_CIANO, m.f*0.8);
-      c.fillText((sel ? '▸ ' : '  ') + L[i][0], x, y);
+      c.fillText(corta(c, (sel ? '▸ ' : '  ') + L[i][0], w - lgE - m.f*0.6), x, y);
       this.apaga(c);
-      c.font = '700 ' + (m.f*0.72).toFixed(1) + 'px system-ui, sans-serif';
-      c.textAlign = 'right'; c.fillStyle = L[i][1] ? MFD_VERM : MFD_VERDE;
-      c.fillText(L[i][1] ? 'COMBATE' : 'SEM HOSTIS', x + w, y);
     }
-    const yB = m.corpoY + m.corpoH*0.66;
+    const S = L[iSel] || [];
+    const yB = m.corpoY + m.corpoH*0.598;
     c.strokeStyle = 'rgba(99,216,255,.10)'; c.lineWidth = 1;
-    c.beginPath(); c.moveTo(x, yB - m.corpoH*0.07); c.lineTo(x + w, yB - m.corpoH*0.07); c.stroke();
-    c.font = '700 ' + (m.f*0.78).toFixed(1) + 'px system-ui, sans-serif';
-    c.textAlign = 'left'; c.fillStyle = MFD_CLARO;
-    paragrafo(c, lema, x, yB, w, m.corpoH*0.085, 3);
-    c.font = '800 ' + (m.f*0.72).toFixed(1) + 'px system-ui, sans-serif';
-    c.textAlign = 'center'; c.fillStyle = MFD_ROT;
-    const rod = 'TOQUE PARA ESCOLHER · DECOLE PARA COMEÇAR';
-    c.fillText(c.measureText(rod).width <= w ? rod : 'TOQUE PARA ESCOLHER',
-               m.W/2, m.corpoY + m.corpoH*0.95);
+    c.beginPath(); c.moveTo(x, yB - m.corpoH*0.048); c.lineTo(x + w, yB - m.corpoH*0.048); c.stroke();
+    c.font = '800 ' + (m.f*0.70).toFixed(1) + 'px system-ui, sans-serif';
+    c.textAlign = 'right'; c.fillStyle = '#ffd257';
+    const lgM = S[6] ? c.measureText(S[6]).width + m.f*0.6 : 0;
+    if (S[6]) c.fillText(S[6], x + w, yB);
+    c.textAlign = 'left'; c.fillStyle = S[1] ? MFD_VERM : MFD_VERDE;
+    c.fillText(corta(c, S[5] || (S[1] ? 'COMBATE' : 'SEM HOSTIS'), w - lgM), x, yB);
+    c.font = '700 ' + (m.f*0.76).toFixed(1) + 'px system-ui, sans-serif';
+    c.fillStyle = MFD_CLARO;
+    paragrafo(c, S[3] || '', x, yB + m.corpoH*0.076, w, m.corpoH*0.072, 3);
+    const yR = m.corpoY + m.corpoH*0.95, altR = m.corpoH*0.092;
+    c.font = '800 ' + (m.f*0.74).toFixed(1) + 'px system-ui, sans-serif';
+    c.textAlign = 'center';
+    this.sorMais = null;
+    if (nPag > 1){
+      this.sorMais = [yR - altR/2, yR + altR/2, nPag];
+      c.strokeStyle = MFD_AMBAR; c.lineWidth = 1;
+      c.strokeRect(x, yR - altR/2 + 1, w, altR - 2);
+      c.fillStyle = MFD_AMBAR;
+      const rod = 'MAIS MISSÕES ▸ ' + (this.sorPag + 1) + '/' + nPag;
+      c.fillText(c.measureText(rod).width <= w - 6 ? rod : 'MAIS ▸ ' + (this.sorPag + 1) + '/' + nPag, m.W/2, yR);
+    } else {
+      c.fillStyle = MFD_ROT;
+      const rod = 'TOQUE PARA ESCOLHER · DECOLE PARA COMEÇAR';
+      c.fillText(c.measureText(rod).width <= w ? rod : 'TOQUE PARA ESCOLHER', m.W/2, yR);
+    }
     c.textAlign = 'left';
   },
   objetivos(c, m, d){
@@ -2325,7 +2357,8 @@ const Painel = {
     /* as duas zonas ficam guardadas de um quadro para o outro; zerar as DUAS
        aqui é o que impede o dedo de acertar uma linha que já não está na
        tela */
-    this.sorZonas = null; this.sorLinha = null;
+    this.sorZonas = null; this.sorLinha = null; this.sorMais = null;
+    this.sorPag = -1;            // a seleção reabre na página da escolhida
     const x = m.pad, w = m.W - m.pad*2;
     const L = (d.objs || []).slice().sort((a, b) => a[0] - b[0]);
     const feitos = (d.objs || []).filter(o => o[0]).length;
@@ -2367,7 +2400,9 @@ const Painel = {
       /* a fase manda: ela é o dado, o nome da sortida é o rótulo. Mede-se a
          fase primeiro e o nome fica com o que sobrar — sem isto "DEFESA
          AÉREA" e "CONTATO EM 9 s" se escrevem um por cima do outro. */
-      this.sorLinha = (d.sorF === 'transito')
+      /* e depois do fim também: cumprida ou perdida, esta linha é o botão de
+         "outra missão" */
+      this.sorLinha = (d.sorF === 'transito' || d.sorF === 'cumprida' || d.sorF === 'fracassou')
         ? [yS - m.corpoH*0.075, yS + m.corpoH*0.075] : null;
       c.font = '800 ' + (m.f*0.94).toFixed(1) + 'px ui-monospace, monospace';
       const larFase = c.measureText(d.sor[1]).width;
@@ -2655,6 +2690,17 @@ const Painel = {
     }
     if (MFD_PAGS[this.carro] === 'OBJET'){
       if (this.sorZonas){
+        /* o botão das páginas é daqui mesmo: roda a lista e não manda nada */
+        if (this.sorMais && py >= this.sorMais[0] && py <= this.sorMais[1]){
+          /* um dedo, uma página: o toque e o clique que o navegador inventa
+             para ele não podem virar duas */
+          const agora = performance.now();
+          if (agora - (this.sorQuando || 0) < 450) return true;
+          this.sorQuando = agora;
+          this.sorPag = (this.sorPag + 1) % this.sorMais[2]; this.pinta();
+          try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
+          return true;
+        }
         for (const z of this.sorZonas){
           if (py < z.y || py > z.y + z.h) continue;
           enviaCtl({ t: 'sor', i: z.i }); this.escolhendo = false;
