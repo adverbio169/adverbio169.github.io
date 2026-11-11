@@ -1633,14 +1633,25 @@ function endireitaEixos(){
    com o mesmo nome, uma com maiúscula e outra sem, é bug esperando acontecer. */
 const Ferrovia = {
   s: 0, vel: 1150, vivo: true,
+  /* `voltas` conta quantas vezes ele sumiu no norte: é o "O TREM ESCAPOU" da
+     sortida CAÇA AO TREM. `VEL` é a velocidade de linha; `vel` é a de agora,
+     e vale zero com o trem esperando na estação (o relógio daquela sortida
+     só larga na decolagem) ou depois de perder a locomotiva. */
+  voltas: 0,
+  VEL: 1150,
   /* A posição de cada vagão sai daqui, não do passo genérico do obstáculo.
      Se cada um andasse por conta, ao dar a volta no fim do mapa um viraria
      antes do outro e o trem se partiria no meio. */
   passo(dt, cars){
+    /* SEM LOCOMOTIVA O TREM PARA. Os vagões seguiam a 1.150 puxados por uma
+       locomotiva destruída — e "pare a locomotiva" não parava nada. Perde o
+       passo em quatro segundos, como composição que ficou sem tração. */
+    if (!this.vivo && this.vel > 0) this.vel = Math.max(0, this.vel - 300*dt);
     this.s += this.vel*dt;
     const volta = MAPA + VAGOES*(VAGAO_COMP + VAGAO_VAO);
-    if (this.s > volta) this.s = -volta;
+    if (this.s > volta){ this.s = -volta; this.voltas++; }
     for (const o of cars){
+      if (o.iVagao === 0 && !o.vivo) this.vivo = false;
       o.z = this.s - o.iVagao*(VAGAO_COMP + VAGAO_VAO);
       o.x = TRILHO_X; o.y = CHAO + 250; o.rumo = 0;
     }
@@ -1705,7 +1716,7 @@ function montaMapa(){
   /* o trem: a locomotiva e os vagões entram na mesma lista dos outros
      obstáculos, e por isso ganham radar, trava e pontuação sem uma linha a
      mais em nenhum desses lugares */
-  Ferrovia.s = -MAPA*0.4; Ferrovia.vivo = true;
+  Ferrovia.s = -MAPA*0.4; Ferrovia.vivo = true; Ferrovia.vel = Ferrovia.VEL; Ferrovia.voltas = 0;
   for (let i = 0; i < VAGOES; i++)
     obstaculos.push({ tipo: i === 0 ? 'locomotiva' : 'vagao', iVagao: i,
                       x:TRILHO_X, y:CHAO + 250, z:0, fase:0, deriva:0, rumo:0,
@@ -9226,6 +9237,7 @@ function atingeAr(x, y, z, raio, dano, semGente){
                 : o.tipo === 'locomotiva' ? 'LOCOMOTIVA! +300'
                 : o.tipo === 'vagao' ? 'VAGÃO! +150' : '+50', '#ffd257', 800);
       Controles.bate('alvo'); sacode(0.22);
+      if (Missoes) Missoes.abateu(o.tipo);       // helicóptero, vagão, locomotiva — ou um civil
       return true;
     }
   }
@@ -11932,6 +11944,24 @@ function mfdCorta(txt, larg){
    entre as duas não há botão de confirmar — decolar é confirmar. */
 let mfdEscolhendo = false;
 
+/* --- DEZ SORTIDAS NUMA PÁGINA DE CINCO CENTÍMETROS ------------------------
+   Com quatro a lista cabia inteira. Com dez, não: ou a letra some, ou a linha
+   fica menor que um polegar. Então a lista é PAGINADA — cinco por vez, e um
+   botão embaixo que roda as páginas. Abre sempre na página da escolhida.
+
+   E cada linha passou a dizer o que já se fez nela: as estrelas da melhor
+   marca à direita, onde antes estava escrito COMBATE / SEM HOSTIS. Esse aviso
+   virou a cor do quadradinho na frente do nome (vermelho: tem caça) e a
+   primeira linha do briefing, que tem lugar para a palavra inteira. */
+const SOR_POR_PAG = 5;
+let mfdSorPag = -1;                 // -1: ainda não aberta (abre na da escolhida)
+/* a linha de cima do briefing, pronta: é a mesma na tela do jogo e no
+   celular-controle, que a recebe no pacote */
+function sortidaCab(q){
+  const m = Relatorio.melhor(q.id);
+  return [ (q.caca.max ? 'COMBATE' : 'SEM HOSTIS') + ' · PAR ' + tempoTxt(q.par || 300),
+           m ? 'MELHOR ' + tempoTxt(m.t) : '' ];
+}
 function mfdPaginaEscolha(o, m){
   const x = o.x + m.pad, w = o.w - m.pad*2;
   h2.textBaseline = 'middle'; h2.textAlign = 'left';
@@ -11941,52 +11971,78 @@ function mfdPaginaEscolha(o, m){
   h2.fillStyle = MFD_AMBAR;
   h2.fillText('SELEÇÃO', o.x + m.pad + lgNome + m.f*1.3, o.y + m.cab*0.62);
 
-  for (let i = 0; i < SORTIDAS.length; i++){
-    const q = SORTIDAS[i], sel = q.id === sortidaId;
-    const y = m.corpoY + m.corpoH*(0.10 + i*0.135);
-    const alt = m.corpoH*0.128;
+  const nPag = Math.ceil(SORTIDAS.length/SOR_POR_PAG);
+  if (mfdSorPag < 0 || mfdSorPag >= nPag)
+    mfdSorPag = Math.floor(Math.max(0, SORTIDAS.findIndex(q => q.id === sortidaId))/SOR_POR_PAG);
+  const i0 = mfdSorPag*SOR_POR_PAG;
+  for (let k = 0; k < SOR_POR_PAG && i0 + k < SORTIDAS.length; k++){
+    const q = SORTIDAS[i0 + k], sel = q.id === sortidaId;
+    const y = m.corpoY + m.corpoH*(0.075 + k*0.108);
+    const alt = m.corpoH*0.104;
     /* a zona é mais alta que a letra: quem escolhe aqui está com o polegar
        na tela, não com um ponteiro */
     mfdZona(o.x, y - alt/2, o.w, alt, () => { escolheSortida(q.id); mfdEscolhendo = false; });
     if (sel){
       h2.fillStyle = 'rgba(99,216,255,.17)';
       h2.fillRect(o.x + m.pad*0.4, y - alt/2, o.w - m.pad*0.8, alt);
-      h2.fillStyle = MFD_CIANO;
-      h2.fillRect(o.x + m.pad*0.4, y - alt/2, Math.max(2, m.pad*0.22), alt);
     }
+    /* o quadradinho: vermelho tem caça, verde é céu limpo */
+    h2.fillStyle = q.caca.max ? MFD_VERM : MFD_VERDE;
+    h2.fillRect(o.x + m.pad*0.4, y - alt*0.36, Math.max(2, m.pad*0.26), alt*0.72);
+    /* as estrelas da melhor marca: três, as ganhas em ouro */
+    const e = (Relatorio.melhor(q.id) || { e: 0 }).e;
+    h2.font = '800 ' + (m.f*0.92).toFixed(1) + 'px system-ui, sans-serif';
+    h2.textAlign = 'right';
+    const lgE = h2.measureText('★★★').width;
+    h2.fillStyle = 'rgba(143,163,184,.30)'; h2.fillText('★★★', x + w, y);
+    if (e > 0){ h2.fillStyle = '#ffd257'; h2.fillText('★★★'.slice(0, e), x + w - lgE*(3 - e)/3, y); }
     h2.font = '800 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
     h2.textAlign = 'left'; h2.fillStyle = sel ? MFD_CIANO : MFD_ROT;
     if (sel) mfdAceso(h2, MFD_CIANO, m.f*0.8);
-    h2.fillText((sel ? '▸ ' : '  ') + q.nome, x, y);
+    h2.fillText(mfdCorta((sel ? '▸ ' : '  ') + q.nome, w - lgE - m.f*0.6), x, y);
     mfdApaga(h2);
-    h2.font = '700 ' + (m.f*0.72).toFixed(1) + 'px system-ui, sans-serif';
-    h2.textAlign = 'right'; h2.fillStyle = q.caca.max ? MFD_VERM : MFD_VERDE;
-    h2.fillText(q.caca.max ? 'COMBATE' : 'SEM HOSTIS', x + w, y);
   }
 
   /* o briefing da escolhida: é o que responde "o que eu vou fazer lá?" antes
      de decolar, e é a razão de a seleção morar aqui e não num menu */
-  const yB = m.corpoY + m.corpoH*0.66;
+  const S = Sortida.atual(), cab = sortidaCab(S);
+  const yB = m.corpoY + m.corpoH*0.635;
   h2.strokeStyle = MFD_FIO + '.10)'; h2.lineWidth = 1;
-  h2.beginPath(); h2.moveTo(x, yB - m.corpoH*0.07); h2.lineTo(x + w, yB - m.corpoH*0.07); h2.stroke();
-  h2.font = '700 ' + (m.f*0.78).toFixed(1) + 'px system-ui, sans-serif';
-  h2.textAlign = 'left'; h2.fillStyle = MFD_CLARO;
-  mfdParagrafo(Sortida.atual().lema, x, yB, w, m.corpoH*0.085, 3);
+  h2.beginPath(); h2.moveTo(x, yB - m.corpoH*0.052); h2.lineTo(x + w, yB - m.corpoH*0.052); h2.stroke();
+  h2.font = '800 ' + (m.f*0.70).toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'right'; h2.fillStyle = '#ffd257';
+  const lgM = cab[1] ? h2.measureText(cab[1]).width + m.f*0.6 : 0;
+  if (cab[1]) h2.fillText(cab[1], x + w, yB);
+  h2.textAlign = 'left'; h2.fillStyle = S.caca.max ? MFD_VERM : MFD_VERDE;
+  h2.fillText(mfdCorta(cab[0], w - lgM), x, yB);
+  h2.font = '700 ' + (m.f*0.76).toFixed(1) + 'px system-ui, sans-serif';
+  h2.fillStyle = MFD_CLARO;
+  mfdParagrafo(S.lema, x, yB + m.corpoH*0.078, w, m.corpoH*0.074, 3);
 
-  /* o rodapé escolhe a frase que CABE, em vez de ser cortado: "DECOLE ..."
-     não instrui ninguém. A tela do jogo é larga e leva as duas; o celular,
-     com letra maior, leva só a primeira. */
-  h2.font = '800 ' + (m.f*0.72).toFixed(1) + 'px system-ui, sans-serif';
-  h2.textAlign = 'center'; h2.fillStyle = MFD_ROT;
-  const rod = mfdVerbo() + ' PARA ESCOLHER · DECOLE PARA COMEÇAR';
-  h2.fillText(h2.measureText(rod).width <= w ? rod : mfdVerbo() + ' PARA ESCOLHER',
-              x + w/2, m.corpoY + m.corpoH*0.95);
+  /* o botão das páginas, no lugar do rodapé: com mais de uma página ele é a
+     coisa mais útil que cabe ali — e continua dizendo o verbo */
+  const yR = m.corpoY + m.corpoH*0.945, altR = m.corpoH*0.10;
+  h2.font = '800 ' + (m.f*0.74).toFixed(1) + 'px system-ui, sans-serif';
+  h2.textAlign = 'center';
+  if (nPag > 1){
+    mfdZona(o.x, yR - altR/2, o.w, altR, () => { mfdSorPag = (mfdSorPag + 1) % nPag; });
+    h2.strokeStyle = MFD_AMBAR; h2.lineWidth = 1;
+    h2.strokeRect(x, yR - altR/2 + 1, w, altR - 2);
+    h2.fillStyle = MFD_AMBAR;
+    const rod = 'MAIS MISSÕES ▸ ' + (mfdSorPag + 1) + '/' + nPag;
+    h2.fillText(h2.measureText(rod).width <= w - 6 ? rod : 'MAIS ▸ ' + (mfdSorPag + 1) + '/' + nPag, x + w/2, yR);
+  } else {
+    h2.fillStyle = MFD_ROT;
+    const rod = mfdVerbo() + ' PARA ESCOLHER · DECOLE PARA COMEÇAR';
+    h2.fillText(h2.measureText(rod).width <= w ? rod : mfdVerbo() + ' PARA ESCOLHER', x + w/2, yR);
+  }
   h2.textAlign = 'left';
 }
 
 function mfdPaginaMissao(o, m){
   /* em solo, o plano de voo ainda está aberto */
   if (Sortida.fase === 'solo' || mfdEscolhendo) return mfdPaginaEscolha(o, m);
+  mfdSorPag = -1;               // da próxima vez, a seleção abre na página da escolhida
   const x = o.x + m.pad, w = o.w - m.pad*2;
   /* OS QUE FALTAM PRIMEIRO. A lista tem seis objetivos e a página mostra
      cinco: mostrando na ordem original, cumprir os primeiros escondia
@@ -12051,14 +12107,15 @@ function mfdPaginaMissao(o, m){
   h2.fillText(mfdCorta(Sortida.atual().nome, w - larFase - m.f*0.8), x, yS);
   h2.font = '800 ' + (m.f*0.94).toFixed(1) + 'px ui-monospace, monospace';
   h2.textAlign = 'right'; h2.fillStyle = S.cor;
-  if (Sortida.fase === 'alerta' || Sortida.fase === 'quente') mfdAceso(h2, S.cor, m.f*0.9);
+  if (Sortida.fase === 'alerta' || Sortida.fase === 'quente' || Sortida.acabou()) mfdAceso(h2, S.cor, m.f*0.9);
   h2.fillText(S.txt, x + w, yS);
   mfdApaga(h2);
   /* decolou e quer trocar de missão? Enquanto o rádio não chamou contato, o
      plano de voo ainda se reabre — tocar na linha da sortida volta para a
      seleção. Depois do ALERTA, não: com caça a caminho isso é desistir, não
-     escolher. */
-  if (Sortida.fase === 'transito')
+     escolher. E depois do FIM, de novo sim: cumprida ou perdida, a linha da
+     sortida é o botão de "outra missão". */
+  if (Sortida.fase === 'transito' || Sortida.acabou())
     mfdZona(o.x, yS - m.corpoH*0.075, o.w, m.corpoH*0.15, () => { mfdEscolhendo = true; });
   const ord = Sortida.ordem();
   if (ord){
@@ -14029,25 +14086,68 @@ const OBJ_DEF = {
   vale:    { txt:'Pousar no VALE',                 meta: 1 },
   abater:  { txt:'Abater {n} caças',               meta: 4 },
   furtivo: { txt:'Infiltrar {n} s',                meta:18 },
+  /* os das sortidas novas. Cada um é contado por um aviso que o jogo já dava
+     (um abate, uma parada) — nenhum pede varredura própria. */
+  loco:    { txt:'Parar a locomotiva',             meta: 1 },
+  vagoes:  { txt:'Destruir {n} vagões',            meta: 4 },
+  portoes: { txt:'Passar {n} portões',             meta: 8 },
+  helis:   { txt:'{n} helicópteros',               meta: 4 },
+  valeP:   { txt:'Parar no VALE',                  meta: 1 },
+  orlaP:   { txt:'Parar em ' + CIDADES[1].nome,    meta: 1 },
   voltar:  { txt:'Voltar e pousar',                meta: 1 }
 };
+
+/* segundos em relógio de gente: 3:07 */
+function tempoTxt(s){
+  s = Math.max(0, Math.round(s));
+  return Math.floor(s/60) + ':' + String(s % 60).padStart(2, '0');
+}
 
 /* Cada sortida diz DUAS coisas: o que conta como vitória (`objs`) e de onde
    vem o perigo (`caca`). O gatilho é o que amarra as duas na mesma história —
    no bombardeio quem chama os caças é a terceira explosão no chão, e na
    infiltração é você subindo onde não devia. Perigo com causa é perigo que se
    pode evitar, e é isso que separa combate de sorteio. */
+/* --- O QUE CADA SORTIDA PODE DIZER, ALÉM DAS DUAS COISAS -------------------
+   "Retira os bugs. Cria umas missões. Deixa ele atraente."
+
+   As quatro primeiras só variavam os números: quantos alvos, quantos caças.
+   As seis de baixo mudam o que a MÃO faz — acertar uma coisa que anda, passar
+   por dentro de um anel, olhar antes de atirar, decolar com pressa, parar em
+   três pistas. Para isso a tabela ganhou campos, todos opcionais:
+
+     par      o tempo-alvo, em segundos de voo. É a segunda estrela.
+     limpo    a terceira estrela: { txt, ok() }. Sem ele vale a regra de casa:
+              não perder mais de 30 de vida.
+     armas    o que vai nos cabides ({ bomba:0, missil:4 }). O que não estiver
+              escrito vai cheio.
+     limite   segundos de voo até a derrota por relógio, e `atraso` o que se
+              lê quando ele acaba.
+     falha()  devolve o motivo da derrota, ou nada. Roda todo quadro: tem de
+              ser uma comparação, não uma procura.
+     relogio() segundos que faltam para a derrota (ou `null`): é o número que
+              aparece no alto da tela. Com `limite`, sai sozinho.
+     prepara() / decola() / passo(dt)   o que a sortida arma no chão, o que
+              larga na decolagem e o que confere em voo.
+     guia()   para onde o losango magenta do HUD aponta agora: { obj, nome }.
+              É o "para onde eu vou?" respondido sem ler nada.
+
+   E o gatilho dos caças ganhou dois jeitos: `obj` (o enésimo vagão, o enésimo
+   helicóptero) e `tempo` (eles vêm, com você no ar ou não). */
 const SORTIDAS = [
   { id:'patrulha', nome:'PATRULHA', icone:'🛩',
     lema:'Céu limpo. Conheça o mapa, voe rasante entre os prédios e pouse onde '
        + 'quiser. É aqui que se aprende o avião.',
     objs:['decolar','alvos','porto','rasante','avenida','vale'],
+    par: 540,
+    limpo:{ txt:'nenhum pouso duro', ok: () => Relatorio.duros === 0 },
     caca:{ max:0 } },
 
   { id:'defesa', nome:'DEFESA AÉREA', icone:'🎯',
     lema:'Quatro caças cruzaram a fronteira. Suba acima de 350 m e o radar os '
        + 'entrega. Depois é caçar, e voltar inteiro.',
     objs:[['abater',4],'voltar'],
+    par: 330,
     caca:{ max:2, cota:4, espera:30, gatilho:'altura', alt:350, aviso:
            'suba acima de 350 m para o radar varrer' } },
 
@@ -14055,6 +14155,7 @@ const SORTIDAS = [
     lema:'Oito alvos no chão. Na terceira explosão um par de caças decola '
        + 'atrás de você. Leve bomba, e leve pressa.',
     objs:[['alvos',8],'voltar'],
+    par: 330,
     caca:{ max:2, cota:3, espera:20, gatilho:'alvos', quantos:3, aviso:
            'os caças só decolam depois do 3º alvo' } },
 
@@ -14062,9 +14163,125 @@ const SORTIDAS = [
     lema:'Dezoito segundos sobre ' + CIDADE2.nome + ' abaixo de 200 m. Passar '
        + 'de 320 m entrega você ao radar — e aí eles vêm.',
     objs:[['furtivo',18],'voltar'],
+    par: 240,
+    limpo:{ txt:'sem ser visto pelo radar', ok: () => !Relatorio.visto },
     caca:{ max:3, cota:9, espera:15, gatilho:'exposto', alt:320, tempo:4, aviso:
-           'voe baixo sobre ' + CIDADE2.nome + '; acima de 320 m eles te veem' } }
+           'voe baixo sobre ' + CIDADE2.nome + '; acima de 320 m eles te veem' } },
+
+  /* O ALVO QUE ANDA. O trem espera na estação do sul enquanto o avião está na
+     pista e larga na decolagem: passa ao lado do aeroporto uns quarenta
+     segundos depois e some no norte em dois minutos e meio. Quem tem relógio
+     aqui é o TREM — dá para vê-lo indo embora. Sem nuclear, senão é um botão. */
+  { id:'trem', nome:'CAÇA AO TREM', icone:'🚂',
+    lema:'O trem de carga foge para o norte, pelos trilhos ao lado da pista. '
+       + 'Pare a locomotiva antes que ele suma e acabe com quatro vagões.',
+    objs:['loco',['vagoes',4],'voltar'],
+    par: 240, armas:{ bomba:0, missil:4 },
+    limpo:{ txt:'os oito vagões', ok: () => Relatorio.mortos.vagao >= VAGOES - 1 },
+    caca:{ max:2, cota:2, espera:20, gatilho:'obj', obj:'vagoes', quantos:2, aviso:
+           'a escolta só decola depois do 2º vagão' },
+    prepara(){ Ferrovia.s = -MAPA*0.4; Ferrovia.vel = 0; },
+    decola(){ if (Ferrovia.vivo) Ferrovia.vel = Ferrovia.VEL; },
+    falha(){ return Ferrovia.voltas > 0 && Ferrovia.vivo ? 'O TREM ESCAPOU' : ''; },
+    relogio(){ return Ferrovia.vivo && Ferrovia.vel > 0
+                 ? (MAPA + VAGOES*(VAGAO_COMP + VAGAO_VAO) - Ferrovia.s)/Ferrovia.vel : null; },
+    relogioTxt:'O TREM SOME EM',
+    guia(){ if (Missoes.feito('loco') && Missoes.feito('vagoes')) return null;
+            const o = obstaculos.find(q => q.iVagao !== undefined && q.vivo);
+            return o ? { obj:o, nome: o.iVagao === 0 ? 'LOCOMOTIVA' : 'VAGÃO' } : null; } },
+
+  /* SÓ MÃO. Oito anéis de luz sobre o rio, ao norte da pista; conta quem
+     passa POR DENTRO. Não tem tiro nem caça: é a sortida de quem quer só voar,
+     e a única em que errar custa uma meia-volta em vez de vida. */
+  { id:'rio', nome:'CORRIDA DO RIO', icone:'🏁',
+    lema:'Oito anéis de luz sobre o rio, ao norte da pista. Passe por dentro '
+       + 'de todos, em ordem, e volte para pousar. Sem tiro: só mão.',
+    objs:[['portoes',8],'voltar'],
+    par: 170, limite: 300, atraso:'TEMPO ESGOTADO',
+    limpo:{ txt:'nenhum anel perdido', ok: () => Portoes.perdidos === 0 },
+    caca:{ max:0 },
+    prepara(){ Portoes.arma(); },
+    passo(dt){ Portoes.passo(dt); },
+    guia(){ return Portoes.proximo(); } },
+
+  /* OLHAR ANTES DE APERTAR. O míssil trava no que estiver mais no meio do
+     cone, e o que está no meio pode ser um avião de rota. Aqui a trava deixa
+     de ser automática e vira decisão: helicóptero paira, civil atravessa. */
+  { id:'exclusao', nome:'ZONA PROIBIDA', icone:'🚁',
+    lema:'Quatro helicópteros hostis pairam sobre o mapa. Os aviões que cruzam '
+       + 'são civis: derrube um e a missão acabou. Olhe antes de atirar.',
+    objs:[['helis',4],'voltar'],
+    par: 300, armas:{ bomba:0 },
+    caca:{ max:2, cota:2, espera:20, gatilho:'obj', obj:'helis', quantos:2, aviso:
+           'os caças vêm depois do 2º helicóptero' },
+    prepara(){ garanteHelis(7); },
+    falha(){ return Relatorio.mortos.aviao > 0 ? 'CIVIL ABATIDO' : ''; },
+    guia(){ return Missoes.feito('helis') ? null : maisPertoVivo('helicoptero', 'HELICÓPTERO'); } },
+
+  /* A DEFESA COM RITMO. Três levas, cada uma maior, e um respiro entre elas —
+     que é a hora de decidir: pouso para consertar e rearmar, ou sigo com o que
+     tenho? O relógio aqui corre no CHÃO também, e é a única sortida em que
+     isso acontece: está no nome dela. Mesmo assim ninguém leva bala sem
+     aviso — são trinta segundos, mais os doze do alerta. */
+  { id:'alerta', nome:'ALERTA NA PISTA', icone:'🚨',
+    lema:'Três levas vêm atacar a base e a primeira chega em 30 s. Decole já! '
+       + 'Parar na pista entre as levas conserta e rearma.',
+    objs:[['abater',6],'voltar'],
+    par: 420,
+    caca:{ max:3, levas:[1,2,3], espera:30, gatilho:'tempo', aviso:
+           'decole já: a primeira leva está chegando' },
+    relogio(){ return Sortida.fase === 'solo' ? 30 - Sortida.tSolo : null; },
+    relogioTxt:'ELES CHEGAM EM' },
+
+  /* TRÊS PISTAS. Navegar e pousar é a parte difícil de voar, e só a PATRULHA
+     pedia, sem pressa nenhuma. Aqui cada entrega só vale com o avião PARADO —
+     tocar e arremeter não entrega carta. */
+  { id:'correio', nome:'CORREIO AÉREO', icone:'📦',
+    lema:'Duas entregas: o aeroporto do VALE e a avenida de ' + CIDADES[1].nome
+       + '. Tem de PARAR em cada uma, e depois voltar para casa.',
+    objs:['valeP','orlaP','voltar'],
+    par: 330, limite: 540, atraso:'O CORREIO ATRASOU',
+    limpo:{ txt:'nenhum pouso duro', ok: () => Relatorio.duros === 0 },
+    caca:{ max:0 },
+    guia(){ return !Missoes.feito('valeP') ? { obj: PONTO_VALE, nome:'VALE' }
+                 : !Missoes.feito('orlaP') ? { obj: PONTO_ORLA, nome: CIDADES[1].nome } : null; } }
 ];
+/* os lugares que o guia aponta: objetos de vida longa, para o losango do HUD
+   não ganhar um objeto novo a cada meio segundo */
+const PONTO_CASA = { x: PISTAS[0].cx, y: PISTA_Y, z: PISTAS[0].cz, vivo: true };
+const PONTO_VALE = { x: PISTAS[1].cx, y: PISTA_Y, z: PISTAS[1].cz, vivo: true };
+const PONTO_ORLA = { x: CIDADES[1].x, y: CHAO,    z: CIDADES[1].z, vivo: true };
+/* O MAPA SORTEIA O TRÁFEGO, e num sorteio ruim saem dois helicópteros no mapa
+   inteiro (são uns seis em média). A sortida que pede quatro não pode depender
+   de sorte: ela completa a conta até `n`, espalhados longe da pista e a meia
+   altura. Entram na mesma lista e ganham a mesma malha dos outros — radar,
+   trava e colisão vêm de graça, como para o trem. */
+function garanteHelis(n){
+  let ha = 0;
+  for (const o of obstaculos) if (o.vivo && o.tipo === 'helicoptero') ha++;
+  for (; ha < n; ha++){
+    const a = Math.random()*6.283, d = 30000 + Math.random()*55000;
+    const x = Math.max(-MAPA*0.92, Math.min(MAPA*0.92, PISTAS[0].cx + Math.sin(a)*d)),
+          z = Math.max(-MAPA*0.92, Math.min(MAPA*0.92, PISTAS[0].cz + Math.cos(a)*d)),
+          y = 1600 + Math.random()*3200;
+    const o = { tipo:'helicoptero', x, y, z, fase: Math.random()*6.28, deriva: 0,
+                rumo: Math.random()*6.283, vel: 0, giro: 0, x0: x, y0: y, vivo: true };
+    obstaculos.push(o);
+    const no = montaHelicoptero();
+    o.no = no; o.rotor = no.userData.rotor; cena.add(no); trafego.push(no);
+  }
+}
+/* o obstáculo vivo de um tipo mais perto do avião (a lista tem umas sessenta
+   coisas, e quem chama faz isso duas vezes por segundo) */
+function maisPertoVivo(tipo, nome){
+  let melhor = null, dm = Infinity;
+  for (const o of obstaculos){
+    if (!o.vivo || o.tipo !== tipo) continue;
+    const d = (o.x - aviaoX)*(o.x - aviaoX) + (o.z - aviaoZ)*(o.z - aviaoZ);
+    if (d < dm){ dm = d; melhor = o; }
+  }
+  return melhor ? { obj: melhor, nome } : null;
+}
 
 let sortidaId = 'patrulha';
 try {
@@ -14076,13 +14293,15 @@ try {
    voltam ao princípio e o céu se esvazia. Virou função porque agora tem dois
    donos — o painel de bordo e, pelo pacote, o celular-controle. */
 function escolheSortida(id){
-  if (!SORTIDAS.some(q => q.id === id) || id === sortidaId) return false;
+  /* escolher a MESMA só faz sentido depois que ela acabou: é o "de novo" */
+  if (!SORTIDAS.some(q => q.id === id) || (id === sortidaId && !Sortida.acabou())) return false;
   sortidaId = id;
   try { localStorage.setItem('aviao3d.sortida', id); } catch(e){}
   if (Missoes) Missoes.zera();
   Sortida.zera();
   Sortida.alvos0 = alvosDestruidos;
   if (typeof Inimigos !== 'undefined') Inimigos.limpa();
+  Relatorio.prepara();
   mostraAviso('SORTIDA: ' + Sortida.atual().nome, '#9fd8ff', 2000);
   bip(620, 0.08, 'square', 0.05);
   return true;
@@ -14094,18 +14313,38 @@ const Sortida = {
      PATRULHA para BOMBARDEIO com três alvos no chão chamava os caças com 0/8,
      contra o lema ("na terceira explosão") e contra a ordem escrita na tela */
   alvos0: 0,
+  /* `tSolo` é o relógio que corre ainda na pista (só a sortida de gatilho
+     `tempo` olha para ele); `leva` é em que leva de caças se está, e `tLeva` a
+     contagem para a próxima; `motivo` é por que a sortida fracassou. */
+  tSolo: 0, leva: 0, tLeva: 0, motivo: '',
 
   atual(){ return SORTIDAS.find(q => q.id === sortidaId) || SORTIDAS[0]; },
-  zera(){ this.fase = 'solo'; this.t = 0; this.tAlerta = 0; this.exposto = 0; this.alto = 0; this.alvos0 = 0; },
+  zera(){ this.fase = 'solo'; this.t = 0; this.tAlerta = 0; this.exposto = 0; this.alto = 0; this.alvos0 = 0;
+          this.tSolo = 0; this.leva = 0; this.tLeva = 0; this.motivo = ''; },
   quente(){ return this.fase === 'quente'; },
+  /* A SORTIDA ACABA. Cumprir tudo dava um aviso e o jogo continuava "QUENTE"
+     para sempre: não havia vitória, só o fim do combustível. Agora há duas
+     fases finais, e nas duas o voo continua — quem quiser segue voando. */
+  acabou(){ return this.fase === 'cumprida' || this.fase === 'fracassou'; },
+  /* o plano de voo se reabre antes do contato e depois do fim: no meio do
+     combate, trocar de missão é desistir, não escolher */
+  podeEscolher(){ return this.fase === 'solo' || this.fase === 'transito' || this.acabou(); },
   /* quantos caças o céu aceita AGORA. Fora da fase quente, zero — e é só isto
      que o `Inimigos.passo` precisa saber. */
   teto(){ return this.quente() ? (this.atual().caca.max || 0) : 0; },
+  /* ainda vem leva depois desta? */
+  temMaisLeva(){ const L = this.atual().caca.levas; return !!L && this.leva < L.length - 1; },
 
   /* a frase do rádio: em que pé está a sortida. Curta, porque vai num painel
      de cinco centímetros. */
   situacao(){
     const c = this.atual().caca;
+    if (this.fase === 'cumprida')  return { txt:'CUMPRIDA ' + Relatorio.estrelasTxt(), cor: MFD_VERDE };
+    if (this.fase === 'fracassou') return { txt:'FRACASSOU', cor: MFD_VERM };
+    /* a sortida que tem relógio mostra o relógio enquanto ele é a notícia */
+    const r = Relatorio.relogio();
+    if (r !== null && this.fase !== 'alerta' && this.fase !== 'quente')
+      return { txt:'RESTAM ' + tempoTxt(r), cor: r < 30 ? MFD_VERM : MFD_AMBAR };
     if (!c.max) return { txt:'SEM HOSTIS · VOO LIVRE', cor: MFD_VERDE };
     if (this.fase === 'solo')    return { txt:'EM SOLO · DECOLE', cor: MFD_FRACO };
     if (this.fase === 'alerta')  return { txt:'CONTATO EM ' + Math.ceil(this.tAlerta) + ' s',
@@ -14113,6 +14352,12 @@ const Sortida = {
     if (this.fase === 'quente'){
       const n = (typeof Inimigos !== 'undefined') ? Inimigos.quantos() : 0;
       const f = (typeof Inimigos !== 'undefined') ? Inimigos.cota : 0;
+      /* céu vazio e ninguém por vir: o trabalho acabou, e a página dizia
+         "QUENTE · 0 NO AR" para sempre */
+      if (n === 0 && f === 0){
+        if (this.temMaisLeva()) return { txt:'LEVA ' + (this.leva + 2) + ' EM ' + Math.ceil(this.tLeva) + ' s', cor: MFD_AMBAR };
+        return { txt:'CÉU LIMPO · VOLTE', cor: MFD_VERDE };
+      }
       return { txt:'QUENTE · ' + n + ' NO AR' + (f > 0 ? ' +' + f : ''), cor: MFD_VERM };
     }
     /* trânsito: falta tempo de voo, ou falta a condição */
@@ -14125,27 +14370,61 @@ const Sortida = {
      transforma "nada está acontecendo" em "falta isto". */
   ordem(){
     const c = this.atual().caca;
+    if (this.fase === 'cumprida')  return 'tempo ' + tempoTxt(Relatorio.t) + ' · ' + mfdVerbo().toLowerCase() + ' aqui para outra missão';
+    if (this.fase === 'fracassou') return this.motivo.toLowerCase() + ' · ' + mfdVerbo().toLowerCase() + ' aqui para tentar de novo';
     if (!c.max) return '';
     if (this.fase === 'quente') return '';
-    if (this.fase === 'solo') return 'decole para começar';
+    if (this.fase === 'solo') return c.gatilho === 'tempo' ? (c.aviso || '') : 'decole para começar';
     return c.aviso || '';
   },
 
   passo(dt){
     if (!jogando || caindo) return;
-    const c = this.atual().caca;
+    Relatorio.passo(dt);
+    if (this.acabou()) return;
+    const S = this.atual(), c = S.caca;
 
     if (this.fase === 'solo'){
       /* a decolagem é a largada. Nem antes: rodando na pista ainda é
          preparação, e preparação não leva tiro. */
       if (!noChao){
         this.fase = 'transito'; this.t = 0;
+        if (S.decola) S.decola();
         if (c.max) mostraAviso('NO AR · ' + (c.aviso || '').toUpperCase(), '#9fd8ff', 3000);
+        return;
+      }
+      /* ...a não ser na sortida que avisa, no nome e no lema, que eles vêm
+         com você no ar ou não: aí o relógio corre na pista */
+      if (c.gatilho === 'tempo'){
+        this.tSolo += dt;
+        if (this.tSolo >= (c.espera || 30)){ this.t = 0; this.alerta(); }
       }
       return;
     }
     this.t += dt;
-    if (this.fase === 'quente') return;
+    if (S.passo) S.passo(dt);
+    /* a derrota: uma pergunta barata por quadro (o trem deu a volta? um civil
+       caiu? o relógio acabou?) */
+    const m = (S.falha && S.falha()) || (S.limite && Relatorio.t > S.limite ? S.atraso : '');
+    if (m){ this.fracassa(m); return; }
+    if (this.fase === 'quente'){
+      /* as LEVAS: a seguinte só é chamada quando o céu esvazia, e avisa antes */
+      if (this.temMaisLeva() && Inimigos.cota === 0 && Inimigos.quantos() === 0){
+        if (this.tLeva <= 0){
+          this.tLeva = 15;
+          mostraAviso('LEVA ' + (this.leva + 2) + ' EM 15 s', '#ffc046', 2600);
+        } else {
+          this.tLeva -= dt;
+          if (this.tLeva <= 0){
+            this.leva++;
+            Inimigos.cota = c.levas[this.leva]; Inimigos._nascer = 0;
+            mostraAviso('LEVA ' + (this.leva + 1) + ' — ' + c.levas[this.leva] + ' HOSTIS', '#ff9c5a', 2600);
+            bip(680, 0.12, 'square', 0.06);
+          }
+        }
+      }
+      return;
+    }
 
     if (this.fase === 'alerta'){
       this.tAlerta -= dt;
@@ -14171,27 +14450,48 @@ const Sortida = {
        dependia de ele estar alto no quadro exato. */
     this.alto = Math.max(this.alto, alt);
     if (c.gatilho === 'exposto') this.exposto = alt > c.alt ? this.exposto + dt : 0;
+    /* no gatilho `tempo` o piso conta desde a pista: quem decolou aos dez
+       segundos espera só os vinte que faltam */
+    if (c.gatilho === 'tempo'){ this.tSolo += dt; if (this.tSolo >= (c.espera || 30)) this.alerta(); return; }
     if (this.t < (c.espera || 30)) return;
 
     let bateu = false;
     if (c.gatilho === 'altura')  bateu = this.alto > c.alt;
     if (c.gatilho === 'alvos')   bateu = alvosDestruidos - this.alvos0 >= (c.quantos || 3);
     if (c.gatilho === 'exposto') bateu = this.exposto > (c.tempo || 4);
+    if (c.gatilho === 'obj')     bateu = Missoes.quanto(c.obj) >= (c.quantos || 1);
     if (bateu) this.alerta();
   },
 
   alerta(){
     const c = this.atual().caca;
+    const n = c.levas ? c.levas[0] : (c.cota || 4);
     this.fase = 'alerta'; this.tAlerta = 12;
     mfdEscolhendo = false;      // com caça a caminho não se mexe no plano de voo
-    if (typeof Inimigos !== 'undefined') Inimigos.cota = c.cota || 4;
+    if (typeof Inimigos !== 'undefined') Inimigos.cota = n;
+    if (c.gatilho === 'exposto') Relatorio.visto = true;
     const comeco = c.gatilho === 'exposto' ? 'VOCÊ FOI VISTO'
-                 : c.gatilho === 'alvos'   ? 'CAÇAS DECOLARAM'
+                 : c.gatilho === 'alvos' || c.gatilho === 'obj' ? 'CAÇAS DECOLARAM'
                  : 'RADAR: CONTATO';
-    mostraAviso(comeco + ' — ' + (c.cota || 4) + ' HOSTIS A CAMINHO', '#ff9c5a', 3400);
+    mostraAviso(comeco + ' — ' + n + (n === 1 ? ' HOSTIL' : ' HOSTIS') + ' A CAMINHO', '#ff9c5a', 3400);
     bip(680, 0.12, 'square', 0.06);
     setTimeout(() => bip(440, 0.18, 'square', 0.06), 150);
     Controles.bate('alvo');
+  },
+
+  /* as duas saídas. Quem cumpriu não é mais caçado: os que ainda estavam no
+     ar dão meia-volta — pousar, parar e continuar levando bala de um caça que
+     a missão já deu por vencido seria o jogo desmentindo a própria tela. */
+  cumpre(){
+    if (this.acabou()) return;
+    this.fase = 'cumprida';
+    if (typeof Inimigos !== 'undefined') Inimigos.recua();
+    Relatorio.fecha(true, '');
+  },
+  fracassa(motivo){
+    if (this.acabou()) return;
+    this.fase = 'fracassou'; this.motivo = motivo || '';
+    Relatorio.fecha(false, this.motivo);
   }
 };
 
@@ -14203,6 +14503,9 @@ Missoes = (function(){
   let LISTA = [];
   const conta = {};
   let cumpridas = 0, tudo = false, avisou = 0;
+  /* para o que acontece PARADO: se este voo já saiu do chão, há quanto tempo
+     as rodas estão quietas, e o que já foi dito e feito nesta parada */
+  let voou = false, tParado = 0, olhouParada = false, rearmou = false;
 
   function monta(){
     LISTA = Sortida.atual().objs.map(o => {
@@ -14217,6 +14520,7 @@ Missoes = (function(){
     for (const k in conta) delete conta[k];
     for (const m of LISTA) conta[m.id] = 0;
     cumpridas = 0; tudo = false; avisou = 0;
+    voou = false; tParado = 0; olhouParada = false; rearmou = false;
   }
   /* declarado aqui em cima para `zera` não tropeçar na zona morta do `let` */
   zera();
@@ -14232,24 +14536,61 @@ Missoes = (function(){
       bip(680, 0.10, 'square', 0.05);
       setTimeout(() => bip(940, 0.16, 'square', 0.05), 110);
       if (cumpridas >= LISTA.length && !tudo){
+        /* "TODOS OS OBJETIVOS CUMPRIDOS! +3000" era tudo o que acontecia aqui:
+           uma linha de aviso, e a sortida continuava como se nada. Agora ela
+           FECHA — fase, estrelas, faixa na tela e melhor marca guardada. */
         tudo = true; pontos += 3000;
-        setTimeout(() => mostraAviso('TODOS OS OBJETIVOS CUMPRIDOS! +3000', '#ffd257', 3600), 1400);
+        Sortida.cumpre();
       }
     }
+  }
+  /* quanto já se fez de um objetivo (zero para o que não é desta sortida): é
+     o que o gatilho `obj` dos caças lê — "depois do 2º vagão" */
+  function quanto(id){ return conta[id] || 0; }
+  /* alguma coisa do céu ou do trilho morreu. O relatório conta todas; a
+     sortida marca as que são objetivo dela. O avião de rota entra na conta
+     porque em ZONA PROIBIDA ele é a derrota. */
+  function abateu(tipo){
+    if (Relatorio.mortos[tipo] !== undefined) Relatorio.mortos[tipo]++;
+    if (tipo === 'locomotiva') marca('loco');
+    else if (tipo === 'vagao') marca('vagoes');
+    else if (tipo === 'helicoptero') marca('helis');
   }
 
   /* o pouso sabe onde tocou: numa avenida, no campo, ou em qual aeroporto */
   function pousou(onde, nome){
     if (onde === 'avenida') marca('avenida');
     if (onde === 'pista' && nome === 'VALE') marca('vale');
-    /* "voltar" é o objetivo que fecha as sortidas de combate, e ele é de
-       propósito o ÚLTIMO: abater quatro caças e cair no mato não é missão
-       cumprida. Só conta em pista — avenida é façanha, não é voltar para
-       casa. */
-    if (onde === 'pista' && tem('voltar')){
-      const fora = LISTA.filter(m => m.id !== 'voltar' && conta[m.id] < m.meta);
-      if (fora.length) mostraAviso('AINDA FALTA: ' + fora[0].txt.toUpperCase(), '#ffc046', 2200);
-      else marca('voltar');
+  }
+  /* --- PARADO ----------------------------------------------------------
+     "Voltar e pousar" era marcado no TOQUE: encostar a roda e arremeter
+     contava como ter voltado. Pousar é parar. Então o que depende de estar
+     no chão é conferido aqui, meio segundo depois de as rodas ficarem
+     quietas, uma vez por parada:
+
+       · as entregas do CORREIO (parar no VALE, parar na avenida);
+       · "voltar", o objetivo que fecha as sortidas, de propósito o ÚLTIMO:
+         abater quatro caças e cair no mato não é missão cumprida. Só conta em
+         pista — avenida é façanha, não é voltar para casa — e não na mesma
+         parada que acabou de valer uma entrega;
+       · e, com quatro segundos de pista e o céu vazio, o conserto. */
+  function parado(dt){
+    if (voo !== 0 || !voou){ tParado = 0; olhouParada = false; rearmou = false; return; }
+    tParado += dt;
+    const naPista = sobreAPista(aviaoX, aviaoZ);
+    if (tParado > 0.5 && !olhouParada){
+      olhouParada = true;
+      const antes = cumpridas;
+      if (naPista && pistaPerto(aviaoX, aviaoZ).nome === 'VALE') marca('valeP');
+      if (!naPista){ const av = avenidaPerto(aviaoX, aviaoZ); if (av && av.cidade === CIDADES[1]) marca('orlaP'); }
+      if (naPista && tem('voltar') && !feito('voltar') && cumpridas === antes){
+        const fora = LISTA.filter(m => m.id !== 'voltar' && conta[m.id] < m.meta);
+        if (fora.length){ if (!Sortida.acabou()) mostraAviso('AINDA FALTA: ' + fora[0].txt.toUpperCase(), '#ffc046', 2200); }
+        else marca('voltar');
+      }
+    }
+    if (tParado > 4 && !rearmou && naPista && combustivel > 0 && Inimigos.quantos() === 0){
+      rearmou = true; Relatorio.rearma();
     }
   }
 
@@ -14270,7 +14611,9 @@ Missoes = (function(){
      duas distâncias. Onde há cidade com nome, há prédio. */
   let serie = 0, avisoRas = 0;
   function passo(dt){
-    if (!jogando || caindo || noChao){ serie = 0; return; }
+    if (!jogando || caindo){ serie = 0; return; }
+    if (noChao){ serie = 0; parado(dt); return; }
+    voou = true; tParado = 0; olhouParada = false; rearmou = false;
     const altura = (aviaoY - CHAO)/METRO;
     const cidade = emCidadeComNome(aviaoX, aviaoZ);
 
@@ -14321,10 +14664,412 @@ Missoes = (function(){
     const m = LISTA.find(q => q.id === id);
     return m ? conta[id] >= m.meta : true;
   }
-  return { zera, marca, pousou, passo, lista, tem, feito,
+  return { zera, marca, pousou, passo, lista, tem, feito, quanto, abateu,
            get cumpridas(){ return cumpridas; },
            get total(){ return LISTA.length; }, get tudo(){ return tudo; } };
 })();
+
+/* =============================================================================
+   O RELATÓRIO DE MISSÃO — a sortida tem fim, e o fim tem nota
+
+   "Retira os bugs. Cria umas missões. Deixa ele atraente."
+
+   Cumprir os objetivos dava uma linha de aviso e mais nada: o jogo continuava
+   "QUENTE", a tela de fim falava de distância voada, e os abates — que o
+   jogo contava — não apareciam em lugar nenhum. Faltava a metade de uma
+   missão que faz alguém querer outra: saber COMO foi.
+
+   Este bloco é isso, e só isso:
+
+     · conta o voo da sortida (tempo, dano levado, G, abates, alvos, pousos);
+     · fecha a conta quando ela é cumprida ou perdida, e dá de uma a três
+       ESTRELAS por um critério que cabe numa linha e está escrito no próprio
+       relatório: cumpriu · dentro do tempo · e a terceira, que é de cada
+       sortida (sem levar mais de 30 de dano, quando ela não diz outra coisa);
+     · guarda a melhor marca de cada sortida neste aparelho;
+     · escreve a faixa "MISSÃO CUMPRIDA" no alto da tela na hora, e o relatório
+       inteiro dentro de `#placar` quando o voo acaba.
+
+   CUMPRIR NÃO ENCERRA O VOO. Quem cumpriu pode continuar voando, parar na
+   pista e escolher outra na página OBJET — o relatório de papel vem quando o
+   voo acabar, e o resumo (as estrelas e o tempo) fica na linha da sortida.
+
+   A faixa e o relógio são elementos da página, não desenho no HUD: assim não
+   custam nada por quadro (só mudam quando o texto muda) e não disputam uma
+   linha de `desenhaHUD` com mais ninguém.
+   ========================================================================== */
+const Relatorio = {
+  t: 0,                 // segundos desde a decolagem (o relógio da sortida)
+  decolou: false,
+  dano: 0, vidaAnt: 100, gPico: 1,
+  duros: 0,             // pousos que não foram "de manual"
+  visto: false,         // o radar pegou (INFILTRAÇÃO)
+  mortos: { aviao:0, helicoptero:0, vagao:0, locomotiva:0 },
+  pousos0: 0, alvos0: 0, pontos0: 0,
+  res: null,            // a conta fechada: { ok, motivo, estrelas, crit, t, ... }
+  _queda: 0, _noChao: true, _tGuia: 0, _guia: null, _relTxt: '',
+
+  /* chamado no fim de `reinicia()` e a cada troca de sortida: o voo que vai
+     ser medido é o que começa agora */
+  prepara(){
+    const S = Sortida.atual();
+    this.t = 0; this.decolou = !noChao; this.dano = 0; this.vidaAnt = vida; this.gPico = 1;
+    this.duros = 0; this.visto = false; this.res = null;
+    this.mortos.aviao = this.mortos.helicoptero = this.mortos.vagao = this.mortos.locomotiva = 0;
+    this.pousos0 = pousos; this.alvos0 = alvosDestruidos; this.pontos0 = pontos;
+    this._noChao = noChao; this._queda = 0; this._tGuia = 0;
+    /* quem troca de sortida em voo leva o que tem nos cabides, no máximo o que
+       a sortida nova permite; em solo, carrega o dela */
+    this.carrega(!noChao);
+    /* o trem e os anéis são de quem os pediu: toda sortida começa com o trem
+       andando e sem anel no céu, e a que precisa de outra coisa diz */
+    if (Ferrovia.vivo) Ferrovia.vel = Ferrovia.VEL;
+    Portoes.some();
+    this.solta();
+    if (S.prepara) S.prepara();
+    this.faixa('');
+    this.pintaRelogio(true);
+  },
+  /* os cabides desta sortida */
+  carrega(soCorta){
+    if (munInfinita){ for (const k in ARMAS) municao[k] = ARMAS[k].municao; return; }
+    const A = Sortida.atual().armas || {};
+    for (const k in ARMAS){
+      const cheio = A[k] !== undefined ? A[k] : ARMAS[k].municao;
+      municao[k] = soCorta ? Math.min(municao[k], cheio) : cheio;
+    }
+  },
+  /* PARADO NA PISTA COM O CÉU VAZIO: conserta, abastece e rearma. A munição e
+     a vida só voltavam ao nascer de novo, então pousar no meio de uma missão
+     não servia para nada — e "voltar e pousar" era só o fim. Agora a pista é
+     um lugar aonde se vai de propósito. */
+  rearma(){
+    const antes = vida + combustivel + municao.missil + municao.metralha + municao.bomba + contra;
+    vida = Math.min(VIDA_CHEIA, vida + 40); this.vidaAnt = vida;
+    combustivel = 100; contra = CONTRA_TOTAL;
+    this.carrega(false);
+    if (vida + combustivel + municao.missil + municao.metralha + municao.bomba + contra > antes + 0.5){
+      mostraAviso('CONSERTADO, ABASTECIDO E REARMADO', '#7fffa8', 2200);
+      bip(520, 0.10, 'sine', 0.05); setTimeout(() => bip(780, 0.14, 'sine', 0.05), 120);
+    }
+  },
+
+  /* um passo por quadro de jogo, do ar e do chão. Nada aqui aloca. */
+  passo(dt){
+    if (vida < this.vidaAnt) this.dano += this.vidaAnt - vida;
+    this.vidaAnt = vida;
+    if (!noChao){
+      this.decolou = true;
+      this._queda = -eixoF.y*voo + vAfunda;      // a descida de agora: no toque, é a do toque
+      const g = Math.abs(cargaG); if (g > this.gPico) this.gPico = g;
+    } else if (!this._noChao && this._queda >= 240) this.duros++;   // a mesma régua do "pouso de manual"
+    this._noChao = noChao;
+    if (this.decolou && !this.res) this.t += dt;
+    /* o guia e o relógio mudam devagar: duas vezes por segundo basta */
+    this._tGuia -= dt;
+    if (this._tGuia <= 0){ this._tGuia = 0.5; this.guia(); this.pintaRelogio(false); }
+  },
+
+  /* segundos até a derrota, ou `null` quando a sortida não tem relógio (ou já
+     acabou) */
+  relogio(){
+    if (this.res) return null;
+    const S = Sortida.atual();
+    if (S.relogio) return S.relogio();
+    if (S.limite && this.decolou) return S.limite - this.t;
+    return null;
+  },
+
+  /* --- O GUIA -------------------------------------------------------------
+     O losango magenta do HUD (a designação de alvo) aponta sozinho para o
+     próximo passo da sortida: o anel, o trem, a pista da entrega — e, quando
+     só falta voltar, a pista de casa. "CÉU LIMPO · VOLTE E POUSE" sem dizer
+     para que lado era uma ordem pela metade. Se o piloto designou outra coisa
+     à mão, a escolha dele manda e o guia não mexe. */
+  guia(){
+    if (alvoDes && (!this._guia || alvoDes.obj !== this._guia)) {
+      if (alvoDes.obj && alvoDes.obj.vivo !== false) return;      // designação do piloto
+    }
+    const S = Sortida.atual();
+    let g = null;
+    if (!this.res && Sortida.fase !== 'solo'){
+      g = S.guia ? S.guia() : null;
+      if (!g && Missoes.tem('voltar') && Missoes.cumpridas === Missoes.total - 1 && !Missoes.feito('voltar'))
+        g = this._casa;
+    }
+    if (!g){ if (this._guia && alvoDes && alvoDes.obj === this._guia) alvoDes = null; this._guia = null; return; }
+    if (this._guia === g.obj && alvoDes && alvoDes.obj === g.obj) return;
+    this._guia = g.obj;
+    alvoDes = { obj: g.obj, nome: g.nome, tipo: 'alvo' };
+  },
+  _casa: { obj: PONTO_CASA, nome: 'PISTA ' + PISTAS[0].nome },
+  solta(){ if (this._guia && alvoDes && alvoDes.obj === this._guia) alvoDes = null; this._guia = null; },
+
+  /* --- AS ESTRELAS --------------------------------------------------------
+     Três perguntas de sim ou não, sempre na mesma ordem. A primeira é a
+     missão; as outras duas são o capricho. */
+  criterios(ok){
+    const S = Sortida.atual();
+    const limpo = S.limpo || { txt:'perdeu menos de 30 de vida', ok: () => this.dano <= 30 };
+    return [
+      { txt:'missão cumprida', ok: !!ok },
+      { txt:'em menos de ' + tempoTxt(S.par || 300), ok: !!ok && this.t <= (S.par || 300) },
+      { txt: limpo.txt, ok: !!ok && !!limpo.ok() }
+    ];
+  },
+  estrelasTxt(n){
+    if (n === undefined) n = this.res ? this.res.estrelas : 0;
+    return '★★★'.slice(0, n) + '☆☆☆'.slice(0, 3 - n);
+  },
+  /* a melhor marca de uma sortida neste aparelho: { e, t } ou null. Lida do
+     aparelho uma vez e guardada: a página de seleção pergunta isto a cada
+     quadro que desenha. */
+  _mel: {},
+  melhor(id){
+    if (id in this._mel) return this._mel[id];
+    let m = null;
+    try {
+      m = JSON.parse(localStorage.getItem('aviao3d.melhor.' + id) || 'null');
+      if (!(m && Number.isInteger(m.e) && m.e >= 1 && m.e <= 3 && Number.isFinite(m.t) && m.t > 0)) m = null;
+    } catch(e){ m = null; }
+    return (this._mel[id] = m);
+  },
+
+  /* a conta fecha UMA vez por sortida, na hora em que ela é cumprida ou
+     perdida; o que acontecer depois (bater na volta para casa) não a reabre */
+  fecha(ok, motivo){
+    if (this.res) return;
+    const S = Sortida.atual();
+    const crit = this.criterios(ok);
+    const estrelas = crit.filter(c => c.ok).length;
+    const r = this.res = {
+      id: S.id, nome: S.nome, ok: !!ok, motivo: motivo || '', estrelas, crit, t: this.t,
+      objs: Missoes.lista(), abates: Inimigos.abatidos,
+      alvos: alvosDestruidos - this.alvos0, pousos: pousos - this.pousos0,
+      g: this.gPico, dano: Math.round(this.dano), pontos: Math.round(pontos - this.pontos0),
+      recorde: false, antes: this.melhor(S.id)
+    };
+    if (ok){
+      const m = r.antes;
+      if (!m || estrelas > m.e || (estrelas === m.e && this.t < m.t)){
+        r.recorde = true;
+        const novo = this._mel[S.id] = { e: estrelas, t: Math.round(this.t*10)/10 };
+        try { localStorage.setItem('aviao3d.melhor.' + S.id, JSON.stringify(novo)); } catch(e){}
+      }
+      this.faixa('MISSÃO CUMPRIDA', this.estrelasTxt(estrelas) + '  ' + tempoTxt(this.t)
+                 + (r.recorde && m ? '  ·  NOVA MELHOR MARCA' : ''), true);
+      bip(660, 0.12, 'square', 0.05);
+      setTimeout(() => bip(880, 0.12, 'square', 0.05), 130);
+      setTimeout(() => bip(1320, 0.26, 'square', 0.05), 260);
+    } else {
+      this.faixa('MISSÃO FRACASSOU', motivo, false);
+      bip(300, 0.20, 'sawtooth', 0.06);
+      setTimeout(() => bip(200, 0.34, 'sawtooth', 0.06), 200);
+    }
+    Controles.bate('alvo');
+    this.solta();
+    this.pintaRelogio(true);
+    if (typeof mandaEstado === 'function') mandaEstado();   // o celular-controle sabe na hora
+  },
+
+  /* --- A FAIXA E O RELÓGIO: dois elementos da página --------------------- */
+  _css: false, _elF: null, _elR: null, _tF: 0,
+  monta(){
+    if (this._css) return;
+    this._css = true;
+    const st = document.createElement('style');
+    st.textContent =
+      '#faixaMissao{position:fixed;z-index:4;left:0;right:0;top:15%;text-align:center;pointer-events:none;' +
+        'opacity:0;transform:scale(.9);transition:opacity .35s,transform .35s;text-shadow:0 3px 20px #000,0 0 3px #000}' +
+      '#faixaMissao.ver{opacity:1;transform:none}' +
+      '#faixaMissao b{display:block;font:900 clamp(26px,6.2vw,62px)/1.05 system-ui,sans-serif;letter-spacing:.06em}' +
+      '#faixaMissao i{display:block;margin-top:.35em;font:800 clamp(15px,3vw,30px)/1.1 system-ui,sans-serif;' +
+        'font-style:normal;letter-spacing:.08em;color:#ffd257}' +
+      '#faixaMissao.ok b{color:#7fffa8} #faixaMissao.nao b{color:#ff7a6a} #faixaMissao.nao i{color:#ffc9c0}' +
+      '#relogioMissao{position:fixed;z-index:4;left:50%;top:calc(6px + env(safe-area-inset-top));transform:translateX(-50%);' +
+        'display:none;pointer-events:none;white-space:nowrap;padding:4px 12px;border-radius:9px;' +
+        'background:rgba(8,12,26,.55);border:1px solid rgba(255,192,70,.45);color:#ffc046;' +
+        'font:800 clamp(11px,1.7vw,16px)/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em}' +
+      '#relogioMissao.aperta{color:#ff7a6a;border-color:rgba(255,106,90,.7)}' +
+      '.rm{margin:2px auto 8px;max-width:440px;text-align:left;line-height:1.45;color:#c9d5ea;' +
+        'background:rgba(8,12,26,.55);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 16px}' +
+      '.rm .rm-topo{display:flex;align-items:baseline;justify-content:space-between;gap:10px}' +
+      '.rm .rm-nome{font-size:12px;letter-spacing:.2em;color:#8fa3b8;font-weight:800}' +
+      '.rm .rm-tempo{font:800 13px ui-monospace,Menlo,Consolas,monospace;color:#8fa3b8}' +
+      '.rm .rm-res{font-size:23px;font-weight:900;letter-spacing:.04em;margin-top:2px}' +
+      '.rm.ok .rm-res{color:#7fffa8} .rm.nao .rm-res{color:#ff7a6a} .rm.meio .rm-res{color:#ffc046}' +
+      '.rm .rm-est{font-size:30px;letter-spacing:.14em;color:#ffd257;line-height:1.1}' +
+      '.rm .rm-est s{text-decoration:none;color:#46526a}' +
+      '.rm .rm-motivo{color:#ffc9c0;font-weight:700}' +
+      '.rm ul{list-style:none;margin:7px 0 0;padding:0;font-size:13.5px}' +
+      '.rm li{display:flex;gap:7px} .rm li u{text-decoration:none;flex:none;width:1.1em;text-align:center}' +
+      '.rm li.sim{color:#dfe8f6} .rm li.sim u{color:#7fffa8} .rm li.nao2{color:#7d8ba3}' +
+      '.rm .rm-crit li.sim u{color:#ffd257}' +
+      '.rm .rm-sub{margin-top:9px;font-size:10.5px;letter-spacing:.18em;color:#6d8095;font-weight:800}' +
+      '.rm .rm-num{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:12.5px;color:#8fa3b8}' +
+      '.rm .rm-num span{color:#5cc8ff;font-weight:800}' +
+      '.rm .rm-melhor{margin-top:7px;font-size:12.5px;color:#ffd257;font-weight:700}';
+    document.head.appendChild(st);
+    const f = this._elF = document.createElement('div'); f.id = 'faixaMissao';
+    f.appendChild(document.createElement('b')); f.appendChild(document.createElement('i'));
+    const r = this._elR = document.createElement('div'); r.id = 'relogioMissao';
+    document.body.appendChild(f); document.body.appendChild(r);
+  },
+  faixa(titulo, sub, ok){
+    this.monta();
+    const f = this._elF;
+    clearTimeout(this._tF);
+    if (!titulo){ f.className = ''; return; }
+    f.firstChild.textContent = titulo; f.lastChild.textContent = sub || '';
+    f.className = 'ver ' + (ok ? 'ok' : 'nao');
+    this._tF = setTimeout(() => { f.className = ok ? 'ok' : 'nao'; }, 6000);
+  },
+  pintaRelogio(forca){
+    this.monta();
+    const el = this._elR, r = jogando ? this.relogio() : null;
+    const S = Sortida.atual();
+    const txt = (r === null || r < 0) ? '' : (S.relogioTxt || 'RESTAM') + ' ' + tempoTxt(r);
+    if (txt === this._relTxt && !forca) return;
+    this._relTxt = txt;
+    el.textContent = txt; el.style.display = txt ? 'block' : 'none';
+    el.className = (r !== null && r < 30) ? 'aperta' : '';
+  },
+
+  /* --- O PAPEL: dentro de `#placar`, quando o voo acaba -------------------
+     `fim()` escreve o placar depois de chamar isto, então o relatório entra
+     na volta seguinte e NA FRENTE do que estiver lá — sem depender de como a
+     capa monta o resto. */
+  noFim(){
+    this.faixa(''); this.pintaRelogio(true); this.solta();
+    /* o voo acabou sem a sortida ter fechado: foi abatido, bateu, secou */
+    if (!this.res && !venceu){
+      const M = { combustivel:'acabou o combustível', seco:'pane seca', predio:'bateu num prédio',
+                  chao:'bateu no chão', abatido:'abatido em combate', bateu:'colidiu com um caça',
+                  aviao:'bateu num avião de rota', helicoptero:'bateu num helicóptero',
+                  locomotiva:'bateu no trem', vagao:'bateu no trem', nuclear:'pego pela própria bomba' };
+      Sortida.fracassa((M[motivoQueda] || 'o avião caiu').toUpperCase());
+      this.faixa('');
+    }
+    const html = this.html();
+    Promise.resolve().then(() => {
+      const p = document.getElementById('placar');
+      if (!p) return;
+      const velho = p.querySelector('.rm'); if (velho) velho.remove();
+      p.insertAdjacentHTML('afterbegin', html);
+      p.style.display = 'block';
+    });
+  },
+  html(){
+    const e = s => String(s).replace(/[&<>]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[c]));
+    const S = Sortida.atual(), r = this.res;
+    /* sem conta fechada (os 26 alvos caíram no meio de outra sortida): só os números */
+    const ok = r ? r.ok : false, cls = r ? (ok ? 'ok' : 'nao') : 'meio';
+    const objs = r ? r.objs : Missoes.lista();
+    const crit = r ? r.crit : this.criterios(false);
+    const n = r ? r.estrelas : 0;
+    const m = this.melhor(S.id);
+    let h = '<div class="rm ' + cls + '">';
+    h += '<div class="rm-topo"><div class="rm-nome">' + e(S.icone + ' ' + S.nome) + '</div>'
+       + '<div class="rm-tempo">' + tempoTxt(r ? r.t : this.t) + '</div></div>';
+    h += '<div class="rm-res">' + (r ? (ok ? 'MISSÃO CUMPRIDA' : 'MISSÃO FRACASSOU') : 'MISSÃO NÃO CONCLUÍDA') + '</div>';
+    if (ok) h += '<div class="rm-est">' + '★'.repeat(n) + '<s>' + '★'.repeat(3 - n) + '</s></div>';
+    else if (r && r.motivo) h += '<div class="rm-motivo">' + e(r.motivo.charAt(0) + r.motivo.slice(1).toLowerCase()) + '</div>';
+    h += '<ul>';
+    for (const o of objs) h += '<li class="' + (o.feito ? 'sim' : 'nao2') + '"><u>' + (o.feito ? '✔' : '○') + '</u>'
+                             + e(o.txt) + (o.progresso && !o.feito ? ' <span>' + e(o.progresso) + '</span>' : '') + '</li>';
+    h += '</ul>';
+    h += '<div class="rm-sub">AS TRÊS ESTRELAS</div><ul class="rm-crit">';
+    for (const c of crit) h += '<li class="' + (c.ok ? 'sim' : 'nao2') + '"><u>' + (c.ok ? '★' : '☆') + '</u>' + e(c.txt) + '</li>';
+    h += '</ul>';
+    const q = r || { abates: Inimigos.abatidos, alvos: alvosDestruidos - this.alvos0, pousos: pousos - this.pousos0,
+                     g: this.gPico, dano: Math.round(this.dano) };
+    h += '<div class="rm-num">Abates <span>' + q.abates + '</span> Alvos <span>' + q.alvos + '</span> Pousos <span>'
+       + q.pousos + '</span> G máx <span>' + q.g.toFixed(1) + '</span> Dano <span>' + q.dano + '</span></div>';
+    if (r && r.recorde) h += '<div class="rm-melhor">★ Nova melhor marca desta missão!</div>';
+    else if (m) h += '<div class="rm-melhor">Melhor marca: ' + this.estrelasTxt(m.e) + ' em ' + tempoTxt(m.t) + '</div>';
+    return h + '</div>';
+  }
+};
+
+/* =============================================================================
+   OS ANÉIS DA CORRIDA DO RIO
+
+   Oito anéis de luz em pé sobre o rio, ao norte da pista, um a cada 550 m.
+   Vale passar POR DENTRO, em ordem: o seguinte brilha em amarelo e os outros
+   esperam em azul apagado. Quem cruza o plano por fora ouve na hora e tem de
+   voltar — é a única sortida em que o erro custa uma meia-volta, e não vida.
+
+   O anel fica ACIMA do que houver embaixo: a cada partida os prédios são
+   outros, então a altura de cada um é conferida contra os telhados em volta
+   dele quando a sortida é armada. Sem isso, um galpão sorteado na margem
+   ficaria dentro do aro.
+   ========================================================================== */
+const Portoes = {
+  N: 8, RAIO: 1300, Z0: 24000, DZ: 11000,
+  lista: [], grupo: null, n: 0, perdidos: 0, _zAnt: 0, _pulso: 0,
+  matProx: null, matEspera: null,
+
+  some(){
+    if (this.grupo){ cena.remove(this.grupo); this.grupo = null; }
+    for (const g of this.lista) g.vivo = false;
+    this.lista.length = 0; this.n = 0; this.perdidos = 0;
+  },
+  arma(){
+    this.some();
+    if (!this.matProx){
+      this.geo = new THREE.TorusGeometry(this.RAIO, 55, 8, 40);
+      this.matProx   = new THREE.MeshBasicMaterial({ color: 0xffd84a, fog: false });
+      this.matEspera = new THREE.MeshBasicMaterial({ color: 0x3aa0d8, transparent: true, opacity: 0.55 });
+    }
+    this.grupo = new THREE.Group();
+    for (let i = 0; i < this.N; i++){
+      const z = this.Z0 + i*this.DZ, x = rioX(z);
+      /* um palmo acima do telhado mais alto num quadrado folgado em volta */
+      let topo = 0;
+      for (const p of predios)
+        if (p.vivo && p.h > topo && Math.abs(p.x - x) < this.RAIO + 700 && Math.abs(p.z - z) < 1400) topo = p.h;
+      const y = CHAO + Math.max(400, topo + 250) + this.RAIO;
+      const no = new THREE.Mesh(this.geo, i === 0 ? this.matProx : this.matEspera);
+      no.position.set(x, y, z); no.userData.sombra = false;
+      this.grupo.add(no);
+      this.lista.push({ x, y, z, vivo: true, no, i });
+    }
+    cena.add(this.grupo);
+    this._zAnt = aviaoZ;
+  },
+  proximo(){
+    const g = this.lista[this.n];
+    return g ? { obj: g, nome: 'ANEL ' + (this.n + 1) } : null;
+  },
+  passo(dt){
+    const g = this.lista[this.n];
+    if (g){
+      /* cruzou o plano do anel neste quadro (de qualquer lado)? */
+      if ((this._zAnt - g.z)*(aviaoZ - g.z) <= 0 && this._zAnt !== aviaoZ){
+        const fora = Math.hypot(aviaoX - g.x, aviaoY - g.y);
+        if (fora < this.RAIO*1.15){
+          g.vivo = false; g.no.visible = false; this.n++;
+          const prox = this.lista[this.n];
+          if (prox) prox.no.material = this.matProx;
+          pontos += 150;
+          Missoes.marca('portoes');
+          if (prox) mostraAviso('ANEL ' + this.n + '/' + this.N, '#ffd84a', 900);
+          bip(880, 0.07, 'sine', 0.06); setTimeout(() => bip(1320, 0.10, 'sine', 0.06), 80);
+          Relatorio._tGuia = 0;                 // o losango pula para o seguinte já
+        } else if (fora < this.RAIO*6){
+          this.perdidos++;
+          mostraAviso('PASSOU POR FORA — VOLTE AO ANEL ' + (this.n + 1), '#ffb86b', 1800);
+          bip(200, 0.16, 'square', 0.05);
+        }
+      }
+      /* o seguinte respira, para o olho achá-lo de longe */
+      this._pulso += dt*5;
+      const s = 1 + 0.05*Math.sin(this._pulso);
+      g.no.scale.set(s, s, 1);
+    }
+    this._zAnt = aviaoZ;
+  }
+};
 
 /* --- O QUE SOBROU DE `pinta` -------------------------------------------------
    Esta função tinha trinta linhas: era ela que enchia as dez caixas de HTML,
@@ -14791,6 +15536,7 @@ function reinicia(){
   montaMapa(); montaChao(); montaPista(); montaRuas(); montaCidade(); montaTelhados(); montaCasas(); montaTambores(); montaAlvos();
   montaTrilhos();
   montaTrafego(); montaNuvens();
+  Relatorio.prepara();        // os cabides, o trem e os anéis da sortida escolhida
   poeCamera(1);
   Motor.liga();
 }
@@ -14849,6 +15595,7 @@ function comeca(){
 }
 function fim(){
   jogando = false;
+  Relatorio.noFim();         // o relatório da sortida entra em #placar
   TelaAcesa.solta();         // acabou: a tela pode dormir como qualquer outra
   /* O laço para aqui, e com ele os `passo()` que desligariam o tom sozinhos:
      ganhar a missão com o alvo travado deixava o alarme tocando na tela de
@@ -15549,7 +16296,7 @@ const Tripulacao = {
          é daqui. E só vale antes do contato — depois do alerta, trocar de
          missão é desistir, não escolher. */
       case 'sor': { const q = SORTIDAS[d.i];
-                    if (q && (Sortida.fase === 'solo' || Sortida.fase === 'transito'))
+                    if (q && Sortida.podeEscolher())
                       escolheSortida(q.id); break; }
       /* carregar e descarregar a aproximação pelo celular: índice na lista
          que ele recebeu, ou nulo para descarregar */
@@ -15807,9 +16554,14 @@ function mandaEstado(){
     /* a lista de sortidas só viaja enquanto ela pode ser escolhida — e aí o
        celular desenha a mesma seleção que a tela do jogo. Fora da preparação
        é peso morto no pacote, e vai `null`. */
-    sorL: (Sortida.fase === 'solo' || Sortida.fase === 'transito')
-            ? SORTIDAS.map(q => [q.nome, q.caca.max ? 1 : 0,
-                                 q.id === sortidaId ? 1 : 0, q.lema])
+    /* com dez sortidas, dez lemas pesavam: o lema só vai para a ESCOLHIDA
+       (o celular só escreve o dela). E cada linha leva as estrelas da melhor
+       marca e as duas pontas da linha de cima do briefing, já prontas. */
+    sorL: Sortida.podeEscolher()
+            ? SORTIDAS.map(q => { const sel = q.id === sortidaId, cab = sel ? sortidaCab(q) : null;
+                                  return [q.nome, q.caca.max ? 1 : 0, sel ? 1 : 0, sel ? q.lema : '',
+                                          (Relatorio.melhor(q.id) || { e: 0 }).e,
+                                          cab ? cab[0] : '', cab ? cab[1] : '']; })
             : null,
     sorF: Sortida.fase,
     cab: cockpit ? 1 : 0,        // em que vista a tela está, para o botão do celular
@@ -16044,9 +16796,58 @@ const matBalaIni = new THREE.MeshBasicMaterial({ color: 0xff8a5a, fog: false });
 const EIXO_Y = new THREE.Vector3(0, 1, 0);
 const CACA_VIDA = 30;             // 4 tiros de metralhadora, ou um míssil
 const CACA_ALC  = 9000;           // alcance de tiro
-const CACA_CONE = 3.5*Math.PI/180;
+const CACA_CONE = 5*Math.PI/180;
 const CACA_ROMPE = 3200;          // colado demais: quebra e sai
+const CACA_T_ROMPE = 1.5;         // ou vai me cruzar em menos que isto, em segundos...
+const CACA_PASSA = 1500;          // ...passando a menos que isto (o choque é a 731)
+const CACA_PISO = CHAO + 500;     // 25 m: abaixo disto o caça não desce
+const CACA_BAIXO = 60*METRO;      // voar abaixo disto corta o acerto deles pela metade
+const CACA_P = 0.24;              // chance de acerto de cada bala, colado (cai com a distância)
+const CACA_GIRO = 0.15;           // rad/s do meu nariz que cortam essa chance pela metade
 const CACA_MAX  = 3;              // no céu ao mesmo tempo
+/* O PISO DE UM CAÇA NAQUELE PEDAÇO DE MAPA: 25 m no campo, e um andar acima
+   do telhado mais alto num quadrado de lado `2r` em volta do ponto. Caça não
+   desce entre as torres — voa por cima dos telhados, que é o que um piloto
+   faz com uma cidade que não conhece. É por isso que a cidade passa a ser
+   abrigo: ele fica lá em cima e a torre fica entre nós dois. */
+function pisoDeCaca(x, z, r){
+  let topo = 0;
+  for (const p of predios){
+    if (!p.vivo || p.h <= topo) continue;
+    if (Math.abs(p.x - x) < r && Math.abs(p.z - z) < r) topo = p.h;
+  }
+  return topo > 0 ? Math.max(CACA_PISO, CHAO + topo + 300) : CACA_PISO;
+}
+/* Há prédio de pé na reta entre dois pontos? A conta é exata, não por
+   amostra: um tiro corre nove mil e uma torre tem trezentos de lado — seis
+   amostras passariam por entre os prédios quase sempre. Corta-se a reta pelas
+   quatro paredes da planta e olha-se a altura dela no trecho que sobrou. A
+   lista é percorrida uma vez, e quase tudo sai na primeira comparação. */
+function predioNaReta(x0, y0, z0, x1, y1, z1){
+  const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+  const xa = Math.min(x0, x1) - 320, xb = Math.max(x0, x1) + 320,
+        za = Math.min(z0, z1) - 320, zb = Math.max(z0, z1) + 320,
+        yBaixo = Math.min(y0, y1);
+  for (const p of predios){
+    if (!p.vivo || p.x < xa || p.x > xb || p.z < za || p.z > zb || CHAO + p.h < yBaixo) continue;
+    let t0 = 0, t1 = 1;
+    const hx = p.w/2, hz = p.d/2;
+    if (Math.abs(dx) < 1e-6){ if (Math.abs(x0 - p.x) > hx) continue; }
+    else {
+      const a = (p.x - hx - x0)/dx, b = (p.x + hx - x0)/dx;
+      t0 = Math.max(t0, Math.min(a, b)); t1 = Math.min(t1, Math.max(a, b));
+      if (t0 > t1) continue;
+    }
+    if (Math.abs(dz) < 1e-6){ if (Math.abs(z0 - p.z) > hz) continue; }
+    else {
+      const a = (p.z - hz - z0)/dz, b = (p.z + hz - z0)/dz;
+      t0 = Math.max(t0, Math.min(a, b)); t1 = Math.min(t1, Math.max(a, b));
+      if (t0 > t1) continue;
+    }
+    if (Math.min(y0 + dy*t0, y0 + dy*t1) < CHAO + p.h) return true;
+  }
+  return false;
+}
 const Inimigos = {
   /* `cota` é quantos caças ainda estão POR VIR nesta sortida, e nasce em zero:
      enquanto a sortida não esquenta, ninguém vem. O `_nascer = 6` que morava
@@ -16062,7 +16863,7 @@ const Inimigos = {
     for (const c of this.lista){ c.vivo = false; if (c.no) cena.remove(c.no); }
     for (const b of this.balas) cena.remove(b.no);
     this.lista.length = 0; this.balas.length = 0;
-    this._nascer = 0; this.cota = 0; this.abatidos = 0;
+    this._nascer = 0; this.cota = 0; this.abatidos = 0; this.giro = 0;
   },
   /* nascem LONGE e de lados sorteados: aparecer em cima do jogador é a
      maneira mais rápida de fazer um combate parecer roubado */
@@ -16083,6 +16884,13 @@ const Inimigos = {
                       nome: 'CAÇA ' + (1 + Math.floor(Math.random()*89)) });
   },
   quantos(){ return this.lista.length; },
+  /* A SORTIDA FOI CUMPRIDA: quem ainda está no ar dá meia-volta e some, e
+     ninguém mais vem. Sem isto dava para pousar, parar, ler "MISSÃO CUMPRIDA"
+     e continuar levando bala. */
+  recua(){
+    this.cota = 0;
+    for (const c of this.lista) c.foge = true;
+  },
   /* alguém está com o nariz em mim, dentro do alcance? é o que acende o
      alarme, e é a pergunta que o piloto faria olhando por cima do ombro */
   ameaca(){
@@ -16093,6 +16901,11 @@ const Inimigos = {
   passo(dt){
     this.passoBalas(dt);
     if (!jogando || caindo) return;
+    /* quanto o meu nariz girou neste quadro, alisado em um quarto de segundo
+       para o tremor da mão não contar como manobra (ver `tiro`) */
+    const gq = Math.hypot(eixoF.x - this._fx, eixoF.y - this._fy, eixoF.z - this._fz)/dt;
+    this._fx = eixoF.x; this._fy = eixoF.y; this._fz = eixoF.z;
+    this.giro += (Math.min(3, gq) - this.giro)*Math.min(1, dt*4);
     /* Três perguntas, nesta ordem: o modo está ligado, a SORTIDA está quente,
        e ainda há cota. Qualquer "não" e o céu fica limpo — que é o estado
        normal de um céu. */
@@ -16124,8 +16937,9 @@ const Inimigos = {
 
       /* longe demais: some. Um caça a sessenta quilômetros não está em
          combate, está ocupando memória e enchendo o radar. */
-      if (d > 72000){
+      if (d > 72000 || (c.foge && d > 30000)){
         c.vivo = false; liberaNo(c.no, [modeloInimigo]); cena.remove(c.no); this.lista.splice(i, 1);
+        if (c.foge) continue;                  // este foi embora de vez
         /* e a cota VOLTA. Sem isto, um caça que desistiu e sumiu no horizonte
            gastava uma das quatro vidas da sortida sem nunca ter sido combatido
            — e "abater 4 caças" virava impossível, com o céu vazio e nenhuma
@@ -16134,12 +16948,48 @@ const Inimigos = {
         continue;
       }
 
-      // ---- escolha do estado
+      /* ---- escolha do estado: ROMPE PELO RELÓGIO, NÃO PELA RÉGUA.
+
+         O rompe entrava a 3200 de distância. De frente os dois se aproximam a
+         sete mil por segundo: sobrava menos de meio segundo, o desvio não
+         chegava ao raio de colisão e o combate acabava em batida — medido, com
+         um caça só e quarenta partidas de 40 s: 9 batidas voando reto e 21
+         contra quem curva a 20°/s, com a bala tirando 5 a 8 de vida no mesmo
+         tempo. Os caças não atiravam: atropelavam.
+
+         A pergunta certa não é "a que distância ele está", é "QUANDO a gente
+         se cruza, e a que distância vai ser". As duas respostas saem da
+         posição e da velocidade relativas (o instante da passagem mais
+         próxima). Vai passar raspando daqui a menos de um segundo e meio?
+         Rompe já — de frente isso dá uns dez mil de antecedência, e na cauda,
+         onde a aproximação é lenta, não dispara nunca, que é onde se quer o
+         caça atirando. O limiar de distância continua como rede de baixo. */
+      const rvx = eixoF.x*voo - c.F.x*c.vel, rvy = eixoF.y*voo - c.F.y*c.vel,
+            rvz = eixoF.z*voo - c.F.z*c.vel;
+      const rv2 = rvx*rvx + rvy*rvy + rvz*rvz;
+      const tPass = rv2 > 1 ? -(dx*rvx + dy*rvy + dz*rvz)/rv2 : -1;
+      /* onde EU vou estar em relação a ele no instante da passagem */
+      let pxm = dx, pym = dy, pzm = dz;
+      if (tPass > 0){ pxm += rvx*tPass; pym += rvy*tPass; pzm += rvz*tPass; }
       if (c.estado === 'rompe'){
+        /* o rompe dura o tempo dele. Saía também por distância (`d > 7680`),
+           o que com o gatilho novo — que dispara a dez mil — encerraria a
+           quebra no quadro seguinte ao que ela começou. */
         c.tRompe -= dt;
-        if (c.tRompe <= 0 || d > CACA_ROMPE*2.4) c.estado = 'caca';
-      } else if (d < CACA_ROMPE){
-        c.estado = 'rompe'; c.tRompe = 2.2 + Math.random();
+        if (c.tRompe <= 0) c.estado = 'caca';
+      } else if (d < CACA_ROMPE || (tPass > 0 && tPass < CACA_T_ROMPE
+                 && pxm*pxm + pym*pym + pzm*pzm < CACA_PASSA*CACA_PASSA)){
+        c.estado = 'rompe'; c.tRompe = d < CACA_ROMPE ? 2.2 + Math.random() : 1.6 + Math.random()*0.8;
+        /* PARA QUE LADO: o lado em que eu NÃO vou passar. Sorteado, metade das
+           quebras cruzava a minha proa. E para cima, a não ser que eu vá passar
+           por cima dele e ele tenha altura para mergulhar. */
+        const h = Math.hypot(dx, dz) || 1;
+        const doLado = pxm*(dz/h) - pzm*(dx/h);        // a passagem, medida no eixo de quebra
+        c.ladoRompe = Math.abs(doLado) < 60 ? (Math.random() < 0.5 ? -1 : 1) : (doLado > 0 ? -1 : 1);
+        c.sobeRompe = (pym > 150 && c.y > CHAO + 5000) ? -1 : 1;
+        /* e a componente vertical entra JÁ, no primeiro quadro, sem esperar a
+           taxa de curva: é o que tira o caça do meu plano enquanto ele vira */
+        c.F.y += 0.5*c.sobeRompe; c.F = vnorm(c.F);
       }
 
       /* ---- para onde apontar: a ANTECIPAÇÃO, não a posição.
@@ -16157,13 +17007,29 @@ const Inimigos = {
         const paraMim = vnorm({ x: dx, y: 0, z: dz });
         const lado = vnorm(vcruz({x:0,y:1,z:0}, paraMim));
         const sn = c.ladoRompe || (c.ladoRompe = Math.random() < 0.5 ? -1 : 1);
-        mira = { x: c.x + lado.x*sn*9000, y: c.y + 2600, z: c.z + lado.z*sn*9000 };
+        mira = { x: c.x + lado.x*sn*9000, y: c.y + 2600*(c.sobeRompe || 1), z: c.z + lado.z*sn*9000 };
       } else {
         c.ladoRompe = 0;
         const tBala = Math.min(2.2, d/9000);
         mira = { x: aviaoX + eixoF.x*voo*tBala,
                  y: aviaoY + eixoF.y*voo*tBala,
                  z: aviaoZ + eixoF.z*voo*tBala };
+      }
+      /* recuando: de costas para mim, subindo, e sem atirar */
+      if (c.foge){ mira.x = c.x - dx; mira.y = c.y + 1500; mira.z = c.z - dz; }
+      /* OS TELHADOS À FRENTE. Os caças não sabiam que a cidade existe — o
+         movimento só conhecia o chão — e, perseguindo quem voa rente em PORTO
+         ALTO, atravessavam prédio (medido: 88 quadros de 39 mil). O piso de
+         cada um agora acompanha os telhados em volta de onde ele vai estar
+         daqui a meio segundo, conferido cinco vezes por segundo e só quando ele
+         está baixo: é uma volta na lista de prédios a cada 0,2 s, não uma por
+         quadro. */
+      c.tSonda = (c.tSonda || 0) - dt;
+      if (c.tSonda <= 0){
+        c.tSonda = 0.2;
+        c.piso = c.y < CHAO + 4600
+          ? pisoDeCaca(c.x + c.F.x*c.vel*0.5, c.z + c.F.z*c.vel*0.5, Math.max(4000, c.vel*1.3))
+          : CACA_PISO;
       }
       const al = vnorm({ x: mira.x - c.x, y: mira.y - c.y, z: mira.z - c.z });
 
@@ -16192,13 +17058,38 @@ const Inimigos = {
          cruzeiro, mais lento que o jogador em pós-combustão. Ou seja: dá
          para escapar, mas só QUEIMANDO NITRO. Fugir em linha reta no
          cruzeiro não resolve, e é isso que obriga a manobrar ou brigar. */
+      /* E DEPOIS DE CHEGAR, ELE FICA. Dentro de 16 mil a velocidade caía para
+         0,95 do cruzeiro — mais devagar que o jogador que só cruza. O caça
+         alcançava, perdia o passo, e o alvo abria de novo até os 16 mil: ele
+         nunca segurava a cauda de ninguém, e por isso voar reto era a defesa
+         perfeita contra bala (medido: 10 de vida por minuto com DOIS em cima).
+         Agora ele fecha 8% mais rápido que eu — nunca acima da velocidade de
+         caça, então a pós-combustão continua sendo a fuga — e a 4.500 passa a
+         copiar a minha velocidade: senta na cauda e atira dali, que é onde um
+         caça fica e onde manobrar tem de ser a resposta. */
+      const VCACA = VOO_BASE*1.45;
       const alvoVel = c.estado === 'rompe' ? VOO_BASE*1.25
-                    : d > 16000 ? VOO_BASE*1.45 : VOO_BASE*0.95;
+                    : d > 16000 || c.foge ? VCACA
+                    : Math.max(VOO_BASE*0.62, Math.min(VCACA, voo*(d > 4500 ? 1.08 : 0.96)));
       c.vel += (alvoVel - c.vel)*Math.min(1, dt*0.7);
       c.x += c.F.x*c.vel*dt; c.y += c.F.y*c.vel*dt; c.z += c.F.z*c.vel*dt;
       // a velocidade, para a metralhadora poder dar a dianteira
       c.vx = c.F.x*c.vel; c.vy = c.F.y*c.vel; c.vz = c.F.z*c.vel;
-      if (c.y < CHAO + 1400){ c.y = CHAO + 1400; c.F.y = Math.abs(c.F.y); c.F = vnorm(c.F); }
+      /* O PISO NÃO VIRA O NARIZ. Era 70 m, e nele o nariz era ESPELHADO para
+         cima a cada quadro: preso ao piso, o caça nunca fechava o ângulo em
+         quem voasse abaixo dele e parava de atirar. Medido: a 20 m, quatro
+         tiros por minuto contra quarenta e dois a 300 m — rente ao chão era
+         imunidade, com o alarme de caça tocando sem ameaça nenhuma. Agora o
+         piso é 25 m (ou os telhados, na cidade) e só tira a DESCIDA do nariz;
+         o resto da pontaria fica. Abaixo do piso ele sobe depressa mas sem
+         salto: 160 m por segundo, que é o que dá para ganhar sobre uma torre
+         vista a um segundo de distância. */
+      const piso = c.piso || CACA_PISO;
+      const noPiso = c.y <= piso;
+      if (noPiso){
+        c.y = Math.min(piso, c.y + 3200*dt);
+        if (c.F.y < 0){ c.F.y = 0; c.F = vnorm(c.F); }
+      }
       if (c.y > TETO_CENA) c.y = TETO_CENA;
 
       /* ---- ATIRA?  E o ângulo que conta é o da ANTECIPAÇÃO, não o meu.
@@ -16211,9 +17102,16 @@ const Inimigos = {
          Quem dispara é o RASTREIO: o nariz em cima da solução. A bala, essa,
          vai na minha direção — é hitscan, e o risco desenhado é o que o
          jogador vê. */
-      const apontado = Math.acos(Math.max(-1, Math.min(1, vponto(c.F, al))));
-      c.mirando = c.estado !== 'rompe' && d < CACA_ALC && apontado < CACA_CONE*2.4;
-      if (c.estado !== 'rompe' && d < CACA_ALC && apontado < CACA_CONE){
+      /* no piso o que conta é o ângulo no PLANO: quem voa a cinco metros está
+         abaixo do caça por definição, e esse resto de ângulo vertical não pode
+         valer como "fora da mira" */
+      let apontado;
+      if (noPiso && al.y < 0){
+        const hF = Math.hypot(c.F.x, c.F.z) || 1, hA = Math.hypot(al.x, al.z) || 1;
+        apontado = Math.acos(Math.max(-1, Math.min(1, (c.F.x*al.x + c.F.z*al.z)/(hF*hA))));
+      } else apontado = Math.acos(Math.max(-1, Math.min(1, vponto(c.F, al))));
+      c.mirando = !c.foge && c.estado !== 'rompe' && d < CACA_ALC && apontado < CACA_CONE*2.4;
+      if (c.mirando && apontado < CACA_CONE){
         c.tRajada -= dt;
         if (c.tRajada <= 0){
           c.tBala -= dt;
@@ -16264,10 +17162,34 @@ const Inimigos = {
      e 4 de dano, ou seja uns 5,5 de vida por segundo enquanto UM caça
      estiver em cima de mim. Dá dezoito segundos para manobrar, e manobrar é
      o jogo. */
+  /* A SEGUNDA CALIBRAGEM, pelos mesmos contadores. A conta de cima prometia
+     5,5 por segundo e a medição deu 10 por MINUTO, com dois caças em cima de
+     quem voa reto e nivelado: sete minutos para morrer de bala — e morria-se
+     antes, de colisão. Com o caça segurando a cauda (ver a velocidade, em
+     `passo`), o cone de 5° e 0,24 de acerto colado, voar reto custa de
+     sessenta a noventa de vida por minuto com dois em cima.
+
+     TRÊS DEFESAS, e as três são regra, não acidente:
+     · CURVAR. A chance de cada bala cai com o quanto o MEU nariz está girando
+       (`giro`, em rad/s): a 20° por segundo ela vale um terço. Sem isto um
+       ziguezague forte só tirava 40% do dano, porque o caça vira mais que eu
+       e segue o ziguezague inteiro. É a regra que o combate precisa ensinar,
+       e ela tem de ser sentida: reto morre, manobra vive.
+     · RENTE AO CHÃO (abaixo de 60 m) a bala deles acerta a metade. Voar baixo
+       era imunidade por um defeito do piso; agora é abrigo de propósito, e o
+       alarme de caça deixou de tocar à toa.
+     · ATRÁS DE PRÉDIO a bala não chega. O tiro era sorteado sem linha de
+       visada e atravessava torre; agora a reta até mim é conferida (só quando
+       ela passa abaixo dos telhados). */
+  danoDado: 0, nTapados: 0,
+  giro: 0, _fx: 0, _fy: 0, _fz: 1,      // o giro do meu nariz, alisado, e o nariz do quadro passado
   tiro(c, d){
-    const p = 0.22*(1 - d/CACA_ALC*0.7);
-    const acertou = Math.random() < p;
-    this.nTiros++; if (acertou) this.nAcertos++;
+    let p = CACA_P*(1 - d/CACA_ALC*0.7)/(1 + this.giro/CACA_GIRO);
+    if (aviaoY - CHAO < CACA_BAIXO) p *= 0.5;
+    let acertou = Math.random() < p;
+    if (acertou && Math.min(c.y, aviaoY) < CHAO + 3700
+        && predioNaReta(c.x, c.y, c.z, aviaoX, aviaoY, aviaoZ)){ acertou = false; this.nTapados++; }
+    this.nTiros++; if (acertou){ this.nAcertos++; this.danoDado += 4; }
     const esp = acertou ? 0 : 520;                 // a que errou passa ao lado
     const mira = { x: aviaoX + (Math.random()-0.5)*esp,
                    y: aviaoY + (Math.random()-0.5)*esp,
