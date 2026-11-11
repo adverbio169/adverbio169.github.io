@@ -14923,6 +14923,10 @@ const Relatorio = {
       '#faixaMissao i{display:block;margin-top:.35em;font:800 clamp(15px,3vw,30px)/1.1 system-ui,sans-serif;' +
         'font-style:normal;letter-spacing:.08em;color:#ffd257}' +
       '#faixaMissao.ok b{color:#7fffa8} #faixaMissao.nao b{color:#ff7a6a} #faixaMissao.nao i{color:#ffc9c0}' +
+      /* no celular deitado a linha de aviso do jogo mora a 38% da altura: a
+         faixa sobe e encolhe um pouco para as duas não se encostarem */
+      '@media (max-height:480px){#faixaMissao{top:12%} #faixaMissao b{font-size:clamp(24px,5.2vw,42px)}' +
+        '#faixaMissao i{font-size:clamp(14px,2.6vw,22px);margin-top:.2em}}' +
       '#relogioMissao{position:fixed;z-index:4;right:calc(12px + env(safe-area-inset-right));top:calc(8px + env(safe-area-inset-top));' +
         'display:none;pointer-events:none;white-space:nowrap;padding:4px 12px;border-radius:9px;' +
         'background:rgba(8,12,26,.55);border:1px solid rgba(255,192,70,.45);color:#ffc046;' +
