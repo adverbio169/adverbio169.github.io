@@ -14261,7 +14261,7 @@ const SORTIDAS = [
     par: 420,
     caca:{ max:3, levas:[1,2,3], espera:30, gatilho:'tempo', aviso:
            'decole já: a primeira leva está chegando' },
-    relogio(){ return Sortida.fase === 'solo' ? 30 - Sortida.tSolo : null; },
+    relogio(){ return Sortida.fase === 'solo' || Sortida.fase === 'transito' ? 30 - Sortida.tSolo : null; },
     relogioTxt:'ELES CHEGAM EM' },
 
   /* TRÊS PISTAS. Navegar e pousar é a parte difícil de voar, e só a PATRULHA
@@ -14401,8 +14401,10 @@ const Sortida = {
      transforma "nada está acontecendo" em "falta isto". */
   ordem(){
     const c = this.atual().caca;
-    if (this.fase === 'cumprida')  return 'tempo ' + tempoTxt(Relatorio.t) + ' · ' + mfdVerbo().toLowerCase() + ' aqui para outra missão';
-    if (this.fase === 'fracassou') return this.motivo.toLowerCase() + ' · ' + mfdVerbo().toLowerCase() + ' aqui para tentar de novo';
+    /* "aperte", e não "toque" ou "clique": esta linha também viaja pronta para
+       o celular-controle, e a tela do jogo não sabe com que dedo ela será lida */
+    if (this.fase === 'cumprida')  return 'tempo ' + tempoTxt(Relatorio.t) + ' · aperte aqui para outra missão';
+    if (this.fase === 'fracassou') return this.motivo.toLowerCase() + ' · aperte aqui para tentar de novo';
     if (!c.max) return '';
     if (this.fase === 'quente') return '';
     if (this.fase === 'solo') return c.gatilho === 'tempo' ? (c.aviso || '') : 'decole para começar';
@@ -14536,7 +14538,7 @@ Missoes = (function(){
   let cumpridas = 0, tudo = false, avisou = 0;
   /* para o que acontece PARADO: se este voo já saiu do chão, há quanto tempo
      as rodas estão quietas, e o que já foi dito e feito nesta parada */
-  let voou = false, tParado = 0, olhouParada = false, rearmou = false;
+  let voou = false, tParado = 0, olhouParada = false, rearmou = false, emPista = false;
 
   function monta(){
     LISTA = Sortida.atual().objs.map(o => {
@@ -14608,9 +14610,11 @@ Missoes = (function(){
   function parado(dt){
     if (voo !== 0 || !voou){ tParado = 0; olhouParada = false; rearmou = false; return; }
     tParado += dt;
-    const naPista = sobreAPista(aviaoX, aviaoZ);
     if (tParado > 0.5 && !olhouParada){
+      /* "estou em pista?" é perguntado UMA vez por parada: parado, a resposta
+         não muda, e a pergunta percorre a lista de pistas */
       olhouParada = true;
+      const naPista = emPista = sobreAPista(aviaoX, aviaoZ);
       const antes = cumpridas;
       if (naPista && pistaPerto(aviaoX, aviaoZ).nome === 'VALE') marca('valeP');
       if (!naPista){ const av = avenidaPerto(aviaoX, aviaoZ); if (av && av.cidade === CIDADES[1]) marca('orlaP'); }
@@ -14620,7 +14624,7 @@ Missoes = (function(){
         else marca('voltar');
       }
     }
-    if (tParado > 4 && !rearmou && naPista && combustivel > 0 && Inimigos.quantos() === 0){
+    if (tParado > 4 && !rearmou && emPista && combustivel > 0 && Inimigos.quantos() === 0){
       rearmou = true; Relatorio.rearma();
     }
   }
@@ -15043,7 +15047,8 @@ const Relatorio = {
 /* =============================================================================
    OS ANÉIS DA CORRIDA DO RIO
 
-   Oito anéis de luz em pé sobre o rio, ao norte da pista, um a cada 550 m.
+   Oito anéis de luz em pé sobre o rio, ao norte da pista, um a cada 575 m
+   (três segundos e meio em cruzeiro) e com 150 m de vão — três envergaduras.
    Vale passar POR DENTRO, em ordem: o seguinte brilha em amarelo e os outros
    esperam em azul apagado. Quem cruza o plano por fora ouve na hora e tem de
    voltar — é a única sortida em que o erro custa uma meia-volta, e não vida.
@@ -15054,7 +15059,7 @@ const Relatorio = {
    ficaria dentro do aro.
    ========================================================================== */
 const Portoes = {
-  N: 8, RAIO: 1300, Z0: 24000, DZ: 11000,
+  N: 8, RAIO: 1500, Z0: 30000, DZ: 11500,
   lista: [], grupo: null, n: 0, perdidos: 0, _zAnt: 0, _pulso: 0,
   matProx: null, matEspera: null,
 
