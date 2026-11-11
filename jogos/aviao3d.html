@@ -286,6 +286,13 @@
      VISÃO ficam em cima o tempo todo — testado, e é como ele preferiu. */
   body.dedos #dTrem,body.dedos #dFlap{display:none}
   body.dedos.painelFechado #dTrem,body.dedos.painelFechado #dFlap{display:inline-block}
+  /* DENTRO DA CABINE não há tecla de borda: as janelas 2D não são desenhadas e
+     as telas pintadas não aceitam toque. Medido no celular deitado: nenhum
+     comando de trem nem de flape — na final, o jogador não baixava o trem sem
+     trocar de vista. Eles voltam para a faixa de cima, fora do painel. */
+  body.dedos #dedos.semCara #dTrem,body.dedos #dedos.semCara #dFlap{display:inline-block}
+  /* e a zona do acelerador, na cabine, fica por cima de quem estiver por perto */
+  #dAcel.naCabine{z-index:7}
   body.dedos #convite{display:none}
   /* As tiras laterais ocupam a borda inteira, e os painéis de canto ficavam
      por baixo delas. Com os botões na tela, tudo recua a largura da tira. */
@@ -9653,8 +9660,12 @@ function usaCabinePintada(){
    O 1,03 é FOLGA PARA O TREMOR: desenhada no tamanho exato, a cabine sacudindo
    descobriria uma tira de mundo na borda a cada quadro. Três por cento de
    sobra é mais do que o maior sacolejo precisa. */
+/* onde o painel pintado COMEÇA, em fração da altura da arte (o topo do
+   para-sol, medido nas três proporções de tela). Dali para baixo a pintura é
+   opaca: nada do HUD pode ser desenhado atrás. */
+const CAB_PINT_TOPO = 0.449;
 function caixaCabinePintada(img){
-  const e = Math.max(W/img.naturalWidth, H/img.naturalHeight)*1.03;
+  const e = Math.max(W/img.naturalWidth, H/img.naturalHeight)*1.06;
   const l = img.naturalWidth*e, a = img.naturalHeight*e;
   return { x: (W - l)/2, y: (H - a)/2, l: l, a: a };
 }
@@ -9672,12 +9683,24 @@ function caixaCabinePintada(img){
    onde o painel está, isso subtende `a/26` radianos; e um radiano vale
    `H/(2*tan(fov/2))` pixels. É a projeção em perspectiva, a mesma conta que
    o deslocamento do HUD já faz. */
-function tremorDaCabine(){
+/* E SATURA NA FOLGA. A pintura sobrava 3% além da tela — 11 pixels a 720p — e
+   o comentário acima dizia que isso "é mais do que o maior sacolejo precisa".
+   Não é: medido, buffet cheio dá 42 px, toque na grama e estol 101, e a
+   pancada cheia 869, mais que a tela. A arte subia cem pixels e deixava uma
+   tira de pista aparecendo por baixo do banco. A folga dobrou (6%) e o
+   deslocamento é dobrado por uma tangente hiperbólica do tamanho dela: o
+   sacolejo leve sai igual, e o forte encosta na borda sem nunca descobri-la. */
+function tremorDaCabine(c){
   const tr = Math.max(sacudida, sacudidaFixa);
   if (tr <= 0.002) return { x: 0, y: 0 };
   const a = tr*tr*70;
   const px = (a/26)/(2*Math.tan(cam.fov*Math.PI/360))*H;
-  return { x: (Math.random()-0.5)*px, y: (Math.random()-0.5)*px };
+  let x = (Math.random()-0.5)*px, y = (Math.random()-0.5)*px;
+  if (c){
+    const tx = Math.max(1, (c.l - W)/2 - 1), ty = Math.max(1, (c.a - H)/2 - 1);
+    x = tx*Math.tanh(x/tx); y = ty*Math.tanh(y/ty);
+  }
+  return { x, y };
 }
 /* QUANTO DA CABINE PINTADA AINDA APARECE, virando a cabeça.
 
@@ -9716,7 +9739,7 @@ function desenhaCabinePintada(){
   aceleradorNaManete(img ? caixaCabinePintada(img) : null, op);
   if (!img || op <= 0.004) return;
   presoNaTela();
-  const c = caixaCabinePintada(img), tre = tremorDaCabine();
+  const c = caixaCabinePintada(img), tre = tremorDaCabine(c);
   c.x += tre.x + hudDX; c.y += tre.y + hudDY;   // presa no avião, como o HUD
   h2.globalAlpha = op;
   h2.drawImage(img, c.x, c.y, c.l, c.a);
@@ -9807,6 +9830,8 @@ function aceleradorNaManete(c, op){
     if (el.classList.contains('naCabine')){
       el.classList.remove('naCabine');
       el.style.left = el.style.top = el.style.width = el.style.height = '';
+      const arma0 = document.getElementById('dArma');
+      if (arma0) arma0.style.width = arma0.style.minWidth = '';
     }
     return;
   }
@@ -9842,10 +9867,26 @@ function aceleradorNaManete(c, op){
   let topo = base - alt;
   if (topo < 0){ topo = 0; alt = base; }
   el.classList.add('naCabine');
-  el.style.left   = (c.x + a.x*c.l - fx) + 'px';
+  const esq = c.x + a.x*c.l - fx;
+  el.style.left   = esq + 'px';
   el.style.top    = topo + 'px';
   el.style.width  = larg + 'px';
   el.style.height = alt + 'px';
+  /* O SELETOR DE ARMA (invisível na cabine) ESTAVA EM CIMA DA MANETE PINTADA.
+     Medido: 43% da zona do acelerador respondia como arma no celular de 844,
+     63% no de 740 — e o eixo inteiro da alavanca DESENHADA era arma. Arrastar
+     a manete trocava de arma. O teste antigo dizia que estava provado, mas a
+     caixa da manete mudou de lugar depois dele. Enquanto a zona estiver na
+     cabine, o seletor encolhe até a borda dela; na saída volta ao tamanho. */
+  const arma = document.getElementById('dArma');
+  if (arma){
+    arma.style.width = arma.style.minWidth = '';
+    const r = arma.getBoundingClientRect();
+    if (r.right > esq - 6 && r.left < esq){
+      const w = Math.max(56, esq - 6 - r.left) + 'px';
+      arma.style.width = w; arma.style.minWidth = w;
+    }
+  }
 }
 
 function lonaPainel(){
@@ -19690,7 +19731,22 @@ function calculaVidroHUD(){
      com o corpo de letra de 9 pixels que `hudH` garante. */
   const l = Math.max(x1 - x0, Math.min(200, W*0.30));
   const a = Math.max(y1 - y0, Math.min(126, H*0.34));
-  vidroHUD = { x: (x0 + x1)/2 - l/2, y: (y0 + y1)/2 - a/2, w: l, h: a,
+  /* NA CABINE PINTADA A CHAPA ESTÁ EM OUTRO LUGAR. A caixa acima sai do
+     combinador da cabine de MALHA — que está invisível quando a pintura está
+     na tela — e o para-sol pintado fica mais alto que o de malha. Medido a
+     720p: caixa de 233 a 400, chapa em 322. A metade de baixo do HUD (o G, o
+     variômetro, o número da altitude e meia fita) era desenhada ATRÁS da
+     pintura, que é opaca. A caixa sobe até a base encostar no topo da chapa. */
+  let yTopo = (y0 + y1)/2 - a/2;
+  if (usaCabinePintada()){
+    const img = cabinePintada();
+    if (img){
+      const cx = caixaCabinePintada(img);
+      const base = cx.y + hudDY + (CAB_PINT_TOPO - 0.006)*cx.a;
+      if (yTopo + a > base) yTopo = Math.max(4, base - a);
+    }
+  }
+  vidroHUD = { x: (x0 + x1)/2 - l/2, y: yTopo, w: l, h: a,
                vidroL: x1 - x0, vidroA: y1 - y0,
                /* `apertado` é o aviso de que a caixa teve de ser esticada:
                   aparelho pequeno. Quem desenha usa isso para cortar o que é
@@ -19698,6 +19754,28 @@ function calculaVidroHUD(){
                apertado: (x1 - x0) < l - 1 };
 }
 function presoNoVidro(){ if (vidroHUD) presoNaTela(); else presoNoAviao(); }
+/* A TARJA DO ALARME. O som diz o que é; a tarja diz onde olhar. O vermelho
+   (pull up, stall, overspeed) pisca; o âmbar não. Virou função porque tem dois
+   lugares: embaixo, na vista de fora, e em cima do para-sol na cabine pintada
+   — onde precisa ser desenhada DEPOIS da pintura, senão fica atrás dela. */
+function tarjaDoAlarme(cx, y, alt){
+  if (!jogando || caindo || !Alarmes.atual) return;
+  const a = Alarmes.atual;
+  const urgente = a.id === 'puxe' || a.id === 'estol' || a.id === 'rapido';
+  const pisca = !urgente || Math.sin(Date.now()/95) > -0.2;
+  h2.textAlign = 'center';
+  h2.font = '900 ' + Math.max(11, Math.min(H*0.032, alt*0.62)).toFixed(0) + 'px system-ui, sans-serif';
+  const larg = Math.max(h2.measureText(a.txt).width + alt, W*0.20);
+  h2.globalAlpha = pisca ? 1 : 0.33;
+  h2.fillStyle = 'rgba(10,14,24,.78)';
+  h2.fillRect(cx - larg/2, y - alt*0.72, larg, alt);
+  h2.strokeStyle = a.cor; h2.lineWidth = Math.max(2, H*0.004);
+  h2.strokeRect(cx - larg/2, y - alt*0.72, larg, alt);
+  h2.fillStyle = a.cor;
+  h2.fillText(a.txt, cx, y + alt*0.10);
+  h2.globalAlpha = 1;
+  h2.textAlign = 'left';
+}
 
 function desenhaHUD(){
   presoNaTela();
@@ -19903,8 +19981,12 @@ function desenhaHUD(){
        alcance subiu de 3 para 6 km, porque agora a cruz é pedida: quem
        carregou a aproximação quer ver a interceptação, não só a final. */
     if (A && A.dist > 60 && A.dist < 6000){
-      presoNoAviao();
-      const r = Math.min(W, H)*0.155, cx2 = W/2, cy2 = H*0.53;
+      /* com o HUD no vidro, a cruz vai para o vidro: centrada em 53% da tela
+         ela caía atrás da chapa pintada e na final só sobrava o toco da agulha */
+      if (vidroHUD) presoNaTela(); else presoNoAviao();
+      const r = vidroHUD ? Math.min(Math.min(W, H)*0.155, vidroHUD.h*0.45) : Math.min(W, H)*0.155,
+            cx2 = vidroHUD ? vidroHUD.x + vidroHUD.w/2 : W/2,
+            cy2 = vidroHUD ? vidroHUD.y + vidroHUD.h*0.5 : H*0.53;
       const ex = Math.max(-1, Math.min(1, -A.lat/120));
       const ey = Math.max(-1, Math.min(1, A.vert/60));
       h2.save();
@@ -20438,24 +20520,10 @@ function desenhaHUD(){
      a cabeça é alarme que se perde justamente quando se vira para procurar o
      chão. O vermelho (pull up, stall, overspeed) pisca; o âmbar não — aviso
      que pisca vira urgência, e nem todo aviso é urgente. */
-  if (jogando && !caindo && Alarmes.atual){
-    const a = Alarmes.atual;
-    const urgente = a.id === 'puxe' || a.id === 'estol' || a.id === 'rapido';
-    const pisca = !urgente || Math.sin(Date.now()/95) > -0.2;
-    const y = H*0.80, alt = Math.max(20, H*0.052);
-    h2.textAlign = 'center';
-    h2.font = '900 ' + Math.max(13, H*0.032).toFixed(0) + 'px system-ui, sans-serif';
-    const larg = Math.max(h2.measureText(a.txt).width + alt, W*0.20);
-    h2.globalAlpha = pisca ? 1 : 0.33;
-    h2.fillStyle = 'rgba(10,14,24,.62)';
-    h2.fillRect(W/2 - larg/2, y - alt*0.72, larg, alt);
-    h2.strokeStyle = a.cor; h2.lineWidth = Math.max(2, H*0.004);
-    h2.strokeRect(W/2 - larg/2, y - alt*0.72, larg, alt);
-    h2.fillStyle = a.cor;
-    h2.fillText(a.txt, W/2, y + alt*0.10);
-    h2.globalAlpha = 1;
-    h2.textAlign = 'left';
-  }
+  /* NA CABINE PINTADA a tarja é desenhada DEPOIS da pintura (no fim desta
+     função), em cima do para-sol: a 80% da altura ela ficava atrás da chapa, e
+     de dentro da cabine o piloto ouvia "pull up" sem ler nada. */
+  if (!usaCabinePintada()) tarjaDoAlarme(W/2, H*0.80, Math.max(20, H*0.052));
 
   /* --- AS CHAMAS QUE SOBRAM ---------------------------------------------------
      "Não vi onde ficou ativado o sistema de contramedida."
@@ -20469,7 +20537,9 @@ function desenhaHUD(){
      ler qual arma está na mão. E a tecla passou a ser anunciada no rótulo da
      própria caixa, junto do "1 2 3" e do "espaço atira" — quem aprende as
      outras teclas aprende essa no mesmo lugar. */
-  if (jogando && !caindo){
+  /* na cabine PINTADA nem subindo ela escapa: caía atrás da chapa. Lá, quantas
+     chamas restam está na página ARMAS e no botão DEFESA. */
+  if (jogando && !caindo && !usaCabinePintada()){
     presoNoAviao();
     /* na cabine o rodapé é o PAINEL: a fita de chamas sobe para não cair em
        cima das telas do avião */
@@ -20506,6 +20576,15 @@ function desenhaHUD(){
      então ele TEM de tapar o que o HUD desenhou atrás dele. Desenhado antes,
      a fita da bússola e a escada de altura apareciam por cima da chapa. */
   desenhaCabinePintada();
+  if (usaCabinePintada()){
+    const img = cabinePintada();
+    if (img && cabinePintadaOpacidade() > 0.5){
+      const c = caixaCabinePintada(img);
+      presoNaTela();
+      const alt = Math.max(16, Math.min(Math.max(20, H*0.052), 0.056*c.a));
+      tarjaDoAlarme(W/2 + hudDX, c.y + hudDY + (CAB_PINT_TOPO + 0.036)*c.a, alt);
+    }
+  }
 }
 
 /* --- painel em HTML --- */
@@ -21117,6 +21196,24 @@ function mfdLimites(o){
            v: Math.max(30, Math.min(o.h*0.30, 80)) };
 }
 function mfdPega(px, py){
+  /* NA CABINE AS JANELAS 2D NÃO SÃO DESENHADAS — mas continuavam pegando
+     toque e clique. Medido: um clique onde estaria a aba invisível trocava de
+     página; no celular o retângulo invisível ficava em cima do manche pintado,
+     engolia o arrasto de pilotagem que começasse ali e podia recolher o painel
+     quando se puxava a manete. Com o painel de verdade à vista, quem responde
+     são as três telas PINTADAS, e só a um gesto: arrastar de lado rola a fita. */
+  if (mostraPainelDeVerdade()){
+    const img = usaCabinePintada() ? cabinePintada() : null;
+    if (!img) return false;
+    const c = caixaCabinePintada(img);
+    for (const t of CAB_PINT_TELAS){
+      const x = c.x + hudDX + t.x*c.l, y = c.y + hudDY + t.y*c.a, w = t.w*c.l, h = t.h*c.a;
+      if (px < x || px > x + w || py < y || py > y + h) continue;
+      mfdGesto = { k: 0, o: { x, y, w, h }, x0: px, y0: py, usou: false, mexeu: false, pintada: true };
+      return true;
+    }
+    return false;
+  }
   for (let k = 0; k < 2; k++){
     const o = mfdOnde(k);
     if (!o) continue;
@@ -21131,6 +21228,13 @@ function mfdArrasta(px, py){
   if (!g || g.usou) return;
   const dx = px - g.x0, dy = py - g.y0, L = mfdLimites(g.o);
   if (Math.abs(dx) > 6 || Math.abs(dy) > 6) g.mexeu = true;
+  if (g.pintada){
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > Math.max(22, g.o.w*0.22)){
+      mfdRola(dx < 0 ? 1 : -1); g.usou = true;
+      try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
+    }
+    return;
+  }
   if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > L.h){
     mfdRola(dx < 0 ? 1 : -1); g.usou = true;          // para a esquerda avança
     try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
@@ -21157,7 +21261,7 @@ function mfdTocaPagina(k, px, py){
 }
 function mfdSolta(px, py){
   const g = mfdGesto; mfdGesto = null;
-  if (!g || g.usou) return;
+  if (!g || g.usou || g.pintada) return;
   const L = mfdLimites(g.o);
   if (px !== undefined){
     /* o resto do gesto: soltar antes do limiar cheio ainda conta, se passou de

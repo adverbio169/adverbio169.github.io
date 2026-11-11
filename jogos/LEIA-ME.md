@@ -818,6 +818,36 @@ máquina fraca; e uns 72 kB de lixo de memória por passo de física.
 
 ---
 
+## A grande revisão — lote 4: a cabine pintada no celular
+
+O revisor de painel achou catorze defeitos; estes seis são os que o dono mais
+sente, porque acontecem no celular deitado, dentro da cabine:
+
+| defeito | onde mora o conserto |
+|---|---|
+| dentro da cabine **não havia comando de trem nem de flape** — na final não dava para baixar o trem sem trocar de vista | CSS: `#dedos.semCara #dTrem, #dFlap` voltam para a faixa de cima |
+| a alavanca pintada do acelerador estava **debaixo do seletor de arma** invisível: arrastar a manete trocava de arma (43% da zona no celular de 844) | `aceleradorNaManete()` encolhe o `#dArma` até a borda da zona |
+| **metade do HUD ficava atrás da pintura**: G, variômetro, número da altitude e meia fita | `calculaVidroHUD()` sobe a caixa até o topo do para-sol (`CAB_PINT_TOPO`) |
+| a **tarja do alarme** era desenhada atrás da chapa: ouvia-se "pull up" sem ler nada | `tarjaDoAlarme()`, chamada depois da pintura, em cima do para-sol |
+| a cruz da aproximação e a fita de chamas caíam atrás da chapa | a cruz vai para o centro do vidro; a fita não é desenhada na cabine pintada |
+| o **tremor** passava muito da folga (até 869 px) e descobria o mundo na borda | folga de 6% e `tremorDaCabine(c)` saturando nela |
+| as janelas 2D, invisíveis na cabine, **continuavam pegando toque** | `mfdPega()`: na cabine respondem as telas PINTADAS, e só ao arrasto de lado (rola a página) |
+
+Prova: `scratchpad/cab4.js` nas duas telas (844x390 com toque e 1280x720), com
+captura olhada: `cab4-cel.png` e `cab4-tv.png`.
+
+**Para desfazer:** `git revert` do commit deste lote.
+
+**Do revisor de painel, ainda aberto:** rumo espelhado entre a bússola do HUD e
+as páginas VOO e APROX (só norte e sul coincidem), e a VEL da APROX em outra
+unidade; a escada de arfagem herda a cor de quem desenhou antes; a fita de
+altura passa por baixo de outras coisas; o HUD salta na vertical com o olhar de
+cabeça; a página MOTOR diz SEM ALERTAS com alarme tocando; distâncias
+sobrepostas na bússola; e, no celular, o texto da página MAPA se sobrepõe nas
+telas pintadas (visto na captura).
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
