@@ -11977,8 +11977,8 @@ function mfdPaginaEscolha(o, m){
   const i0 = mfdSorPag*SOR_POR_PAG;
   for (let k = 0; k < SOR_POR_PAG && i0 + k < SORTIDAS.length; k++){
     const q = SORTIDAS[i0 + k], sel = q.id === sortidaId;
-    const y = m.corpoY + m.corpoH*(0.075 + k*0.108);
-    const alt = m.corpoH*0.104;
+    const y = m.corpoY + m.corpoH*(0.068 + k*0.104);
+    const alt = m.corpoH*0.100;
     /* a zona é mais alta que a letra: quem escolhe aqui está com o polegar
        na tela, não com um ponteiro */
     mfdZona(o.x, y - alt/2, o.w, alt, () => { escolheSortida(q.id); mfdEscolhendo = false; });
@@ -12006,9 +12006,9 @@ function mfdPaginaEscolha(o, m){
   /* o briefing da escolhida: é o que responde "o que eu vou fazer lá?" antes
      de decolar, e é a razão de a seleção morar aqui e não num menu */
   const S = Sortida.atual(), cab = sortidaCab(S);
-  const yB = m.corpoY + m.corpoH*0.635;
+  const yB = m.corpoY + m.corpoH*0.598;
   h2.strokeStyle = MFD_FIO + '.10)'; h2.lineWidth = 1;
-  h2.beginPath(); h2.moveTo(x, yB - m.corpoH*0.052); h2.lineTo(x + w, yB - m.corpoH*0.052); h2.stroke();
+  h2.beginPath(); h2.moveTo(x, yB - m.corpoH*0.048); h2.lineTo(x + w, yB - m.corpoH*0.048); h2.stroke();
   h2.font = '800 ' + (m.f*0.70).toFixed(1) + 'px system-ui, sans-serif';
   h2.textAlign = 'right'; h2.fillStyle = '#ffd257';
   const lgM = cab[1] ? h2.measureText(cab[1]).width + m.f*0.6 : 0;
@@ -12017,11 +12017,11 @@ function mfdPaginaEscolha(o, m){
   h2.fillText(mfdCorta(cab[0], w - lgM), x, yB);
   h2.font = '700 ' + (m.f*0.76).toFixed(1) + 'px system-ui, sans-serif';
   h2.fillStyle = MFD_CLARO;
-  mfdParagrafo(S.lema, x, yB + m.corpoH*0.078, w, m.corpoH*0.074, 3);
+  mfdParagrafo(S.lema, x, yB + m.corpoH*0.076, w, m.corpoH*0.072, 3);
 
   /* o botão das páginas, no lugar do rodapé: com mais de uma página ele é a
      coisa mais útil que cabe ali — e continua dizendo o verbo */
-  const yR = m.corpoY + m.corpoH*0.945, altR = m.corpoH*0.10;
+  const yR = m.corpoY + m.corpoH*0.95, altR = m.corpoH*0.092;
   h2.font = '800 ' + (m.f*0.74).toFixed(1) + 'px system-ui, sans-serif';
   h2.textAlign = 'center';
   if (nPag > 1){
@@ -12124,6 +12124,21 @@ function mfdPaginaMissao(o, m){
     mfdParagrafo(ord.toUpperCase(), x, yS + m.corpoH*0.085, w, m.corpoH*0.075, 2);
   }
   const y2 = m.corpoY + m.corpoH*0.86;
+  /* A SORTIDA ACABOU E O AVIÃO ESTÁ PARADO: o rodapé vira o botão do
+     relatório. Sem ele o papel só aparecia para quem batesse — e quem cumpre
+     a missão e pousa inteiro é justamente quem merece ler. Pontos e distância
+     estão no próprio relatório. */
+  if (Sortida.acabou() && noChao && voo === 0){
+    const altB = m.corpoH*0.17;
+    mfdZona(o.x, y2 - altB/2, o.w, altB, () => Relatorio.encerra());
+    h2.strokeStyle = MFD_AMBAR; h2.lineWidth = 1;
+    h2.strokeRect(x, y2 - altB/2 + 1, w, altB - 2);
+    h2.font = '800 ' + (m.f*0.86).toFixed(1) + 'px system-ui, sans-serif';
+    h2.textAlign = 'center'; h2.fillStyle = MFD_AMBAR;
+    h2.fillText(mfdCorta('VER O RELATÓRIO ▸', w - 6), x + w/2, y2);
+    h2.textAlign = 'left'; h2.textBaseline = 'middle';
+    return;
+  }
   h2.strokeStyle = MFD_FIO + '.12)'; h2.lineWidth = 1;
   h2.beginPath(); h2.moveTo(x, y2 - m.corpoH*0.11); h2.lineTo(x + w, y2 - m.corpoH*0.11); h2.stroke();
   h2.font = '700 ' + m.f.toFixed(1) + 'px ui-monospace, monospace';
@@ -14090,7 +14105,7 @@ const OBJ_DEF = {
      (um abate, uma parada) — nenhum pede varredura própria. */
   loco:    { txt:'Parar a locomotiva',             meta: 1 },
   vagoes:  { txt:'Destruir {n} vagões',            meta: 4 },
-  portoes: { txt:'Passar {n} portões',             meta: 8 },
+  portoes: { txt:'Passar {n} anéis',               meta: 8 },
   helis:   { txt:'{n} helicópteros',               meta: 4 },
   valeP:   { txt:'Parar no VALE',                  meta: 1 },
   orlaP:   { txt:'Parar em ' + CIDADES[1].nome,    meta: 1 },
@@ -14696,7 +14711,9 @@ Missoes = (function(){
 
    A faixa e o relógio são elementos da página, não desenho no HUD: assim não
    custam nada por quadro (só mudam quando o texto muda) e não disputam uma
-   linha de `desenhaHUD` com mais ninguém.
+   linha de `desenhaHUD` com mais ninguém. O relógio mora no canto de cima à
+   direita porque é o único canto vazio nos dois jeitos de jogar: no celular o
+   meio de cima é do CALIBRAR, e a esquerda é dos botões de vista.
    ========================================================================== */
 const Relatorio = {
   t: 0,                 // segundos desde a decolagem (o relógio da sortida)
@@ -14886,7 +14903,7 @@ const Relatorio = {
       '#faixaMissao i{display:block;margin-top:.35em;font:800 clamp(15px,3vw,30px)/1.1 system-ui,sans-serif;' +
         'font-style:normal;letter-spacing:.08em;color:#ffd257}' +
       '#faixaMissao.ok b{color:#7fffa8} #faixaMissao.nao b{color:#ff7a6a} #faixaMissao.nao i{color:#ffc9c0}' +
-      '#relogioMissao{position:fixed;z-index:4;left:50%;top:calc(6px + env(safe-area-inset-top));transform:translateX(-50%);' +
+      '#relogioMissao{position:fixed;z-index:4;right:calc(12px + env(safe-area-inset-right));top:calc(8px + env(safe-area-inset-top));' +
         'display:none;pointer-events:none;white-space:nowrap;padding:4px 12px;border-radius:9px;' +
         'background:rgba(8,12,26,.55);border:1px solid rgba(255,192,70,.45);color:#ffc046;' +
         'font:800 clamp(11px,1.7vw,16px)/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em}' +
@@ -14935,6 +14952,17 @@ const Relatorio = {
     el.className = (r !== null && r < 30) ? 'aperta' : '';
   },
 
+  /* encerrar o voo de propósito, parado na pista com a sortida fechada: é o
+     caminho para o relatório que não passa por bater. O título da capa é
+     escrito por `fim()`, que só conhece os motivos de queda — então, depois
+     dela, este voo ganha o título que é dele. */
+  _encerrou: false,
+  encerra(){
+    if (!jogando || caindo || !Sortida.acabou()) return;
+    this._encerrou = true;
+    Motor.desliga(); fim();
+  },
+
   /* --- O PAPEL: dentro de `#placar`, quando o voo acaba -------------------
      `fim()` escreve o placar depois de chamar isto, então o relatório entra
      na volta seguinte e NA FRENTE do que estiver lá — sem depender de como a
@@ -14950,9 +14978,14 @@ const Relatorio = {
       Sortida.fracassa((M[motivoQueda] || 'o avião caiu').toUpperCase());
       this.faixa('');
     }
-    const html = this.html();
+    const html = this.html(), encerrou = this._encerrou;
+    this._encerrou = false;
     Promise.resolve().then(() => {
       const p = document.getElementById('placar');
+      if (encerrou){
+        const h = document.querySelector('#capa h1');
+        if (h) h.textContent = this.res && this.res.ok ? 'Missão cumprida' : 'Voo encerrado';
+      }
       if (!p) return;
       const velho = p.querySelector('.rm'); if (velho) velho.remove();
       p.insertAdjacentHTML('afterbegin', html);
@@ -15017,7 +15050,7 @@ const Portoes = {
   arma(){
     this.some();
     if (!this.matProx){
-      this.geo = new THREE.TorusGeometry(this.RAIO, 55, 8, 40);
+      this.geo = new THREE.TorusGeometry(this.RAIO, 70, 8, 40);
       this.matProx   = new THREE.MeshBasicMaterial({ color: 0xffd84a, fog: false });
       this.matEspera = new THREE.MeshBasicMaterial({ color: 0x3aa0d8, transparent: true, opacity: 0.55 });
     }
