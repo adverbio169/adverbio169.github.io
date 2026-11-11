@@ -2020,7 +2020,7 @@ const Painel = {
        para trás as linhas de sortida da última vez — zonas fantasma, que só
        não pegam ninguém hoje porque quem toca confere o formato antes. Limpar
        aqui é fechar a porta antes de alguém entrar por ela. */
-    if (fmt !== 'OBJET'){ this.sorZonas = null; this.sorLinha = null; }
+    if (fmt !== 'OBJET'){ this.sorZonas = null; this.sorLinha = null; this.sorMais = null; }
     if (fmt !== 'APROX'){ this.apxZonas = null; this.apxCab = null; }
     if (fmt === 'ATITUDE'){
       const fr = this.faixaRot(r);
@@ -2270,7 +2270,9 @@ const Painel = {
   sorPag: -1,
   escolha(c, m, d){
     const x = m.pad, w = m.W - m.pad*2, L = d.sorL || [];
-    const POR = 5, nPag = Math.max(1, Math.ceil(L.length/POR));
+    /* cinco por página onde cabem; num painel baixo, três, com a linha alta
+       o bastante para o polegar */
+    const POR = m.corpoH < 130 ? 3 : 5, passoL = 0.52/POR, nPag = Math.max(1, Math.ceil(L.length/POR));
     c.textBaseline = 'middle'; c.textAlign = 'left';
     c.font = '800 ' + Math.max(9, m.cab*0.52).toFixed(1) + 'px system-ui, sans-serif';
     const lgNome = c.measureText('OBJET').width;
@@ -2283,7 +2285,7 @@ const Painel = {
     const i0 = this.sorPag*POR;
     for (let k = 0; k < POR && i0 + k < L.length; k++){
       const i = i0 + k;
-      const y = m.corpoY + m.corpoH*(0.068 + k*0.104), alt = m.corpoH*0.100;
+      const y = m.corpoY + m.corpoH*(0.016 + passoL*(k + 0.5)), alt = m.corpoH*passoL*0.96;
       const sel = !!L[i][2];
       this.sorZonas.push({ i, y: y - alt/2, h: alt });
       if (sel){
@@ -2291,7 +2293,7 @@ const Painel = {
         c.fillRect(m.pad*0.4, y - alt/2, m.W - m.pad*0.8, alt);
       }
       c.fillStyle = L[i][1] ? MFD_VERM : MFD_VERDE;           // vermelho: tem caça
-      c.fillRect(m.pad*0.4, y - alt*0.36, Math.max(2, m.pad*0.26), alt*0.72);
+      c.fillRect(m.pad*0.4, y - Math.min(alt, m.f*1.5)*0.36, Math.max(2, m.pad*0.26), Math.min(alt, m.f*1.5)*0.72);
       const e = L[i][4] || 0;
       c.font = '800 ' + (m.f*0.92).toFixed(1) + 'px system-ui, sans-serif';
       c.textAlign = 'right';
@@ -2675,6 +2677,11 @@ const Painel = {
       if (this.sorZonas){
         /* o botão das páginas é daqui mesmo: roda a lista e não manda nada */
         if (this.sorMais && py >= this.sorMais[0] && py <= this.sorMais[1]){
+          /* um dedo, uma página: o toque e o clique que o navegador inventa
+             para ele não podem virar duas */
+          const agora = performance.now();
+          if (agora - (this.sorQuando || 0) < 450) return true;
+          this.sorQuando = agora;
           this.sorPag = (this.sorPag + 1) % this.sorMais[2]; this.pinta();
           try { navigator.vibrate && navigator.vibrate(10); } catch(e){}
           return true;

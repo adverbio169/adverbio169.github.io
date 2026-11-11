@@ -11949,12 +11949,27 @@ let mfdEscolhendo = false;
    fica menor que um polegar. Então a lista é PAGINADA — cinco por vez, e um
    botão embaixo que roda as páginas. Abre sempre na página da escolhida.
 
+   Cinco, onde cabem. No celular deitado a tela do instrumento tem uns noventa
+   pontos de altura útil, e cinco linhas ali dão dez pontos cada: lê-se, mas
+   não se acerta com o polegar. Ali são TRÊS por página, com a linha mais alta
+   do que era quando só havia quatro sortidas.
+
    E cada linha passou a dizer o que já se fez nela: as estrelas da melhor
    marca à direita, onde antes estava escrito COMBATE / SEM HOSTIS. Esse aviso
    virou a cor do quadradinho na frente do nome (vermelho: tem caça) e a
    primeira linha do briefing, que tem lugar para a palavra inteira. */
-const SOR_POR_PAG = 5;
-let mfdSorPag = -1;                 // -1: ainda não aberta (abre na da escolhida)
+function sorPorPag(corpoH){ return corpoH < 130 ? 3 : 5; }
+let mfdSorPag = -1, _sorPagQuando = 0;
+/* O botão das páginas RODA, e por isso não pode ouvir o mesmo dedo duas vezes:
+   num celular o toque chega como toque e, logo depois, como o clique que o
+   navegador inventa para ele. Escolher uma sortida duas vezes não muda nada;
+   virar a página duas vezes, com duas páginas, é não sair do lugar. */
+function sorViraPagina(nPag){
+  const agora = performance.now();
+  if (agora - _sorPagQuando < 450) return;
+  _sorPagQuando = agora;
+  mfdSorPag = (mfdSorPag + 1) % nPag;
+}                 // -1: ainda não aberta (abre na da escolhida)
 /* a linha de cima do briefing, pronta: é a mesma na tela do jogo e no
    celular-controle, que a recebe no pacote */
 function sortidaCab(q){
@@ -11971,14 +11986,15 @@ function mfdPaginaEscolha(o, m){
   h2.fillStyle = MFD_AMBAR;
   h2.fillText('SELEÇÃO', o.x + m.pad + lgNome + m.f*1.3, o.y + m.cab*0.62);
 
-  const nPag = Math.ceil(SORTIDAS.length/SOR_POR_PAG);
+  const POR = sorPorPag(m.corpoH), passoL = 0.52/POR;
+  const nPag = Math.ceil(SORTIDAS.length/POR);
   if (mfdSorPag < 0 || mfdSorPag >= nPag)
-    mfdSorPag = Math.floor(Math.max(0, SORTIDAS.findIndex(q => q.id === sortidaId))/SOR_POR_PAG);
-  const i0 = mfdSorPag*SOR_POR_PAG;
-  for (let k = 0; k < SOR_POR_PAG && i0 + k < SORTIDAS.length; k++){
+    mfdSorPag = Math.floor(Math.max(0, SORTIDAS.findIndex(q => q.id === sortidaId))/POR);
+  const i0 = mfdSorPag*POR;
+  for (let k = 0; k < POR && i0 + k < SORTIDAS.length; k++){
     const q = SORTIDAS[i0 + k], sel = q.id === sortidaId;
-    const y = m.corpoY + m.corpoH*(0.068 + k*0.104);
-    const alt = m.corpoH*0.100;
+    const y = m.corpoY + m.corpoH*(0.016 + passoL*(k + 0.5));
+    const alt = m.corpoH*passoL*0.96;
     /* a zona é mais alta que a letra: quem escolhe aqui está com o polegar
        na tela, não com um ponteiro */
     mfdZona(o.x, y - alt/2, o.w, alt, () => { escolheSortida(q.id); mfdEscolhendo = false; });
@@ -11988,7 +12004,7 @@ function mfdPaginaEscolha(o, m){
     }
     /* o quadradinho: vermelho tem caça, verde é céu limpo */
     h2.fillStyle = q.caca.max ? MFD_VERM : MFD_VERDE;
-    h2.fillRect(o.x + m.pad*0.4, y - alt*0.36, Math.max(2, m.pad*0.26), alt*0.72);
+    h2.fillRect(o.x + m.pad*0.4, y - Math.min(alt, m.f*1.5)*0.36, Math.max(2, m.pad*0.26), Math.min(alt, m.f*1.5)*0.72);
     /* as estrelas da melhor marca: três, as ganhas em ouro */
     const e = (Relatorio.melhor(q.id) || { e: 0 }).e;
     h2.font = '800 ' + (m.f*0.92).toFixed(1) + 'px system-ui, sans-serif';
@@ -12025,7 +12041,7 @@ function mfdPaginaEscolha(o, m){
   h2.font = '800 ' + (m.f*0.74).toFixed(1) + 'px system-ui, sans-serif';
   h2.textAlign = 'center';
   if (nPag > 1){
-    mfdZona(o.x, yR - altR/2, o.w, altR, () => { mfdSorPag = (mfdSorPag + 1) % nPag; });
+    mfdZona(o.x, yR - altR/2, o.w, altR, () => sorViraPagina(nPag));
     h2.strokeStyle = MFD_AMBAR; h2.lineWidth = 1;
     h2.strokeRect(x, yR - altR/2 + 1, w, altR - 2);
     h2.fillStyle = MFD_AMBAR;
