@@ -1553,6 +1553,7 @@ let vyChao = 0, altChao = 0;
    `quedaAcabou`: a trava de "já explodi no chão", que antes era o próprio
    `motivoQueda` e por isso apagava o motivo (ver `atualizaQueda`). */
 let rolagemDePouso = false, tNoAr = 99, quedaAcabou = false;
+let tFim = 0;                 // o fim agendado pela queda: uma partida nova o cancela
 const G_JOGO = 640;      // ver a âncora dos 9 g, no medidor de carga
 let estresse=0;
 let vida=100;
@@ -2516,11 +2517,15 @@ function montaCidade(){
   cena.add(cidade);
 }
 /* quando um prédio cai, some com ele encolhendo a instância para zero */
-function derrubaPredio(p){
+function derrubaPredio(p, emLote){
   p.vivo = false;
   /* o telhado e a baliza caem com ele: sem isto ficava uma caixa-d'água
      boiando no ar em cima do vazio, que é a cara de bug que mais se nota */
-  if (telhados || balizas) montaTelhados();
+  /* `emLote`: quem derruba vários de uma vez refaz os telhados UMA vez, no
+     fim. A nuclear chamava isto por prédio — 238 prédios no ponto mais denso,
+     238 reconstruções dos telhados da cidade inteira, 387 ms de tela parada
+     no instante do clarão (medido; num celular, um a dois segundos). */
+  if (!emLote && (telhados || balizas)) montaTelhados();
   const i = cidadeIdx.indexOf(p);
   if (i < 0 || !cidade) return;
   const m = new THREE.Matrix4();
@@ -7275,12 +7280,18 @@ const Cabeca = {
   },
 
   async liga(){
-    if (this.ligada) return;
+    /* `ligada` só vira verdade depois de três esperas (o detector, a câmera, o
+       vídeo). Um segundo C nesse intervalo entrava de novo e abria OUTRA
+       câmera por cima da primeira, que ficava acesa até fechar a aba. */
+    if (this.ligada || this._ligando) return;
+    this._ligando = true;
     try{
       mostraAviso('PROCURANDO A CÂMERA…', '#7fd8ff', 900);
       await this._carrega();
-      this._fluxo = await navigator.mediaDevices.getUserMedia({
+      const fluxo = await navigator.mediaDevices.getUserMedia({
         video:{ width:{ideal:640}, height:{ideal:480}, facingMode:'user' }, audio:false });
+      if (this._fluxo && this._fluxo !== fluxo) try{ this._fluxo.getTracks().forEach(t => t.stop()); }catch(e){}
+      this._fluxo = fluxo;
       if (!this._video){
         this._video = document.createElement('video');
         this._video.playsInline = true; this._video.muted = true;
@@ -7300,6 +7311,7 @@ const Cabeca = {
                  : (e && e.message) || 'não deu para ligar a câmera';
       mostraAviso(this.aviso.toUpperCase(), '#ff8f6b', 2200);
     }
+    finally { this._ligando = false; }
     pintaBotaoCabeca();
   },
 
@@ -8672,10 +8684,12 @@ function nuclear(x, z){
     if (a.no) a.no.visible = false;
     mostraAviso('ALVO DESTRUÍDO! ' + alvosDestruidos + '/' + alvosTotal, '#ffd257', 1600);
   }
+  let caiuPredio = false;
   for (const p of predios){
     if (!p.vivo) continue;
-    if ((p.x-x)*(p.x-x) + (p.z-z)*(p.z-z) < R2) derrubaPredio(p);
+    if ((p.x-x)*(p.x-x) + (p.z-z)*(p.z-z) < R2){ derrubaPredio(p, true); caiuPredio = true; }
   }
+  if (caiuPredio && (telhados || balizas)) montaTelhados();
   for (const o of obstaculos){
     if (!o.vivo) continue;
     if ((o.x-x)*(o.x-x) + (o.z-z)*(o.z-z) < R2*0.5){ o.vivo = false; if (o.no) o.no.visible = false; pontos += 50; }
@@ -9357,7 +9371,10 @@ function atualizaTiros(dt){
        "vejo ele indo de lado, quando tinha que ver ele de trás". */
     if (b.tipo !== 'missil' && b.tipo !== 'nuke') b.no.rotateX(Math.PI/2);
   }
-  bombas = bombas.filter(b => { if (b.morto){ cena.remove(b.no); return false; } return true; });
+  /* cada míssil deixava nove geometrias na placa para sempre (medido: 152
+     para 243 depois de dez), e recomeçar não liberava: numa tarde de jogo no
+     celular isso só cresce. Quem sai da cena solta o que era só dele. */
+  bombas = bombas.filter(b => { if (b.morto){ liberaNo(b.no); cena.remove(b.no); return false; } return true; });
   for (const t of tiros){
     t.x += t.dx*t.v*dt; t.y += t.dy*t.v*dt; t.z += t.dz*t.v*dt; t.vida -= dt;
     if (atingeAr(t.x,t.y,t.z,320,DANO.metralha)) t.vida = 0;
@@ -9417,7 +9434,7 @@ function atualizaQueda(dt){
        lia 'acabou' como combustível — então TODA morte terminava com o título
        "Acabou o combustível", fosse prédio, chão, caça ou a própria bomba. A
        trava ganhou variável dela e o motivo chega inteiro ao fim. */
-    if (!quedaAcabou){ quedaAcabou = true; explode(aviaoX, aviaoY, aviaoZ, 2.0); Motor.desliga(); setTimeout(fim, 900); }
+    if (!quedaAcabou){ quedaAcabou = true; explode(aviaoX, aviaoY, aviaoZ, 2.0); Motor.desliga(); tFim = setTimeout(fim, 900); }
   }
 }
 
@@ -9714,7 +9731,7 @@ function atualiza(dt){
 
   passoFogo(dt);
   for (const c of cogumelos) passoCogumelo(c, dt);
-  cogumelos = cogumelos.filter(c => { if (c.t > 12){ cena.remove(c.no); return false; } return true; });
+  cogumelos = cogumelos.filter(c => { if (c.t > 12){ liberaNo(c.no); cena.remove(c.no); return false; } return true; });
 
   if (caindo){ atualizaQueda(dt); return; }
 
@@ -12386,6 +12403,7 @@ function aproxSugerida(){
 
 function aproxDados(){
   if (!aproxSel) return null;          // nada carregado, nada na tela
+  if (!PISTAS[aproxSel.i]){ aproxSel = null; return null; }   // cinto de segurança
   let melhor = null;
   for (const p of [PISTAS[aproxSel.i]]){
     const dx = aviaoX - p.cx, dz = aviaoZ - p.cz;
@@ -14368,9 +14386,28 @@ function religaQuadro(){
   lacoVivo = false;
   pedeQuadro();
 }
+/* UM TROPEÇO NÃO CONGELA O JOGO. O corpo do quadro soltava a trava e só pedia
+   o quadro seguinte na ÚLTIMA linha: uma exceção em qualquer ponto — física,
+   cena, HUD — e o laço morria para sempre, com `jogando` verdadeiro, a capa
+   escondida, o motor roncando e nenhum aviso. Só esconder e mostrar a aba
+   religava. Agora um erro isolado custa um quadro; um erro que se repete meio
+   segundo leva à tela de fim com a mensagem, em vez de uma tela parada. */
+let errosSeguidos = 0;
 function quadro(t){
   lacoVivo = false;
   if (!jogando) return;
+  try { quadroCorpo(t); errosSeguidos = 0; }
+  catch(e){
+    try { console.error(e); } catch(x){}
+    if (++errosSeguidos >= 30){
+      errosSeguidos = 0;
+      try { Motor.desliga(); fim(); erro('O jogo tropeçou e parou: ' + (e && e.message ? e.message : e)); } catch(x){}
+      return;
+    }
+  }
+  if (jogando) pedeQuadro();
+}
+function quadroCorpo(t){
   const dt = Math.min(0.1, (t-ultimoT)/1000 || PASSO);
   sacudida *= Math.pow(0.02, dt);              // o susto desce sozinho
   ultimoT = t; sobrando += dt;
@@ -14410,7 +14447,6 @@ function quadro(t){
     }
     else ruins = 0;
   }
-  pedeQuadro();
 }
 /* a escolha que a pessoa fez no botão (0, 1 ou 2), ou null se nunca mexeu */
 function qualidadeSalva(){
@@ -14444,7 +14480,15 @@ function poeQualidade(q, calado){
 /* =============================================================================
    ENTRADA E COMEÇO
    ========================================================================== */
+/* O TECLADO NÃO OLHAVA O ALVO. O alfabeto dos códigos de sala tem G, F, V, C,
+   X, Z, M, Q, E, W, S, A, D, 2 e 3 — todos comandos. Digitar o código de uma
+   batalha baixava flape, trocava a vista, pedia a câmera e ligava a munição
+   infinita sem aviso; e o Enter do campo, além de entrar na batalha, começava
+   (ou recomeçava) o voo. Quem está escrevendo num campo está escrevendo. */
+const digitando = e => { const a = e.target;
+  return !!(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)); };
 document.addEventListener('keydown', e => {
+  if (digitando(e)) return;
   if (e.key==='ArrowLeft')  tecla.esq=true;
   if (e.key==='ArrowRight') tecla.dir=true;
   if (e.key==='ArrowUp')   { tecla.cima=true;  e.preventDefault(); }
@@ -14473,9 +14517,15 @@ document.addEventListener('keydown', e => {
     if (munInfinita) for (const k in ARMAS) municao[k] = ARMAS[k].municao;
     mostraAviso(munInfinita ? 'MUNIÇÃO INFINITA' : 'munição normal', '#7fd8ff', 1200); }
   if (e.key===' '){ atirando = true; e.preventDefault(); }
-  if (e.key==='Enter' && !jogando) comeca();
+  /* SEM SINAL DO CELULAR não tinha saída: só um pacote do celular retomava. Na
+     TV com teclado, Enter devolve o avião ao teclado e o voo continua. */
+  if (e.key==='Enter' && pausado){ Controle.modo = 'nenhum'; usandoToque = false; retoma();
+    mostraAviso('COMANDO NO TECLADO', '#9fd8ff', 1600); return; }
+  if (e.key==='Enter' && !jogando && !estaPausado() && $('capa').style.display !== 'none'
+      && !$('painelSala').classList.contains('ver')) comeca();
 });
 document.addEventListener('keyup', e => {
+  if (digitando(e)) return;
   if (e.key==='ArrowLeft')  tecla.esq=false;
   if (e.key==='ArrowRight') tecla.dir=false;
   if (e.key==='ArrowUp')    tecla.cima=false;
@@ -14604,25 +14654,63 @@ function mfdSolta(px, py){
      ao dedo, isso fecharia a tela na cara de quem errou o contato por 3 px. */
   if (g.y0 < o.y + mfdMedidas(o).cab) mfdRecolhe(true);
 }
+/* --- O MANCHE TEM DONO -------------------------------------------------------
+   Estes ouvintes liam sempre `e.touches[0]` — o PRIMEIRO dedo na tela, fosse
+   ele qual fosse — e não olhavam onde o toque tinha caído. Medido no celular
+   deitado, com os comandos de dedo ligados:
+
+     · arrastar a MANETE para cima era profundor cheio, junto com o motor;
+     · deslizar o seletor de ARMAS virava o avião;
+     · virando com um dedo e apertando FOGO com o outro, o manche voltava ao
+       centro (o segundo dedo reancorava a origem);
+     · com o FOGO apertado primeiro, não dava para pilotar — e soltar o FOGO
+       zerava o manche.
+
+   Agora o toque que começa em cima de um botão NÃO é manche; o manche guarda o
+   dedo que o pegou (`identifier`) e só segue esse dedo; e só o dedo que é o
+   dono, ao sair, devolve o manche ao centro. A tela de instrumento faz o mesmo
+   com o gesto dela. Atirar e pilotar passaram a caber na mesma mão. */
+const toqueNaoEManche = t => {
+  const a = t && t.target;
+  return !!(a && a.closest && a.closest('#dedos, .bt, button, input, #painelSala, #capa'));
+};
+const achaToque = (lista, id) => {
+  if (!lista) return null;
+  if (id === undefined) return lista[0] || null;        // evento sintético, sem identidade
+  for (let i = 0; i < lista.length; i++) if (lista[i].identifier === id) return lista[i];
+  return null;
+};
 addEventListener('touchstart', e => {
-  if (!jogando || !e.touches || !e.touches[0]) return;
-  if (mfdPega(e.touches[0].clientX, e.touches[0].clientY)){ toqueIni = null; return; }
-  usandoToque = Controle.modo !== 'sensor';
-  toqueIni = { x:e.touches[0].clientX, y:e.touches[0].clientY, t:Date.now() };
+  if (!jogando) return;
+  const novos = (e.changedTouches && e.changedTouches.length) ? e.changedTouches : e.touches;
+  if (!novos) return;
+  for (let i = 0; i < novos.length; i++){
+    const t = novos[i];
+    if (!t || toqueNaoEManche(t)) continue;
+    if (!mfdGesto && mfdPega(t.clientX, t.clientY)){ if (mfdGesto) mfdGesto.id = t.identifier; continue; }
+    if (toqueIni) continue;                               // o manche já tem dono
+    usandoToque = Controle.modo !== 'sensor';
+    toqueIni = { id: t.identifier, x: t.clientX, y: t.clientY, t: Date.now() };
+  }
 }, {passive:true});
 addEventListener('touchmove', e => {
-  if (!e.touches || !e.touches[0]) return;
-  if (mfdGesto){ mfdArrasta(e.touches[0].clientX, e.touches[0].clientY); return; }
+  if (!e.touches) return;
+  if (mfdGesto){ const t = achaToque(e.touches, mfdGesto.id); if (t) mfdArrasta(t.clientX, t.clientY); }
   if (!toqueIni || !usandoToque) return;
-  toqueX = Math.max(-1, Math.min(1, (e.touches[0].clientX - toqueIni.x)/90));
-  toqueY = Math.max(-1, Math.min(1, (toqueIni.y - e.touches[0].clientY)/90));
+  const t = achaToque(e.touches, toqueIni.id);
+  if (!t) return;
+  toqueX = Math.max(-1, Math.min(1, (t.clientX - toqueIni.x)/90));
+  toqueY = Math.max(-1, Math.min(1, (toqueIni.y - t.clientY)/90));
 }, {passive:true});
 addEventListener('touchend', e => {
+  const saiu = e.changedTouches;
   if (mfdGesto){
-    const t = e.changedTouches && e.changedTouches[0];
-    mfdSolta(t ? t.clientX : undefined, t ? t.clientY : undefined);
-    return;                                   // toque na tela NÃO atira
+    const t = achaToque(saiu, mfdGesto.id);
+    // toque na tela de instrumento NÃO atira: o gesto acaba aqui
+    if (t || mfdGesto.id === undefined) mfdSolta(t ? t.clientX : undefined, t ? t.clientY : undefined);
   }
+  if (!toqueIni) return;
+  if (toqueIni.id !== undefined && !achaToque(saiu, toqueIni.id)) return;   // saiu outro dedo, não o do manche
   /* O TIRO SÓ NO FOGO. "então tem que arrumar o disparo só no fogo mesmo."
 
      O toque curto em qualquer lugar atirava, e era de propósito — mas com o
@@ -14639,7 +14727,7 @@ addEventListener('touchend', e => {
   }
   toqueIni = null; toqueX = 0; toqueY = 0;
 }, {passive:true});
-addEventListener('touchcancel', () => { if (mfdGesto) mfdSolta(); }, {passive:true});
+addEventListener('touchcancel', () => { if (mfdGesto) mfdSolta(); toqueIni = null; toqueX = 0; toqueY = 0; }, {passive:true});
 
 $('btVisao').onclick = () => { poeVista(nVista + 1); };
 /* e o mesmo no computador, com o rato: clicar na aba troca, e arrastar rola —
@@ -14762,10 +14850,13 @@ function reinicia(){
   /* valem para os dois começos (pista e ar), e não só para o da pista */
   vyChao = 0; altChao = 0; rolagemDePouso = false; tNoAr = noChao ? 0 : 99;
   giroMotor = motor; vAfunda = 0; avisouSeco = false;
-  for (const b of bombas) cena.remove(b.no); bombas = [];
+  /* um fim atrasado (900 ms depois do impacto) nunca cai em cima de uma partida
+     nova; e partida nova não herda pausa de sinal nem de aba */
+  clearTimeout(tFim); pausado = false; pausadoDeAba = false;
+  for (const b of bombas){ liberaNo(b.no); cena.remove(b.no); } bombas = [];
   for (const t of tiros) cena.remove(t.no); tiros = [];
   for (const f of faiscas) cena.remove(f.no); faiscas = [];
-  for (const c of cogumelos) cena.remove(c.no); cogumelos = [];
+  for (const c of cogumelos){ liberaNo(c.no); cena.remove(c.no); } cogumelos = [];
   for (const f of fumos) cena.remove(f.no); fumos = [];
   for (const c of chamas) cena.remove(c.no); chamas = [];
   contra = CONTRA_TOTAL; contraEspera = 0;
@@ -14860,6 +14951,12 @@ function fim(){
   Controles.treme('metralha', false); Controles.treme('estol', false);
   Controles.treme('buffet', false);
   Alarmes.zera();                 // nenhum alarme continua gritando na tela de fim
+  /* O FIM QUE CHEGA DURANTE UMA PAUSA. A queda agenda o fim para 900 ms
+     depois; se nesse intervalo a aba escondia (ou o sinal caía), a retomada
+     fazia `jogando = true` sem perguntar se o jogo tinha acabado — e ele
+     voltava a rodar atrás da tela de fim, sem Enter nem celular que o
+     recomeçasse. Acabou, acabou: as três pausas são desfeitas aqui. */
+  pausado = false; pausadoDePe = false; pausadoDeAba = false;
   const m = Math.round(distancia/METRO);
   if (m > recorde){ recorde = m; try{ localStorage.setItem('aviao.recorde', String(m)); }catch(e){} }
   const t = venceu ? 'Missão cumprida! Todos os alvos no chão.'
@@ -15462,6 +15559,14 @@ function desenhaQR(canvas, texto){
    comando no talo: v = 1e18 viraria tonel cheio. A faixa é a do que o
    controle de verdade manda (voltaCurta e toFixed lá na origem), então nenhum
    comando legítimo cai fora dela. */
+/* O NOME também é palavra de estranho. Um nome que não é texto (`nome: 12345`)
+   estourava `nome.toUpperCase()` a cada quadro na página MAPA: o laço morria,
+   o pacote de estado morria junto, e o anfitrião ainda repassava o nome a
+   todos — qualquer um que acertasse as quatro letras da sala congelava a
+   batalha inteira. Texto, sem controle nem marcação, doze letras. */
+function nomeDeRede(x){
+  return (typeof x === 'string' ? x : '').replace(/[\u0000-\u001f<>&]/g, '').trim().slice(0, 12) || 'visitante';
+}
 function numeroDeRede(x, min, max, padrao){
   if (typeof x !== 'number' || !isFinite(x) || x < min || x > max) return padrao;
   return x;
@@ -15491,6 +15596,14 @@ const Tripulacao = {
     if (era === 'piloto'){
       const novo = this.membros[0];
       if (novo){ novo.papel = 'piloto'; this.avisaPapel(novo); }
+      /* O último celular saiu. Num aparelho de TOQUE o comando volta para a
+         tela e o voo segue — antes o jogo pausava em "SEM SINAL" sem botão
+         nenhum, e só recarregando a página se saía dali. Numa TV pausa, e o
+         aviso diz como continuar. */
+      else if (jogando && (('ontouchstart' in window) || navigator.maxTouchPoints > 0)){
+        Controle.modo = 'toque'; usandoToque = true; Dedos.mostra(true);
+        mostraAviso('O CELULAR SAIU — O COMANDO VOLTOU PARA ESTA TELA', '#ffb86b', 3200);
+      }
       else pausa();
     }
     temArtilheiro = this.membros.some(m => m.papel === 'artilheiro');
@@ -15507,6 +15620,18 @@ const Tripulacao = {
   recebe(m, d){
     if (!d || !d.t) return;
     m.ultimo = Date.now();
+    /* QUEM FOI VARRIDO E VOLTOU, VOLTA DE VERDADE. Três segundos e meio de
+       silêncio (tela do celular bloqueada, troca de aplicativo) tiravam o
+       membro da lista — mas a ligação e este ouvinte continuavam vivos. Ele
+       voltava a mandar e PILOTAVA por fora da tripulação: sem receber estado,
+       sem tremor, com o botão preso em "Voando…", e podendo virar um segundo
+       piloto escrevendo no mesmo manche. Readmitido, ele volta com posto. */
+    if (!this.membros.includes(m)){
+      m.papel = this.membros.some(o => o.papel === 'piloto') ? 'artilheiro' : 'piloto';
+      this.membros.push(m);
+      Dedos.mostra(false);
+      this.avisaPapel(m); this.mostra();
+    }
     if (d.t === 'eixo'){
       if (m.papel === 'piloto'){
         Controle.volante = numeroDeRede(d.v, -180, 180, 0);
@@ -15553,8 +15678,11 @@ const Tripulacao = {
                       escolheSortida(q.id); break; }
       /* carregar e descarregar a aproximação pelo celular: índice na lista
          que ele recebeu, ou nulo para descarregar */
-      case 'apx': aproxSel = (d.i === null || d.i === undefined) ? null
-                             : { i: d.i >> 1, s: (d.i & 1) ? -1 : 1 };
+      /* sem teste de faixa, um índice de pista que não existe (`i: 99`)
+         estourava a página APROX a cada quadro e congelava jogo e estado */
+      case 'apx': if (d.i === null || d.i === undefined) aproxSel = null;
+                  else if (Number.isInteger(d.i) && d.i >= 0 && (d.i >> 1) < PISTAS.length)
+                    aproxSel = { i: d.i >> 1, s: (d.i & 1) ? -1 : 1 };
                   break;
       case 'visao': poeVista(d.v === undefined ? nVista + 1 : Math.round(numeroDeRede(d.v, 0, 99, nVista))); break;
       /* AS FUNÇÕES DE VISUALIZAÇÃO, PELO CELULAR. Elas moravam só em botões
@@ -15935,10 +16063,13 @@ function pausa(){
   Controles.treme('metralha', false); Controles.treme('estol', false);
   Controles.treme('buffet', false);
   Alarmes.zera();
-  mostraAviso('SEM SINAL DO CELULAR', '#ffb86b', 4000);
+  mostraAviso('SEM SINAL DO CELULAR — religue o controle, ou ENTER para o teclado', '#ffb86b', 6000);
 }
 function retoma(){
   if (!pausado) return;
+  /* com a tela de fim aberta não há o que retomar: o primeiro pacote de um
+     celular punha o jogo para rodar por baixo da capa */
+  if ($('capa').style.display !== 'none'){ pausado = false; return; }
   pausado = false; jogando = true; Motor.liga();
   // a janela de fps também: uma pausa longa não pode contar como quadro lento
   ultimoT = performance.now(); sobrando = 0; tQuadro = ultimoT; quadros = 0;
@@ -16328,7 +16459,7 @@ const Batalha = {
 
   /* ---- entrar como anfitrião: é só assumir, a sala já está aberta ---- */
   hospeda(){
-    if (this.ligada) return;
+    if (this.anfitriao) return;
     this.ligada = true; this.anfitriao = true;
     this.eu = 'a:' + codigo;
     this.nome = meuNome();
@@ -16343,26 +16474,44 @@ const Batalha = {
     if (cod.length !== 4){ estadoBatalha('nao', 'o código tem 4 letras'); return; }
     if (cod === codigo){ estadoBatalha('nao', 'esse é o código desta tela'); return; }
     estadoBatalha('meio', 'procurando a batalha ' + cod + '…');
+    /* ENTRAR NÃO DESFAZIA NADA. `ligada` virava verdade ANTES de a ligação
+       abrir e ninguém a desligava se o código não existisse: a tela ficava
+       "em batalha" sozinha (nascendo em ponto sorteado), e quando chegava um
+       convidado na sala DELA, `hospeda` desistia na primeira linha — ele
+       entrava e não via ninguém. Trocar de batalha deixava a ligação antiga
+       aberta, e o `close` dela derrubava a nova. Agora: a ligação antiga é
+       fechada antes; `ligada` só vira verdade quando abre; quem não abriu em
+       oito segundos é desfeito; e cada ouvinte confere se ainda é o dono. */
+    if (this.conn){ const velha = this.conn; this.conn = null; try{ velha.close(); }catch(e){} this.solta(); }
     const c = peer.connect('aviao-rr-' + cod, { reliable:false, serialization:'json' });
-    this.conn = c; this.ligada = true; this.anfitriao = false;
+    this.conn = c; this.anfitriao = false;
     this.nome = meuNome();
-    vida = VIDA_CHEIA;
     c.on('open', () => {
+      if (this.conn !== c) return;
+      this.ligada = true; vida = VIDA_CHEIA;
       estadoBatalha('ok', 'na batalha ' + cod);
       c.send({ t:'entra', nome:this.nome });
       pintaBatalha();
     });
-    c.on('data', d => this.recebe(d, null));
-    c.on('close', () => { estadoBatalha('nao', 'a batalha caiu'); this.solta(); });
+    c.on('data', d => { if (this.conn === c) this.recebe(d, null); });
+    c.on('close', () => { if (this.conn !== c) return; estadoBatalha('nao', 'a batalha caiu'); this.solta(); });
     c.on('error', () => {});
-    setTimeout(() => { if (!c.open) estadoBatalha('nao', 'batalha ' + cod + ' não encontrada'); }, 8000);
+    setTimeout(() => {
+      if (this.conn !== c || c.open) return;
+      try{ c.close(); }catch(e){}
+      this.conn = null; this.ligada = this.anfitriao;
+      estadoBatalha('nao', 'batalha ' + cod + ' não encontrada');
+      pintaBatalha();
+    }, 8000);
   },
   /* ---- no anfitrião: chegou um jogador ---- */
   aceita(c, d){
+    // um teto de gente: sem ele, quem acertasse o código podia abrir ligações sem fim
+    if (this.conexoes.length >= 7){ try{ c.close(); }catch(e){} return; }
     this.hospeda();
     const id = 'j:' + Math.random().toString(36).slice(2, 8);
     const cor = CORES_JOGADOR[(this.conexoes.length + 1) % CORES_JOGADOR.length];
-    const j = { c, id, nome: (d && d.nome) || 'visitante', cor, ultimo: Date.now() };
+    const j = { c, id, nome: nomeDeRede(d && d.nome), cor, ultimo: Date.now() };
     this.conexoes.push(j);
     c.on('close', () => this.saiu(id));
     c.on('error', () => {});
@@ -16379,7 +16528,7 @@ const Batalha = {
   },
   tira(id){
     const o = this.outros.get(id);
-    if (o && o.no){ cena.remove(o.no); }
+    if (o && o.no){ liberaNo(o.no, [modeloOutro]); cena.remove(o.no); }
     this.outros.delete(id);
   },
   solta(){
@@ -16414,7 +16563,7 @@ const Batalha = {
     switch (d.t){
       case 'sejabem':
         this.eu = d.id; this.cor = d.cor;
-        estadoBatalha('ok', 'na batalha de ' + (d.nome||'alguém'));
+        estadoBatalha('ok', 'na batalha de ' + nomeDeRede(d.nome));
         pintaBatalha();
         break;
       case 'eu': {
@@ -16473,6 +16622,13 @@ const Batalha = {
   },
   /* guarda/atualiza o avião de outra pessoa */
   poe(id, d, nome, cor){
+    /* posição e eixos entravam crus. Com um x que não é número, o teste de
+       distância do tiro dava falso para NaN e TODO tiro contava como acerto
+       naquele avião; e a malha recebia matriz NaN. Pacote torto é descartado
+       inteiro, antes de criar avião para ele. */
+    if (!d || typeof id !== 'string') return;
+    for (const v of [d.x, d.y, d.z]) if (typeof v !== 'number' || !isFinite(v) || Math.abs(v) > MAPA*2) return;
+    for (const v of [d.fx, d.fy, d.fz, d.cx, d.cy, d.cz]) if (typeof v !== 'number' || !isFinite(v) || Math.abs(v) > 1.01) return;
     let o = this.outros.get(id);
     if (!o){
       const no = modeloOutro.clone(true);
@@ -16497,7 +16653,7 @@ const Batalha = {
          verdade. (Sem isto, mexer na asa de outro jogador estoura.) */
       no.userData.asas = no.children.filter(c => c.userData && c.userData.lado !== undefined);
       cena.add(no);
-      o = { id, no, nome: nome || 'visitante', cor: cor || CORES_JOGADOR[1] };
+      o = { id, no, nome: nomeDeRede(nome), cor: cor || CORES_JOGADOR[1] };
       this.outros.set(id, o);
       pintaBatalha();
     }
@@ -16518,10 +16674,10 @@ const Batalha = {
     o.x = d.x; o.y = d.y; o.z = d.z;
     o.F = { x:d.fx, y:d.fy, z:d.fz };
     o.C = { x:d.cx, y:d.cy, z:d.cz };
-    o.vida = d.v === undefined ? VIDA_CHEIA : d.v;
-    o.asa = d.a === undefined ? ASA_ABERTA : d.a;   // controle antigo: asa aberta
+    o.vida = numeroDeRede(d.v, 0, VIDA_CHEIA, VIDA_CHEIA);
+    o.asa = numeroDeRede(d.a, -2, 2, ASA_ABERTA);   // controle antigo: asa aberta
     o.vivo = !d.k;                              // k = caiu
-    o.nome = nome || o.nome;
+    if (nome !== undefined && nome !== null) o.nome = nomeDeRede(nome);
     o.t = Date.now();
   },
   /* o meu estado, 20 vezes por segundo */
@@ -16567,7 +16723,9 @@ const Batalha = {
   /* levei um tiro: quem atirou já decidiu que acertou */
   levaTiro(d){
     if (caindo || !jogando) return;
-    vida -= d.dano || 10;
+    /* `dano: 'muito'` deixava a vida em NaN — imortal, porque `vida <= 0`
+       nunca mais dava verdade; `dano: -500` curava */
+    vida -= numeroDeRede(d.dano, 0, 200, 10);
     /* `leve` é o tiro de metralhadora de um caça da máquina: vêm muitos por
        segundo, e o solavanco de 0,42 com aviso escrito a cada bala faria a
        tela tremer sem parar e cobriria o próprio inimigo de letra. Dano
@@ -16620,7 +16778,7 @@ function inimigosRede(){
   return r;
 }
 function meuNome(){
-  try{ const n = localStorage.getItem('aviao3d.nome'); if (n) return n; }catch(e){}
+  try{ const n = localStorage.getItem('aviao3d.nome'); if (n) return nomeDeRede(n); }catch(e){}
   const n = 'piloto ' + Math.floor(Math.random()*90 + 10);
   try{ localStorage.setItem('aviao3d.nome', n); }catch(e){}
   return n;
@@ -16704,9 +16862,20 @@ function abrirSala(){
   peer.on('error', e => {
     if (e.type === 'unavailable-id'){ try{ peer.destroy(); }catch(x){} abrirSala(); return; }
     if (e.type === 'network' || e.type === 'server-error') estadoSala('nao', 'sem acesso ao servidor de encontro. Esta tela tem internet?');
+    // o código que não existe é assunto da caixa da BATALHA, não da do celular
+    else if (e.type === 'peer-unavailable') estadoBatalha('nao', 'batalha não encontrada');
     else estadoSala('nao', 'erro: ' + (e.type || e));
   });
-  peer.on('disconnected', () => { try{ peer.reconnect(); }catch(e){} });
+  /* RELIGAR COM CALMA. Sem servidor de encontro o PeerJS tentava de novo para
+     sempre, a cada segundo ou dois — 25 tentativas em 56 s, medido — desde a
+     capa. Numa TV sem internet isso não tinha fim. Agora a espera dobra a cada
+     tentativa, até meio minuto, e zera quando a ligação volta. */
+  { const p = peer; let tent = 0;
+    p.on('open', () => { tent = 0; });
+    p.on('disconnected', () => {
+      const espera = Math.min(30000, 1000*Math.pow(2, tent++));
+      setTimeout(() => { if (p === peer && !p.destroyed && p.disconnected) try{ p.reconnect(); }catch(e){} }, espera);
+    }); }
 }
 abrirSala();
 

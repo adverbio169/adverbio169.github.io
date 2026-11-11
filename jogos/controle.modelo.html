@@ -1002,7 +1002,14 @@ function conectar(codigo){
     else if (tipo === 'network' || tipo === 'server-error') estadoRede('nao', 'sem acesso ao servidor de sinalização. Tem internet?');
     else estadoRede('nao', 'erro: ' + tipo);
   });
-  peer.on('disconnected', () => { try { peer.reconnect(); } catch(e){} });
+  /* religar com calma: sem servidor de encontro a tentativa se repetia a cada
+     segundo, para sempre. A espera dobra até meio minuto e zera ao abrir. */
+  { const pp = peer; let tent = 0;
+    pp.on('open', () => { tent = 0; });
+    pp.on('disconnected', () => {
+      const espera = Math.min(30000, 1000*Math.pow(2, tent++));
+      setTimeout(() => { if (!pp.destroyed && pp.disconnected) try { pp.reconnect(); } catch(e){} }, espera);
+    }); }
 }
 
 /* =============================================================================

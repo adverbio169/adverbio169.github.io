@@ -5894,7 +5894,14 @@ function abrirSala(){
     if (e.type === 'network' || e.type === 'server-error') estado('nao', 'sem acesso ao servidor de sinalização. Esta tela tem internet?');
     else estado('nao', 'erro: ' + (e.type || e));
   });
-  peer.on('disconnected', () => { try { peer.reconnect(); } catch(e){} });
+  /* religar com calma: sem servidor de encontro a tentativa se repetia a cada
+     segundo, para sempre. A espera dobra até meio minuto e zera ao abrir. */
+  { const pp = peer; let tent = 0;
+    pp.on('open', () => { tent = 0; });
+    pp.on('disconnected', () => {
+      const espera = Math.min(30000, 1000*Math.pow(2, tent++));
+      setTimeout(() => { if (!pp.destroyed && pp.disconnected) try { pp.reconnect(); } catch(e){} }, espera);
+    }); }
 }
 
 // enquanto a tela espera, desenha o cenário parado atrás do véu
@@ -6181,7 +6188,14 @@ function conectaComCodigo(cod){
     else if (e.type === 'network' || e.type === 'server-error') estadoRede('nao', 'sem acesso ao servidor de sinalização. Tem internet?');
     else estadoRede('nao', 'erro: ' + (e.type || e));
   });
-  p.on('disconnected', () => { try { p.reconnect(); } catch(e){} });
+  /* religar com calma: sem servidor de encontro a tentativa se repetia a cada
+     segundo, para sempre. A espera dobra até meio minuto e zera ao abrir. */
+  { const pp = p; let tent = 0;
+    pp.on('open', () => { tent = 0; });
+    pp.on('disconnected', () => {
+      const espera = Math.min(30000, 1000*Math.pow(2, tent++));
+      setTimeout(() => { if (!pp.destroyed && pp.disconnected) try { pp.reconnect(); } catch(e){} }, espera);
+    }); }
 }
 
 $('btConectar').onclick = async () => {

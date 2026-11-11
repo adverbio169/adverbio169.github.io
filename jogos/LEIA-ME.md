@@ -780,6 +780,44 @@ chão).
 
 ---
 
+## A grande revisão — lote 3: toque, teclado, rede e robustez
+
+Os três revisores que o limite de uso tinha cortado voltaram e entregaram
+(painel, entrada, robustez). Com os dois primeiros são **63 achados**, todos
+com reprodução. Este lote fecha os de entrada e de robustez que não são visuais
+(os do painel e da capa ficam com os construtores da cabine e da capa).
+
+| defeito | onde mora o conserto |
+|---|---|
+| no modo DEDO o manche lia sempre o primeiro dedo: arrastar a **manete** era profundor cheio, deslizar a **arma** virava o avião, apertar **FOGO** recentrava o manche e, apertado antes, impedia de pilotar | os ouvintes de `touchstart/move/end`: o manche tem dono (`identifier`) e ignora toque que começa em botão |
+| digitar o **código da sala** baixava flape, trocava vista, pedia câmera e ligava munição infinita; Enter no campo começava o voo | `digitando(e)` nos ouvintes de teclado |
+| um **nome de jogador** que não é texto congelava o anfitrião e todos os convidados | `nomeDeRede()` (texto, sem marcação, 12 letras) |
+| mensagem `apx` com pista inexistente congelava jogo e estado | faixa no `case 'apx'` e cinto em `aproxDados()` |
+| posição/eixos de outro jogador entravam crus (NaN na malha; todo tiro "acertava") | validação no topo de `Batalha.poe` |
+| dano que não é número deixava o avião **imortal**; negativo curava | `numeroDeRede` em `levaTiro` |
+| celular varrido por silêncio continuava pilotando **por fora** da tripulação | readmissão em `Tripulacao.recebe` |
+| `Batalha.entra` não desfazia nada ao falhar nem ao trocar de batalha | `entra()`/`hospeda()` e os ouvintes que conferem o dono |
+| "SEM SINAL DO CELULAR" **sem saída** | no aparelho de toque o comando volta para a tela; na TV, Enter devolve ao teclado |
+| o fim de jogo durante uma pausa era desfeito na retomada | `fim()` limpa as três pausas; `tFim` cancelado em `reinicia()` |
+| a **nuclear** sobre a cidade congelava o jogo (238 reconstruções dos telhados: 387 ms; agora 1: 11 ms) | `derrubaPredio(p, emLote)` e `nuclear()` |
+| cada **míssil** deixava 9 geometrias na placa para sempre | `liberaNo` ao tirar bomba e cogumelo da cena |
+| uma exceção em qualquer ponto do quadro **congelava o jogo** para sempre | `quadro()` embrulha `quadroCorpo()` |
+| dois `C` seguidos abriam duas câmeras | trava `_ligando` em `Cabeca.liga` |
+| sem servidor de encontro o PeerJS religava a cada segundo, para sempre | espera que dobra até 30 s, nos quatro modelos |
+
+Prova: `scratchpad/lote3.js` (16 verificações que falhavam antes), os scripts
+dos revisores `revisao/entrada/a.js` e `b.js` antes e depois, e a regressão
+(`voo2.js`, `fumaca.js`, `acesa.js`, `tv3d.js`) com `FALHAS: 0`.
+
+**Para desfazer:** `git revert` do commit deste lote.
+
+**Do revisor de robustez, ainda aberto:** um terço das ordens de desenho vem de
+geometria parada (a pista gasta 50 ordens para 124 triângulos; os alvos, 30) —
+cabe em 5; a queda automática de qualidade lê tela travada em 30 Hz como
+máquina fraca; e uns 72 kB de lixo de memória por passo de física.
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
