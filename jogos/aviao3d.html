@@ -553,6 +553,7 @@
     <div id="ondeComeca">
       <button class="op" id="btDragao">🐲 Dragão</button>
       <button class="op ligado" id="btCaca">✈ Caça AD-02</button>
+      <button class="op" id="btTerceiro">✈ Caça novo</button>
     </div>
     <!-- A MISSÃO NÃO SE ESCOLHE AQUI. Ela se escolhe no computador de bordo,
          na página OBJET, com o avião ainda na pista — que é onde um plano de
@@ -9379,7 +9380,7 @@ let tipoDeAviao = 'caca';
 let PINTURA_AD02 = 'bordo';
 try { const q = localStorage.getItem('aviao3d.pintura');
       if (q === 'asas' || q === 'bordo' || q === 'meio') PINTURA_AD02 = q; } catch(e){}
-try { const t = localStorage.getItem('aviao3d.aviao'); if (t === 'dragao' || t === 'caca') tipoDeAviao = t; } catch(e){}
+try { const t = localStorage.getItem('aviao3d.aviao'); if (t === 'dragao' || t === 'caca' || t === 'terceiro') tipoDeAviao = t; } catch(e){}
 
 /* A CANÓPIA É MEDIDA, não número solto.
 
@@ -9443,20 +9444,47 @@ const MEDIDAS_CACA = {
      cabem: a cabine abre um terço e a gota continua gota (1 para 2,3, contra
      1 para 2,6 de antes). Medir de dentro sem olhar de fora é meio caminho. */
   canopia: { x: 23, y: 29, z: 54, cy: 30, cz: 122, arco: 143 },
-  /* o fogo nasce na saída dos bocais novos: eixo em x=±31, y=-8, e as
-     pétalas acabam uns 22 atrás do bocal (z=-210). Bocal de raio 15 pede
-     envelope de 17. */
-  jatos: [{ x: -34, y: -8, z: -236 }, { x: 34, y: -8, z: -236 }],
-  fogo: { raio: 19, nucleo: 10, anel: 8 },
+  jatos: [{ x: -26, y: -7, z: -252 }, { x: 26, y: -7, z: -252 }],
+  fogo: { raio: 14, nucleo: 7.5, anel: 6.5 },
   ponta: null,                   // vem da tabela AD02, que é mais exata
-  pivo:  null,
-  /* O CURSO DA ASA NESTE AVIÃO: 60% do curso do jogo, contado a partir da
-     asa aberta (ver `giroDaAsa`). A asa nova sai do desenho já enflechada
-     38°; com o curso inteiro (44° a mais) ela fecharia a 82°, colada no
-     corpo, e o centro aerodinâmico recuaria o dobro do que a revisão de
-     margem estática aceitou. Com 0,6 ela fecha a 64°, que é o máximo de um
-     F-14 de verdade. O dragão não tem este número e varre como sempre. */
-  asaVarre: 0.6
+  pivo:  null
+};
+
+/* O TERCEIRO AVIÃO (ver `montaTerceiro`). Ele é DESENHADO na escala da
+   cabine do AD-02 e encolhido por `escala` — então aqui há dois tipos de
+   número, e cada um diz qual é:
+     · na escala do JOGO (o que o resto do código lê): roda, cabine, jatos,
+       fogo, pivô, ponta, marcaDeriva;
+     · no DESENHO (só o montador lê): canopia, que é a da cabine copiada.
+   As contas: comprimento 500 no desenho × 0,64 = 320 (16,0 m); envergadura
+   aberta 381 × 0,64 = 244 (12,2 m); altura 152 × 0,64 = 97 (4,8 m). */
+const ESC_T = 0.64;
+const MEDIDAS_TERCEIRO = {
+  nome: 'CAÇA NOVO',
+  escala: ESC_T,
+  roda: 82*ESC_T,                         // a roda toca em -82 no desenho
+  /* o olho do piloto é o do AD-02 encolhido junto com a cabine */
+  cabine: { frente: 118*ESC_T, cima: 50*ESC_T },
+  canopia: { x: 23, y: 29, z: 54, cy: 30, cz: 122, arco: 143 },   // DESENHO
+  /* o fogo nasce na saída dos bocais: eixo em x=±34, y=-8, e as pétalas
+     acabam uns 26 atrás do bocal (z=-210) — tudo no desenho, vezes a escala */
+  jatos: [{ x: -34*ESC_T, y: -8*ESC_T, z: -236*ESC_T }, { x: 34*ESC_T, y: -8*ESC_T, z: -236*ESC_T }],
+  fogo: { raio: 19*ESC_T, nucleo: 10*ESC_T, anel: 8*ESC_T },
+  /* a asa, para o vórtice da ponta (`pontaDaAsa`): pivô e ponta com a asa
+     ABERTA, que é como ela está desenhada */
+  pivo:  { x: 80*ESC_T, z: -30*ESC_T },
+  ponta: { x: 190*ESC_T, y: 12.4*ESC_T, z: -22*ESC_T },
+  /* o curso da asa: 0,8 do curso do jogo, contado a partir da asa aberta
+     (ver `giroDaAsa`). O jogo varre de -0,10 a 0,77 rad; 0,8 disso são 40°,
+     de 18° (decolagem, como está desenhada) a 58° (alta velocidade). O
+     cruzeiro de 38° da ficha cai no meio do caminho. */
+  asaVarre: 0.8,
+  /* a faixa da cor do jogador nos aviões da rede, no meio de cada deriva
+     inclinada (ver `poe` da Batalha), já na escala do jogo */
+  marcaDeriva: { x: 45.5*ESC_T, y: 39.6*ESC_T, z: -143*ESC_T, inc: 0.30, esp: 7, alt: 22, comp: 20 },
+  /* a câmera de perseguição chega mais perto: o avião tem 65% do tamanho do
+     AD-02, e na distância dele virava um avião de brinquedo lá na frente */
+  camera: 0.78
 };
 
 /* =============================================================================
@@ -9742,7 +9770,8 @@ function cabineCaca(){
    dragão, que é o que já acontecia. */
 function arteDaCabine(){
   const lucas = cabinePintada(), caca = cabineCaca();
-  return (tipoDeAviao === 'caca' && caca) ? caca : lucas;
+  /* o terceiro avião senta na cabine do AD-02: a arte é de caça, e ele é caça */
+  return (tipoDeAviao !== 'dragao' && caca) ? caca : lucas;
 }
 /* o topo do painel (fração da altura da arte) e as telas tocáveis (caixas, em
    fração) — as duas perguntas que o resto do jogo faz sem querer saber qual
@@ -10709,21 +10738,14 @@ function costura(aneis, mat, tampa){
    isso que dá barriga chata e dorso arredondado) e um expoente que diz o quão
    "quadrada" ela é. Os anéis vão para a mesma costura da asa.
    ========================================================================== */
-/* A QUINA (`q`, de 0 a 1). Superelipse é sempre redonda na lateral, e o
-   nariz do caça da referência não é: ele tem CHINES, a aresta viva que corre
-   do bico até as tomadas e que faz o nariz ler como bico de pato achatado e
-   não como charuto. A quina estreita a seção linearmente com a altura — na
-   linha do meio a largura fica inteira, e um pouco acima ou abaixo ela já
-   caiu, o que desenha um vinco na lateral. Com q=0 a seção é a de sempre. */
 function anelDeSecao(sec, n){
   const anel = [];
-  const e = sec.n || 2.4, q = sec.q || 0;
+  const e = sec.n || 2.4;
   for (let i = 0; i < n; i++){
     const a = i/n*Math.PI*2, c = Math.cos(a), s2 = Math.sin(a);
-    const alt = Math.pow(Math.abs(s2), 2/e);
-    const x = sec.w * Math.sign(c) * Math.pow(Math.abs(c), 2/e) * (1 - q*alt);
+    const x = sec.w * Math.sign(c) * Math.pow(Math.abs(c), 2/e);
     const h = s2 >= 0 ? sec.hCima : sec.hBaixo;
-    const y = sec.yc + h * Math.sign(s2) * alt;
+    const y = sec.yc + h * Math.sign(s2) * Math.pow(Math.abs(s2), 2/e);
     anel.push(new THREE.Vector3(x, y, sec.z));
   }
   return anel;
@@ -10731,12 +10753,12 @@ function anelDeSecao(sec, n){
 /* um ponto qualquer da casca: seção, ângulo (0 = lateral, +PI/2 = dorso) e um
    empurrãozinho para fora, para a pintura não brigar com a chapa */
 function pontoNoCasco(sec, ang, fora){
-  const e = sec.n || 2.4, c = Math.cos(ang), s2 = Math.sin(ang), q = sec.q || 0;
+  const e = sec.n || 2.4, c = Math.cos(ang), s2 = Math.sin(ang);
   const w = sec.w + (fora||0), hC = sec.hCima + (fora||0), hB = sec.hBaixo + (fora||0);
-  const h = s2 >= 0 ? hC : hB, alt = Math.pow(Math.abs(s2), 2/e);
+  const h = s2 >= 0 ? hC : hB;
   return new THREE.Vector3(
-    w * Math.sign(c) * Math.pow(Math.abs(c), 2/e) * (1 - q*alt),
-    sec.yc + h * Math.sign(s2) * alt,
+    w * Math.sign(c) * Math.pow(Math.abs(c), 2/e),
+    sec.yc + h * Math.sign(s2) * Math.pow(Math.abs(s2), 2/e),
     sec.z);
 }
 /* interpola uma seção em qualquer z */
@@ -10746,11 +10768,8 @@ function secaoEm(secoes, z){
   const a = secoes[i], b = secoes[i+1];
   const k = Math.max(0, Math.min(1, (a.z - z)/(a.z - b.z)));
   const m = {};
-  for (const key of ['z','w','hCima','hBaixo','yc','n','q','xc','rk']){
-    const pad = key === 'n' ? 2.4 : 0;          // quina, centro e rampa: zero
-    const va = a[key]===undefined ? pad : a[key], vb = b[key]===undefined ? pad : b[key];
-    m[key] = va + (vb - va)*k;
-  }
+  for (const key of ['z','w','hCima','hBaixo','yc','n'])
+    m[key] = (a[key]===undefined?2.4:a[key]) + ((b[key]===undefined?2.4:b[key]) - (a[key]===undefined?2.4:a[key]))*k;
   return m;
 }
 /* =============================================================================
@@ -10972,24 +10991,19 @@ function banheiraDaCabine(CP, mat){
   return m;
 }
 
-function fuselagem(secoes, mat, de, ate, tampa, n){
-  const aneis = [];
-  n = n || 28;
-  /* `xc` desloca a seção para o lado (a nacele, que não mora no eixo) e `rk`
-     inclina a boca: o z de cada ponto anda com a altura, e a tomada de ar
-     fica com o lábio de cima mais à frente que o de baixo, como na
-     referência. As duas são zero na fuselagem do meio. */
-  const anel = sec => anelDeSecao(sec, n).map(p => {
-    p.x += sec.xc || 0; p.z += (sec.rk || 0)*(p.y - sec.yc); return p; });
+function fuselagem(secoes, mat, de, ate){
+  const aneis = [], n = 28;
   for (let i = de; i <= ate; i++){
-    const a = secoes[i];
-    aneis.push(anel(a));
+    const a = secoes[i], b = secoes[Math.min(ate, i+1)];
+    aneis.push(anelDeSecao(a, n));
     if (i < ate){       // uma seção intermediária, para a curva não ficar poligonal
-      const m = secaoEm([a, secoes[i+1]], (a.z + secoes[i+1].z)/2);
-      aneis.push(anel(m));
+      const m = {};
+      for (const k of ['z','w','hCima','hBaixo','yc','n'])
+        m[k] = ((a[k]===undefined?2.4:a[k]) + (b[k]===undefined?2.4:b[k]))/2;
+      aneis.push(anelDeSecao(m, n));
     }
   }
-  return costura(aneis, mat, tampa !== false);
+  return costura(aneis, mat, true);
 }
 
 /* =============================================================================
@@ -11314,101 +11328,102 @@ function casco(perfil, mat, achata){
    estava 12% pequeno demais — volume de cauda 0,295, abaixo da faixa.
    ========================================================================== */
 const AD02 = {
-  /* --- A ASA, DESENHADA ABERTA ------------------------------------------------
-     A planta saiu da referência (o caça azul e amarelo do hangar): trapézio
-     com 38° de enflechamento no bordo de ataque, bordo de fuga quase reto e
-     ponta cortada. Ela é desenhada JÁ NA POSIÇÃO ABERTA — o pivô fica em zero
-     com a asa aberta (ver `giroDaAsa`) —, então o que está nesta tabela é o
-     que se vê na pista, sem conta de cabeça.
-
-     O painel que gira, medido a partir do PIVÔ (x=112, z=-40). A torção
-     (washout) continua: a ponta tem 2,4° a menos que a raiz, para a raiz
-     estolar primeiro e o aileron continuar mandando. */
+  /* a asa móvel, medida a partir do PIVÔ (x=110, z=-20) */
+  /* o painel que gira. A TORÇÃO (washout) é o detalhe que faltava: a ponta
+     tem 2,4° de incidência a MENOS que a raiz, para a raiz estolar primeiro.
+     Asa sem torção estola pela ponta — justo onde mora o aileron —, e aí o
+     avião cai de asa em vez de baixar o nariz. Custa um campo na tabela. */
   asa: [
-    { x:   0, zLE:  55, corda: 164, y: 13.6, tt: 0.065, tor:  0.0 },
-    { x:  28, zLE:  33, corda: 136, y: 13.2, tt: 0.062, tor: -0.6 },
-    { x:  58, zLE:   9, corda: 107, y: 12.8, tt: 0.058, tor: -1.3 },
-    { x:  88, zLE: -14, corda:  77, y: 12.4, tt: 0.054, tor: -1.9 },
-    { x: 113, zLE: -34, corda:  52, y: 12.0, tt: 0.05,  tor: -2.4 }
+    { x:   0, zLE:  42, corda: 150, y: 0,    tt: 0.10,  tor:  0.0 },
+    { x:  40, zLE:  26, corda: 124, y: 2.8,  tt: 0.096, tor: -0.6 },
+    { x:  80, zLE:  10, corda:  99, y: 5.6,  tt: 0.091, tor: -1.3 },
+    { x: 116, zLE:  -4, corda:  78, y: 8.1,  tt: 0.086, tor: -1.9 },
+    { x: 134, zLE: -12, corda:  66, y: 9.4,  tt: 0.08,  tor: -2.4 }
   ],
-  /* A LUVA fixa, e agora ela é também o LERX: a extensão do bordo de ataque
-     que nasce do lado da cabine, passa POR CIMA da tomada de ar e vira asa.
-     Na referência é essa aresta que liga o nariz à asa num traço só — sem
-     ela a asa parece espetada na lateral. O bordo de fuga é reto (z=-148)
-     da raiz ao pivô, e o de ataque quebra em dois: 67° no LERX, 41° na luva,
-     que é o mesmo ângulo do painel aberto. */
+  /* A LUVA fixa, que casa a asa com o corpo. Ela tinha 236 de corda na raiz —
+     48% do comprimento TOTAL do avião, o que é muito até para uma luva de asa
+     variável. E corda de raiz grande infla a corda média (167!), que é o
+     divisor do volume de cauda: era por isso que, com a cauda já no tamanho
+     certo, a estabilidade dava 0,22. Cortando a luva para 196 a corda média
+     cai, o alongamento sobe e o volume de cauda volta para a faixa — e de
+     quebra aparece mais fuselagem, que é o que faz o avião parecer avião em
+     vez de uma asa com cabeça. */
   luva: [
-    { x:  20, zLE: 172, corda: 320, y: 18,   tt: 0.035 },
-    { x:  48, zLE: 124, corda: 272, y: 17,   tt: 0.042 },
-    { x:  72, zLE:  51, corda: 199, y: 15,   tt: 0.058 },
-    { x:  96, zLE:  28, corda: 176, y: 14,   tt: 0.066 },
-    { x: 118, zLE:  10, corda: 158, y: 13.6, tt: 0.07 }
+    { x:  24, zLE:  86, corda: 196, y: -2, tt: 0.11 },
+    { x:  70, zLE:  56, corda: 176, y: -1, tt: 0.105 },
+    { x: 110, zLE:  24, corda: 160, y:  0, tt: 0.10 },
+    { x: 126, zLE:  14, corda: 152, y:  0.6, tt: 0.10 }
   ],
-  /* o estabilizador nasce na lateral de fora da nacele, abaixo da asa — a
-     asa recolhida varre POR CIMA dele, como num caça de asa variável de
-     verdade. Enflechamento de 34°, ponta amarela. */
-  estab: [
-    { x:  40, zLE: -138, corda: 96, y: -6,   tt: 0.07 },
-    { x:  90, zLE: -172, corda: 66, y: -6.5, tt: 0.065 },
-    { x: 136, zLE: -204, corda: 36, y: -7,   tt: 0.06 }
-  ],
-  /* AS DUAS DERIVAS, desenhadas deitadas e postas em pé sobre as naceles,
-     abertas 20° para fora. Duas derivas inclinadas são a assinatura do caça
-     da referência (e de todo caça bimotor de hoje): uma só, no meio, era o
-     que fazia o AD-02 parecer um treinador. Cada uma tem a metade da área da
-     deriva antiga mais um pouco, porque a inclinação tira uns 6% da área
-     que trabalha de lado. */
-  deriva: [
-    { x:   0, zLE:  -70, corda: 158, y: 0, tt: 0.06 },
-    { x:  60, zLE: -122, corda: 108, y: 0, tt: 0.055 },
-    { x: 116, zLE: -170, corda:  62, y: 0, tt: 0.05 }
-  ],
-  DERIVA: { x: 36, y: 9, cant: 0.30 },
-  /* --- A FUSELAGEM DO MEIO: nariz, cabine e a espinha ---------------------
-     z · meia-largura · meia-altura para cima · para baixo · centro ·
-     expoente · quina. Os motores NÃO moram mais aqui: atrás da cabine o
-     tronco afina numa espinha estreita, e quem carrega os motores são as duas
-     naceles (`nacele`, logo abaixo). É o arranjo do caça da referência.
+  /* o estabilizador desceu para y negativo: com a asa recolhida a 54° a ponta
+     dela passa por cima da cauda, e é assim num avião de asa variável de
+     verdade — a asa varre POR CIMA do estabilizador. E cresceu 12%, para o
+     volume de cauda entrar na faixa de caça (0,30 a 0,50) em vez de ficar
+     raspando embaixo dela. */
+  /* a raiz em x=36: ENTERRADA no tronco (que ali tem meia-largura 56 a 44).
+     Ela estava em 74, a largura dos canos de motor da versão anterior — com a
+     fuselagem nova o profundor ficou flutuando ao lado do avião. */
+  /* O TAMANHO DA CAUDA. Ela tinha 45% da área da asa e envergadura de 77% —
+     ou seja, uma segunda asa ali atrás. Caça de verdade fica em 20 a 25% de
+     área e uns 50% de envergadura (F/A-18: 24% e 53%; F-16: 21%). O erro veio
+     de somar duas correções: cresci 12% para acertar o volume de cauda, e
+     depois puxei a raiz para dentro (x=36) para o profundor não flutuar — e
+     puxar a raiz para dentro aumenta a envergadura de novo.
 
-     Da cabine (z de 68 a 176) as alturas de cima ficaram as de antes, de
-     propósito: a bolha, o convés e a vista de dentro se apoiam nelas. */
+     Agora: raiz em x=48 (dentro do tronco, fora do bocal), ponta em 138, corda
+     108 na raiz. Dá 21% de área e 53% de envergadura — as duas na faixa. E a
+     cauda foi 18 para trás, que é o braço que se ganha sem engordar peça. */
+  estab: [
+    { x:  48, zLE: -162, corda: 108, y: -10, tt: 0.09 },
+    { x:  94, zLE: -182, corda:  78, y:  -7, tt: 0.085 },
+    { x: 138, zLE: -200, corda:  46, y:  -3, tt: 0.08 }
+  ],
+  /* a deriva é desenhada deitada e depois posta em pé */
+  deriva: [
+    { x:   0, zLE: -110, corda: 168, y: 0, tt: 0.10 },
+    { x:  60, zLE: -140, corda: 122, y: 0, tt: 0.09 },
+    { x: 112, zLE: -170, corda:  74, y: 0, tt: 0.08 }
+  ],
+  /* as seções da fuselagem, do bico para a cauda:
+       z · meia-largura · meia-altura para cima · para baixo · centro · expoente */
   secoes: [
-    { z: 254, w: 0.6, hCima: 0.6, hBaixo: 0.6, yc: -1, n: 2.0 },
-    { z: 244, w:  10, hCima:   8, hBaixo: 3.6, yc: -1.5, n: 2.1, q: 0.30 },
-    { z: 224, w:  19, hCima:  14, hBaixo: 6.2, yc: -2.5, n: 2.2, q: 0.40 },
-    { z: 202, w:  23, hCima:  19, hBaixo: 7.5, yc: -4, n: 2.2, q: 0.45 },   // fim do cone amarelo
-    { z: 178, w:  29, hCima:  27, hBaixo:  12, yc: -6, n: 2.4, q: 0.40 },
-    { z: 152, w:  32, hCima:  36, hBaixo:  17, yc: -6, n: 2.6, q: 0.32 },   // base do para-brisa
-    { z: 118, w:  33, hCima:  39, hBaixo:  19, yc: -5, n: 2.8, q: 0.22 },   // deck da cabine
-    { z:  84, w:  33, hCima:  35, hBaixo:  20, yc: -5, n: 3.0, q: 0.12 },
-    { z:  50, w:  29, hCima:  28, hBaixo:  19, yc: -3, n: 3.0 },            // entre as tomadas
-    { z:   0, w:  26, hCima:  24, hBaixo:  18, yc: -4, n: 3.0 },
-    { z: -80, w:  24, hCima:  21, hBaixo:  16, yc: -5, n: 3.0 },
-    { z:-160, w:  20, hCima:  17, hBaixo:  14, yc: -6, n: 2.8 },
-    { z:-200, w:  14, hCima:  12, hBaixo:  11, yc: -7, n: 2.5 },
-    { z:-224, w:   6, hCima:   6, hBaixo:   6, yc: -7, n: 2.2 },
-    { z:-232, w:   1, hCima:   1, hBaixo:   1, yc: -7, n: 2.0 }
+    { z: 246, w: 0.8, hCima: 0.8, hBaixo: 0.8, yc:  0, n: 2.0 },
+    { z: 232, w:   8, hCima:   8, hBaixo:   8, yc:  0, n: 2.0 },
+    { z: 208, w:  18, hCima:  18, hBaixo:  17, yc:  0, n: 2.2 },   // fim do radome
+    { z: 178, w:  26, hCima:  25, hBaixo:  22, yc: -1, n: 2.4 },
+    { z: 152, w:  30, hCima:  31, hBaixo:  24, yc: -1, n: 2.6 },   // base do para-brisa
+    { z: 118, w:  32, hCima:  35, hBaixo:  25, yc: -1, n: 2.8 },   // deck da cabine
+    { z:  84, w:  36, hCima:  32, hBaixo:  27, yc: -1, n: 3.0 },
+    { z:  40, w:  50, hCima:  27, hBaixo:  31, yc: -2, n: 3.3 },   // começam as tomadas
+    /* A CINTURA (regra das áreas). A distribuição de área somava o pico do
+       tronco com o pico da asa exatamente no mesmo lugar (z=-40): é ali que o
+       arrasto transônico explode. Estreitando o tronco onde a asa passa, a
+       soma fica lisa — é a "garrafa de coca" do F-106 e do Tornado, e dá para
+       ver de cima. */
+    { z:  -6, w:  56, hCima:  24, hBaixo:  33, yc: -3, n: 3.6 },   // tronco, na cintura
+    { z: -60, w:  53, hCima:  23, hBaixo:  32, yc: -3, n: 3.6 },   // o ponto mais fino
+    { z: -96, w:  59, hCima:  23, hBaixo:  34, yc: -3, n: 3.6 },
+    { z:-160, w:  56, hCima:  20, hBaixo:  28, yc: -4, n: 3.2 },
+    { z:-186, w:  50, hCima:  18, hBaixo:  22, yc: -6, n: 3.0 },
+    { z:-202, w:  46, hCima:  17, hBaixo:  21, yc: -7, n: 3.0 },
+    /* O CORTE DE POPA. A fuselagem terminava em ponta lá em -248, e os bocais
+       ficavam ENTERRADOS nela — o que se via eram dois anéis escuros afundados
+       na barriga. Em avião a jato o casco acaba num corte reto e os bocais
+       SAEM dele; é isso agora, com a popa fechando em -212. */
+    { z:-212, w:  40, hCima:  15, hBaixo:  17, yc: -7, n: 3.0 },
+    /* e a popa ainda afina ENTRE os bocais: o degrau de área no corte era o
+       pior salto da distribuição, e uma quilha estreita ali o suaviza sem
+       tapar o motor */
+    { z:-232, w:  22, hCima:  10, hBaixo:  12, yc: -7, n: 2.6 }
   ],
-  /* --- A NACELE, uma de cada lado (desenhada para +x e espelhada) ---------
-     Boca quase quadrada (expoente 5) e inclinada (`rk`), que vai
-     arredondando até o tubo do motor, e o eixo que ENTRA para o meio: a
-     tomada fica longe da fuselagem (com uma fresta, o separador de camada
-     limite) e o bocal fica perto. É o desenho do F-15 e do Su-27, e é o que
-     dá ao avião visto de cima a cintura entre o nariz e a cauda. */
-  nacele: [
-    { z:  84, xc: 57,   w: 21.5, hCima: 25,   hBaixo: 24,   yc: -13,  n: 5.0, rk: 0.30 },
-    { z:  50, xc: 55,   w: 21.5, hCima: 25,   hBaixo: 23,   yc: -12,  n: 4.2 },
-    { z: -20, xc: 48,   w: 21,   hCima: 23,   hBaixo: 21,   yc: -10,  n: 3.4 },
-    { z:-100, xc: 41,   w: 20.5, hCima: 21,   hBaixo: 19.5, yc: -9,   n: 2.8 },
-    { z:-170, xc: 36,   w: 19.5, hCima: 19.5, hBaixo: 19,   yc: -8,   n: 2.4 },
-    { z:-200, xc: 34,   w: 18.5, hCima: 18.5, hBaixo: 18.5, yc: -8,   n: 2.2 },
-    { z:-212, xc: 34,   w: 16.5, hCima: 16.5, hBaixo: 16.5, yc: -8,   n: 2.0 }
-  ],
-  /* a boca da tomada: z do lábio, e a meia-largura e meia-altura de DENTRO */
-  TOMADA: { z: 100, w: 17.5, hCima: 21, hBaixo: 20, fundo: 68 },
-  MOTOR_X: 34, MOTOR_Y: -8, BOCAL_Z: -210, BOCAL_R: 17.5,
-  PIVO: { x: 112, z: -40 },
+  MOTOR_X: 26, MOTOR_Y: -12,
+  PIVO: { x: 126, z: -26 },
   FLAP: [0.02, 0.46], AIL: [0.54, 0.96], CORDA_MOVEL: 0.70,
+  /* O ENFLECHAMENTO MÁXIMO caiu de 54° para 44°, e o pivô foi de 110 para 126.
+     Os dois pelo mesmo motivo, e é o problema clássico da asa variável: ao
+     recolher, o centro aerodinâmico RECUA, e com ele a margem estática dispara
+     (o avião fica um caminhão no arfagem). Medido na revisão: o CA recuava 34 e
+     a margem ia de 17% para 38%. Pivô mais para fora = painel móvel menor =
+     menos passeio; menos ângulo = menos passeio ainda. */
   ASA_ABERTA: -0.10, ASA_FECHADA: 0.77
 };
 
@@ -11476,11 +11491,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
      quinas e continuar limpa no meio. */
   const mVidro   = new THREE.MeshStandardMaterial({ color: corVidro,
                      roughness: 0.06, metalness: 0.0, envMap: ceuDeReflexo(),
-                     envMapIntensity: 1.15, transparent: true, opacity: 0.66 });
-  /* 0,66 e não 0,5: o vidro da referência é ESCURO, e com meio vidro o que
-     se lia de fora eram os bancos e o painel, como num aquário. A face é
-     só a de fora (FrontSide), então de dentro o piloto continua vendo o
-     mundo sem filtro nenhum. */
+                     envMapIntensity: 1.15, transparent: true, opacity: 0.5 });
   const mBranco  = new THREE.MeshPhongMaterial({ color: 0xf6f9ff, shininess: 60 });
   const mFriso   = new THREE.MeshPhongMaterial({ color: 0x17458f, shininess: 40 });
   /* 0x11161f é preto de verdade, e preto absoluto num avião azul-claro não lê
@@ -11613,112 +11624,130 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
      uma palavra. */
   const ESQ = {
     asas:  { luva:'A', painel:'A', bordo:null, ponta:'C', abas:'A', estab:'A', prof:'A' },
-    bordo: { luva:'C', painel:'C', bordo:'A',  ponta:'A', abas:'C', estab:'C', prof:'C' },
+    bordo: { luva:'C', painel:'C', bordo:'A',  ponta:'A', abas:'C', estab:'C', prof:'A' },
     meio:  { luva:'A', painel:'A', bordo:'C',  ponta:'C', abas:'A', estab:'A', prof:'C' }
   }[PINTURA_AD02] || {};
   const tinta = p => ESQ[p] === 'A' ? mAmarelo : mCorpo;
   const M = AD02;
 
-  /* --- CASCO ---------------------------------------------------------------
-     O NARIZ É UM CONE AMARELO, comprido e de quina viva: é a primeira coisa
-     que se reconhece no caça da referência. Era um radome cinza; agora é a
-     mesma tinta amarela do resto, e o cinza saiu — uma tinta a menos é uma
-     ordem de desenho a menos, no jogador e em cada inimigo. */
+  /* --- CASCO ------------------------------------------------------------
+     Esbeltez 7,5:1 e um leve achatamento (0,92) — fuselagem de caça não é
+     tubo redondo, é um pouco mais larga que alta. */
+  const mRadome = new THREE.MeshPhongMaterial({ color: 0x8e98a6, shininess: 30 });
   const mMetal  = new THREE.MeshPhongMaterial({ color: 0x5a6068, shininess: 90, specular: 0xb0b8c4 });
-  g.add(fuselagem(M.secoes, mAmarelo, 0, 3));          // o cone, até z=202
-  g.add(fuselagem(M.secoes, mCorpo, 3, M.secoes.length - 1));
-  /* A FAIXA DA QUINA: amarela, corre pelo vinco do chine do fim do cone até
-     a boca da tomada, engrossando para trás. É ela que amarra o bico à
-     tomada num traço só, como na pintura da referência. Desenhada do lado
-     +x e espelhada pela escala (a fusão desvira o espelho; ver fundePorCor). */
-  for (const lado of [-1, 1]){
-    const f = faixaNoCasco(M.secoes, 1, t => {
-      /* mais para CIMA do vinco que para baixo: o jogador vê o avião de
-         cima e de trás, e uma fita centrada no vinco some na silhueta */
-      const z = 204 - t*100, larg = 0.10 + t*0.10;
-      return { z, a0: larg*1.5, a1: -larg*0.5 };
-    }, mAmarelo, 16);
-    f.scale.x = lado; g.add(f);
-  }
+  g.add(fuselagem(M.secoes, mRadome, 0, 2));       // o radome, cinza como é
+  g.add(fuselagem(M.secoes, mCorpo, 2, M.secoes.length - 1));
 
-  /* --- ASA: luva fixa (com o LERX) + painel que gira, flape e aileron -------
-     A PINTURA é a da referência: asa azul com uma FAIXA amarela correndo de
-     ponta a ponta logo atrás do bordo de ataque (um fio azul na frente dela)
-     e a PONTA amarela. A faixa nasce na luva e continua no painel nas mesmas
-     frações de corda, então com a asa aberta ela é uma linha só, do LERX à
-     ponta. Esquemas 'asas' e 'meio' continuam valendo (`tinta`).
-
-     As costelas pintadas em leque saíram: a referência não as tem, e quem
-     mostra a asa varrendo agora é a faixa e a ponta amarela girando. */
-  const FAIXA = ESQ.bordo ? [0.07, 0.24] : null;     // frações de corda
-  const PONTA = 0.88;                                // de onde a ponta é amarela
-  /* uma peça de asa pintada com a faixa: três fatias de corda que dividem as
-     mesmas estações, então se encontram sem degrau */
-  const comFaixa = (ests, t0, t1, f1, base, nEnv, ponta) => {
-    if (!FAIXA) return [pedacoDeAsa(ests, t0, t1, 0, f1, base, nEnv, 10, ponta)];
-    return [pedacoDeAsa(ests, t0, t1, 0, FAIXA[0], base, nEnv, 3, ponta),
-            pedacoDeAsa(ests, t0, t1, FAIXA[0], FAIXA[1], tinta('bordo'), nEnv, 3, ponta),
-            pedacoDeAsa(ests, t0, t1, FAIXA[1], f1, base, nEnv, 7, ponta)];
-  };
+  /* --- ASA: luva fixa + painel que gira, com flape e aileron recortados --- */
   const asas = [];
   for (const lado of [-1, 1]){
     const espelha = no => { no.scale.x = lado; return no; };
-    for (const p of comFaixa(M.luva, 0, 1, 1, tinta('luva'), 6)) g.add(espelha(p));
+    /* --- A PINTURA, EM DUAS COMPANHIAS ---------------------------------------
+       "alterna aí entre azul e amarelo, não predominantemente azul."
+
+       A divisão certa não é por PEÇA (foi o erro antigo: luva azul, painel
+       amarelo, e a troca de cor caindo exatamente em cima da juntura, que o
+       olho lê como borda de objeto). É por FUNÇÃO:
+
+           amarelo .... tudo o que voa: asa inteira — luva, painel, flape,
+                        aileron — e o estabilizador com o profundor
+           azul ....... tudo o que carrega: fuselagem, deriva, leme, bocais
+
+       A asa fica de uma cor só da raiz à ponta, então não há emenda nenhuma
+       para a cor denunciar; e o avião alterna forte, porque asa e cauda são
+       metade do que se vê. É a divisão dos aviões de acrobacia, e é a mesma
+       razão: de longe, o que se lê primeiro é a asa. */
+    const BORDO = 0.16;                 // a fatia de corda que é bordo de ataque
+    if (ESQ.bordo){
+      g.add(espelha(pedacoDeAsa(M.luva, 0, 1, 0, BORDO, tinta('bordo'), 4, 4)));
+      g.add(espelha(pedacoDeAsa(M.luva, 0, 1, BORDO, 1, tinta('luva'), 4, 8)));
+    } else {
+      g.add(espelha(pedacoDeAsa(M.luva, 0, 1, 0, 1, tinta('luva'), 4, 10)));
+    }
 
     const pivo = new THREE.Group();
     pivo.position.set(lado*M.PIVO.x, 0, M.PIVO.z);
     pivo.userData.lado = lado;
-    /* o curso deste avião (ver `giroDaAsa`): é dado simples, então sobrevive
-       ao `clone()` dos aviões da rede junto com o `lado` */
-    pivo.userData.ganho = MEDIDAS_CACA.asaVarre;
     const dentro = new THREE.Group();
     dentro.scale.x = lado;
-    const CM = M.CORDA_MOVEL;
-    for (const p of comFaixa(M.asa, 0, PONTA, CM, tinta('painel'), 6)) dentro.add(p);
-    dentro.add(pedacoDeAsa(M.asa, PONTA, 1, 0, CM, tinta('ponta'), 2, 10, true));
-    /* O QUE SOBRA ATRÁS DA LINHA DA DOBRADIÇA e não é aba: o pedacinho antes
-       do flape, o vão entre flape e aileron e a ponta. Eram buracos — de
-       cima se via o céu por três dentes no bordo de fuga. */
-    for (const [t0, t1, mat, pt] of [[0, M.FLAP[0], tinta('painel')], [M.FLAP[1], M.AIL[0], tinta('painel')],
-                                     [M.AIL[1], PONTA, tinta('painel')], [PONTA, 1, tinta('ponta'), true]])
-      dentro.add(pedacoDeAsa(M.asa, t0, t1, CM - 0.005, 1, mat, 2, 5, pt));
-    /* A RAIZ GROSSA DO PAINEL: o painel entra por dentro da luva com o mesmo
-       perfil, para que, girando, a raiz varra um leque de chapa e não abra um
-       vão para o céu. Agora ela tem a espessura da luva naquele ponto — mais
-       grossa, ela saía por cima e por baixo como uma bolha.
-       E o bordo de ataque dela é RECUADO: girando para trás, a parte de
-       dentro do pivô anda para a FRENTE (a 30°, 38 unidades para dentro
-       viram 19 para a frente), e com o bordo alinhado ao do painel a raiz
-       furava o bordo de ataque da luva com a asa fechada. A conta é
-       z·cos30 + 19 ≤ bordo da luva ali (55): z ≤ 41. */
-    const r0 = M.asa[0], fuga = r0.zLE - r0.corda;
+    // a parte fixa do painel, de ponta a ponta
+    /* o painel fixo em duas partes que dividem a MESMA estação (t=0,86): do
+       encaixe até ali no azul do corpo, e a ponta em amarelo. As duas séries
+       de anéis nascem de naEstacao(0,86), então as superfícies se encontram
+       exatamente — não é decalque colado por cima, é a pintura da asa. */
+    /* --- AS COSTELAS: a asa mostrando que está varrendo -----------------------
+       "No dragão a asa é pintada em radial. É visível a sua movimentação."
+
+       É a melhor observação desta conversa inteira. A asa do dragão tem
+       varetas azuis saindo em leque da raiz sobre a membrana amarela — e é por
+       causa delas que dá para VER a asa recolher: a superfície lisa se mexe
+       sem dar sinal nenhum, as linhas em leque giram na frente do olho.
+
+       Aqui são duas costelas pintadas atravessando a corda, em faixas de
+       envergadura. Como todo o resto da pintura, não é decalque por cima: a
+       asa é lofteada em pedaços que dividem as MESMAS estações, então as
+       faixas se encontram sem degrau e sem brigar por profundidade. */
+    const RIB = ESQ.painel === 'A' ? mCorpo : mAmarelo;   // sempre o contrário do painel
+    const COSTELAS = [0, 0.24, 0.31, 0.56, 0.63, 0.86];
+    const f0 = ESQ.bordo ? BORDO : 0;
+    if (ESQ.bordo)
+      dentro.add(pedacoDeAsa(M.asa, 0, 0.86, 0, BORDO, tinta('bordo'), 7, 4));
+    for (let i = 0; i < COSTELAS.length - 1; i++)
+      dentro.add(pedacoDeAsa(M.asa, COSTELAS[i], COSTELAS[i+1], f0, M.CORDA_MOVEL,
+                             (i % 2) ? RIB : tinta('painel'), 3, 8));
+    dentro.add(pedacoDeAsa(M.asa, 0.86, 1, 0, M.CORDA_MOVEL, tinta('ponta'), 3, 10, true));
+    /* --- A RAIZ GROSSA DO PAINEL -------------------------------------------
+       O painel encosta na luva de TOPO, e topo não fecha: girando, a raiz do
+       painel varre um leque e abre um vão por onde se enxerga o céu. Era o que
+       fazia o avião parecer um monte de peças soltas.
+
+       A primeira tentativa foi um par de BOLHAS (duas esferas achatadas, uma
+       por cima e uma por baixo). Tapava o vão e ficava horrível: duas bolotas
+       grudadas na asa, como se o painel estivesse parafusado na luva. De cima
+       o avião virava um feixe de salsichas paralelas.
+
+       O jeito certo é o dos aviões de verdade: a raiz do painel é simplesmente
+       MAIS GROSSA, e essa raiz grossa entra por dentro da luva. Não é peça
+       colada — é a mesma asa, com o perfil engordando até a dobradiça, que é
+       onde mora a caixa do pivô. Aqui isso é um pedaço de asa com a MESMA
+       família de perfil, três estações, engrossando de 11% na juntura para 15%
+       lá dentro, e alongando a corda para cobrir o leque que a raiz varre. */
+    const r0 = M.asa[0];
     const raizGrossa = [
-      { x: -38, zLE: 40, corda: 40 - fuga, y: r0.y, tt: 0.08,  tor: 0 },
-      { x: -14, zLE: 50, corda: 50 - fuga, y: r0.y, tt: 0.072, tor: 0 },
-      { x:  14, zLE: r0.zLE, corda: r0.corda, y: r0.y, tt: 0.064, tor: 0 }
+      { x: -38, zLE: r0.zLE + 10, corda: r0.corda + 20, y: 0, tt: 0.150, tor: 0 },
+      { x: -14, zLE: r0.zLE +  4, corda: r0.corda +  8, y: 0, tt: 0.132, tor: 0 },
+      { x:  18, zLE: r0.zLE,      corda: r0.corda,      y: 0, tt: 0.108, tor: 0 }
     ];
-    dentro.add(pedacoDeAsa(raizGrossa, 0, 1, 0, 1, tinta('luva'), 4, 10));
+    dentro.add(pedacoDeAsa(raizGrossa, 0, 1, 0, 1, tinta('luva'), 5, 12));
     pivo.add(dentro);
 
     /* FLAPE e AILERON: mesma planta, mesma espessura, só a faixa de corda é
        outra. Cada um no seu grupo, com a dobradiça na linha de 70% de corda. */
     const abas = {};
+    /* flape e aileron: azul de superfície móvel, e um friso escuro na linha da
+       dobradiça — é assim que se enxerga a aba sem partir a asa em duas cores. */
     for (const [nome, faixa, mat] of [['flape', M.FLAP, tinta('abas')], ['aileron', M.AIL, tinta('abas')]]){
       const meio = naEstacao(M.asa, (faixa[0] + faixa[1])/2);
       const eixo = new THREE.Group();
-      const peça = pedacoDeAsa(M.asa, faixa[0], faixa[1], CM - 0.005, 1, mat, 5, 6);
+      eixo.position.set(lado*0, 0, 0);
+      const peça = pedacoDeAsa(M.asa, faixa[0], faixa[1], M.CORDA_MOVEL - 0.005, 1, mat, 5, 6);
       peça.scale.x = lado;
       eixo.add(peça);
-      const zEixo = meio.zLE - CM*meio.corda;
+      // a dobradiça de verdade fica na linha de 70% da corda da estação média
+      const zEixo = meio.zLE - M.CORDA_MOVEL*meio.corda;
       eixo.position.set(0, 0, zEixo);
       peça.position.z = -zEixo;
       eixo.userData.comando = nome;
       pivo.add(eixo);
       abas[nome] = eixo;
     }
-    /* o risco da dobradiça, tirado da MESMA planta */
+    /* o risco da dobradiça: uma tira estreitíssima de corda, na cor do friso,
+       tirada da MESMA planta — por isso ela acompanha o afilamento da asa em
+       vez de ser uma barra reta atravessada. É o que faz a aba aparecer sem
+       precisar pintá-la de outra cor. */
     for (const faixa of [M.FLAP, M.AIL])
-      dentro.add(pedacoDeAsa(M.asa, faixa[0], faixa[1], CM - 0.026, CM - 0.004,
+      dentro.add(pedacoDeAsa(M.asa, faixa[0], faixa[1],
+                             M.CORDA_MOVEL - 0.026, M.CORDA_MOVEL - 0.004,
                              ESQ.abas === 'A' ? mEscuro : mFriso, 4, 3));
 
     pivo.userData.abas = abas;
@@ -11726,24 +11755,21 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     g.add(pivo);
   }
 
-  /* --- CAUDA: dois estabilizadores com profundor, DUAS derivas com leme ---- */
-  const comandos = { flapes: [], ailerons: [], profundor: null, lemes: [] };
-  const PE = 0.80;                                   // ponta amarela do estabilizador
+  /* --- CAUDA: estabilizador fixo + profundor, deriva fixa + leme ---------
+     Volume de cauda horizontal 0,52 e vertical 0,041 — as duas faixas em que
+     um avião fica estável sem ficar preguiçoso. */
+  const comandos = { flapes: [], ailerons: [], profundor: null, leme: null };
   for (const lado of [-1, 1]){
-    const fixo = pedacoDeAsa(M.estab, 0, PE, 0, 0.62, tinta('estab'), 4, 9);
+    const fixo = pedacoDeAsa(M.estab, 0, 1, 0, 0.62, tinta('estab'), 5, 9, true);
     fixo.scale.x = lado; g.add(fixo);
-    const ponta = pedacoDeAsa(M.estab, PE, 1, 0, 0.62, mAmarelo, 2, 9, true);
-    ponta.scale.x = lado; g.add(ponta);
   }
   const profundor = new THREE.Group();
   {
     const meio = naEstacao(M.estab, 0.5);
     const z = meio.zLE - 0.62*meio.corda;
     for (const lado of [-1, 1]){
-      for (const [t0, t1, mat] of [[0, PE, tinta('prof')], [PE, 1, mAmarelo]]){
-        const p = pedacoDeAsa(M.estab, t0, t1, 0.615, 1, mat, 4, 5);
-        p.scale.x = lado; p.position.z = -z; profundor.add(p);
-      }
+      const p = pedacoDeAsa(M.estab, 0, 1, 0.615, 1, tinta('prof'), 5, 5);
+      p.scale.x = lado; p.position.z = -z; profundor.add(p);
     }
     profundor.position.set(0, 0, z);
     profundor.userData.comando = 'profundor';
@@ -11751,74 +11777,71 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
   g.add(profundor);
   comandos.profundor = profundor;
 
-  /* AS DERIVAS. Cada uma é desenhada deitada (envergadura em x) e posta em
-     pé com `rotation.z`, inclinada `cant` para fora. As duas NÃO são
-     espelhadas: com a mesma geometria, o x local de cada leme (a dobradiça)
-     aponta para cima das duas, e o mesmo `rotation.x` vira as duas pontas
-     para o MESMO lado do mundo — que é o que os dois lemes fazem juntos.
-     Pintura da referência: azul, uma faixa amarela paralela ao bordo de
-     ataque no meio da corda e a ponta amarela. */
-  const D = M.DERIVA, PD = 0.86;
-  for (const lado of [-1, 1]){
-    const derivaNo = new THREE.Group();
-    derivaNo.rotation.z = Math.PI/2 - lado*D.cant;
-    derivaNo.position.set(lado*D.x, D.y, 0);
-    derivaNo.add(pedacoDeAsa(M.deriva, 0, PD, 0, 0.34, mCorpo, 4, 4));
-    derivaNo.add(pedacoDeAsa(M.deriva, 0, PD, 0.34, 0.50, mAmarelo, 4, 3));
-    derivaNo.add(pedacoDeAsa(M.deriva, 0, PD, 0.50, 0.60, mCorpo, 4, 2));
-    derivaNo.add(pedacoDeAsa(M.deriva, PD, 1, 0, 0.60, mAmarelo, 2, 8, true));
-    const leme = new THREE.Group();
-    {
-      const meio = naEstacao(M.deriva, 0.5);
-      const z = meio.zLE - 0.60*meio.corda;
-      for (const [t0, t1, mat, pt] of [[0, PD, mMovel], [PD, 1, mAmarelo, true]]){
-        const p = pedacoDeAsa(M.deriva, t0, t1, 0.595, 1, mat, 4, 5, pt);
-        p.position.z = -z; leme.add(p);
-      }
-      leme.position.z = z;
-      leme.userData.comando = 'leme';
-    }
-    derivaNo.add(leme);
-    g.add(derivaNo);
-    comandos.lemes.push(leme);
+  const derivaNo = new THREE.Group();
+  derivaNo.rotation.z = Math.PI/2;                 // desenhada deitada, posta em pé
+  derivaNo.position.y = 12;      // a base some dentro do dorso
+  derivaNo.add(pedacoDeAsa(M.deriva, 0, 1, 0, 0.60, mCorpo, 5, 9, true));
+  const leme = new THREE.Group();
+  {
+    const meio = naEstacao(M.deriva, 0.5);
+    const z = meio.zLE - 0.60*meio.corda;
+    const p = pedacoDeAsa(M.deriva, 0, 1, 0.595, 1, mMovel, 5, 5);
+    p.position.z = -z;
+    leme.add(p); leme.position.z = z;
+    leme.userData.comando = 'leme';
   }
+  derivaNo.add(leme);
+  g.add(derivaNo);
+  comandos.leme = leme;
 
-  /* --- AS NACELES, AS TOMADAS E OS BOCAIS -----------------------------------
-     Os dois motores moram em duas naceles que correm da tomada ao bocal,
-     afastadas na frente (a tomada fica fora do nariz) e juntas atrás (os
-     bocais quase se tocam). A tomada é o que mais se lê da referência: boca
-     grande, quase retangular, inclinada, com a BORDA AMARELA.
-
-     A boca é um furo de verdade, feito de três peças e nenhuma booleana:
-       COLAR ... a borda amarela: um anel que dobra do lábio de dentro para o
-                 de fora e corre para trás por cima da nacele
-       DUTO .... a parede escura de dentro, com os anéis andando para a FRENTE
-                 — é isso que vira as normais para dentro, e de dentro a
-                 parede é vista em vez de sumir
-       FUNDO ... uma chapa escura lá no fundo, com o rotor na frente
-     A nacele não tem tampa na frente: tampada, a chapa dela atravessaria o
-     duto e taparia o buraco. */
+  /* --- MOTORES DENTRO DO TRONCO --------------------------------------------
+     Os dois motores moram na fuselagem, como num F-14 ou num Su-27: o tronco
+     largo de barriga chata É a nacele. O que aparece por fora é o que aparece
+     num caça: a BOCA retangular da tomada de cada lado, com o divisor, e o
+     BOCAL de pétalas atrás. Nada de cano pendurado. */
   const rotores = [], bocais = [];
-  const T = M.TOMADA, N0 = M.nacele[0];
-  const boca = (z, dw, dh, rk) => ({ z, xc: N0.xc, w: T.w + dw, hCima: T.hCima + dh,
-                                     hBaixo: T.hBaixo + dh, yc: N0.yc, n: N0.n, rk });
   for (const lado of [-1, 1]){
-    const espelha = no => { no.scale.x = lado; return no; };
-    g.add(espelha(fuselagem(M.nacele, mCorpo, 0, M.nacele.length - 1, false, 24)));
-    g.add(espelha(fuselagem([boca(T.z, 0, 0, N0.rk), boca(T.z + 1.6, 3.4, 3.4, N0.rk),
-                             boca(T.z - 4, 3.6, 3.6, N0.rk), boca(N0.z - 2, 3.6, 3.6, N0.rk)],
-                            mAmarelo, 0, 3, false, 24)));
-    g.add(espelha(fuselagem([boca(T.fundo, -1, -1, 0), boca(T.z + 0.2, 0, 0, N0.rk)],
-                            mEscuro, 0, 1, false, 24)));
-    const fundo = new THREE.Mesh(new THREE.PlaneGeometry(T.w*2, T.hCima + T.hBaixo), mPreto);
-    fundo.position.set(lado*N0.xc, N0.yc + (T.hCima - T.hBaixo)/2, T.fundo + 1); g.add(fundo);
-
-    /* raio 15: a nacele termina com 14 e o bocal a abraça. A gola fixa do
-       bocal (raio 16) cobre a emenda. */
-    const bocal = bocalVariavel(M.BOCAL_R, mMetal, mEscuro);
-    bocal.position.set(lado*M.MOTOR_X, M.MOTOR_Y, M.BOCAL_Z);
+    /* A TOMADA COMO FURO. Testei cortar a fuselagem com booleana (three-bvh-csg
+       faz, e rápido: 45 ms para os dois lados). Funciona — mas para chegar ao
+       MESMO resultado basta modelar o duto: quatro paredes e um fundo escuro,
+       com o beiço por fora. Furo é o que o olho vê, não o que a topologia diz,
+       e assim o jogo não carrega 200 KB de biblioteca para desenhar dois
+       buracos. A booleana fica guardada para quando a forma do corte for
+       complicada de verdade. */
+    const BW = 15, BH = 12, BP = 26;                 // meia-largura, meia-altura, profundidade
+    const paredes = [[0, BH, BW*2 + 4, 2], [0, -BH, BW*2 + 4, 2],
+                     [BW, 0, 2, BH*2], [-BW, 0, 2, BH*2]];
+    for (const [dx, dy, w, h] of paredes){
+      const pa = new THREE.Mesh(new THREE.BoxGeometry(w, h, BP), mEscuro);
+      pa.position.set(lado*44 + dx, -10 + dy, 30); g.add(pa);
+    }
+    const fundo = new THREE.Mesh(new THREE.BoxGeometry(BW*2, BH*2, 2), mPreto);
+    fundo.position.set(lado*44, -10, 18); g.add(fundo);
+    /* o beiço: uma moldura fina em volta da boca, que é o que dá a borda
+       afiada da tomada de um caça */
+    for (const [dx, dy, w, h] of [[0, BH + 2, BW*2 + 10, 4], [0, -BH - 2, BW*2 + 10, 4],
+                                  [BW + 3, 0, 4, BH*2 + 8], [-BW - 3, 0, 4, BH*2 + 8]]){
+      const b2 = new THREE.Mesh(caixaViva(w, h, 7, 1.4), mCorpo);
+      b2.position.set(lado*44 + dx, -10 + dy, 42); g.add(b2);
+    }
+    const divisor = new THREE.Mesh(caixaViva(3, 26, 30, 1.2), mCorpo);
+    divisor.position.set(lado*26, -10, 40); g.add(divisor);
+    /* O BOCAL foi para DENTRO (x=26 em vez de 38): com 38 ele atravessava a
+       raiz do profundor, que nasce em x=36 — dois sólidos no mesmo lugar, que
+       foi o que você viu. Agora os dois bocais ficam colados no eixo, como num
+       F/A-18, e a cauda passa por fora deles. */
+    /* raio 12, não 14. Com 14 o anel de pétalas chegava a 36 de diâmetro numa
+       popa de 35 de altura: os dois bocais ficavam mais ALTOS que a fuselagem
+       em que moram, sobrando por cima e por baixo — a cara de peça parafusada
+       depois. Num caça de verdade o bocal fica em torno de três quartos da
+       altura local do casco (F/A-18, Su-27). Com 12 ele cabe. */
+    const bocal = bocalVariavel(12, mMetal, mEscuro);
+    /* o bocal SAI do casco: em -214 ele ficava rente ao corte de popa (-212) e
+       as pétalas nasciam dentro da fuselagem, sem duto nenhum para ver. Em
+       -224 o anel fica de fora, e por trás dele aparece a garganta escura. */
+    bocal.position.set(lado*M.MOTOR_X, -7, -224);
     g.add(bocal);
-    for (const fixo of bocal.userData.fixos){      // o anel e a gola, no corpo
+    for (const fixo of bocal.userData.fixos){      // o anel e o aro, no corpo
       fixo.position.add(bocal.position); g.add(fixo);
     }
     bocais.push(bocal);
@@ -11828,9 +11851,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       pa.position.set(Math.sin(i/9*6.283)*6, Math.cos(i/9*6.283)*6, 0);
       pa.rotation.z = i/9*6.283; pa.rotation.y = 0.55; rotor.add(pa);
     }
-    /* 0,8: com o tamanho antigo as pás passavam da parede do duto */
-    rotor.scale.setScalar(0.8);
-    rotor.position.set(lado*N0.xc, N0.yc + (T.hCima - T.hBaixo)/2, T.fundo + 6);
+    rotor.position.set(lado*44, -10, 30);
     rotores.push(rotor);
   }
 
@@ -11861,10 +11882,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
        dentro do arco ainda vê a face de FORA dele. */
     /* e o TUBO afinou de 0,075 para 0,05: visto de dentro, a 25 unidades do
        olho, o de antes era uma barra de arquibancada. Moldura é moldura. */
-    /* a moldura de FORA é escura, como a da referência (era amarela: com o
-       nariz amarelo na frente, o arco amarelo virava um terceiro amarelo
-       brigando pelo olho). */
-    const arco = new THREE.Mesh(new THREE.TorusGeometry(1, 0.028, 8, 44, Math.PI), mPreto);
+    const arco = new THREE.Mesh(new THREE.TorusGeometry(1, 0.028, 8, 44, Math.PI), mAmarelo);
     arco.scale.set(CP.x*k + 0.4, CP.y*k + 0.4, 3); arco.position.set(0, CP.cy, CP.arco); g.add(arco);
     /* O TAMANHO DO ESCURO é conta, não gosto. Ele tem de ser o mais interno
        nos dois sentidos e o mais externo em nenhum:
@@ -11943,23 +11961,84 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
      nasce da tabela de seções e não tem como descolar. */
   for (const lado of [-1, 1])
     g.add(faixaNoCasco(M.secoes, lado, t => {
-      const z = 200 - t*38;                 // do fim do cone à base do vidro
+      const z = 208 - t*46;                 // do fim do radome à base do vidro
       const larg = 0.30 + t*0.34;           // estreita no bico, abre na cabine
       return { z, a0: Math.PI/2, a1: Math.PI/2 - larg };
     }, mFosco, 10));
   /* o aro: TorusGeometry(1,1) tem raio EXTERNO 2 — escalado, ele virava uma
      mancha amarela do dobro da cabine na frente dela. Tubo fino resolve. */
-  const moldura = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 8, 52), mPreto);
+  const moldura = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 8, 52), mAmarelo);
   moldura.scale.set(CP.x + 0.6, CP.z + 0.6, 3.2); moldura.rotation.x = Math.PI/2;
   moldura.position.set(0, CP.cy, CP.cz); g.add(moldura);
   /* e a carenagem que desce da cabine para a cauda: sem ela o dorso fica reto
      e o avião perde a linha */
 
 
-  /* (A cara do dragão — olho, listra, boca, crista, dente do bico e o
-     emblema na deriva — saiu com o redesenho pela referência: o caça do
-     hangar é um caça limpo, e a identidade dele é o nariz amarelo e a
-     pintura das asas e das derivas. Está no histórico do git.) */
+  /* --- A CARA DO DRAGÃO: PINTURA, não adesivo ---------------------------
+     O olho anterior era um disco branco com uma bola preta no meio — de perto
+     virava olho de brinquedo colado na lataria. Dragão de verdade (ou melhor:
+     avião pintado de dragão, que é o que este é) tem o olho DESENHADO com a
+     forma do bicho: puxado para trás, canto afilado, sobrancelha acompanhando
+     a linha do bico. É uma chapa fina seguindo a lateral, não uma bola.
+
+     A regra que eu deveria ter seguido desde o começo: identidade em PINTURA
+     custa zero volume; identidade em GEOMETRIA engorda o avião. Foi a geometria
+     que deixou o AD-01 parecendo madeira. */
+  {
+    const olho = new THREE.Shape();
+    olho.moveTo(0, 0);
+    olho.quadraticCurveTo(10, 9, 24, 7);
+    olho.quadraticCurveTo(38, 4, 46, -3);
+    olho.quadraticCurveTo(28, -11, 13, -8);
+    olho.quadraticCurveTo(4, -6, 0, 0);
+    olho.closePath();
+    const pupila = new THREE.Shape();
+    pupila.moveTo(13, 1); pupila.quadraticCurveTo(21, 6, 30, 1);
+    pupila.quadraticCurveTo(21, -8, 13, 1); pupila.closePath();
+    /* O LADO DA PINTURA. `rotation.y = +PI/2` manda o x do desenho para o z
+       NEGATIVO do avião: o lado direito saía com o olho olhando para trás e a
+       listra correndo ao contrário. A chapa é fina e tem duas faces, então o
+       espelho não precisa de truque nenhum — é a MESMA rotação nos dois lados,
+       e só a posição muda de sinal. */
+    const poeNaLateral = (forma, esp, mat, x, y, z) => {
+      const m = fazFormaFina(forma, esp, mat);
+      m.rotation.y = -Math.PI/2; m.position.set(x, y, z);
+      g.add(m); return m;
+    };
+    for (const lado of [-1, 1]){
+      poeNaLateral(olho, 1.2, mAmarelo, lado*23.5, 6, 176);
+      poeNaLateral(pupila, 1.4, mPreto, lado*24.3, 6, 176);
+      /* A LISTRA corre do bico até a cauda, subindo de altura: é ela que amarra
+         o avião numa linha só. Agora ela é amostrada da própria casca, então
+         encosta na chapa do começo ao fim. */
+      g.add(faixaNoCasco(M.secoes, lado, t => {
+        const z = 214 - t*400;                       // do bico ao fim do tronco
+        const a = -0.34 + t*0.30;                    // desce na frente, sobe atrás
+        const larg = 0.10 + t*0.05;
+        return { z, a0: a + larg, a1: a - larg };
+      }, mAmarelo));
+      /* a BOCA: o friso branco curto embaixo do bico, como as bocas de tubarão
+         pintadas nos caças da segunda guerra */
+      g.add(faixaNoCasco(M.secoes, lado, t => {
+        const z = 206 - t*70;
+        const a = -0.95 + t*0.16;
+        return { z, a0: a + 0.075, a1: a - 0.075 };
+      }, mBranco, 12));
+    }
+  }
+
+  /* crista: três lâminas finas nas costas, não três cones gordos */
+  for (let i = 0; i < 4; i++){
+    const t = i/3;
+    const lam = new THREE.Mesh(new THREE.BoxGeometry(3, 13 - t*6, 26 - t*8), mAmarelo);
+    lam.position.set(0, 32 - t*4, 10 - i*34); lam.rotation.x = 0.22; g.add(lam);
+  }
+  /* o dente do bico e a faixa amarela da lateral */
+  const focinho = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mAmarelo);
+  focinho.scale.set(15, 11, 34); focinho.position.set(0, -6, 206); g.add(focinho);
+
+  const emblema = new THREE.Mesh(new THREE.ConeGeometry(13, 26, 3), mAmarelo);
+  emblema.position.set(0, 96, -150); emblema.rotation.set(Math.PI/2, 0, 0); g.add(emblema);
 
   /* =========================================================================
      O DETALHE
@@ -12609,6 +12688,1145 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
   }
 
   if (!simples){   // detalhe de perto: o avião de fundo não leva
+    /* --- SONDAS, ANTENAS E LUZES ------------------------------------------- */
+    {
+      const pitot = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.8, 46, 8), mEscuro);
+      pitot.rotation.x = Math.PI/2; pitot.position.set(0, 2, 268); g.add(pitot);
+      for (const lado of [-1, 1]){
+        const palheta = new THREE.Mesh(caixaViva(2, 11, 5, 0.8), mEscuro);
+        palheta.position.set(lado*22, 6, 212); palheta.rotation.z = lado*0.4; g.add(palheta);
+      }
+      const antena = new THREE.Mesh(caixaViva(2.4, 15, 22, 0.9), mCorpo);
+      antena.position.set(0, 30, -70); antena.rotation.x = 0.3; g.add(antena);
+      const antena2 = new THREE.Mesh(caixaViva(2.4, 12, 18, 0.9), mCorpo);
+      antena2.position.set(0, -32, 60); antena2.rotation.x = -0.3; g.add(antena2);
+      /* luzes de navegação: verde na asa direita, vermelha na esquerda, branca
+         na cauda. A regra é essa no mundo inteiro desde 1848, herdada dos navios. */
+      const luz = (x, y, z, cor) => {
+        const m = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 6),
+                    new THREE.MeshBasicMaterial({ color: cor }));
+        m.position.set(x, y, z); return m;
+      };
+      asas[1].children[0].add(luz(146, 10, -40, 0x4dff7a));
+      asas[0].children[0].add(luz(146, 10, -40, 0xff4d4d));
+      g.add(luz(0, 40, -238, 0xffffff));
+    }
+
+  }
+
+  /* --- QUILHAS VENTRAIS e ESTRAKES ---------------------------------------
+     As duas quilhas embaixo da cauda seguram o avião em ângulo de ataque alto
+     (é onde a deriva começa a ficar na sombra da fuselagem); os estrakes no
+     bico geram o vórtice que mantém a asa colada na manobra. Os dois existem
+     em quase todo caça moderno, e os dois são pura silhueta. */
+  for (const lado of [-1, 1]){
+    const quilha = new THREE.Shape();
+    quilha.moveTo(-158, 0); quilha.lineTo(-192, -30); quilha.lineTo(-206, -29); quilha.lineTo(-200, 0);
+    quilha.closePath();
+    const q = fazFormaFina(quilha, 5, mCorpo);
+    q.rotation.y = -Math.PI/2;
+    /* INCLINADAS PARA FORA. Em pé, vistas de trás, as duas viravam dois postes
+       embaixo do avião — cara de trem de pouso esquecido do lado de fora. Toda
+       quilha ventral de caça é cantada (F-16, Su-27, F/A-18E): inclinada, ela
+       lê como quilha e ainda trabalha melhor, porque fica fora da sombra da
+       fuselagem no ângulo de ataque alto, que é justo para o que ela serve. */
+    const qNo = new THREE.Group();
+    qNo.add(q); qNo.position.set(lado*34, -22, 0); qNo.rotation.z = lado*0.40; g.add(qNo);
+    const estrake = new THREE.Mesh(caixaViva(3, 5, 76, 1.2), mCorpo);
+    estrake.position.set(lado*30, 8, 166); estrake.rotation.set(0, lado*0.13, -lado*0.5); g.add(estrake);
+  }
+
+  if (!simples){   // detalhe de perto: o avião de fundo não leva
+    /* --- CARGAS: dois pilones na luva, com míssil, e o tanque ventral ------- */
+    for (const lado of [-1, 1]){
+      const pilone = new THREE.Mesh(caixaViva(7, 22, 54, 2.2), mCorpo);
+      pilone.position.set(lado*82, -18, -34); g.add(pilone);
+      const corpoM = new THREE.Mesh(new THREE.CylinderGeometry(7.5, 7.5, 120, 12), mBranco);
+      corpoM.rotation.x = Math.PI/2; corpoM.position.set(lado*82, -34, -26); g.add(corpoM);
+      const ogiva = new THREE.Mesh(new THREE.ConeGeometry(7.5, 26, 12), mEscuro);
+      ogiva.rotation.x = Math.PI/2; ogiva.position.set(lado*82, -34, 47); g.add(ogiva);
+      for (let i = 0; i < 4; i++){
+        const a = Math.PI/4 + i/4*Math.PI*2;
+        const aleta = new THREE.Mesh(new THREE.BoxGeometry(2, 16, 22), mAmarelo);
+        aleta.position.set(lado*82 + Math.cos(a)*11, -34 + Math.sin(a)*11, -76);
+        aleta.rotation.z = a; g.add(aleta);
+        const canard = new THREE.Mesh(new THREE.BoxGeometry(1.6, 11, 14), mAmarelo);
+        canard.position.set(lado*82 + Math.cos(a)*10, -34 + Math.sin(a)*10, 20);
+        canard.rotation.z = a; g.add(canard);
+      }
+    }
+    {
+      const tanque = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mAmarelo);
+      tanque.scale.set(13, 13, 82); tanque.position.set(0, -50, -50); g.add(tanque);
+      const quilhaT = new THREE.Mesh(new THREE.BoxGeometry(2.5, 14, 30), mAmarelo);
+      quilhaT.position.set(0, -60, -118); g.add(quilhaT);
+    }
+
+  }
+
+  /* --- CARENAGENS -----------------------------------------------------------
+     O que mais denuncia "peças coladas" num modelo é o encontro seco entre
+     duas peças. Avião de verdade é cheio de carenagem: a bolha que casa a asa
+     com o corpo, o rabo de peixe atrás da cabine, o berço da deriva. Cada uma
+     é meia elipsoide bem esticada, e cada uma apaga uma emenda. */
+  for (const lado of [-1, 1]){
+    const raizAsa = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mCorpo);
+    raizAsa.scale.set(16, 13, 116); raizAsa.position.set(lado*30, -4, -14); g.add(raizAsa);
+    /* a bolha da luva no ponto do pivô: fecha o lado de dentro da junta, que a
+       carenagem que gira não alcança */
+    /* (aqui havia mais uma bolha, fixa na luva. Saiu junto com as outras: a
+       raiz grossa do painel já cobre a juntura em todo o curso.) */
+    const raizEstab = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), mCorpo);
+    raizEstab.scale.set(10, 8, 46); raizEstab.position.set(lado*50, -8, -192); g.add(raizEstab);
+  }
+  {
+    const rabo = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10, 0, Math.PI*2, 0, Math.PI/2), mCorpo);
+    rabo.scale.set(15, 17, 116); rabo.position.set(0, 14, 24); g.add(rabo);
+    const berco = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8, 0, Math.PI*2, 0, Math.PI/2), mCorpo);
+    berco.scale.set(10, 14, 70); berco.position.set(0, 12, -150); g.add(berco);
+    /* o ferrão entre os dois bocais, onde mora o paraquedas de freio */
+    /* o ferrão entre os dois bocais (onde mora o paraquedas de freio) — fino e
+       ENTRE eles, não por cima: era ele que tapava os bocais */
+    /* e ele PARA antes dos bocais. Com o bocal recuado para -224, o ferrão
+       chegava até -266 e aparecia por cima dos dois, como um dedo apontando
+       para o meio do rastro. */
+    const ferrao = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), mCorpo);
+    ferrao.scale.set(5.0, 5.8, 30); ferrao.position.set(0, -4, -212); g.add(ferrao);
+  }
+
+  if (!simples){   // detalhe de perto: o avião de fundo não leva
+    /* --- TREM DE POUSO -------------------------------------------------------
+       O de antes era um cano com uma roda no fim. Perna de avião tem ANATOMIA, e
+       é ela que faz a peça parecer máquina:
+
+         · o AMORTECEDOR é telescópico — cilindro externo grosso e escuro, e o
+           pistão cromado saindo por baixo, mais fino. Sem os dois diâmetros não
+           existe amortecedor, existe vareta;
+         · a TESOURA (dois braços articulados ligando o cilindro ao pistão) é o
+           que impede a roda de girar em torno da perna. É pequena e é a peça
+           que mais diz "trem de pouso de verdade";
+         · o TIRANTE DE ARRASTO segura a perna contra a frenagem;
+         · o PNEU tem ombro redondo e flanco reto, com cubo e disco de freio;
+         · e as PORTAS: uma na perna, outra no poço.
+
+       E a ALTURA sai do avião, não o contrário. Eu tinha amarrado as pernas ao
+       RODA=158 do jogo — que era a altura do dragão barrigudo de antes. Com a
+       fuselagem nova, esbelta e de barriga a -40, aquilo virou perna de
+       pernilongo: o avião pairava meio metro acima das rodas. Agora as pernas
+       têm o comprimento que a barriga pede (a roda encosta em -103, com a
+       barriga a -40 e o tanque ventral a -63, dois metros de folga), e é o RODA
+       do jogo que passa a valer 103 quando este modelo entrar lá. */
+    const trem = new THREE.Group();
+    {
+      const mPerna  = new THREE.MeshPhongMaterial({ color: 0x9aa3ae, shininess: 70, specular: 0xdfe6ef });
+      const mCromo  = new THREE.MeshPhongMaterial({ color: 0xcfd6de, shininess: 150, specular: 0xffffff });
+      const mBorracha = new THREE.MeshPhongMaterial({ color: 0x1a1d22, shininess: 14 });
+      const mFreio  = new THREE.MeshPhongMaterial({ color: 0x6b7078, shininess: 60 });
+
+      const perna = ({ x, z, curso, raio, gemeas, dianteira }) => {
+        const n2 = new THREE.Group();
+        const topo = 0, baixo = -curso;
+        // ferragem de fixação no poço
+        const ferro = new THREE.Mesh(caixaViva(16, 12, 20, 2.4), mPerna); ferro.castShadow = true;
+        ferro.position.y = 4; n2.add(ferro);
+        // cilindro externo (a metade de cima do curso) e pistão cromado
+        const cil = new THREE.Mesh(new THREE.CylinderGeometry(8.4, 7.4, curso*0.60, 14), mPerna);
+        cil.position.y = topo - curso*0.30; n2.add(cil);
+        const pist = new THREE.Mesh(new THREE.CylinderGeometry(5.6, 5.6, curso*0.56, 14), mCromo);
+        pist.position.y = topo - curso*0.70; n2.add(pist);
+        // tesoura: dois braços com um joelho
+        const joelho = [0, baixo + curso*0.30, 9.5];
+        n2.add(barra([0, baixo + curso*0.56, 5.2], joelho, 3.4, 2.2, mPerna));
+        n2.add(barra(joelho, [0, baixo + curso*0.06, 5.2], 3.4, 2.2, mPerna));
+        // tirante de arrasto, para a frente
+        n2.add(barra([0, 2, 5], [0, baixo + curso*0.46, 22], 5, 3.4, mPerna));
+        // eixo e rodas
+        const eixo = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, gemeas ? gemeas*2 + 12 : 14, 10), mPerna);
+        eixo.rotation.z = Math.PI/2; eixo.position.y = baixo; n2.add(eixo);
+        for (const dx of gemeas ? [-gemeas, gemeas] : [0]){
+          const p2 = pneu(raio, raio*0.36, mBorracha);   // pneu de caça é gordo
+          p2.position.set(dx, baixo, 0); n2.add(p2);
+          /* o cubo tem de caber DENTRO da largura do pneu: na primeira versão
+             ele tinha 14 de comprimento num pneu de 13 e saía pelos dois lados,
+             parecendo um carretel. */
+          const cubo = new THREE.Mesh(new THREE.CylinderGeometry(raio*0.38, raio*0.38, raio*0.56, 14), mPerna);
+          cubo.rotation.z = Math.PI/2; cubo.position.set(dx, baixo, 0); n2.add(cubo);
+          const disco = new THREE.Mesh(new THREE.CylinderGeometry(raio*0.60, raio*0.60, raio*0.14, 16), mFreio);
+          disco.rotation.z = Math.PI/2; disco.position.set(dx, baixo, 0); n2.add(disco);
+        }
+        if (dianteira){
+          // colar de esterçamento e o farol de táxi
+          const colar = new THREE.Mesh(new THREE.TorusGeometry(7, 2.2, 8, 14), mPerna);
+          colar.rotation.x = Math.PI/2; colar.position.y = -curso*0.22; n2.add(colar);
+          const farol = new THREE.Mesh(new THREE.SphereGeometry(4.2, 10, 8),
+                          new THREE.MeshBasicMaterial({ color: 0xfff6d8 }));
+          farol.position.set(0, -curso*0.30, 9); n2.add(farol);
+        }
+        n2.position.set(x, -22, z);
+        return n2;
+      };
+      trem.add(perna({ x: 0,   z: 150, curso: 64, raio: 17, gemeas: 8.5, dianteira: true }));
+      trem.add(perna({ x: -72, z: -44, curso: 59, raio: 22 }));   // bitola 144; recuado com o CG
+      trem.add(perna({ x:  72, z: -44, curso: 59, raio: 22 }));
+      /* as portas: a do poço (grande, na fuselagem) e a da perna (pequena) */
+      for (const [x, z, larg, comp] of [[0, 150, 22, 74], [-72, -44, 24, 66], [72, -44, 24, 66]]){
+        const lado = x === 0 ? 1 : Math.sign(x);
+        const poço = new THREE.Mesh(caixaViva(larg, 2.4, comp, 1.1), mCorpo);
+        poço.position.set(x + lado*(larg*0.62), -26, z);
+        poço.rotation.z = lado*1.05;
+        trem.add(poço);
+        const naPerna = new THREE.Mesh(caixaViva(2.4, 30, comp*0.46, 1.1), mCorpo);
+        naPerna.position.set(x - lado*9, -40, z);
+        trem.add(naPerna);
+      }
+    }
+    g.add(trem);
+    g.userData.trem = trem;
+
+  }
+
+  if (!simples){   // detalhe de perto: o avião de fundo não leva
+    /* --- LINHAS DE PAINEL ---------------------------------------------------
+       Meia dúzia de frisos escuros rentes à casca. É o detalhe mais barato que
+       existe (uma caixa fininha cada) e o que mais faz a fuselagem parecer
+       CHAPEADA em vez de moldada num pedaço só. */
+    for (const lado of [-1, 1]){
+      /* Os frisos eram caixas de 2 por 40 em quase preto: de perto, fita isolante
+         colada na fuselagem. Linha de chapa é um RISCO — fina, curta e só um tom
+         abaixo da pintura. */
+      /* e o x de cada friso sai da TABELA DO CASCO, não de um número escrito
+         na mão. Dois deles estavam FORA da fuselagem — o de z=-40 sobrava oito
+         unidades no ar — e viravam duas aletinhas pretas espetadas na lateral,
+         que de perfil liam como um risco de faca no avião. */
+      for (const [z, alt] of [[196, 18], [140, 22], [64, 26], [-40, 28], [-130, 24]]){
+        const sec = secaoEm(M.secoes, z);
+        const p = pontoNoCasco(sec, 0, -0.35);     // rente à casca, por dentro
+        const friso = new THREE.Mesh(caixaViva(1.1, alt, 1.2, 0.3), mFriso);
+        friso.position.set(lado*p.x, p.y, z); g.add(friso);
+      }
+    }
+
+    /* --- A CARA: a boca do dragão pintada no bico, com os dentes ------------
+       A identidade do jogo mora aqui. No AD-01 ela era ESCULPIDA (bolas de 21 de
+       raio grudadas na fuselagem) e por isso engrossava o avião. Aqui é pintura
+       e um dente fino de cada lado: de longe se lê o dragão, de perto o avião
+       continua avião. */
+    {
+      for (const lado of [-1, 1]){
+
+        /* faixa de formatura: a listra clara que os caças têm para o líder
+           enxergar a asa do ala à noite */
+
+        /* cerca de asa: o friso que segura o escoamento na ponta */
+        const cerca = new THREE.Mesh(new THREE.BoxGeometry(2, 9, 46), mCorpo);
+        cerca.position.set(lado*96, 6, -66); cerca.rotation.y = -lado*0.12; g.add(cerca);
+      }
+      /* freio aerodinâmico no dorso, entre a cabine e a deriva */
+      const freio = new THREE.Mesh(caixaViva(34, 2.5, 52, 1.1), mCorpo);
+      freio.position.set(0, 26, -30); g.add(freio);
+      const frisoF = new THREE.Mesh(new THREE.BoxGeometry(36, 1.2, 54), mEscuro);
+      frisoF.position.set(0, 25.2, -30); g.add(frisoF);
+    }
+
+  }
+
+  g.userData.asas = asas;
+  g.userData.comandos = comandos;
+  g.userData.rotores = rotores;
+  g.userData.bocais = bocais;
+  for (const a of asas){ comandos.flapes.push(a.userData.abas.flape);
+                         comandos.ailerons.push(a.userData.abas.aileron); }
+  for (const r of rotores) g.add(r);
+  g.userData.medidas = MEDIDAS_CACA;     // cada carcaça carrega as suas
+  return g;
+}
+
+/* =============================================================================
+   O TERCEIRO AVIÃO — "Caça novo" (nome provisório)
+
+   O desenho que nasceu da ilustração do hangar e da FICHA TÉCNICA que o dono
+   mandou (scratchpad/capas/arte/ficha-terceiro.webp): 16,0 m de comprimento,
+   12,2 m de envergadura aberta, 4,8 m de altura; asa variável de 18°, 38° e
+   58°; derivas duplas inclinadas; radome amarelo pontudo; tomadas laterais
+   de borda amarela; dois turbofans; bequilha e duas pernas principais.
+
+   Ele é um TERCEIRO avião na garagem, ao lado do AD-02 e do dragão, e por
+   isso nada aqui toca no AD-02: as funções de casco abaixo são cópias das
+   dele com uma coisa a mais (a quina dos chines), e a cabine é a mesma do
+   AD-02, copiada. Copiar foi a escolha certa porque o AD-02 tem de ficar
+   idêntico byte a byte — mudar uma função que ele usa mudaria ele.
+
+   O DESENHO E O JOGO TÊM ESCALAS DIFERENTES. A cabine do AD-02 (vidro,
+   banco, painel, pernas) mede 108 de comprimento, e ela foi desenhada para
+   um avião de 490. Este tem 320. Em vez de redesenhar a cabine inteira, o
+   avião é desenhado na escala da cabine (500 de comprimento) e encolhido no
+   fim por `MEDIDAS_TERCEIRO.escala` (0,64). Tudo o que o jogo lê — olho,
+   roda, fogo, ponta da asa, vidro do HUD — já sai em MEDIDAS_TERCEIRO na
+   escala do jogo.
+   ========================================================================== */
+
+/* A QUINA (`q`, de 0 a 1). Superelipse é sempre redonda na lateral, e o
+   nariz deste caça não é: ele tem CHINES, a aresta viva que corre do bico até
+   as tomadas e que faz o nariz ler como bico achatado e não como charuto. A
+   quina estreita a seção linearmente com a altura — na linha do meio a
+   largura fica inteira, e um pouco acima ou abaixo ela já caiu, o que
+   desenha um vinco na lateral. Com q=0 é a `anelDeSecao` do AD-02. */
+function anelDeSecao3(sec, n){
+  const anel = [];
+  const e = sec.n || 2.4, q = sec.q || 0;
+  for (let i = 0; i < n; i++){
+    const a = i/n*Math.PI*2, c = Math.cos(a), s2 = Math.sin(a);
+    const alt = Math.pow(Math.abs(s2), 2/e);
+    const x = sec.w * Math.sign(c) * Math.pow(Math.abs(c), 2/e) * (1 - q*alt);
+    const h = s2 >= 0 ? sec.hCima : sec.hBaixo;
+    const y = sec.yc + h * Math.sign(s2) * alt;
+    anel.push(new THREE.Vector3(x, y, sec.z));
+  }
+  return anel;
+}
+function pontoNoCasco3(sec, ang, fora){
+  const e = sec.n || 2.4, c = Math.cos(ang), s2 = Math.sin(ang), q = sec.q || 0;
+  const w = sec.w + (fora||0), hC = sec.hCima + (fora||0), hB = sec.hBaixo + (fora||0);
+  const h = s2 >= 0 ? hC : hB, alt = Math.pow(Math.abs(s2), 2/e);
+  return new THREE.Vector3(
+    w * Math.sign(c) * Math.pow(Math.abs(c), 2/e) * (1 - q*alt),
+    sec.yc + h * Math.sign(s2) * alt,
+    sec.z);
+}
+/* interpola uma seção em qualquer z; quina, centro e rampa valem zero onde
+   não foram escritos (o expoente vale 2,4, como no AD-02) */
+function secaoEm3(secoes, z){
+  let i = 0;
+  while (i < secoes.length - 2 && secoes[i+1].z > z) i++;
+  const a = secoes[i], b = secoes[i+1];
+  const k = Math.max(0, Math.min(1, (a.z - z)/(a.z - b.z)));
+  const m = {};
+  for (const key of ['z','w','hCima','hBaixo','yc','n','q','xc','rk']){
+    const pad = key === 'n' ? 2.4 : 0;
+    const va = a[key]===undefined ? pad : a[key], vb = b[key]===undefined ? pad : b[key];
+    m[key] = va + (vb - va)*k;
+  }
+  return m;
+}
+/* `xc` desloca a seção para o lado (a nacele, que não mora no eixo) e `rk`
+   inclina a boca: o z de cada ponto anda com a altura, e a tomada de ar fica
+   com o lábio de cima mais à frente que o de baixo. `tampa` false deixa as
+   pontas abertas (a nacele, o duto). */
+function fuselagem3(secoes, mat, de, ate, tampa, n){
+  const aneis = [];
+  n = n || 28;
+  const anel = sec => anelDeSecao3(sec, n).map(p => {
+    p.x += sec.xc || 0; p.z += (sec.rk || 0)*(p.y - sec.yc); return p; });
+  for (let i = de; i <= ate; i++){
+    const a = secoes[i];
+    aneis.push(anel(a));
+    if (i < ate){       // uma seção intermediária, para a curva não ficar poligonal
+      const m = secaoEm3([a, secoes[i+1]], (a.z + secoes[i+1].z)/2);
+      aneis.push(anel(m));
+    }
+  }
+  return costura(aneis, mat, tampa !== false);
+}
+function faixaNoCasco3(secoes, lado, marcas, mat, n){
+  n = n || 26;
+  const aneis = [];
+  for (let i = 0; i <= n; i++){
+    const m = marcas(i/n);                     // { z, a0, a1 }
+    const sec = secaoEm3(secoes, m.z);
+    const p0 = pontoNoCasco3(sec, m.a0, 0.7), p1 = pontoNoCasco3(sec, m.a1, 0.7);
+    const q0 = pontoNoCasco3(sec, m.a0, -0.5), q1 = pontoNoCasco3(sec, m.a1, -0.5);
+    for (const p of [p0, p1, q1, q0]) p.x *= lado;
+    aneis.push([p0, p1, q1, q0]);
+  }
+  return costura(aneis, mat, true);
+}
+/* a banheira da cabine (ver `convesDaCabine`), sobre a casca COM quina:
+   com a casca sem quina ela saía larga demais e furava a chapa na borda
+   do vidro */
+function convesDaCabine3(CP, secoes, mat, nz, na){
+  nz = nz || 16; na = na || 12;
+  const aneis = [];
+  for (let i = 0; i <= nz; i++){
+    const z = CP.cz - CP.z*0.995 + CP.z*1.99*i/nz;
+    const sec = secaoEm3(secoes, z), e = sec.n || 2.4;
+    const xs = CP.x*0.99*Math.sqrt(Math.max(0, 1 - Math.pow((z - CP.cz)/CP.z, 2)));
+    const lim = Math.acos(Math.min(1, Math.pow(Math.min(1, xs/(sec.w*(1 - (sec.q||0)*0.5))), e/2)));
+    const anel = [];
+    for (let j = 0; j <= na; j++)
+      anel.push(pontoNoCasco3(sec, lim + (Math.PI - 2*lim)*j/na, 0.45));
+    aneis.push(anel);
+  }
+  const m = costura(aneis, mat, false);
+  m.castShadow = false;
+  return m;
+}
+
+const TERCEIRO = {
+  /* --- A ASA, DESENHADA ABERTA A 18° -----------------------------------------
+     A ficha técnica dá os três pontos da asa variável: 18° na decolagem e
+     baixa velocidade, 38° no cruzeiro, 58° na alta velocidade. A asa é
+     desenhada JÁ NA POSIÇÃO DE 18° (o pivô fica em zero com ela aberta, ver
+     `giroDaAsa`) e o curso dela é 0,8 do curso do jogo — 40° de 18 a 58.
+
+     O painel que gira, medido a partir do PIVÔ (x=80, z=-30), no desenho
+     (ver `escala` em MEDIDAS_TERCEIRO). A envergadura aberta dá 381 no
+     desenho, 244 no jogo: os 12,2 m da ficha. A torção (washout) continua:
+     a ponta tem 2,4° a menos que a raiz, para a raiz estolar primeiro. */
+  asa: [
+    { x:   0, zLE: 60,   corda: 150,   y: 13.6, tt: 0.065, tor:  0.0 },
+    { x:  26, zLE: 51.6, corda: 125.5, y: 13.3, tt: 0.062, tor: -0.6 },
+    { x:  53, zLE: 42.8, corda: 100,   y: 13.0, tt: 0.058, tor: -1.3 },
+    { x:  80, zLE: 34,   corda:  74.5, y: 12.7, tt: 0.054, tor: -1.9 },
+    { x: 106, zLE: 25.5, corda:  50,   y: 12.4, tt: 0.05,  tor: -2.4 }
+  ],
+  /* A LUVA fixa, e ela é também o LERX: nasce do lado da cabine, passa POR
+     CIMA da tomada de ar e vai a 67° até o pivô — o desenho do F-14, que é o
+     que a ficha mostra na vista de cima. Bordo de fuga reto em z=-120. */
+  luva: [
+    { x:  20, zLE: 172,  corda: 292,   y: 18,   tt: 0.035 },
+    { x:  48, zLE: 124,  corda: 244,   y: 17,   tt: 0.042 },
+    { x:  70, zLE:  70,  corda: 190,   y: 15,   tt: 0.055 },
+    { x:  88, zLE: 27.4, corda: 147.4, y: 13.6, tt: 0.065 }
+  ],
+  /* o estabilizador nasce na lateral de fora da nacele, abaixo da asa — a
+     asa recolhida varre POR CIMA dele, como num caça de asa variável de
+     verdade. Enflechamento de 34°, ponta amarela. */
+  estab: [
+    { x:  40, zLE: -138, corda: 96, y: -6,   tt: 0.07 },
+    { x:  84, zLE: -168, corda: 66, y: -6.5, tt: 0.065 },
+    { x: 124, zLE: -196, corda: 38, y: -7,   tt: 0.06 }
+  ],
+  /* AS DUAS DERIVAS, desenhadas deitadas e postas em pé sobre as naceles,
+     abertas 17° para fora, como na ficha. A altura total da ficha (4,8 m, do
+     chão à ponta da deriva) é o que manda nelas: 64 de envergadura no
+     desenho, com o trem que a ficha pede, fecha os 96 do jogo. */
+  deriva: [
+    { x:   0, zLE:  -84, corda: 128, y: 0, tt: 0.06 },
+    { x:  34, zLE: -116, corda:  94, y: 0, tt: 0.055 },
+    { x:  64, zLE: -146, corda:  58, y: 0, tt: 0.05 }
+  ],
+  DERIVA: { x: 36, y: 9, cant: 0.30 },
+  /* --- A FUSELAGEM DO MEIO: nariz, cabine e a espinha ---------------------
+     z · meia-largura · meia-altura para cima · para baixo · centro ·
+     expoente · quina. Os motores não moram aqui: atrás da cabine o
+     tronco afina numa espinha estreita, e quem carrega os motores são as duas
+     naceles (`nacele`, logo abaixo). É o arranjo do caça da referência.
+
+     Da cabine (z de 68 a 176) as alturas de cima ficaram as de antes, de
+     propósito: a bolha, o convés e a vista de dentro se apoiam nelas. */
+  secoes: [
+    { z: 254, w: 0.6, hCima: 0.6, hBaixo: 0.6, yc: -1, n: 2.0 },
+    { z: 244, w:  10, hCima:   8, hBaixo: 3.6, yc: -1.5, n: 2.1, q: 0.30 },
+    { z: 224, w:  19, hCima:  14, hBaixo: 6.2, yc: -2.5, n: 2.2, q: 0.40 },
+    { z: 202, w:  23, hCima:  19, hBaixo: 7.5, yc: -4, n: 2.2, q: 0.45 },   // fim do cone amarelo
+    { z: 178, w:  29, hCima:  27, hBaixo:  12, yc: -6, n: 2.4, q: 0.40 },
+    { z: 152, w:  32, hCima:  36, hBaixo:  17, yc: -6, n: 2.6, q: 0.32 },   // base do para-brisa
+    { z: 118, w:  33, hCima:  39, hBaixo:  19, yc: -5, n: 2.8, q: 0.22 },   // deck da cabine
+    { z:  84, w:  33, hCima:  35, hBaixo:  20, yc: -5, n: 3.0, q: 0.12 },
+    { z:  50, w:  29, hCima:  28, hBaixo:  19, yc: -3, n: 3.0 },            // entre as tomadas
+    { z:   0, w:  26, hCima:  24, hBaixo:  18, yc: -4, n: 3.0 },
+    { z: -80, w:  24, hCima:  21, hBaixo:  16, yc: -5, n: 3.0 },
+    { z:-160, w:  20, hCima:  17, hBaixo:  14, yc: -6, n: 2.8 },
+    { z:-200, w:  14, hCima:  12, hBaixo:  11, yc: -7, n: 2.5 },
+    { z:-224, w:   6, hCima:   6, hBaixo:   6, yc: -7, n: 2.2 },
+    { z:-232, w:   1, hCima:   1, hBaixo:   1, yc: -7, n: 2.0 }
+  ],
+  /* --- A NACELE, uma de cada lado (desenhada para +x e espelhada) ---------
+     Boca quase quadrada (expoente 5) e inclinada (`rk`), que vai
+     arredondando até o tubo do motor, e o eixo que ENTRA para o meio: a
+     tomada fica longe da fuselagem (com uma fresta, o separador de camada
+     limite) e o bocal fica perto. É o desenho do F-15 e do Su-27, e é o que
+     dá ao avião visto de cima a cintura entre o nariz e a cauda. */
+  nacele: [
+    { z:  84, xc: 57,   w: 21.5, hCima: 25,   hBaixo: 24,   yc: -13,  n: 5.0, rk: 0.30 },
+    { z:  50, xc: 55,   w: 21.5, hCima: 25,   hBaixo: 23,   yc: -12,  n: 4.2 },
+    { z: -20, xc: 48,   w: 21,   hCima: 23,   hBaixo: 21,   yc: -10,  n: 3.4 },
+    { z:-100, xc: 41,   w: 20.5, hCima: 21,   hBaixo: 19.5, yc: -9,   n: 2.8 },
+    { z:-170, xc: 36,   w: 19.5, hCima: 19.5, hBaixo: 19,   yc: -8,   n: 2.4 },
+    { z:-200, xc: 34,   w: 18.5, hCima: 18.5, hBaixo: 18.5, yc: -8,   n: 2.2 },
+    { z:-212, xc: 34,   w: 16.5, hCima: 16.5, hBaixo: 16.5, yc: -8,   n: 2.0 }
+  ],
+  /* a boca da tomada: z do lábio, e a meia-largura e meia-altura de DENTRO */
+  TOMADA: { z: 100, w: 17.5, hCima: 21, hBaixo: 20, fundo: 68 },
+  MOTOR_X: 34, MOTOR_Y: -8, BOCAL_Z: -210, BOCAL_R: 17.5,
+  PIVO: { x: 80, z: -30 },
+  FLAP: [0.02, 0.46], AIL: [0.54, 0.96], CORDA_MOVEL: 0.70,
+  /* o trem: a ficha pede o avião baixo (4,8 m de altura total), então as
+     pernas são mais curtas que as do AD-02 — a roda toca em -82 no desenho */
+  TREM: { dianteira: { z: 150, curso: 43, raio: 17 }, principal: { x: 50, z: -44, curso: 38, raio: 22 } }
+};
+
+function montaTerceiro(corCorpo, corDetalhe, corVidro, simples){
+  const g = new THREE.Group();
+  /* 0,34 chapava o avião inteiro e matava o sol junto com o defeito — e o
+     defeito não era luz, era malha espelhada (ver `fundePorCor`). Com a malha
+     certa, basta um empurrãozinho para o lado na sombra não virar borra. */
+  const CHAPA = 0.13;    // quanto da própria cor volta como luz própria
+  const mCorpo   = new THREE.MeshPhongMaterial({ color: corCorpo,  shininess: 34,
+                     specular: 0x3d5877, emissive: luzPropria(corCorpo, CHAPA) });
+  /* o reflexo era 0x6b5a20, um marrom: numa área grande, tudo o que não pegava
+     sol virava mostarda suja. Reflexo claro e brilho baixo deixam o amarelo ser
+     amarelo também na sombra. */
+  const mAmarelo = new THREE.MeshPhongMaterial({ color: corDetalhe, shininess: 24,
+                     specular: 0xcbbf8c, emissive: luzPropria(corDetalhe, CHAPA) });
+  const mEscuro  = new THREE.MeshPhongMaterial({ color: 0x16223c,  shininess: 40 });
+  /* --- O VIDRO DA CAPOTA, AGORA COM O QUE SE REFLETE NELE -----------------
+     Em Phong ele era um plástico azul translúcido com um pontinho de brilho.
+     Acrílico de canópia é a superfície mais reflexiva do avião inteiro, e o
+     que o olho reconhece como vidro não é a transparência: é o CÉU correndo
+     por cima dela quando a máquina gira.
+
+     `roughness` 0,06 porque acrílico de caça é polido e não é espelho de
+     primeira; `metalness` zero porque não é metal — o brilho de borda vem do
+     Fresnel, que o Standard faz sozinho, e é ele que faz a bolha clarear nas
+     quinas e continuar limpa no meio. */
+  const mVidro   = new THREE.MeshStandardMaterial({ color: corVidro,
+                     roughness: 0.06, metalness: 0.0, envMap: ceuDeReflexo(),
+                     envMapIntensity: 1.15, transparent: true, opacity: 0.66 });
+  /* 0,66 e não 0,5: o vidro da referência é ESCURO, e com meio vidro o que
+     se lia de fora eram os bancos e o painel, como num aquário. A face é
+     só a de fora (FrontSide), então de dentro o piloto continua vendo o
+     mundo sem filtro nenhum. */
+  const mBranco  = new THREE.MeshPhongMaterial({ color: 0xf6f9ff, shininess: 60 });
+  const mFriso   = new THREE.MeshPhongMaterial({ color: 0x17458f, shininess: 40 });
+  /* 0x11161f é preto de verdade, e preto absoluto num avião azul-claro não lê
+     como peça: lê como BURACO. Num caça as partes "pretas" — antirreflexo,
+     banco, painel — são cinza-fosco escuro, que ainda recebe luz e ainda tem
+     forma. */
+  const mPreto   = new THREE.MeshPhongMaterial({ color: 0x1e2530, shininess: 26 });
+  const mFosco   = new THREE.MeshPhongMaterial({ color: 0x27303d, shininess: 12 });
+  /* A COR DE DENTRO DA CABINE.
+
+     Estava tudo em `mPreto`/`mFosco`, que são cores de PEÇA DE FORA vista ao
+     sol. Por dentro, contra um céu claro, elas viram uma silhueta chapada:
+     arco, coaming, consoles e painel no mesmo preto, sem uma aresta para o
+     olho segurar. É disso que vem a cara de recorte.
+
+     Cabine de caça de verdade é CINZA-ESCURO fosco (o "dark gull grey"), e a
+     graça é que com uma luz de céu vinda de cima as faces viradas para cima
+     clareiam e as verticais escurecem sozinhas: o cinza dá FORMA onde o preto
+     dava mancha. Com brilho baixo e um específico frio, a quina do coaming
+     e o tubo da capota ganham um fio de luz — que é o que separa uma peça da
+     outra sem desenhar nada. */
+  const mCabine  = new THREE.MeshPhongMaterial({ color: 0x4a535e, shininess: 8,
+                                                 specular: 0x39434f, vertexColors: true });
+  const mCabEsc  = new THREE.MeshPhongMaterial({ color: 0x343c45, shininess: 6,
+                                                 specular: 0x2d353f, vertexColors: true });
+  /* --- AS TINTAS DA CABINE NOVA, E POR QUE SÃO TRÊS ------------------------
+     Cada tinta nova é UMA ORDEM DE DESENHO a mais: `fundePorCor` junta por
+     material, então dez cinzas parecidos custam dez chamadas. A primeira
+     montagem da cabine nova tinha nove materiais só dela e o orçamento (R8)
+     reprovou na hora — 95 chamadas viraram 113 no alto, 24 viraram 33 no
+     médio, e a regra é que a cabine nova não pode custar mais que a de hoje.
+
+     Três bastam, e a razão é que a COR não precisa vir do material: ela vem
+     do multiplicador por vértice que `luzNaCabine` já escreve. O segundo
+     argumento dela é esse multiplicador, então a mesma tinta serve para o
+     console (1,00), para a chapa do painel (0,60) e para a aba do coaming
+     (0,26) sem custar nenhuma chamada a mais. O que o material tem de ser é
+     o tom MAIS CLARO do conjunto, porque dali só se desce.
+
+       mCab     o grafite da cabine: console, banco, painel, aba, trilhos
+       mCabFio  o alumínio das quinas: o fio de luz do console, do trilho, da
+                aba e da borda de dentro da moldura da capota
+       mCabVoo  o verde-oliva do traje: coxa, joelho, canela, bota
+       mCabMold o cinza da moldura da capota (não leva luz de cabine: ela é
+                peça de fora, iluminada pelo céu)
+
+     Elas nascem aqui, e não dentro do bloco da cabine, porque o ARCO DA
+     CAPOTA é montado antes e usa duas delas. */
+  /* E AS QUATRO SÃO `MeshStandardMaterial`, que é a mudança que faltava.
+
+     A cabine é uma caixa de superfícies pequenas e próximas — chapa pintada,
+     alumínio, acrílico, tecido — e é justamente nessa escala que a falta de
+     reflexo entrega tudo. Em Phong cada uma delas é cor chapada mais um
+     ponto de brilho; com rugosidade e um céu para refletir, a chapa fosca
+     devolve um cinza do céu nas faces viradas para cima, a quina de alumínio
+     devolve o SOL e o acrílico devolve o horizonte inteiro. É a diferença
+     entre uma maquete pintada e uma peça que está ali.
+
+     Os números saíram de olhar a foto, um de cada vez:
+
+       mCab     0,80 de rugosidade, 0,04 de metal — tinta fosca de cabine.
+                Reflexo fraco (0,55) e largo: só levanta as faces de cima.
+       mCabFio  0,30 e 0,90 — alumínio escovado. É a única peça metálica de
+                verdade aqui, e é ela que pega o sol e corre quando o avião
+                gira. Com 0,15 de rugosidade virava cromo (já aconteceu com o
+                brilho Phong, pelo mesmo motivo); com 0,45 virava chumbo.
+       mCabVoo  0,94 e zero — tecido. Rugosidade alta é o que impede o traje
+                de brilhar, e é por isso que ele lê como pano e não plástico.
+       mCabMold 0,42 e 0,65 — alumínio PINTADO. Metade metal: a tinta espalha
+                o reflexo, mas o que está embaixo ainda é chapa.
+
+     `envMapIntensity` abaixo de 1 em tudo o que é de dentro: a cabine vê um
+     pedaço do céu pela boca da capota, não o céu inteiro. */
+  const CEU_REF = ceuDeReflexo();
+  /* A PALETA VEIO DA PRANCHA DO DONO (scratchpad/pranchas/lucas-cabine.png),
+     e ela derruba uma decisão que estava escrita logo abaixo: "cabine de caça
+     é monocromática". Na prancha não é — é azul-marinho quase preta com
+     CONTRALUZ AZUL nos peitoris e ouro nos manetes, e é a contraluz que
+     carrega quase todo o impacto da imagem. Cinza-grafite dava papelão. */
+  const mCab     = new THREE.MeshStandardMaterial({ color: 0x232c3a, roughness: 0.78,
+                     metalness: 0.06, envMap: CEU_REF, envMapIntensity: 0.55,
+                     vertexColors: true });
+  const mCabFio  = new THREE.MeshStandardMaterial({ color: 0x79889c, roughness: 0.26,
+                     metalness: 0.92, envMap: CEU_REF, envMapIntensity: 0.9 });
+  /* A CONTRALUZ. Luz própria pura: não depende de lâmpada nenhuma, não custa
+     sombra, não entra na conta de iluminação. É uma fita, e fita é barata. */
+  const mCabLuz  = new THREE.MeshBasicMaterial({ color: 0x4fb4ff });
+  const mCabOuro = new THREE.MeshStandardMaterial({ color: corDetalhe, roughness: 0.34,
+                     metalness: 0.85, envMap: CEU_REF, envMapIntensity: 1.0 });
+  /* 0x5d6650 era o tom certo em Phong e saiu CLARO DEMAIS em Standard, e a
+     causa é de unidade: desde a r155 o three usa luz em unidades físicas por
+     padrão, e a difusa do Standard responde a elas de outro jeito que a do
+     Phong. Na foto do capacete as duas pernas voltaram a ser dois morros
+     verdes acesos. 0x4a5240 devolve o tom que a foto antiga tinha. */
+  const mCabVoo  = new THREE.MeshStandardMaterial({ color: 0x4a5240, roughness: 0.94,
+                     metalness: 0.0, envMap: CEU_REF, envMapIntensity: 0.40,
+                     vertexColors: true });
+  const mCabMold = new THREE.MeshStandardMaterial({ color: 0x242a31, roughness: 0.42,
+                     metalness: 0.65, envMap: CEU_REF, envMapIntensity: 0.95 });
+  /* --- A COR DAS SUPERFÍCIES MÓVEIS -----------------------------------------
+     A regra anterior era "móvel = cor oposta": painel de asa amarelo, flape e
+     aileron azuis. Lida de longe, essa regra ARREBENTA o avião: a troca de cor
+     caía exatamente em cima da juntura entre a luva e o painel, e olho humano
+     lê borda de cor como borda de OBJETO. Daí o avião parecer um monte de
+     tábuas soltas mesmo com as peças encostadas.
+
+     Avião de verdade pinta a superfície móvel da mesma cor da peça onde ela
+     mora, e marca a dobradiça com um RISCO. É o que está aqui: um azul dois
+     tons acima do corpo — perto dá para ver cada aba, longe a asa é uma asa
+     só. O amarelo volta a ser o que era para ser: faixa de identificação. */
+  /* E ELA É A MESMA TINTA. Eu tinha posto as superfícies móveis num azul 17%
+     mais claro, para se poder apontar cada uma parada. Lido na tela não deu
+     "aba", deu TINTA MAL COMBINADA: um flape aqui, outro ali e o profundor lá
+     atrás, cada um de um azul ligeiramente diferente, como avião remendado com
+     peça de ferro-velho.
+
+     Avião pintado de uma cor só tem a superfície móvel da mesma cor: quem a
+     mostra é o RISCO da dobradiça, e o movimento. E o movimento agora existe —
+     26° de profundor, 30° de aileron. Não precisa de tinta para se ver. */
+  const mMovel   = mCorpo;
+  /* --- OS ESQUEMAS DE PINTURA ------------------------------------------------
+     Três, para escolher olhando em vez de discutindo:
+
+       'asas'   amarelo tudo o que voa, azul tudo o que carrega
+       'bordo'  azul, com uma FAIXA amarela logo atrás do bordo de ataque e
+                as pontas em amarelo (é o da referência, e o padrão)
+       'meio'   asa amarela com o bordo de ataque azul: o amarelo quebrado por
+                uma linha, para não virar uma prancha de mostarda
+
+     `tinta(parte)` é o único lugar que decide cor. Trocar de esquema é trocar
+     uma palavra. */
+  const ESQ = {
+    asas:  { luva:'A', painel:'A', bordo:null, ponta:'C', abas:'A', estab:'A', prof:'A' },
+    bordo: { luva:'C', painel:'C', bordo:'A',  ponta:'A', abas:'C', estab:'C', prof:'C' },
+    meio:  { luva:'A', painel:'A', bordo:'C',  ponta:'C', abas:'A', estab:'A', prof:'C' }
+  }[PINTURA_AD02] || {};
+  const tinta = p => ESQ[p] === 'A' ? mAmarelo : mCorpo;
+  const M = TERCEIRO;
+
+  /* --- CASCO ---------------------------------------------------------------
+     O NARIZ É UM CONE AMARELO, comprido e de quina viva: é a primeira coisa
+     que se reconhece no caça da referência. Era um radome cinza; agora é a
+     mesma tinta amarela do resto, e o cinza saiu — uma tinta a menos é uma
+     ordem de desenho a menos, no jogador e em cada inimigo. */
+  const mMetal  = new THREE.MeshPhongMaterial({ color: 0x5a6068, shininess: 90, specular: 0xb0b8c4 });
+  g.add(fuselagem3(M.secoes, mAmarelo, 0, 3));          // o cone, até z=202
+  g.add(fuselagem3(M.secoes, mCorpo, 3, M.secoes.length - 1));
+  /* A FAIXA DA QUINA: amarela, corre pelo vinco do chine do fim do cone até
+     a boca da tomada, engrossando para trás. É ela que amarra o bico à
+     tomada num traço só, como na pintura da referência. Desenhada do lado
+     +x e espelhada pela escala (a fusão desvira o espelho; ver fundePorCor). */
+  for (const lado of [-1, 1]){
+    const f = faixaNoCasco3(M.secoes, 1, t => {
+      /* mais para CIMA do vinco que para baixo: o jogador vê o avião de
+         cima e de trás, e uma fita centrada no vinco some na silhueta */
+      const z = 204 - t*100, larg = 0.10 + t*0.10;
+      return { z, a0: larg*1.5, a1: -larg*0.5 };
+    }, mAmarelo, 16);
+    f.scale.x = lado; g.add(f);
+  }
+
+  /* --- ASA: luva fixa (com o LERX) + painel que gira, flape e aileron -------
+     A PINTURA é a da referência: asa azul com uma FAIXA amarela correndo de
+     ponta a ponta logo atrás do bordo de ataque (um fio azul na frente dela)
+     e a PONTA amarela. A faixa nasce na luva e continua no painel nas mesmas
+     frações de corda, então com a asa aberta ela é uma linha só, do LERX à
+     ponta. Esquemas 'asas' e 'meio' continuam valendo (`tinta`).
+
+     As costelas pintadas em leque saíram: a referência não as tem, e quem
+     mostra a asa varrendo agora é a faixa e a ponta amarela girando. */
+  const FAIXA = ESQ.bordo ? [0.07, 0.24] : null;     // frações de corda
+  const PONTA = 0.88;                                // de onde a ponta é amarela
+  /* uma peça de asa pintada com a faixa: três fatias de corda que dividem as
+     mesmas estações, então se encontram sem degrau */
+  const comFaixa = (ests, t0, t1, f1, base, nEnv, ponta) => {
+    if (!FAIXA) return [pedacoDeAsa(ests, t0, t1, 0, f1, base, nEnv, 10, ponta)];
+    return [pedacoDeAsa(ests, t0, t1, 0, FAIXA[0], base, nEnv, 3, ponta),
+            pedacoDeAsa(ests, t0, t1, FAIXA[0], FAIXA[1], tinta('bordo'), nEnv, 3, ponta),
+            pedacoDeAsa(ests, t0, t1, FAIXA[1], f1, base, nEnv, 7, ponta)];
+  };
+  const asas = [];
+  for (const lado of [-1, 1]){
+    const espelha = no => { no.scale.x = lado; return no; };
+    for (const p of comFaixa(M.luva, 0, 1, 1, tinta('luva'), 6)) g.add(espelha(p));
+
+    const pivo = new THREE.Group();
+    pivo.position.set(lado*M.PIVO.x, 0, M.PIVO.z);
+    pivo.userData.lado = lado;
+    /* o curso deste avião (ver `giroDaAsa`): é dado simples, então sobrevive
+       ao `clone()` dos aviões da rede junto com o `lado` */
+    pivo.userData.ganho = MEDIDAS_TERCEIRO.asaVarre;
+    const dentro = new THREE.Group();
+    dentro.scale.x = lado;
+    const CM = M.CORDA_MOVEL;
+    for (const p of comFaixa(M.asa, 0, PONTA, CM, tinta('painel'), 6)) dentro.add(p);
+    dentro.add(pedacoDeAsa(M.asa, PONTA, 1, 0, CM, tinta('ponta'), 2, 10, true));
+    /* O QUE SOBRA ATRÁS DA LINHA DA DOBRADIÇA e não é aba: o pedacinho antes
+       do flape, o vão entre flape e aileron e a ponta. Eram buracos — de
+       cima se via o céu por três dentes no bordo de fuga. */
+    for (const [t0, t1, mat, pt] of [[0, M.FLAP[0], tinta('painel')], [M.FLAP[1], M.AIL[0], tinta('painel')],
+                                     [M.AIL[1], PONTA, tinta('painel')], [PONTA, 1, tinta('ponta'), true]])
+      dentro.add(pedacoDeAsa(M.asa, t0, t1, CM - 0.005, 1, mat, 2, 5, pt));
+    /* A RAIZ GROSSA DO PAINEL: o painel entra por dentro da luva com o mesmo
+       perfil, para que, girando, a raiz varra um leque de chapa e não abra um
+       vão para o céu. Agora ela tem a espessura da luva naquele ponto — mais
+       grossa, ela saía por cima e por baixo como uma bolha.
+       E o bordo de ataque dela é um pouco RECUADO: girando para trás, a
+       parte de dentro do pivô anda para a FRENTE, e alinhado ao do painel
+       ele furava o bordo de ataque da luva com a asa fechada. Aqui a luva é
+       um LERX de 67°, com folga de sobra na frente do pivô. */
+    const r0 = M.asa[0], fuga = r0.zLE - r0.corda;
+    const raizGrossa = [
+      { x: -38, zLE: r0.zLE - 10, corda: r0.zLE - 10 - fuga, y: r0.y, tt: 0.062, tor: 0 },
+      { x: -14, zLE: r0.zLE -  4, corda: r0.zLE -  4 - fuga, y: r0.y, tt: 0.062, tor: 0 },
+      { x:  14, zLE: r0.zLE,      corda: r0.corda,           y: r0.y, tt: 0.062, tor: 0 }
+    ];
+    dentro.add(pedacoDeAsa(raizGrossa, 0, 1, 0, 1, tinta('luva'), 4, 10));
+    pivo.add(dentro);
+
+    /* FLAPE e AILERON: mesma planta, mesma espessura, só a faixa de corda é
+       outra. Cada um no seu grupo, com a dobradiça na linha de 70% de corda. */
+    const abas = {};
+    for (const [nome, faixa, mat] of [['flape', M.FLAP, tinta('abas')], ['aileron', M.AIL, tinta('abas')]]){
+      const meio = naEstacao(M.asa, (faixa[0] + faixa[1])/2);
+      const eixo = new THREE.Group();
+      const peça = pedacoDeAsa(M.asa, faixa[0], faixa[1], CM - 0.005, 1, mat, 5, 6);
+      peça.scale.x = lado;
+      eixo.add(peça);
+      const zEixo = meio.zLE - CM*meio.corda;
+      eixo.position.set(0, 0, zEixo);
+      peça.position.z = -zEixo;
+      eixo.userData.comando = nome;
+      pivo.add(eixo);
+      abas[nome] = eixo;
+    }
+    /* o risco da dobradiça, tirado da MESMA planta */
+    for (const faixa of [M.FLAP, M.AIL])
+      dentro.add(pedacoDeAsa(M.asa, faixa[0], faixa[1], CM - 0.026, CM - 0.004,
+                             ESQ.abas === 'A' ? mEscuro : mFriso, 4, 3));
+
+    pivo.userData.abas = abas;
+    asas.push(pivo);
+    g.add(pivo);
+  }
+
+  /* --- CAUDA: dois estabilizadores com profundor, DUAS derivas com leme ---- */
+  const comandos = { flapes: [], ailerons: [], profundor: null, lemes: [] };
+  const PE = 0.80;                                   // ponta amarela do estabilizador
+  for (const lado of [-1, 1]){
+    const fixo = pedacoDeAsa(M.estab, 0, PE, 0, 0.62, tinta('estab'), 4, 9);
+    fixo.scale.x = lado; g.add(fixo);
+    const ponta = pedacoDeAsa(M.estab, PE, 1, 0, 0.62, mAmarelo, 2, 9, true);
+    ponta.scale.x = lado; g.add(ponta);
+  }
+  const profundor = new THREE.Group();
+  {
+    const meio = naEstacao(M.estab, 0.5);
+    const z = meio.zLE - 0.62*meio.corda;
+    for (const lado of [-1, 1]){
+      for (const [t0, t1, mat] of [[0, PE, tinta('prof')], [PE, 1, mAmarelo]]){
+        const p = pedacoDeAsa(M.estab, t0, t1, 0.615, 1, mat, 4, 5);
+        p.scale.x = lado; p.position.z = -z; profundor.add(p);
+      }
+    }
+    profundor.position.set(0, 0, z);
+    profundor.userData.comando = 'profundor';
+  }
+  g.add(profundor);
+  comandos.profundor = profundor;
+
+  /* AS DERIVAS. Cada uma é desenhada deitada (envergadura em x) e posta em
+     pé com `rotation.z`, inclinada `cant` para fora. As duas NÃO são
+     espelhadas: com a mesma geometria, o x local de cada leme (a dobradiça)
+     aponta para cima das duas, e o mesmo `rotation.x` vira as duas pontas
+     para o MESMO lado do mundo — que é o que os dois lemes fazem juntos.
+     Pintura da referência: azul, uma faixa amarela paralela ao bordo de
+     ataque no meio da corda e a ponta amarela. */
+  const D = M.DERIVA, PD = 0.86;
+  for (const lado of [-1, 1]){
+    const derivaNo = new THREE.Group();
+    derivaNo.rotation.z = Math.PI/2 - lado*D.cant;
+    derivaNo.position.set(lado*D.x, D.y, 0);
+    derivaNo.add(pedacoDeAsa(M.deriva, 0, PD, 0, 0.34, mCorpo, 4, 4));
+    derivaNo.add(pedacoDeAsa(M.deriva, 0, PD, 0.34, 0.50, mAmarelo, 4, 3));
+    derivaNo.add(pedacoDeAsa(M.deriva, 0, PD, 0.50, 0.60, mCorpo, 4, 2));
+    derivaNo.add(pedacoDeAsa(M.deriva, PD, 1, 0, 0.60, mAmarelo, 2, 8, true));
+    const leme = new THREE.Group();
+    {
+      const meio = naEstacao(M.deriva, 0.5);
+      const z = meio.zLE - 0.60*meio.corda;
+      for (const [t0, t1, mat, pt] of [[0, PD, mMovel], [PD, 1, mAmarelo, true]]){
+        const p = pedacoDeAsa(M.deriva, t0, t1, 0.595, 1, mat, 4, 5, pt);
+        p.position.z = -z; leme.add(p);
+      }
+      leme.position.z = z;
+      leme.userData.comando = 'leme';
+    }
+    derivaNo.add(leme);
+    g.add(derivaNo);
+    comandos.lemes.push(leme);
+  }
+
+  /* --- AS NACELES, AS TOMADAS E OS BOCAIS -----------------------------------
+     Os dois motores moram em duas naceles que correm da tomada ao bocal,
+     afastadas na frente (a tomada fica fora do nariz) e juntas atrás (os
+     bocais quase se tocam). A tomada é o que mais se lê da referência: boca
+     grande, quase retangular, inclinada, com a BORDA AMARELA.
+
+     A boca é um furo de verdade, feito de três peças e nenhuma booleana:
+       COLAR ... a borda amarela: um anel que dobra do lábio de dentro para o
+                 de fora e corre para trás por cima da nacele
+       DUTO .... a parede escura de dentro, com os anéis andando para a FRENTE
+                 — é isso que vira as normais para dentro, e de dentro a
+                 parede é vista em vez de sumir
+       FUNDO ... uma chapa escura lá no fundo, com o rotor na frente
+     A nacele não tem tampa na frente: tampada, a chapa dela atravessaria o
+     duto e taparia o buraco. */
+  const rotores = [], bocais = [];
+  const T = M.TOMADA, N0 = M.nacele[0];
+  const boca = (z, dw, dh, rk) => ({ z, xc: N0.xc, w: T.w + dw, hCima: T.hCima + dh,
+                                     hBaixo: T.hBaixo + dh, yc: N0.yc, n: N0.n, rk });
+  for (const lado of [-1, 1]){
+    const espelha = no => { no.scale.x = lado; return no; };
+    g.add(espelha(fuselagem3(M.nacele, mCorpo, 0, M.nacele.length - 1, false, 24)));
+    g.add(espelha(fuselagem3([boca(T.z, 0, 0, N0.rk), boca(T.z + 1.6, 3.4, 3.4, N0.rk),
+                             boca(T.z - 4, 3.6, 3.6, N0.rk), boca(N0.z - 2, 3.6, 3.6, N0.rk)],
+                            mAmarelo, 0, 3, false, 24)));
+    g.add(espelha(fuselagem3([boca(T.fundo, -1, -1, 0), boca(T.z + 0.2, 0, 0, N0.rk)],
+                            mEscuro, 0, 1, false, 24)));
+    const fundo = new THREE.Mesh(new THREE.PlaneGeometry(T.w*2, T.hCima + T.hBaixo), mPreto);
+    fundo.position.set(lado*N0.xc, N0.yc + (T.hCima - T.hBaixo)/2, T.fundo + 1); g.add(fundo);
+
+    /* raio 15: a nacele termina com 14 e o bocal a abraça. A gola fixa do
+       bocal (raio 16) cobre a emenda. */
+    const bocal = bocalVariavel(M.BOCAL_R, mMetal, mEscuro);
+    bocal.position.set(lado*M.MOTOR_X, M.MOTOR_Y, M.BOCAL_Z);
+    g.add(bocal);
+    for (const fixo of bocal.userData.fixos){      // o anel e a gola, no corpo
+      fixo.position.add(bocal.position); g.add(fixo);
+    }
+    bocais.push(bocal);
+    const rotor = new THREE.Group();
+    for (let i = 0; i < 9; i++){
+      const pa = new THREE.Mesh(new THREE.BoxGeometry(4, 20, 1.4), mMetal);
+      pa.position.set(Math.sin(i/9*6.283)*6, Math.cos(i/9*6.283)*6, 0);
+      pa.rotation.z = i/9*6.283; pa.rotation.y = 0.55; rotor.add(pa);
+    }
+    /* 0,8: com o tamanho antigo as pás passavam da parede do duto */
+    rotor.scale.setScalar(0.8);
+    rotor.position.set(lado*N0.xc, N0.yc + (T.hCima - T.hBaixo)/2, T.fundo + 6);
+    rotores.push(rotor);
+  }
+
+  /* --- A CABINE: a MESMA do AD-02 -------------------------------------------
+     Bolha, moldura, banheira, consoles, pernas, banco, painel com as telas
+     vivas, combinador do HUD, manche e manete: tudo copiado de `montaAD02`,
+     nas mesmas medidas (o avião inteiro é encolhido no fim). Os comentários
+     ficaram lá — cada número desta cabine tem a sua história em montaAD02, e
+     repeti-la aqui seria ter duas histórias para desencontrar. As únicas
+     diferenças: a moldura de FORA da capota é escura (o amarelo brigava com
+     o nariz amarelo) e o painel antirreflexo começa no fim do cone. */
+  const CP = MEDIDAS_TERCEIRO.canopia;      // no desenho (ver `escala`)
+  const bolha = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12, 0, Math.PI*2, 0, Math.PI/2), mVidro);
+  bolha.scale.set(CP.x, CP.y, CP.z); bolha.position.set(0, CP.cy, CP.cz); g.add(bolha);
+  {
+    const t = (CP.arco - CP.cz)/CP.z, k = Math.sqrt(Math.max(0, 1 - t*t));
+    const arco = new THREE.Mesh(new THREE.TorusGeometry(1, 0.028, 8, 44, Math.PI), mPreto);
+    arco.scale.set(CP.x*k + 0.4, CP.y*k + 0.4, 3); arco.position.set(0, CP.cy, CP.arco); g.add(arco);
+    if (CABINE_NOVA){
+      const S = CP.x*k + 0.4, Sy = CP.y*k + 0.4;
+      const anel = (esc, tubo, nr, nt, mat, dz, ez) => {
+        const a = new THREE.Mesh(new THREE.TorusGeometry(1, tubo, nr, nt, Math.PI), mat);
+        a.scale.set(S*esc, Sy*esc, ez); a.position.set(0, CP.cy, CP.arco + dz);
+        g.add(a);
+      };
+      anel(0.982, 0.045, 6, 40, mCabMold, -0.5, 2.6);
+      anel(0.958, 0.012, 4, 28, mCabFio,  -1.6, 1.0);
+    } else {
+      const arcoI = new THREE.Mesh(new THREE.TorusGeometry(1, 0.036, 8, 44, Math.PI), mCabine);
+      arcoI.scale.set((CP.x*k + 0.4)*0.985, (CP.y*k + 0.4)*0.985, 2.6);
+      arcoI.position.set(0, CP.cy, CP.arco - 0.5); g.add(arcoI);
+    }
+  }
+  for (const lado of [-1, 1])
+    g.add(faixaNoCasco3(M.secoes, lado, t => {
+      const z = 200 - t*38;                 // do fim do cone à base do vidro
+      const larg = 0.30 + t*0.34;           // estreita no bico, abre na cabine
+      return { z, a0: Math.PI/2, a1: Math.PI/2 - larg };
+    }, mFosco, 10));
+  const moldura = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 8, 52), mPreto);
+  moldura.scale.set(CP.x + 0.6, CP.z + 0.6, 3.2); moldura.rotation.x = Math.PI/2;
+  moldura.position.set(0, CP.cy, CP.cz); g.add(moldura);
+
+  if (!simples){   // detalhe de perto: o avião de fundo não leva
+    if (CABINE_NOVA){
+      g.add(luzNaCabine(convesDaCabine3(CP, M.secoes, mCabEsc)));
+      const piso = new THREE.Mesh(new THREE.BoxGeometry(32, 2, 54), mCabEsc);
+      piso.position.set(0, 32.5, 122); g.add(luzNaCabine(piso));
+
+      const mLuva   = new THREE.MeshPhongMaterial({ color: 0x2c3138, shininess: 10 });
+      const mTira   = new THREE.MeshPhongMaterial({ color: 0x23272c, shininess: 6 });
+
+      for (const lado of [-1, 1]){
+        const con = new THREE.Mesh(caixaViva(6.8, 5.0, 44, 1.0), mCab);
+        con.position.set(lado*18.4, 33.2, 126); g.add(luzNaCabine(con));
+        const tampo = new THREE.Mesh(new THREE.PlaneGeometry(44, 6.4),
+                        new THREE.MeshPhongMaterial({ map: lonaConsole(lado < 0), shininess: 10 }));
+        tampo.rotation.set(-Math.PI/2, 0, lado < 0 ? Math.PI/2 : -Math.PI/2);
+        tampo.position.set(lado*18.4, 35.75, 126); g.add(tampo);
+        const fio = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 44), mCabFio);
+        fio.position.set(lado*15.1, 35.7, 126); g.add(fio);
+        const tr = new THREE.Mesh(caixaViva(3.4, 1.6, 50, 0.5), mCab);
+        tr.position.set(lado*21.3, 35.4, 124); g.add(luzNaCabine(tr, 0.78));
+        const trFio = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.44, 50), mCabFio);
+        trFio.position.set(lado*19.8, 36.1, 124); g.add(trFio);
+      }
+
+      for (const lado of [-1, 1]){
+        const coxa = new THREE.Mesh(caixaViva(9.0, 7.6, 28, 2.6), mCabVoo);
+        coxa.position.set(lado*8.2, 34.6, 124); coxa.rotation.set(0.05, -lado*0.19, 0);
+        g.add(luzNaCabine(coxa));
+        const dentro = new THREE.Mesh(new THREE.BoxGeometry(1.3, 6.6, 27), mCabVoo);
+        dentro.position.set(lado*3.9, 34.4, 124); dentro.rotation.y = -lado*0.19;
+        g.add(luzNaCabine(dentro, 0.62));
+        const joelho = new THREE.Mesh(new THREE.SphereGeometry(4.0, 8, 5), mCabVoo);
+        joelho.scale.set(1, 0.84, 1.05); joelho.position.set(lado*11.2, 35.5, 138);
+        g.add(luzNaCabine(joelho, 1.14));           // um tom acima: é o alto da perna
+        const canela = new THREE.Mesh(caixaViva(7.0, 6.4, 16, 2.2), mCabVoo);
+        canela.position.set(lado*10.4, 33.5, 150); canela.rotation.set(-0.30, lado*0.10, 0);
+        g.add(luzNaCabine(canela));
+        const bota = new THREE.Mesh(new THREE.BoxGeometry(6.4, 4.2, 10), mCabVoo);
+        bota.position.set(lado*9.6, 30.3, 159); bota.rotation.set(0.22, lado*0.10, 0);
+        g.add(luzNaCabine(bota, 0.58));
+        for (const z of [117, 130]){
+          const t = new THREE.Mesh(new THREE.BoxGeometry(9.8, 1.0, 2.2), mTira);
+          t.position.set(lado*8.2 - lado*(z - 124)*0.19, 38.6, z); g.add(t);
+        }
+        const cad = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.4, 26), mTira);
+        cad.position.set(lado*12.6, 35.2, 125); cad.rotation.y = -lado*0.19; g.add(cad);
+      }
+
+      const assento = new THREE.Mesh(caixaViva(17, 5, 23, 2.2), mCab);
+      assento.position.set(0, 36, 112); g.add(luzNaCabine(assento));
+      const encosto = new THREE.Mesh(caixaViva(17, 16, 6, 2.2), mCab);
+      encosto.position.set(0, 42, 99); encosto.rotation.x = -0.16;
+      g.add(luzNaCabine(encosto, 0.86));
+      const apoio = new THREE.Mesh(caixaViva(16, 7, 7, 2.4), mCab);
+      apoio.position.set(0, 46.5, 96); g.add(luzNaCabine(apoio, 0.62));
+      for (const lado of [-1, 1]){
+        const arnes = new THREE.Mesh(new THREE.BoxGeometry(3.0, 15, 1.0), mTira);
+        arnes.position.set(lado*4.6, 42.4, 102.2); arnes.rotation.x = -0.16;
+        g.add(arnes);
+      }
+
+      const PL = 29, PA = PL*PAINEL_LONA.alt/PAINEL_LONA.larg;    // 29 x 7,37
+      const caixaP = new THREE.Mesh(caixaViva(PL + 1.2, PA + 1.0, 3.0, 0.7), mCab);
+      caixaP.position.set(0, 39.4, 147.0); caixaP.rotation.x = 0.35;
+      g.add(luzNaCabine(caixaP, 0.60));
+      const grupoP = new THREE.Group();
+      grupoP.add(new THREE.Mesh(new THREE.PlaneGeometry(PL, PA), materialDoPainel()));
+      const telasC = fazTelasCabine();
+      PAINEL_TELAS.forEach((t, i) => {
+        const w = t.w/PAINEL_LONA.larg*PL, h = t.h/PAINEL_LONA.alt*PA;
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+                    new THREE.MeshBasicMaterial({ map: telasC[i].tex }));
+        m.position.set(((t.x + t.w/2)/PAINEL_LONA.larg - 0.5)*PL,
+                       (0.5 - (t.y + t.h/2)/PAINEL_LONA.alt)*PA, 0.12);
+        grupoP.add(m);
+      });
+      grupoP.position.set(0, 40.09, 145.12);
+      grupoP.rotation.set(0.35, Math.PI, 0);
+      g.add(grupoP);
+      g.userData.telasCabine = telasC;
+
+      const aba = new THREE.Mesh(caixaViva(PL + 2.6, 1.3, 5.26, 0.5), mCab);
+      aba.position.set(0, 44.16, 145.94); aba.rotation.x = 0.325;
+      g.add(luzNaCabine(aba, 0.26));
+      const abaFio = new THREE.Mesh(new THREE.BoxGeometry(PL + 2.6, 0.22, 0.22), mCabFio);
+      abaFio.position.set(0, 45.12, 143.50); g.add(abaFio);
+
+      const COMB = { y: 48.3, z: 146.1, l: 9, a: 7.4, incl: 0.16 };
+      {
+        for (const lado of [-1, 1]){
+          const mo = new THREE.Mesh(new THREE.BoxGeometry(0.26, 8, 0.8), mCabMold);
+          mo.position.set(lado*4.8, COMB.y, COMB.z); mo.rotation.x = COMB.incl; g.add(mo);
+          const fio = new THREE.Mesh(new THREE.BoxGeometry(0.16, 7.8, 0.16), mCabFio);
+          fio.position.set(lado*4.63, COMB.y, COMB.z - 0.3); fio.rotation.x = COMB.incl;
+          g.add(fio);
+        }
+        const topo = new THREE.Mesh(new THREE.BoxGeometry(10, 0.26, 0.8), mCabMold);
+        topo.position.set(0, 52.1, 145.6); g.add(topo);
+        const vidro = new THREE.Mesh(new THREE.PlaneGeometry(COMB.l, COMB.a),
+          new THREE.MeshStandardMaterial({ color: 0x9fffd8, transparent: true, opacity: 0.09,
+            side: THREE.DoubleSide, roughness: 0.04, metalness: 0.0,
+            envMap: ceuDeReflexo(), envMapIntensity: 1.3, depthWrite: false }));
+        vidro.position.set(0, COMB.y, COMB.z); vidro.rotation.set(COMB.incl, Math.PI, 0);
+        g.add(vidro);
+      }
+      g.userData.combinador = COMB;
+
+      const maneteG = new THREE.Group();
+      maneteG.position.set(-18.4, 34.6, 112);
+      {
+        const haste = new THREE.Mesh(caixaViva(3, 9, 2.6, 0.8), mPreto);
+        haste.position.set(0, 4, 0); maneteG.add(haste);
+        const bola = new THREE.Mesh(new THREE.SphereGeometry(2.6, 10, 8), mFosco);
+        bola.scale.set(1, 0.8, 1.25); bola.position.set(0, 8.6, 0); maneteG.add(bola);
+        const mao = new THREE.Mesh(caixaViva(5, 4.2, 7, 1.8), mLuva);
+        mao.position.set(0.6, 8.4, 0.6); maneteG.add(mao);
+      }
+      g.add(maneteG);
+      comandos.manete = maneteG;
+
+      const mancheG = new THREE.Group();
+      mancheG.position.set(15.0, 32.2, 129);
+      {
+        const haste = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.8, 9, 8), mPreto);
+        haste.position.y = 4.5; mancheG.add(haste);
+        const pega = new THREE.Mesh(caixaViva(3.4, 5.4, 3.6, 1.2), mFosco);
+        pega.position.y = 10.6; mancheG.add(pega);
+        const gatilho = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 1.2), mBranco);
+        gatilho.position.set(0, 10.8, -2.3); mancheG.add(gatilho);
+        const mao = new THREE.Mesh(caixaViva(5, 5.6, 7.4, 1.8), mLuva);
+        mao.position.set(-0.5, 9.9, 0.4); mancheG.add(mao);
+        const punho = new THREE.Mesh(new THREE.BoxGeometry(5.4, 5.0, 2.2), mPreto);
+        punho.position.set(-0.5, 8.4, 4.0); mancheG.add(punho);
+      }
+      mancheG.rotation.set(-0.10, 0, -0.08);
+      g.add(mancheG);
+      comandos.manche = mancheG;
+    } else {
+      g.add(sombraNaCabine(convesDaCabine3(CP, M.secoes, mCabEsc)));
+      const piso = new THREE.Mesh(new THREE.BoxGeometry(32, 2, 54), mCabEsc);
+      piso.position.set(0, 32.5, 122); g.add(sombraNaCabine(piso));
+      for (const lado of [-1, 1]){
+        const con = new THREE.Mesh(caixaViva(6.4, 4.4, 42, 1.2), mCabine);
+        con.position.set(lado*18.4, 33.4, 126); g.add(sombraNaCabine(con));
+        const tampo = new THREE.Mesh(new THREE.PlaneGeometry(42, 6),
+                        new THREE.MeshPhongMaterial({ map: lonaConsole(lado < 0), shininess: 10 }));
+        tampo.rotation.set(-Math.PI/2, 0, lado < 0 ? Math.PI/2 : -Math.PI/2);
+        tampo.position.set(lado*18.4, 35.7, 126); g.add(tampo);
+      }
+      const mVoo   = new THREE.MeshPhongMaterial({ color: 0x626b52, shininess: 4, vertexColors: true });
+      const mLuva  = new THREE.MeshPhongMaterial({ color: 0x2c3138, shininess: 10 });
+      const mTira  = new THREE.MeshPhongMaterial({ color: 0x23272c, shininess: 6 });
+      const mTrilho= new THREE.MeshPhongMaterial({ color: 0x79828e, shininess: 18,
+                                                   specular: 0x555e69 });
+      for (const lado of [-1, 1]){
+        const coxa = new THREE.Mesh(caixaViva(9.6, 8.4, 30, 2.8), mVoo);
+        coxa.position.set(lado*6.6, 35.6, 126); coxa.rotation.x = 0.07;
+        g.add(sombraNaCabine(coxa));
+        const canela = new THREE.Mesh(caixaViva(8, 7.4, 17, 2.4), mVoo);
+        canela.position.set(lado*7, 33, 148); canela.rotation.x = -0.26;
+        g.add(sombraNaCabine(canela));
+        for (const z of [119, 133]){
+          const t = new THREE.Mesh(new THREE.BoxGeometry(10.2, 1.2, 2.4), mTira);
+          t.position.set(lado*6.6, 39.6, z); g.add(t);
+        }
+      }
+      for (const lado of [-1, 1]){
+        const tr = new THREE.Mesh(caixaViva(3.2, 1.2, 50, 0.5), mTrilho);
+        tr.position.set(lado*21.3, 35.2, 124); g.add(tr);
+      }
+      const maneteG = new THREE.Group();
+      maneteG.position.set(-18.4, 34.6, 112);
+      {
+        const haste = new THREE.Mesh(caixaViva(3, 9, 2.6, 0.8), mPreto);
+        haste.position.set(0, 4, 0); maneteG.add(haste);
+        const bola = new THREE.Mesh(new THREE.SphereGeometry(2.6, 10, 8), mFosco);
+        bola.scale.set(1, 0.8, 1.25); bola.position.set(0, 8.6, 0); maneteG.add(bola);
+        const mao = new THREE.Mesh(caixaViva(5, 4.2, 7, 1.8), mLuva);
+        mao.position.set(0.6, 8.4, 0.6); maneteG.add(mao);
+      }
+      g.add(maneteG);
+      comandos.manete = maneteG;
+      const assento = new THREE.Mesh(caixaViva(17, 5, 23, 2.2), mCabine);
+      assento.position.set(0, 36, 112); g.add(sombraNaCabine(assento));
+      const encosto = new THREE.Mesh(caixaViva(17, 16, 6, 2.2), mCabine);
+      encosto.position.set(0, 42, 99); encosto.rotation.x = -0.16;
+      g.add(sombraNaCabine(encosto));
+      const apoio = new THREE.Mesh(caixaViva(16, 7, 7, 2.4), mCabine);
+      apoio.position.set(0, 46.5, 96); g.add(sombraNaCabine(apoio));
+      const PL = 24, PA = PL*PAINEL_LONA.alt/PAINEL_LONA.larg;
+      const caixaP = new THREE.Mesh(caixaViva(PL + 1, PA + 0.9, 3.2, 0.8), mCabEsc);
+      caixaP.position.set(0, 39.5, 145.98); caixaP.rotation.x = 0.52;
+      g.add(sombraNaCabine(caixaP));
+      const grupoP = new THREE.Group();
+      grupoP.add(new THREE.Mesh(new THREE.PlaneGeometry(PL, PA), materialDoPainel()));
+      const telasC = fazTelasCabine();
+      PAINEL_TELAS.forEach((t, i) => {
+        const w = t.w/PAINEL_LONA.larg*PL, h = t.h/PAINEL_LONA.alt*PA;
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+                    new THREE.MeshBasicMaterial({ map: telasC[i].tex }));
+        m.position.set(((t.x + t.w/2)/PAINEL_LONA.larg - 0.5)*PL,
+                       (0.5 - (t.y + t.h/2)/PAINEL_LONA.alt)*PA, 0.3);
+        grupoP.add(m);
+      });
+      grupoP.position.set(0, 40.52, 144.2);
+      grupoP.rotation.set(0.52, Math.PI, 0);
+      g.add(grupoP);
+      g.userData.telasCabine = telasC;
+      const coam = new THREE.Mesh(caixaViva(PL, 0.5, 2.2, 0.2), mCabEsc);
+      coam.position.set(0, 43.55, 143.2); coam.rotation.x = 0.30;
+      g.add(sombraNaCabine(coam));
+      {
+        const mMont = new THREE.MeshPhongMaterial({ color: 0x2a3038, shininess: 20 });
+        for (const lado of [-1, 1]){
+          const mo = new THREE.Mesh(caixaViva(0.34, 8, 0.9, 0.12), mMont);
+          mo.position.set(lado*4.8, 48.2, 146.2); mo.rotation.x = 0.16; g.add(mo);
+        }
+        const topo = new THREE.Mesh(caixaViva(10, 0.34, 0.9, 0.12), mMont);
+        topo.position.set(0, 52.1, 145.6); g.add(topo);
+        const base = new THREE.Mesh(caixaViva(10.4, 0.8, 1.6, 0.25), mMont);
+        base.position.set(0, 44.5, 146.9); g.add(base);
+        const vidro = new THREE.Mesh(new THREE.PlaneGeometry(9, 7.4),
+          new THREE.MeshPhongMaterial({ color: 0x9fffd8, transparent: true, opacity: 0.11,
+            side: THREE.DoubleSide, shininess: 120, specular: 0xbfffe6, depthWrite: false }));
+        vidro.position.set(0, 48.3, 146.1); vidro.rotation.set(0.16, Math.PI, 0);
+        g.add(vidro);
+      }
+      const mancheG = new THREE.Group();
+      mancheG.position.set(16.2, 32.6, 124);
+      {
+        const haste = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.9, 10, 8), mPreto);
+        haste.position.y = 5; mancheG.add(haste);
+        const pega = new THREE.Mesh(caixaViva(3.4, 5, 3.4, 1.2), mFosco);
+        pega.position.y = 11.4; mancheG.add(pega);
+        const gatilho = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 1.2), mBranco);
+        gatilho.position.set(0, 11.6, -2.2); mancheG.add(gatilho);
+        const mao = new THREE.Mesh(caixaViva(5, 5.4, 7, 1.8), mLuva);
+        mao.position.set(-0.4, 10.6, 0.4); mancheG.add(mao);
+      }
+      mancheG.rotation.set(-0.10, 0, -0.08);
+      g.add(mancheG);
+      comandos.manche = mancheG;
+    }
+
+  }
+
+  if (!simples){   // detalhe de perto: o avião de fundo não leva
     /* --- ANTENAS E LUZES ------------------------------------------------------
        A sonda comprida do bico e as palhetas saíram: a referência não tem, e
        o nariz amarelo pontudo é o desenho — uma vareta espetada nele virava
@@ -12725,19 +13943,25 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
         n2.position.set(x, -22, z);
         return n2;
       };
-      trem.add(perna({ x: 0,   z: 150, curso: 64, raio: 17, gemeas: 8.5, dianteira: true }));
-      /* as pernas principais saem da barriga das NACELES (x=±50), que é onde
-         o trem mora num bimotor de naceles afastadas; a bitola caiu de 144
-         para 100, que ainda é larga para o avião não tombar na curva de
-         táxi. O comprimento é o mesmo: a roda continua tocando em -103. */
-      trem.add(perna({ x: -50, z: -44, curso: 59, raio: 22 }));
-      trem.add(perna({ x:  50, z: -44, curso: 59, raio: 22 }));
+      /* a bequilha e as duas principais, estas saindo da barriga das
+         NACELES (x=±50), que é onde o trem mora num bimotor de naceles
+         afastadas. As pernas são as da ficha: curtas, o avião baixo. A roda
+         toca em -82 no desenho (`roda` em MEDIDAS_TERCEIRO, já na escala). */
+      const TD = M.TREM.dianteira, TP = M.TREM.principal;
+      trem.add(perna({ x: 0, z: TD.z, curso: TD.curso, raio: TD.raio, gemeas: 8.5, dianteira: true }));
+      trem.add(perna({ x: -TP.x, z: TP.z, curso: TP.curso, raio: TP.raio }));
+      trem.add(perna({ x:  TP.x, z: TP.z, curso: TP.curso, raio: TP.raio }));
       /* (as portas do poço e da perna saíram: na cor do corpo, de lado elas
          liam como blocos azuis pendurados sob o avião, e a referência não as
          mostra — o trem dela é perna, roda e mais nada) */
     }
-    g.add(trem);
-    g.userData.trem = trem;
+    /* o trem mora DENTRO de um grupo de fora, porque o jogo anima a escala
+       e a altura do grupo de fora (recolher encolhendo) e a escala do
+       desenho tem de ficar no de dentro */
+    const tremFora = new THREE.Group();
+    tremFora.add(trem); tremFora.userData.dentro = trem;
+    g.add(tremFora);
+    g.userData.trem = tremFora;
 
   }
 
@@ -12757,8 +13981,8 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       /* só no nariz: do z=90 para trás a lateral do corpo fica dentro das
          naceles, e friso ali seria friso enterrado */
       for (const [z, alt] of [[186, 14], [140, 20]]){
-        const sec = secaoEm(M.secoes, z);
-        const p = pontoNoCasco(sec, 0, -0.35);     // rente à casca, por dentro
+        const sec = secaoEm3(M.secoes, z);
+        const p = pontoNoCasco3(sec, 0, -0.35);     // rente à casca, por dentro
         const friso = new THREE.Mesh(caixaViva(1.1, alt, 1.2, 0.3), mFriso);
         friso.position.set(lado*p.x, p.y, z); g.add(friso);
       }
@@ -12776,9 +14000,30 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
   for (const a of asas){ comandos.flapes.push(a.userData.abas.flape);
                          comandos.ailerons.push(a.userData.abas.aileron); }
   for (const r of rotores) g.add(r);
-  g.userData.medidas = MEDIDAS_CACA;     // cada carcaça carrega as suas
+
+  /* --- DO DESENHO PARA O JOGO ------------------------------------------------
+     A escala não pode morar no grupo do avião: `poeMalha` escreve a matriz
+     dele inteira a cada quadro (só eixos e posição) e jogaria a escala fora.
+     Ela vai para CADA FILHO — posição e escala —, e a fusão por cor depois
+     assa isso na geometria. Quem se mexe só gira (asa, comandos, rotor,
+     bocal), então girar por cima da escala é girar a peça já encolhida. O
+     trem é a exceção (o jogo mexe na escala e na altura dele), e por isso a
+     escala dele vai para o grupo de dentro. */
+  const ESC = MEDIDAS_TERCEIRO.escala;
+  for (const filho of g.children){
+    const alvo = (filho === g.userData.trem) ? filho.userData.dentro : filho;
+    if (filho !== alvo) alvo.position.multiplyScalar(ESC);
+    else filho.position.multiplyScalar(ESC);
+    alvo.scale.multiplyScalar(ESC);
+  }
+  /* o vidro do HUD é lido em números (ver `calculaVidroHUD`), não pela malha */
+  const C0 = g.userData.combinador;
+  if (C0) g.userData.combinador = Object.assign({}, C0,
+            { l: C0.l*ESC, a: C0.a*ESC, y: C0.y*ESC, z: C0.z*ESC });
+  g.userData.medidas = MEDIDAS_TERCEIRO;
   return g;
 }
+
 
 function fazForma(forma, esp, mat){
   const g = new THREE.ExtrudeGeometry(forma, { depth: esp, bevelEnabled: true,
@@ -13226,8 +14471,9 @@ function montaDragaoClassico(corCorpo, corDetalhe, corVidro, asasMoveis){
    AD-02. O contrato é este, e quem mexer no modelo tem de manter:
 
      userData.asas      [pivô esquerdo, direito] com userData.lado
-     userData.comandos  { ailerons:[e,d], flapes:[e,d], profundor, lemes:[e,d] }
-                        (o dragão antigo tinha `leme`, um só; quem lê aceita os dois)
+     userData.comandos  { ailerons:[e,d], flapes:[e,d], profundor, leme }
+                        (o terceiro avião traz `lemes:[e,d]` no lugar de `leme`;
+                        quem lê aceita os dois)
      userData.rotores   os rotores que giram com a manete
      userData.bocais    os bocais variáveis, com userData.abre(0..1)
      userData.trem      o trem de pouso, que some no ar
@@ -13240,8 +14486,11 @@ function montaDragaoClassico(corCorpo, corDetalhe, corVidro, asasMoveis){
    O inimigo não mexe nada: é fundido inteiro, de uma vez.
    ========================================================================== */
 function montaDragao(corCorpo, corDetalhe, corVidro, asasMoveis, tipo){
-  const g = (tipo || tipoDeAviao) === 'dragao'
+  const qual = tipo || tipoDeAviao;
+  const g = qual === 'dragao'
           ? montaDragaoClassico(corCorpo, corDetalhe, corVidro, asasMoveis)
+          : qual === 'terceiro'
+          ? montaTerceiro(corCorpo, corDetalhe, corVidro, !asasMoveis)
           : montaAD02(corCorpo, corDetalhe, corVidro, !asasMoveis);
   const U = g.userData;
   if (!asasMoveis){
@@ -13272,6 +14521,7 @@ function montaDragao(corCorpo, corDetalhe, corVidro, asasMoveis, tipo){
     for (const filho of asa.children) if (filho.type === 'Group') fundePorCor(filho);
   }
   if (U.comandos){ fundePorCor(U.comandos.profundor);
+                   /* o terceiro tem DOIS lemes (`lemes`), o AD-02 um (`leme`) */
                    for (const l of U.comandos.lemes || [U.comandos.leme]) if (l) fundePorCor(l);
                    if (U.comandos.manche) fundePorCor(U.comandos.manche);
                    if (U.comandos.manete) fundePorCor(U.comandos.manete); }
@@ -13358,7 +14608,10 @@ function montaGaragem(){
   /* os outros aviões do céu seguem a escolha: um céu de dragões com um caça no
      meio (ou o contrário) não é um mundo, é um bug que parece proposital */
   moldesVelhos.push(modeloInimigo, modeloOutro);
-  modeloInimigo = montaDragao(0xc9402f, 0xffb03a, 0x4a1f1a);
+  /* o terceiro avião é só do jogador: com ele na garagem, os inimigos
+     continuam sendo o AD-02 (os outros JOGADORES, na rede, voam o dele) */
+  modeloInimigo = montaDragao(0xc9402f, 0xffb03a, 0x4a1f1a, undefined,
+                              tipoDeAviao === 'terceiro' ? 'caca' : undefined);
   modeloOutro = montaDragao(0x4a9f6a, 0xffd42a, 0x16325c, true);
   modeloOutro.userData = { medidas: modeloOutro.userData.medidas };
 }
@@ -14143,9 +15396,12 @@ function poeCamera(dt){
     camC = vnorm(vsub(camC, vmul(camF, vponto(camC, camF))));
     if (!isFinite(camC.x)) camC = {x:0,y:1,z:0};
     camD = vcruz(camC, camF);
-    const alvo = new THREE.Vector3(aviaoX - eixoF.x*CAMD + eixoC.x*CAM_CIMA,
-                                   aviaoY - eixoF.y*CAMD + eixoC.y*CAM_CIMA,
-                                   aviaoZ - eixoF.z*CAMD + eixoC.z*CAM_CIMA);
+    /* `MEDIDAS.camera`: o avião menor (o terceiro) pede a câmera mais perto;
+       sem o número, é 1 e a vista é a de sempre */
+    const kCam = MEDIDAS.camera || 1, cD = CAMD*kCam, cC = CAM_CIMA*kCam;
+    const alvo = new THREE.Vector3(aviaoX - eixoF.x*cD + eixoC.x*cC,
+                                   aviaoY - eixoF.y*cD + eixoC.y*cC,
+                                   aviaoZ - eixoF.z*cD + eixoC.z*cC);
     camPos.lerp(alvo, Math.min(1, dt*12));
   }
   /* A INCLINAÇÃO. A câmera de fora estava OLHANDO PARALELA ao nariz, com o
@@ -17222,12 +18478,12 @@ const vortices = [-1, 1].map(lado => {
    As medidas saem da TABELA do projeto (AD02), não de números soltos aqui: a
    dobradiça é o pivô da asa e a ponta é a última estação. Quando o projeto
    mudar de novo, o vórtice acompanha sozinho. */
-/* O ÂNGULO DO PIVÔ para um dado enflechamento do jogo. O dragão gira o
-   pivô pelo próprio `enflecha`; o caça tem a asa desenhada JÁ ABERTA e um
-   curso menor (`ganho`, que vem de MEDIDAS_CACA.asaVarre e mora no pivô), então
-   o pivô dele fica em zero com a asa aberta e anda só uma fração do curso.
-   É a única conta de asa do jogo: o laço do quadro, a ponta da asa do
-   vórtice e os aviões da rede passam todos por aqui. */
+/* O ÂNGULO DO PIVÔ para um dado enflechamento do jogo. O AD-02 e o dragão
+   giram o pivô pelo próprio `enflecha`. O terceiro tem a asa desenhada JÁ
+   ABERTA e um curso menor (`ganho`, que vem de MEDIDAS_TERCEIRO.asaVarre e
+   mora no pivô), então o pivô dele fica em zero com a asa aberta e anda só
+   uma fração do curso. Sem `ganho`, a conta é a de sempre. O laço do quadro,
+   a ponta da asa do vórtice e os aviões da rede passam todos por aqui. */
 function giroDaAsa(no, e){
   const k = no.userData.ganho;
   return no.userData.lado * (k === undefined ? e : (e - ASA_ABERTA)*k);
@@ -17354,10 +18610,10 @@ function arruma(){
        como um profundorzinho empoleirado na ponta da deriva. Quem vira em
        torno da vertical do mundo é o X local. O teste dizia "a ponta do leme
        foi para 0" há muito tempo, e eu li como arredondamento. */
-    /* e são DOIS lemes no caça (um em cada deriva inclinada), girando juntos:
-       as derivas não são espelhadas, então o mesmo ângulo leva as duas
-       pontas para o mesmo lado. O dragão, que tem um só, usa `leme`. */
-    for (const l of cmd.lemes || (cmd.leme ? [cmd.leme] : [])) l.rotation.x = -cmdLem * LEM_MAX;
+    /* o terceiro avião tem DOIS lemes, um em cada deriva inclinada, e eles
+       giram juntos: as derivas dele não são espelhadas, então o mesmo
+       ângulo leva as duas pontas para o mesmo lado. */
+    for (const l of cmd.lemes || [cmd.leme]) l.rotation.x = -cmdLem * LEM_MAX;
   }
   desenhaVortices();
   piscaBalizas(Date.now()/1000);
@@ -22336,7 +23592,8 @@ function reinicia(){
   eixoC = {x:0,y:1,z:0}; eixoD = vcruz(eixoC, eixoF);
   endireitaEixos();
   camF = {x:eixoF.x,y:0,z:eixoF.z}; camC = {x:0,y:1,z:0}; camD = {x:eixoD.x,y:0,z:eixoD.z};
-  camPos.set(aviaoX - eixoF.x*CAMD, aviaoY + CAM_CIMA, aviaoZ - eixoF.z*CAMD);
+  const kCam = MEDIDAS.camera || 1;
+  camPos.set(aviaoX - eixoF.x*CAMD*kCam, aviaoY + CAM_CIMA*kCam, aviaoZ - eixoF.z*CAMD*kCam);
   if (Missoes) Missoes.zera();
   turbo = 0; combustivel = 100; distancia = 0; subida = 0;
   cargaG = 1; gMax = 1; gMin = 1; _fAnt = null;   // zera as agulhas de memória do G
@@ -22590,9 +23847,10 @@ $('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque
    dois — com o avião novo e a altura velha, o avião nasce enterrado na pista
    ou pairando um palmo acima dela. */
 (function(){
-  const bd = $('btDragao'), bc = $('btCaca');
+  const bd = $('btDragao'), bc = $('btCaca'), bt = $('btTerceiro');
   const pinta = () => { bd.classList.toggle('ligado', tipoDeAviao === 'dragao');
-                        bc.classList.toggle('ligado', tipoDeAviao !== 'dragao'); };
+                        bc.classList.toggle('ligado', tipoDeAviao === 'caca');
+                        bt.classList.toggle('ligado', tipoDeAviao === 'terceiro'); };
   const poe = t => {
     if (t === tipoDeAviao) return;
     tipoDeAviao = t;
@@ -22605,6 +23863,7 @@ $('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque
   };
   bd.onclick = () => poe('dragao');
   bc.onclick = () => poe('caca');
+  bt.onclick = () => poe('terceiro');
   pinta();
 })();
 (function(){
@@ -24319,9 +25578,17 @@ const Batalha = {
       const matCor = new THREE.MeshPhongMaterial({ color: cor2, shininess: 60 });
       const faixa = new THREE.Mesh(new THREE.BoxGeometry(34, 8, 90), matCor);
       faixa.position.set(0, 16, -40); no.add(faixa);
+      /* a marca das derivas vem das MEDIDAS quando o avião as traz: as do
+         terceiro avião são inclinadas e menores, e a caixa no lugar de
+         sempre ficava boiando ao lado delas. Mais grossa que a deriva,
+         senão some dentro dela. */
+      const md = (modeloOutro.userData.medidas || {}).marcaDeriva;
       for (const lado of [-1, 1]){
-        const d2 = new THREE.Mesh(new THREE.BoxGeometry(6, 40, 26), matCor);
-        d2.position.set(lado*38, 58, -122); no.add(d2);
+        const d2 = new THREE.Mesh(md ? new THREE.BoxGeometry(md.esp, md.alt, md.comp)
+                                     : new THREE.BoxGeometry(6, 40, 26), matCor);
+        if (md){ d2.position.set(lado*md.x, md.y, md.z); d2.rotation.z = -lado*md.inc; }
+        else d2.position.set(lado*38, 58, -122);
+        no.add(d2);
       }
       /* --- as asas do clone -------------------------------------------------
          `clone()` copia o userData passando por JSON, e referência de objeto
