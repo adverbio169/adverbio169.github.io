@@ -918,16 +918,24 @@ novo vira um **terceiro avião** na garagem, ao lado do AD-02 e do dragão.
 
 - **Cotas da ficha** (20 unidades = 1 m): 16,0 m de comprimento (320),
   12,2 m de envergadura aberta (244), 4,8 m de altura do chão à ponta das
-  derivas (96). Medido no modelo montado: 320 x 248 (com as luzes) x 97.
-- **Nariz** em cone amarelo pontudo com *chines* (aresta viva lateral) e uma
-  faixa amarela correndo pelo vinco até a tomada.
-- **Cabine** em bolha, vidro escuro e moldura escura. É a cabine do AD-02,
-  copiada, com o avião inteiro encolhido (ver "escala" abaixo).
+  derivas (96). Medido no modelo montado: 320 x 247 (com as luzes) x 96.
+- **Nariz** raso e largo, de dorso chato, com *chines* (aresta viva lateral)
+  correndo do bico às tomadas; cone amarelo longo (72 no desenho) e fino na
+  ponta, e uma faixa amarela pelo vinco.
+- **Cabine**: por dentro é a do AD-02, copiada. A **bolha de fora é dele**
+  (`TERCEIRO.BOLHA`): baixa e comprida, assentada no dorso chato, com arco e
+  moldura escuros. Ela foi medida em volta do olho do piloto, da câmera do
+  capacete, do combinador do HUD, do painel e do apoio de cabeça — tudo fica
+  dentro dela (as contas estão no comentário da tabela).
 - **Duas tomadas** laterais grandes, quase retangulares, inclinadas, com a
   borda amarela; duas naceles até dois bocais grandes (os mesmos bocais
   variáveis e vetorados do AD-02).
-- **Duas derivas** inclinadas 17° para fora, azuis com faixa e ponta
-  amarelas, **cada uma com o seu leme**; os dois giram juntos.
+- **Duas derivas** altas, inclinadas 22° para fora e enflechadas 50°, azuis
+  com faixa diagonal e ponta amarelas, **cada uma com o seu leme**; os dois
+  giram juntos. A altura de 4,8 m foi fechada baixando o corpo e o trem, não
+  encurtando a deriva.
+- **Motores**: as naceles engordam para trás e os bocais (raio 19 no
+  desenho) saem de trás delas e do estabilizador, à mostra entre as derivas.
 - **Asa variável de 18°, 38° e 58°**, como na ficha: desenhada aberta a 18°,
   com curso de 0,8 do curso do jogo (`asaVarre`), nasce de um LERX amarelo;
   faixa amarela atrás do bordo de ataque, banda amarela transversal no meio
@@ -941,10 +949,10 @@ novo vira um **terceiro avião** na garagem, ao lado do AD-02 e do dragão.
 
 ### A escala
 
-A cabine do AD-02 tem 108 de comprimento e centenas de números próprios
-(banco, painel, pernas, HUD). Em vez de redesenhá-la para um avião de 320, o
-terceiro é **desenhado na escala da cabine (500 de comprimento) e encolhido
-por 0,64** no fim de `montaTerceiro` — a escala vai para cada filho (o
+A cabine do AD-02 tem centenas de números próprios (banco, painel, pernas,
+HUD). Em vez de redesenhá-la para um avião de 320, o terceiro é **desenhado
+na escala da cabine (514 de comprimento) e encolhido por 320/514 ≈ 0,62** no
+fim de `montaTerceiro` — a escala vai para cada filho (o
 `poeMalha` reescreve a matriz do avião e jogaria fora uma escala no grupo).
 Tudo o que o jogo lê sai em `MEDIDAS_TERCEIRO` já na escala do jogo: roda,
 olho do piloto, fogo, pivô e ponta da asa, marca das derivas. O vidro do HUD
@@ -980,11 +988,22 @@ Tirar o botão `btTerceiro` da capa e o `'terceiro'` da validação do
 e de `montaGaragem`; o resto (`giroDaAsa`, `lemes`, `camera`, `escala`) é
 neutro para os outros aviões e pode ficar.
 
+### O pouso que não contava (era o teste)
+
+O `pousos` só sobe quando o avião ficou pelo menos 3 s no ar (`tNoAr >= 3`,
+para encostar a roda duas vezes não valer dois pousos). `tNoAr` conta o
+tempo do JOGO, e o laço do quadro limita o passo a 0,1 s: numa máquina lenta
+(o navegador de teste desenha por software, a uns 3 quadros por segundo) o
+jogo anda bem mais devagar que o relógio, e o teste antigo esperava pelo
+relógio e ainda teletransportava o avião. O teste novo (`mexe.js` no
+rascunho) decola, segura a altura com um piloto automático até `tNoAr`
+passar de 3,5 s e desce na própria pista: o pouso conta (`pousos` 0 → 1,
+1000 pontos), nos dois caças. O jogo não tinha defeito.
+
 ### O que ficou diferente da ficha
 
-- A cabine é a do AD-02 encolhida: a bolha sai maior e o corpo embaixo dela
-  mais fundo que na ficha, onde o caça é mais esguio. Com isso as derivas
-  ficaram mais baixas do que a ficha mostra, para caber nos 4,8 m.
+- O interior da cabine é o do AD-02 encolhido; a bolha de fora já é a dele,
+  mas ainda é uma bolha só (a ficha mostra a capota com mais armação).
 - Sem armamento, sem as inscrições e sem o logotipo da ficha.
 - Ao fechar a asa a 58°, a raiz do painel mostra um dentinho na quina da
   luva, visível só de cima e de perto.
