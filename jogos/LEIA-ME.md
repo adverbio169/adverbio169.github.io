@@ -1118,7 +1118,10 @@ combate) e diz em qual tentativa venceu.
 **Medido:**
 
 - As nove sortidas foram cumpridas de ponta a ponta pelo piloto de teste,
-  com relatório e marca gravada; cada uma também fracassou do jeito dela
+  com relatório e marca gravada (na última rodada: PATRULHA 3★ 5:39,
+  DEFESA 3★ 4:40 na 4ª tentativa, BOMBARDEIO 2★ 4:02, INFILTRAÇÃO 3★ 1:42,
+  TREM 2★ 3:03, RIO 3★ 2:05, ZONA PROIBIDA 2★ 2:52 na 3ª, CORREIO 3★ 3:41;
+  o ALERTA só numa rodada anterior, ver abaixo); cada uma também fracassou do jeito dela
   (chão, abatido, TREM ESCAPOU aos 2:35, TEMPO ESGOTADO aos 5:00, CIVIL
   ABATIDO, O CORREIO ATRASOU aos 9:00).
 - Caças: 6 voos de 2 min com caças em cima, reto e em curva: **0 batidas**,
@@ -1155,13 +1158,19 @@ sortidas que pousam em avenida foram cumpridas.
   para dentro da quebra — de 1054 a 780 em 0,1 s. O lado da quebra é escolhido
   uma vez, no começo; quem persegue na direção dela ainda encontra o caça.
 - **O ALERTA é a mais difícil:** 6 caças com 8 mísseis; o resto é na
-  metralhadora. O piloto de teste venceu em poucas tentativas (ver o
-  relatório da verificação).
-- **O avião que raspa o chão devagar pode ficar preso nele:** com o nariz
-  alto e sem velocidade fora do asfalto, a regra "quem só raspou ainda pode
-  arremeter" segura o avião no chão a `voo = 0` até o nariz cair abaixo de
-  -0,30. Visto com o piloto de teste estolado na metralhadora; não é das
-  missões, não foi mexido.
+  metralhadora, e o conserto entre as levas não acontece (acima). O piloto
+  de teste venceu **uma vez em umas 22 tentativas** (2★, 6:42, 32 de dano);
+  nas outras caiu com 1 a 5 dos 6 abatidos, quase sempre no chão, brigando de
+  metralhadora. É o piloto de teste que é fraco; um jogador bom deve vencer,
+  mas a sortida merece ser jogada por gente antes de ir ao ar.
+- **Um estado estranho perto do chão (não é das missões, não foi mexido):**
+  nas quedas do piloto de teste na metralhadora (ALERTA), a fita dos últimos
+  1,5 s mostra o avião a 80 do chão, **de dorso** (banco de 140° a 160°),
+  estolado, com `voo = 0` e o nariz a +0,8, até o nariz passar de -0,30 e
+  vir a queda. Parece a regra "quem só raspou ainda pode arremeter" (fora do
+  asfalto, só mata com o nariz abaixo de -0,30) segurando no chão um avião
+  que tocou de dorso. Não consegui reproduzir de propósito, nem medi quanto
+  tempo ele fica ali.
 - A página OBJET mostra `LEVA 2 EM 0 s` por um quadro, no instante em que o
   céu esvazia (o `tLeva` só é posto no passo seguinte).
 
