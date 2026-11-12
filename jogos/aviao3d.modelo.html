@@ -3671,7 +3671,7 @@ function aceleradorNaManete(c, op){
 }
 
 function lonaPainel(){
-  if (CABINE_NOVA) return lonaPainelNova();
+  if (CABINE_NOVA) return PAINEL_ARTE ? lonaPainelArte() : lonaPainelNova();
   const W = PAINEL_LONA.larg, H = PAINEL_LONA.alt;
   const desenha = (g, aceso) => {
     if (aceso){ g.fillStyle = '#000'; g.fillRect(0, 0, W, H); return; }
@@ -3878,10 +3878,214 @@ function lonaPainelNova(){
   return { mapa: faz(false), brilho: faz(true) };
 }
 
+/* =============================================================================
+   O PAINEL DA ARTE NOVA — a cabine 3D com a cara da cabine pintada
+
+   "Na visão do capacete ainda tá o painel velho feio." Estava: a vista de
+   CABINE cola a pintura nova por cima de tudo e esconde o modelo, mas a do
+   CAPACETE mostra o modelo — e o modelo ainda era o da prancha antiga:
+   azul-marinho quase preto, contraluz azul no peitoril e um degradê quente
+   no alto que, visto de trás da cabeça, lia como uma FAIXA BEGE deitada em
+   cima do painel (era a cara de cima da aba, acesa pelo sol e tingida pela
+   luz quente de `luzNaCabine`).
+
+   A arte aprovada (scratchpad/arte-caca2/14.png) é outra cabine: metal
+   cinza-azulado de chapas aparafusadas, três telas de moldura GROSSA com um
+   parafuso em cada canto, e no para-sol uma placa com três luzes, que no
+   jogo são o trem. As cores foram MEDIDAS na arte, não escolhidas:
+
+     consoles  #4f5360 a #565966        face do painel  #232737
+     molduras  #35373c (quina de cima #4a4b50)
+     laterais  verde-água #30454c       luzes apagadas  #381613
+
+   O que é PINTURA vai para as lonas, que já eram desenhadas — custo zero.
+   O que precisa MUDAR (as luzes do trem) ou ter relevo de verdade (a placa
+   do para-sol, as luzes laranja, as grades) vira peça, e toda peça de chapa
+   usa `mCab`, a mesma tinta do resto: `fundePorCor` emenda por material, e
+   peça de tinta repetida não custa chamada nenhuma. Só duas tintas são
+   novas, a das luzes do trem e a laranja: duas ordens de desenho.
+
+   PARA DESFAZER: `PAINEL_ARTE = false`. Volta a lona da prancha antiga, a
+   cor antiga de `mCab`, a aba quase preta, e as peças novas não nascem.
+   ========================================================================== */
+const PAINEL_ARTE = true;
+/* `cab` é a cor de `mCab`; os tons de cada peça continuam vindo do
+   multiplicador por vértice de `luzNaCabine`. `aba` é esse multiplicador na
+   aba do coaming, que deixa de ser preta: na arte o para-sol é do mesmo
+   metal do resto, só mais escuro.
+   `verde` tinge a face de dentro dos consoles (o verde-água da arte) sem
+   tinta nova: é o mesmo `mCab`, com a cor por vértice puxada para o verde. */
+const ARTE_CAB = { cab: 0x6c6a76, aba: 0.85, verde: [0.62, 0.90, 0.92] };
+
+function lonaPainelArte(){
+  const W = PAINEL_LONA.larg, H = PAINEL_LONA.alt;
+  /* parafuso de cabeça redonda: corpo, sombra embaixo, brilho em cima e a
+     fenda — é a fenda que faz o olho ler "parafuso" e não "bolinha" */
+  const parafuso = (g, x, y, r) => {
+    g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.arc(x + 0.8, y + 1.2, r + 0.6, 0, 7); g.fill();
+    const b = g.createRadialGradient(x - r*0.35, y - r*0.4, 0.5, x, y, r);
+    b.addColorStop(0, '#8a8f99'); b.addColorStop(1, '#3f434c');
+    g.fillStyle = b; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x - r*0.6, y - r*0.6); g.lineTo(x + r*0.6, y + r*0.6); g.stroke();
+  };
+  /* costura de chapa: um risco escuro e, um pixel abaixo, um fio claro —
+     a borda de baixo de uma chapa pega a luz de cima */
+  const costura = (g, pts) => {
+    for (const [cor, dy] of [['rgba(6,8,12,.75)', 0], ['rgba(120,128,150,.22)', 1.5]]){
+      g.strokeStyle = cor; g.lineWidth = 1.6; g.beginPath();
+      pts.forEach(([x, y], i) => i ? g.lineTo(x, y + dy) : g.moveTo(x, y + dy)); g.stroke();
+    }
+  };
+  /* a moldura GROSSA de uma tela, como na arte: aro de metal liso, quina de
+     cima clara e de baixo escura, um lábio preto encostado no vidro e os
+     quatro parafusos nos cantos */
+  const moldura = (g, t, m) => {
+    const x = t.x - m, y = t.y - m, w = t.w + m*2, h = t.h + m*2;
+    g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(x + 1, y + 3, w, h);      // sombra na face
+    const f = g.createLinearGradient(0, y, 0, y + h);
+    f.addColorStop(0, '#4a4b50'); f.addColorStop(0.06, '#3a3c42'); f.addColorStop(1, '#2e3035');
+    g.fillStyle = f; g.fillRect(x, y, w, h);
+    g.fillStyle = 'rgba(255,255,255,.16)'; g.fillRect(x, y, w, 2); g.fillRect(x, y, 2, h);
+    g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(x, y + h - 2.5, w, 2.5); g.fillRect(x + w - 2, y, 2, h);
+    g.fillStyle = '#08090b'; g.fillRect(t.x - 4, t.y - 4, t.w + 8, t.h + 8);
+    g.strokeStyle = 'rgba(150,156,170,.35)'; g.lineWidth = 1;
+    g.strokeRect(t.x - 4.5, t.y - 4.5, t.w + 9, t.h + 9);
+    const p = m*0.5;
+    for (const [px, py] of [[x + p, y + p], [x + w - p, y + p], [x + p, y + h - p], [x + w - p, y + h - p]])
+      parafuso(g, px, py, 3.4);
+  };
+  /* grade de ventilação: moldura e furos em fila, um a um */
+  const grade = (g, x, y, w, h) => {
+    g.fillStyle = '#16181f'; g.fillRect(x, y, w, h);
+    g.strokeStyle = 'rgba(140,146,160,.3)'; g.lineWidth = 1.2; g.strokeRect(x + 0.6, y + 0.6, w - 1.2, h - 1.2);
+    g.fillStyle = '#050608';
+    for (let yy = y + 5; yy < y + h - 5; yy += 6)
+      for (let xx = x + 5 + ((yy - y) % 12 ? 3 : 0); xx < x + w - 6; xx += 7) g.fillRect(xx, yy, 4, 3);
+  };
+
+  const desenha = (g, aceso) => {
+    /* SEM LUZ PRÓPRIA. A lona antiga acendia um fio quente no alto e uma
+       contraluz azul no peitoril; a arte nova não tem nenhum dos dois, e o
+       fio quente era justamente parte da faixa bege. As únicas coisas que
+       acendem nesta cabine são as telas e as luzes, e essas são peças. */
+    if (aceso){ g.fillStyle = '#000'; g.fillRect(0, 0, W, H); return; }
+    /* ---- a face: #232737, um tom mais clara em cima, onde o céu bate ---- */
+    const f = g.createLinearGradient(0, 0, 0, H);
+    f.addColorStop(0, '#3a3f53'); f.addColorStop(0.45, '#2e3346'); f.addColorStop(1, '#252937');
+    g.fillStyle = f; g.fillRect(0, 0, W, H);
+    /* as chapas: a testa do meio (onde a arte tem o para-sol), as duas asas
+       chanfradas dos lados e a faixa de baixo */
+    costura(g, [[0, 64], [26, 40], [226, 40], [244, 22], [456, 22], [474, 40], [674, 40], [700, 64]]);
+    costura(g, [[0, 246], [700, 246]]);
+    costura(g, [[242, 246], [242, 300]]); costura(g, [[458, 246], [458, 300]]);
+    for (let x = 18; x < W; x += 44){ parafuso(g, x, 9, 2.6); parafuso(g, x, H - 9, 2.6); }
+    for (const x of [10, W - 10]) for (let y = 80; y < 240; y += 40) parafuso(g, x, y, 2.6);
+    /* ---- as três molduras: a do meio maior, como na arte ---- */
+    PAINEL_TELAS.forEach((t, i) => moldura(g, t, i === 1 ? 14 : 11));
+    /* ---- embaixo: a base do manche no meio e uma grade em cada lado ---- */
+    g.fillStyle = '#2b2f3c';
+    g.beginPath(); g.moveTo(276, 256); g.lineTo(424, 256); g.lineTo(412, 300); g.lineTo(288, 300); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(276, 256, 148, 2);
+    parafuso(g, 286, 265, 3); parafuso(g, 414, 265, 3);
+    grade(g, 60, 256, 144, 34); grade(g, 496, 256, 144, 34);
+  };
+
+  const faz = (aceso) => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    desenha(c.getContext('2d'), aceso);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true;
+    return t;
+  };
+  return { mapa: faz(false), brilho: faz(true) };
+}
+
+/* AS PEÇAS NOVAS DO PAINEL — uma função só para o AD-02 e para o terceiro,
+   que senta numa cópia da mesma cabine (ver `montaTerceiro`): as medidas de
+   painel, aba e console são as mesmas nos dois, e o terceiro encolhe tudo
+   no fim. Nada aqui mexe no que outras coisas leem — o combinador, o olho,
+   as telas vivas, o manche e a manete ficam onde estão. É acréscimo.
+
+   Devolve a tinta das luzes do trem, que o laço do jogo acende (ver
+   `acendeLuzesTrem`). */
+function vestePainelArte(g, mCab, mCabFio){
+  /* --- A PLACA DO PARA-SOL, COM AS TRÊS LUZES ------------------------------
+     Na arte ela mora no alto do painel, logo acima da tela do meio. Aqui o
+     alto do painel é a ABA do coaming, e é a cara dela que olha para o
+     piloto que aparece do capacete (a lona fica escondida embaixo dela).
+     Então a placa é pregada ali, no quadro da própria aba: mesma posição,
+     mesma inclinação, e cada peça é posta pela conta abaixo para continuar
+     sendo filha direta do avião — `luzNaCabine` lê a matriz LOCAL da peça,
+     e dentro de um grupo ela acharia que a placa está no chão.
+
+     Ela não desce abaixo da aba (a borda de baixo da aba já é a borda de
+     cima da tela do meio vista do capacete) e sobe só 0,6 acima da quina:
+     o vidro do combinador começa logo atrás. */
+  const ABA = { y: 44.16, z: 145.94, incl: 0.325, frente: -2.63 };
+  const naAba = (m, x, y, z) => {
+    const c = Math.cos(ABA.incl), s = Math.sin(ABA.incl);
+    m.position.set(x, ABA.y + y*c - z*s, ABA.z + y*s + z*c);
+    m.rotation.x = ABA.incl; g.add(m); return m;
+  };
+  const f = new THREE.Shape();
+  f.moveTo(-5.8, -0.62); f.lineTo(5.8, -0.62); f.lineTo(4.5, 0.62); f.lineTo(-4.5, 0.62); f.closePath();
+  const gp = new THREE.ExtrudeGeometry(f, { depth: 0.36, bevelEnabled: true, bevelThickness: 0.08,
+                                            bevelSize: 0.08, bevelSegments: 1, curveSegments: 1 });
+  gp.translate(0, 0, -0.18);
+  const Z0 = ABA.frente - 0.26;                 // o meio da placa, saindo da aba
+  g.add(luzNaCabine(naAba(new THREE.Mesh(gp, mCab), 0, 0, Z0), 0.62));
+  /* o rebaixo escuro onde as luzes moram, e as luzes */
+  g.add(luzNaCabine(naAba(new THREE.Mesh(new THREE.BoxGeometry(7.8, 0.78, 0.06), mCab),
+                          0, -0.04, Z0 - 0.27), 0.22));
+  const mLuzTrem = new THREE.MeshBasicMaterial({ color: 0x381613 });
+  for (const x of [-2.55, 0, 2.55])
+    naAba(new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.56, 0.06), mLuzTrem), x, -0.04, Z0 - 0.31);
+  for (const x of [-4.9, 4.9])
+    g.add(luzNaCabine(naAba(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.1), mCab), x, -0.2, Z0 - 0.27), 1.4));
+
+  /* --- AS LATERAIS: verde-água, luz laranja e grade --------------------------
+     Na arte a face de dentro dos consoles é verde-água e, acima deles, junto
+     da parede, há uma luz laranja e uma grade de cada lado. As três são
+     `mCab` menos a luz: a placa verde é a mesma tinta com a cor por vértice
+     puxada para o verde, e a grade são lâminas escuras. */
+  const mLaranja = new THREE.MeshBasicMaterial({ color: 0xff9a2e });
+  for (const lado of [-1, 1]){
+    const verde = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.6, 36), mCab);
+    verde.position.set(lado*14.95, 33.0, 128); g.add(tinge(luzNaCabine(verde, 0.9), ARTE_CAB.verde));
+    /* a luz laranja, numa caixinha na parede logo atrás do fim do painel */
+    const caixa = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 3.4), mCab);
+    caixa.position.set(lado*16.6, 37.6, 140); g.add(luzNaCabine(caixa, 0.5));
+    const luz = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 2.4), mLaranja);
+    luz.position.set(lado*16.3, 37.6, 140); g.add(luz);
+    /* a grade, logo atrás da luz: cinco lâminas */
+    for (let i = 0; i < 5; i++){
+      const l = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 3.0), mCab);
+      l.position.set(lado*16.5, 36.9 - i*0.42 + 2.2, 135.4); g.add(luzNaCabine(l, 0.25));
+    }
+  }
+  return mLuzTrem;
+}
+/* tinge a cor por vértice que `luzNaCabine` acabou de escrever */
+function tinge(no, rgb){
+  const c = no.geometry.attributes.color.array;
+  for (let i = 0; i < c.length; i += 3){ c[i] *= rgb[0]; c[i+1] *= rgb[1]; c[i+2] *= rgb[2]; }
+  return no;
+}
+/* AS TRÊS LUZES DO TREM, como na cabine pintada (`desenhaCabineCaca`):
+   apagadas com ele recolhido, âmbar piscando em trânsito, verdes com ele
+   baixado. É uma tinta só para as três, então mudar a cor dela é mudar as
+   três sem tocar em malha. */
+function acendeLuzesTrem(m, tA){
+  m.color.setHex(tA > 0.97 ? 0x46ff82
+               : (tA > 0.03 && (performance.now() % 500) < 280) ? 0xff9636 : 0x381613);
+}
+
 /* a lona dos CONSOLES: a face de cima das duas bancadas. Mesma ideia do
    painel — chave, guarda vermelha e etiqueta custam um canvas de 448x64 e
    nada de malha. */
 function lonaConsole(esq){
+  if (PAINEL_ARTE) return lonaConsoleArte(esq);
   const W = 448, H = 64;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d');
@@ -3901,6 +4105,37 @@ function lonaConsole(esq){
   g.fillStyle = '#c4402c'; g.fillRect(esq ? 390 : 30, 18, 28, 28);
   if (esq){ g.fillStyle = '#05080b'; g.fillRect(100, 20, 128, 24);
             g.strokeStyle = '#39424c'; g.lineWidth = 2; g.strokeRect(101, 21, 126, 22); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true;
+  return t;
+}
+/* o tampo dos consoles na arte nova: o cinza-azulado claro dela (#4f5360 a
+   #565966), chapas com costura e rebite, o trilho da manete à esquerda e o
+   da alavanca de flape à direita. Nada de guarda vermelha: a arte não tem. */
+function lonaConsoleArte(esq){
+  const W = 448, H = 64;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const f = g.createLinearGradient(0, 0, 0, H);
+  f.addColorStop(0, '#5a5d6b'); f.addColorStop(1, '#4b4f5c');
+  g.fillStyle = f; g.fillRect(0, 0, W, H);
+  for (const x of [112, 250, 360]){
+    g.fillStyle = 'rgba(8,10,14,.7)'; g.fillRect(x, 0, 2, H);
+    g.fillStyle = 'rgba(255,255,255,.14)'; g.fillRect(x + 2, 0, 1.5, H);
+  }
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, 0, W, 3); g.fillRect(0, H - 3, W, 3);
+  for (let x = 10; x < W; x += 30) for (const y of [8, H - 8]){
+    g.fillStyle = 'rgba(0,0,0,.5)'; g.beginPath(); g.arc(x + 0.6, y + 0.8, 2.6, 0, 7); g.fill();
+    g.fillStyle = '#8a8e99'; g.beginPath(); g.arc(x, y, 2.1, 0, 7); g.fill();
+  }
+  /* o trilho: rebaixo escuro com moldura e o rasgo no meio */
+  const trilho = (x, w) => {
+    g.fillStyle = '#353844'; g.fillRect(x - 4, 14, w + 8, 36);
+    g.fillStyle = 'rgba(255,255,255,.15)'; g.fillRect(x - 4, 14, w + 8, 2);
+    g.fillStyle = '#0c0d12'; g.fillRect(x, 22, w, 20);
+    g.fillStyle = '#20222a'; g.fillRect(x + 4, 30, w - 8, 4);
+  };
+  if (esq) trilho(100, 128); else trilho(270, 80);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true;
   return t;
@@ -5136,7 +5371,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
      é monocromática". Na prancha não é — é azul-marinho quase preta com
      CONTRALUZ AZUL nos peitoris e ouro nos manetes, e é a contraluz que
      carrega quase todo o impacto da imagem. Cinza-grafite dava papelão. */
-  const mCab     = new THREE.MeshStandardMaterial({ color: 0x232c3a, roughness: 0.78,
+  const mCab     = new THREE.MeshStandardMaterial({ color: PAINEL_ARTE ? ARTE_CAB.cab : 0x232c3a, roughness: 0.78,
                      metalness: 0.06, envMap: CEU_REF, envMapIntensity: 0.55,
                      vertexColors: true });
   const mCabFio  = new THREE.MeshStandardMaterial({ color: 0x79889c, roughness: 0.26,
@@ -5891,11 +6126,14 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
          do piloto. */
       const aba = new THREE.Mesh(caixaViva(PL + 2.6, 1.3, 5.26, 0.5), mCab);
       aba.position.set(0, 44.16, 145.94); aba.rotation.x = 0.325;
-      g.add(luzNaCabine(aba, 0.26));
+      g.add(luzNaCabine(aba, PAINEL_ARTE ? ARTE_CAB.aba : 0.26));
       /* o fio da quina da aba, fino (0,22): com 0,40 ele virou uma régua
          brilhante atravessando o quadro */
       const abaFio = new THREE.Mesh(new THREE.BoxGeometry(PL + 2.6, 0.22, 0.22), mCabFio);
       abaFio.position.set(0, 45.12, 143.50); g.add(abaFio);
+      /* a placa do para-sol com as luzes do trem, as laterais verdes, a luz
+         laranja e as grades: tudo da arte nova (ver `vestePainelArte`) */
+      if (PAINEL_ARTE) g.userData.luzesTrem = vestePainelArte(g, mCab, mCabFio);
       /* (O FORRO QUENTE era um plano em cor própria debaixo da aba — a
          lâmpada da cabine. Saiu no corte do orçamento, e sem perda: quem faz
          esse brilho é o mapa de luz própria da lona, que acende a faixa de
@@ -6867,7 +7105,7 @@ function montaTerceiro(corCorpo, corDetalhe, corVidro, simples){
      é monocromática". Na prancha não é — é azul-marinho quase preta com
      CONTRALUZ AZUL nos peitoris e ouro nos manetes, e é a contraluz que
      carrega quase todo o impacto da imagem. Cinza-grafite dava papelão. */
-  const mCab     = new THREE.MeshStandardMaterial({ color: 0x232c3a, roughness: 0.78,
+  const mCab     = new THREE.MeshStandardMaterial({ color: PAINEL_ARTE ? ARTE_CAB.cab : 0x232c3a, roughness: 0.78,
                      metalness: 0.06, envMap: CEU_REF, envMapIntensity: 0.55,
                      vertexColors: true });
   const mCabFio  = new THREE.MeshStandardMaterial({ color: 0x79889c, roughness: 0.26,
@@ -7274,9 +7512,10 @@ function montaTerceiro(corCorpo, corDetalhe, corVidro, simples){
 
       const aba = new THREE.Mesh(caixaViva(PL + 2.6, 1.3, 5.26, 0.5), mCab);
       aba.position.set(0, 44.16, 145.94); aba.rotation.x = 0.325;
-      g.add(luzNaCabine(aba, 0.26));
+      g.add(luzNaCabine(aba, PAINEL_ARTE ? ARTE_CAB.aba : 0.26));
       const abaFio = new THREE.Mesh(new THREE.BoxGeometry(PL + 2.6, 0.22, 0.22), mCabFio);
       abaFio.position.set(0, 45.12, 143.50); g.add(abaFio);
+      if (PAINEL_ARTE) g.userData.luzesTrem = vestePainelArte(g, mCab, mCabFio);
 
       const COMB = { y: 48.3, z: 146.1, l: 9, a: 7.4, incl: 0.16 };
       {
@@ -12272,6 +12511,7 @@ function arruma(){
     for (const r2 of aviao.userData.rotores) r2.rotation.z -= giro;
   }
   tremAnim += ((trem ? 1 : 0) - tremAnim) * 0.10;
+  if (aviao.userData.luzesTrem) acendeLuzesTrem(aviao.userData.luzesTrem, tremAnim);
   tremNo.visible = tremAnim > 0.02;
   if (tremNo.visible){
     tremNo.scale.set(1, Math.max(0.03, tremAnim), 1);   // recolhe encolhendo para dentro do poço
