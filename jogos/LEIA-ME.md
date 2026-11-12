@@ -1033,6 +1033,140 @@ entrar.
 
 ---
 
+## As missões novas
+
+A leva das missões (commit `6b4cfd1` e os acertos seguintes) juntou cinco
+sortidas às quatro antigas, o relatório de fim com estrelas, os anéis do rio,
+a página OBJET paginada e os caças inimigos recalibrados. Esta seção diz o que
+cada uma pede, onde mora e como sai — e o que a verificação mediu.
+
+### O que cada sortida pede
+
+Todas se escolhem na página **OBJET** com o avião **parado na pista** (a
+linha toca `escolheSortida(id)`; com nove sortidas a lista tem páginas de 5,
+ou de 3 no celular deitado, e o botão `MAIS MISSÕES ▸` roda as páginas). A
+escolha fica em `localStorage` `aviao3d.sortida`.
+
+| id | nome | objetivos | quem chama os caças | perde quando | 3ª estrela | par |
+|---|---|---|---|---|---|---|
+| `patrulha` | PATRULHA | decolar, 6 alvos, rasar PORTO ALTO, 12 s de rasante, pousar numa avenida, pousar no VALE | ninguém | cai | nenhum pouso duro | 9:00 |
+| `defesa` | DEFESA AÉREA | abater 4 caças, voltar e pousar | subir acima de 350 m (depois de 30 s de voo) | cai / abatido | perder < 30 de vida | 5:30 |
+| `bombardeio` | BOMBARDEIO | 8 alvos, voltar e pousar | o 3º alvo no chão | cai / abatido | perder < 30 de vida | 5:30 |
+| `infiltra` | INFILTRAÇÃO | 18 s abaixo de 200 m sobre PORTO ALTO, voltar | passar 4 s acima de 320 m | cai / abatido | não ser visto | 4:00 |
+| `trem` | CAÇA AO TREM | parar a locomotiva, 4 vagões, voltar (4 mísseis, sem nuclear) | o 2º vagão | **o trem some no norte** (~2:35 depois da decolagem) | os 8 vagões | 4:00 |
+| `rio` | CORRIDA DO RIO | 8 anéis em ordem, voltar | ninguém | **5:00 de voo** | nenhum anel perdido | 2:50 |
+| `exclusao` | ZONA PROIBIDA | 4 helicópteros, voltar (sem nuclear) | o 2º helicóptero | **derrubar um avião de rota** | perder < 30 de vida | 5:00 |
+| `alerta` | ALERTA NA PISTA | abater 6 (levas de 1, 2 e 3), voltar | o relógio: 30 s **contando na pista** | cai / abatido | perder < 30 de vida | 7:00 |
+| `correio` | CORREIO AÉREO | **parar** no VALE, **parar** numa avenida de NOVA ORLA, voltar | ninguém | **9:00 de voo** | nenhum pouso duro | 5:30 |
+
+"Voltar e pousar" só conta parado em pista (não em avenida), e é sempre o
+último: com outro objetivo faltando, a parada só avisa `AINDA FALTA`.
+
+### Onde mora (em `aviao3d.modelo.html`)
+
+- `const SORTIDAS = [...]` — a tabela das nove; os campos opcionais (`par`,
+  `limpo`, `armas`, `limite`/`atraso`, `falha()`, `relogio()`, `prepara()`,
+  `decola()`, `passo()`, `guia()`) estão descritos no comentário logo acima.
+- `OBJ_DEF` — o texto e a meta de cada objetivo; `Missoes` (logo abaixo de
+  `Sortida`) marca cada um, e `Missoes.parado()` confere o que depende de
+  estar PARADO (as entregas, o "voltar", o conserto na pista).
+- `const Sortida` — as fases (solo → trânsito → alerta → quente →
+  cumprida/fracassou), o gatilho dos caças e as levas.
+- `const Relatorio` — o relógio da sortida, as três estrelas
+  (`criterios()`), a melhor marca em `localStorage` `aviao3d.melhor.<id>`
+  (`{ e, t }`; só sobe — mais estrelas, ou as mesmas em menos tempo), a
+  faixa `MISSÃO CUMPRIDA` e o relatório que entra em `#placar` no fim do voo.
+- `const Portoes` — os anéis da CORRIDA DO RIO.
+- `mfdPaginaEscolha` / `sorPorPag` / `sorViraPagina` — a página OBJET.
+- `CACA_*` e `const Inimigos` — os caças. Não abalroam (o `rompe` é pelo
+  tempo até a passagem mais próxima), não descem entre as torres
+  (`pisoDeCaca`) e a bala deles não atravessa prédio (`predioNaReta`).
+
+### Como desfazer
+
+- **Uma sortida:** apagar a entrada dela em `SORTIDAS` e rodar `montar.py`.
+  Os objetivos de `OBJ_DEF` que sobrarem não fazem mal; quem tinha a sortida
+  guardada em `aviao3d.sortida` cai na PATRULHA (a leitura confere o id), e
+  a melhor marca `aviao3d.melhor.<id>` fica esquecida no aparelho.
+- **A leva inteira:** reverter `6b4cfd1` e os commits de acerto que vieram
+  depois dele (o celular-controle também mudou: `controle.modelo.html`) e
+  rodar `montar.py`.
+- **O conserto das avenidas desta verificação:** tirar as duas linhas
+  `if (invadeAvenida(...)) continue;` de `montaMapa` (a função pode ficar).
+
+### A verificação (testes novos, no rascunho `missoes2/`)
+
+Os testes antigos se perderam; estes voam de verdade. `piloto.js` é um piloto
+automático que só mexe em `eixos()`, `motor`, `trem`, `flap` e no gatilho —
+quem move o avião é `atualiza(1/60)`, chamado em laço (o laço do jogo é
+parado: no navegador de teste o tempo de jogo não anda com o relógio).
+Pousos, paradas, anéis e decolagens contam pelas regras do jogo, sem
+teletransporte.
+
+| script | prova |
+|---|---|
+| `missoes.js [ids]` | para cada sortida: escolhida **clicando** na OBJET (virando a página da lista quando precisa), objetivos zerados, voada até cumprir, estrelas iguais aos critérios, melhor marca gravada e não sobrescrita por uma pior, relatório com as estrelas acesas, 30 quadros inteiros sem exceção; e um segundo voo que fracassa (pelo motivo da própria sortida quando ela tem um) com o relatório de fracasso e sem gravar marca |
+| `cacas.js` | caças: nenhuma batida e a menor distância (reto e em curva), nenhum passo dentro de prédio com o jogador rente sobre PORTO ALTO, e o tiro: 5 balas forçadas a acertar atrás de uma torre não tiram nada; com a reta livre tiram 20 |
+| `persegue.js`, `choque.js` | o jogador colado num caça (sem e com tiro): conta batidas |
+| `garagem.js` | caça, dragão e terceiro avião numa CORRIDA DO RIO (1º anel) e numa DEFESA AÉREA (caças no céu), com quadros desenhados e o laço de verdade rodando depois |
+| `avenida-livre.js` | nenhum prédio sobre o eixo de nenhuma avenida, em 8 mapas sorteados |
+
+O piloto de teste é fraco de combate: nas sortidas com caça ele pode ser
+derrubado antes de cumprir, e `missoes.js` tenta de novo (até 5 vezes nas de
+combate) e diz em qual tentativa venceu.
+
+**Medido:**
+
+- As nove sortidas foram cumpridas de ponta a ponta pelo piloto de teste,
+  com relatório e marca gravada; cada uma também fracassou do jeito dela
+  (chão, abatido, TREM ESCAPOU aos 2:35, TEMPO ESGOTADO aos 5:00, CIVIL
+  ABATIDO, O CORREIO ATRASOU aos 9:00).
+- Caças: 6 voos de 2 min com caças em cima, reto e em curva: **0 batidas**,
+  menor distância 2195 (o choque é a 731), 49 quebras. 8 voos de 2 min com o
+  jogador perseguindo sem atirar: 0 batidas, menor distância 1000. 3 voos de
+  150 s rente sobre PORTO ALTO: **0** passos de caça dentro de prédio em
+  27 000 (32 000 passos-caça abaixo de 200 m).
+
+### Um defeito achado e consertado: prédio em cima da avenida de NOVA ORLA
+
+`naRua` olhava só o meio da célula onde o prédio nasce; o prédio anda até 160
+para o lado e tem até 280 de meia largura, e a caixa dele (desenho e colisão)
+é sempre alinhada aos eixos do mundo. Em NOVA ORLA, de grade torta a 35°, a
+quina atravessa a avenida. **Medido em 8 mapas: de 4 a 10 prédios sobre o
+eixo de cada avenida de NOVA ORLA, em todos; em PORTO ALTO, 0 ou 1.** O piloto
+de teste, alinhado no eixo, batia num prédio ao tocar — e o CORREIO pede
+PARAR lá. Agora `invadeAvenida()` recusa o prédio cuja caixa (mais a folga de
+260 da colisão) entra no asfalto: 0 prédios nas 8 partidas, e as duas
+sortidas que pousam em avenida foram cumpridas.
+
+### O que ficou em aberto (das missões)
+
+- **O conserto entre as levas do ALERTA quase não existe.** O respiro entre
+  uma leva e a próxima é de 15 s, e o conserto pede o céu vazio e 4 s parado
+  na pista. O piloto de teste abateu a 1ª leva e foi direto pousar: levou
+  53 e 55 s até parar, a 2ª leva já estava no ar (2 caças) e não houve
+  conserto. Só rearma quem já está na final quando o último cai. O lema
+  promete outra coisa — é decisão de projeto (respiro maior, ou a leva
+  esperar quem está parado na pista).
+- **O caça ainda pode ser abalroado por quem o persegue.** Sem o jogador
+  atacando, nenhuma batida; mas no combate de verdade o piloto de teste bateu
+  3 vezes em umas 25 tentativas. A caixa-preta de uma delas: o caça estava em
+  `rompe` (quebrando para o lado, faltando 1,6 s) e o piloto de teste virou
+  para dentro da quebra — de 1054 a 780 em 0,1 s. O lado da quebra é escolhido
+  uma vez, no começo; quem persegue na direção dela ainda encontra o caça.
+- **O ALERTA é a mais difícil:** 6 caças com 8 mísseis; o resto é na
+  metralhadora. O piloto de teste venceu em poucas tentativas (ver o
+  relatório da verificação).
+- **O avião que raspa o chão devagar pode ficar preso nele:** com o nariz
+  alto e sem velocidade fora do asfalto, a regra "quem só raspou ainda pode
+  arremeter" segura o avião no chão a `voo = 0` até o nariz cair abaixo de
+  -0,30. Visto com o piloto de teste estolado na metralhadora; não é das
+  missões, não foi mexido.
+- A página OBJET mostra `LEVA 2 EM 0 s` por um quadro, no instante em que o
+  céu esvazia (o `tLeva` só é posto no passo seguinte).
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
