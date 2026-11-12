@@ -11359,9 +11359,9 @@ const AD02 = {
      deriva antiga mais um pouco, porque a inclinação tira uns 6% da área
      que trabalha de lado. */
   deriva: [
-    { x:   0, zLE:  -80, corda: 136, y: 0, tt: 0.065 },
-    { x:  65, zLE: -132, corda:  92, y: 0, tt: 0.06 },
-    { x: 122, zLE: -180, corda:  50, y: 0, tt: 0.055 }
+    { x:   0, zLE:  -70, corda: 158, y: 0, tt: 0.06 },
+    { x:  60, zLE: -122, corda: 108, y: 0, tt: 0.055 },
+    { x: 116, zLE: -170, corda:  62, y: 0, tt: 0.05 }
   ],
   DERIVA: { x: 36, y: 9, cant: 0.30 },
   /* --- A FUSELAGEM DO MEIO: nariz, cabine e a espinha ---------------------
@@ -11374,8 +11374,8 @@ const AD02 = {
      propósito: a bolha, o convés e a vista de dentro se apoiam nelas. */
   secoes: [
     { z: 254, w: 0.6, hCima: 0.6, hBaixo: 0.6, yc: -1, n: 2.0 },
-    { z: 242, w:   8, hCima:   6, hBaixo: 2.8, yc: -1.5, n: 2.0, q: 0.30 },
-    { z: 224, w:  16, hCima:  12, hBaixo:   5, yc: -2, n: 2.1, q: 0.42 },
+    { z: 244, w:  10, hCima:   8, hBaixo: 3.6, yc: -1.5, n: 2.1, q: 0.30 },
+    { z: 224, w:  19, hCima:  14, hBaixo: 6.2, yc: -2.5, n: 2.2, q: 0.40 },
     { z: 202, w:  23, hCima:  19, hBaixo: 7.5, yc: -4, n: 2.2, q: 0.45 },   // fim do cone amarelo
     { z: 178, w:  29, hCima:  27, hBaixo:  12, yc: -6, n: 2.4, q: 0.40 },
     { z: 152, w:  32, hCima:  36, hBaixo:  17, yc: -6, n: 2.6, q: 0.32 },   // base do para-brisa
@@ -11633,8 +11633,10 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
      +x e espelhada pela escala (a fusão desvira o espelho; ver fundePorCor). */
   for (const lado of [-1, 1]){
     const f = faixaNoCasco(M.secoes, 1, t => {
-      const z = 204 - t*100, larg = 0.045 + t*0.06;
-      return { z, a0: larg, a1: -larg };
+      /* mais para CIMA do vinco que para baixo: o jogador vê o avião de
+         cima e de trás, e uma fita centrada no vinco some na silhueta */
+      const z = 204 - t*100, larg = 0.10 + t*0.10;
+      return { z, a0: larg*1.5, a1: -larg*0.5 };
     }, mAmarelo, 16);
     f.scale.x = lado; g.add(f);
   }
@@ -11683,12 +11685,17 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
     /* A RAIZ GROSSA DO PAINEL: o painel entra por dentro da luva com o mesmo
        perfil, para que, girando, a raiz varra um leque de chapa e não abra um
        vão para o céu. Agora ela tem a espessura da luva naquele ponto — mais
-       grossa, ela saía por cima e por baixo como uma bolha. */
-    const r0 = M.asa[0];
+       grossa, ela saía por cima e por baixo como uma bolha.
+       E o bordo de ataque dela é RECUADO: girando para trás, a parte de
+       dentro do pivô anda para a FRENTE (a 30°, 38 unidades para dentro
+       viram 19 para a frente), e com o bordo alinhado ao do painel a raiz
+       furava o bordo de ataque da luva com a asa fechada. A conta é
+       z·cos30 + 19 ≤ bordo da luva ali (55): z ≤ 41. */
+    const r0 = M.asa[0], fuga = r0.zLE - r0.corda;
     const raizGrossa = [
-      { x: -38, zLE: r0.zLE + 12, corda: r0.corda + 22, y: r0.y, tt: 0.074, tor: 0 },
-      { x: -14, zLE: r0.zLE +  5, corda: r0.corda +  9, y: r0.y, tt: 0.07,  tor: 0 },
-      { x:  14, zLE: r0.zLE,      corda: r0.corda,      y: r0.y, tt: 0.064, tor: 0 }
+      { x: -38, zLE: 40, corda: 40 - fuga, y: r0.y, tt: 0.08,  tor: 0 },
+      { x: -14, zLE: 50, corda: 50 - fuga, y: r0.y, tt: 0.072, tor: 0 },
+      { x:  14, zLE: r0.zLE, corda: r0.corda, y: r0.y, tt: 0.064, tor: 0 }
     ];
     dentro.add(pedacoDeAsa(raizGrossa, 0, 1, 0, 1, tinta('luva'), 4, 10));
     pivo.add(dentro);
