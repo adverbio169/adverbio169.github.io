@@ -397,6 +397,64 @@
        e são elas que empurram o segundo botão de jogar para fora da tela */
     #capa > .cartao > p.txt:first-of-type{display:none}
   }
+
+  /* --- A CAPA NO HANGAR -------------------------------------------------------
+     A entrada era uma coluna de caixas sobre um degradê azul: tudo certo e nada
+     convidando a voar. A arte veio do ChatGPT do dono: um hangar aberto ao pôr
+     do sol, com o avião parado na metade direita e a parede escura da esquerda
+     vazia de propósito — é ali que o cartão mora, em vidro escuro por cima dela.
+
+     O que saiu da frente, e por quê:
+     - o parágrafo de apresentação e o "esta é a tela do jogo": o hangar já diz
+       as duas coisas sem ninguém ler;
+     - a caixa "voar no céu de outra tela": continua no botão "Sala · QR e
+       batalha aérea", que abre o painel com o mesmo campo;
+     - o aviso de onde se escolhe a missão: vira assunto da cabine.
+     O QR e o código CONTINUAM na TV, porque é por eles que o celular vira
+     controle. A ajuda de teclado e o teste do tremor continuam no cartão, rolando.
+
+     A imagem entra embutida pelo montar.py. No modelo, o marcador não carrega e
+     sobra o degradê de sempre por baixo. Escolhendo o dragão, a classe `dragao`
+     troca a arte (`--hangar`); enquanto não houver `capa-hangar-dragao.webp`,
+     o montar.py não escreve a regra dele e o hangar do caça continua.
+
+     PARA DESFAZER: apagar este bloco (até o fim do `@media` dele). */
+  #capa{--hangar:url(__CAPA_HANGAR_CACA__);justify-content:flex-start;align-items:center;padding:3vh 3.2vw;
+    background:linear-gradient(90deg,rgba(4,8,16,.72) 0,rgba(4,8,16,.45) 30%,rgba(4,8,16,0) 46%),
+               var(--hangar) 62% 50%/cover no-repeat,
+               radial-gradient(1200px 700px at 50% -10%,#16224a,#0b1020 60%)}
+  /* a regra do dragão é ESCRITA pelo montar.py só quando a arte dele existe:
+     uma regra com `url()` vazio é válida e apagaria o hangar */
+  /*__REGRA_HANGAR_DRAGAO__*/
+  #capa .cartao{margin:0;max-width:none;width:min(430px,38vw);align-items:stretch;text-align:left;gap:12px;
+    background:rgba(8,14,28,.58);-webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
+    border:1px solid rgba(110,200,255,.20);border-radius:18px;padding:20px 22px;max-height:94vh;overflow:auto;
+    box-shadow:0 18px 50px rgba(0,0,0,.45)}
+  #capa .selo{color:#ffb24a;letter-spacing:3px}
+  #capa h1{font-size:40px;letter-spacing:.5px;text-shadow:0 2px 18px rgba(0,0,0,.6)}
+  #capa > .cartao > p.txt:first-of-type, #capa #euSou, #capa #batalha, #capa #ondeMissao{display:none}
+  #capa #capaSala{display:block}
+  #capa #sala{padding:10px 12px}
+  #capa #sala > p.txt{display:none}
+  #capa #qr{width:104px;height:104px;padding:6px}
+  #capa .cod{font-size:30px}
+  #capa .salaTxt p.txt{font-size:12px!important}
+  #capa button.grande{max-width:none}
+  #capa button.grande.azul{background:linear-gradient(180deg,#ff9a2e,#e86a10);box-shadow:0 6px 22px rgba(255,130,30,.35)}
+  /* em pé (celular de pé, tablet): o cartão ocupa a largura e o avião aparece embaixo */
+  @media (max-aspect-ratio:1/1){
+    #capa{align-items:flex-start;background-position:0 0,70% 50%,0 0}
+    #capa .cartao{width:100%}
+  }
+  @media (max-height:560px){
+    #capa{padding:2.2vh 2.6vw}
+    #capa .cartao{width:min(330px,40vw);gap:7px;padding:12px 14px}
+    #capa h1{font-size:26px}
+    #capa button.grande{padding:11px;font-size:14px}
+    #capa #sala{display:none}
+    /* três aviões na mesma linha: sem isto "Caça AD-02" quebrava em duas */
+    #capa #ondeComeca .op{white-space:nowrap;font-size:13px;padding:9px 4px}
+  }
 </style>
 </head>
 <body>
@@ -17375,7 +17433,8 @@ $('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque
   const bd = $('btDragao'), bc = $('btCaca'), bt = $('btTerceiro');
   const pinta = () => { bd.classList.toggle('ligado', tipoDeAviao === 'dragao');
                         bc.classList.toggle('ligado', tipoDeAviao === 'caca');
-                        bt.classList.toggle('ligado', tipoDeAviao === 'terceiro'); };
+                        bt.classList.toggle('ligado', tipoDeAviao === 'terceiro');
+                        $('capa').classList.toggle('dragao', tipoDeAviao === 'dragao'); };
   const poe = t => {
     if (t === tipoDeAviao) return;
     tipoDeAviao = t;
