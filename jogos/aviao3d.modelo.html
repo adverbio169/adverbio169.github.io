@@ -3910,12 +3910,21 @@ function lonaPainelNova(){
    ========================================================================== */
 const PAINEL_ARTE = true;
 /* `cab` é a cor de `mCab`; os tons de cada peça continuam vindo do
-   multiplicador por vértice de `luzNaCabine`. `aba` é esse multiplicador na
+   multiplicador por vértice de `luzNaCabine`. Ela é MAIS CLARA e mais quente
+   que a medida na arte (#4f5360), e de propósito: a primeira tentativa, com
+   0x3e4352, saiu na foto do capacete em #2c3444 — a luz da cena e o
+   multiplicador escurecem a chapa a uns 70% e o céu de reflexo a puxa para
+   o azul. Com 0x6c6a76 o console sai #5a5e6e, que é o tom da arte.
+   `aba` é esse multiplicador na
    aba do coaming, que deixa de ser preta: na arte o para-sol é do mesmo
    metal do resto, só mais escuro.
+   `trilho` é o mesmo para o trilho da capota: ele aparece por FORA do avião
+   (no terceiro, que é mais estreito, ele chega a passar da lateral), e no
+   cinza claro dos consoles ele virava uma régua clara contornando a capota
+   vista de fora. Escuro, ele continua sendo o friso escuro de antes.
    `verde` tinge a face de dentro dos consoles (o verde-água da arte) sem
    tinta nova: é o mesmo `mCab`, com a cor por vértice puxada para o verde. */
-const ARTE_CAB = { cab: 0x6c6a76, aba: 0.85, verde: [0.62, 0.90, 0.92] };
+const ARTE_CAB = { cab: 0x6c6a76, aba: 0.70, trilho: 0.45, verde: [0.62, 0.90, 0.92] };
 
 function lonaPainelArte(){
   const W = PAINEL_LONA.larg, H = PAINEL_LONA.alt;
@@ -4066,6 +4075,22 @@ function vestePainelArte(g, mCab, mCabFio){
   }
   return mLuzTrem;
 }
+/* ESCURECE O QUE FICA DO LADO DE FORA DE |x| = lim. O console tem 6,8 de
+   largura a 18,4 do eixo, então chega a 21,8 — e no terceiro, que é mais
+   estreito, essa ponta passa da lateral e aparece por FORA do avião, ao
+   longo da capota. No grafite antigo ninguém via; no cinza claro da arte
+   ela virou uma régua clara do lado de fora. De dentro essa face está
+   encostada na parede, que é onde ela tem de ser escura de qualquer jeito. */
+function escureceFora(no, lim, k){
+  no.updateMatrix();
+  const p = no.geometry.attributes.position, c = no.geometry.attributes.color.array;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++){
+    v.fromBufferAttribute(p, i).applyMatrix4(no.matrix);
+    if (Math.abs(v.x) > lim){ c[i*3] *= k; c[i*3+1] *= k; c[i*3+2] *= k; }
+  }
+  return no;
+}
 /* tinge a cor por vértice que `luzNaCabine` acabou de escrever */
 function tinge(no, rgb){
   const c = no.geometry.attributes.color.array;
@@ -4124,7 +4149,14 @@ function lonaConsoleArte(esq){
     g.fillStyle = 'rgba(255,255,255,.14)'; g.fillRect(x + 2, 0, 1.5, H);
   }
   g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, 0, W, 3); g.fillRect(0, H - 3, W, 3);
-  for (let x = 10; x < W; x += 30) for (const y of [8, H - 8]){
+  /* a faixa de CIMA da lona é a borda de FORA do console nos dois lados (a
+     rotação do tampo leva o alto do desenho para a parede). Ela fica escura:
+     é o vinco entre o console e a parede que a arte tem, e no terceiro é
+     também a ponta que sai pelo lado do casco e não pode virar uma régua
+     clara vista de fora (ver `escureceFora`). */
+  g.fillStyle = '#23252e'; g.fillRect(0, 0, W, 14);
+  g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(0, 14, W, 1.5);
+  for (let x = 10; x < W; x += 30) for (const y of [21, H - 8]){
     g.fillStyle = 'rgba(0,0,0,.5)'; g.beginPath(); g.arc(x + 0.6, y + 0.8, 2.6, 0, 7); g.fill();
     g.fillStyle = '#8a8e99'; g.beginPath(); g.arc(x, y, 2.1, 0, 7); g.fill();
   }
@@ -5942,6 +5974,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
       for (const lado of [-1, 1]){
         const con = new THREE.Mesh(caixaViva(6.8, 5.0, 44, 1.0), mCab);
         con.position.set(lado*18.4, 33.2, 126); g.add(luzNaCabine(con));
+        if (PAINEL_ARTE) escureceFora(con, 20.2, 0.35);
         const tampo = new THREE.Mesh(new THREE.PlaneGeometry(44, 6.4),
                         new THREE.MeshPhongMaterial({ map: lonaConsole(lado < 0), shininess: 10 }));
         tampo.rotation.set(-Math.PI/2, 0, lado < 0 ? Math.PI/2 : -Math.PI/2);
@@ -5950,7 +5983,7 @@ function montaAD02(corCorpo, corDetalhe, corVidro, simples){
         const fio = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 44), mCabFio);
         fio.position.set(lado*15.1, 35.7, 126); g.add(fio);
         const tr = new THREE.Mesh(caixaViva(3.4, 1.6, 50, 0.5), mCab);
-        tr.position.set(lado*21.3, 35.4, 124); g.add(luzNaCabine(tr, 0.78));
+        tr.position.set(lado*21.3, 35.4, 124); g.add(luzNaCabine(tr, PAINEL_ARTE ? ARTE_CAB.trilho : 0.78));
         const trFio = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.44, 50), mCabFio);
         trFio.position.set(lado*19.8, 36.1, 124); g.add(trFio);
       }
@@ -7439,6 +7472,7 @@ function montaTerceiro(corCorpo, corDetalhe, corVidro, simples){
       for (const lado of [-1, 1]){
         const con = new THREE.Mesh(caixaViva(6.8, 5.0, 44, 1.0), mCab);
         con.position.set(lado*18.4, 33.2, 126); g.add(luzNaCabine(con));
+        if (PAINEL_ARTE) escureceFora(con, 20.2, 0.35);
         const tampo = new THREE.Mesh(new THREE.PlaneGeometry(44, 6.4),
                         new THREE.MeshPhongMaterial({ map: lonaConsole(lado < 0), shininess: 10 }));
         tampo.rotation.set(-Math.PI/2, 0, lado < 0 ? Math.PI/2 : -Math.PI/2);
@@ -7448,7 +7482,7 @@ function montaTerceiro(corCorpo, corDetalhe, corVidro, simples){
         /* o trilho da capota acompanha a bolha deste avião, que é mais
            estreita que a do AD-02: em x=21,3 ele saía pela lateral do casco */
         const tr = new THREE.Mesh(caixaViva(3.4, 1.6, 50, 0.5), mCab);
-        tr.position.set(lado*19.6, 35.0, 124); g.add(luzNaCabine(tr, 0.78));
+        tr.position.set(lado*19.6, 35.0, 124); g.add(luzNaCabine(tr, PAINEL_ARTE ? ARTE_CAB.trilho : 0.78));
         const trFio = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.44, 50), mCabFio);
         trFio.position.set(lado*18.1, 35.7, 124); g.add(trFio);
       }

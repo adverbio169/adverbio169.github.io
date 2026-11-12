@@ -1189,6 +1189,63 @@ sortidas que pousam em avenida foram cumpridas.
 
 ---
 
+## O painel 3D com a cara da cabine nova
+
+"Na visão do capacete ainda tá o painel velho feio." A vista de CABINE cola a
+pintura nova por cima e esconde o modelo; a do CAPACETE mostra o modelo, e o
+modelo ainda era o da prancha antiga: azul-marinho quase preto, contraluz
+azul e uma faixa bege no alto (o degradê quente da lona do painel). Agora o
+interior 3D do caça e do terceiro segue a arte aprovada
+(`scratchpad/arte-caca2/14.png`), com as cores medidas nela:
+
+- **chapa cinza-azulada**: `mCab` passou de `0x232c3a` para `0x6c6a76`. A
+  arte mede `#4f5360` nos consoles; a luz da cena escurece a chapa a uns 70%,
+  e com esta base o console sai `#5a5e6e` na foto. A aba do coaming deixou de
+  ser preta (multiplicador 0,26 → 0,70).
+- **a lona do painel** (`lonaPainelArte`): face `#232737` com chapas,
+  costuras e rebites, três molduras GROSSAS (`#35373c`, a do meio maior) com
+  um parafuso em cada canto, grades embaixo. Sem luz própria — o fio quente e
+  a contraluz azul saíram.
+- **o tampo dos consoles** (`lonaConsoleArte`): o cinza claro da arte, com
+  rebites e o trilho da manete / do flape; a borda de fora é um vinco escuro.
+- **a placa do para-sol com as três luzes do trem**, pregada na cara da aba
+  que olha para o piloto: apagadas (`#381613`) com o trem recolhido, âmbar
+  piscando em trânsito, verdes com ele baixado — a mesma regra de
+  `desenhaCabineCaca`, lida de `tremAnim` em `acendeLuzesTrem`.
+- **as laterais**: uma luz laranja e uma grade de cada lado, junto da parede
+  logo atrás do painel, e a face de dentro dos consoles em verde-água
+  (`#30454c`, por cor de vértice, sem tinta nova).
+
+**Onde mora.** Tudo no `aviao3d.modelo.html`, na seção "O PAINEL DA ARTE
+NOVA" (logo antes de `lonaConsole`): `PAINEL_ARTE`, `ARTE_CAB`,
+`lonaPainelArte`, `vestePainelArte` (as peças, uma função só chamada pelo
+`montaAD02` e pelo `montaTerceiro`), `escureceFora`, `tinge`,
+`acendeLuzesTrem` e `lonaConsoleArte`. As luzes acendem no laço, logo depois
+da linha do `tremAnim`. O dragão tem cabine própria e não mudou.
+
+**O que não mudou.** O combinador, o olho, as telas vivas, o manche, a
+manete e o corte de perto das câmeras ficaram onde estavam: as peças novas
+são acréscimo. O inimigo usa o AD-02 `simples`, sem cabine: continua com 130
+malhas, 16 materiais e 16.418 triângulos.
+
+**Custo.** Duas tintas novas (as luzes do trem e a laranja); todo o resto é
+`mCab` e se emenda no `fundePorCor`. Medido na vista do capacete, só o avião:
+caça 27 → 29 chamadas, terceiro 24 → 26 (76 → 80 e 74 → 78 contando a
+passada de sombra). A cena inteira fica em torno de 200 e varia mais que isso
+de uma carga para a outra.
+
+**Ficou diferente da arte.** As telas laterais não são inclinadas (as telas
+vivas não podiam mudar de lugar); o para-sol não sobe em corcova acima do
+painel (subiria na frente do vidro do combinador) — a placa das luzes fica na
+cara da aba; o verde-água quase não aparece, porque as pernas do piloto tapam
+a face de dentro dos consoles; e o trilho da capota continua escuro, porque
+aparece por fora do avião.
+
+**Para desfazer:** `const PAINEL_ARTE = false;` — volta a lona antiga, a cor
+antiga de `mCab`, a aba e o trilho escuros, e as peças novas não nascem.
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
