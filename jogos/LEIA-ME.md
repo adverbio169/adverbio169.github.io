@@ -907,6 +907,29 @@ para a cabine do dragão e nada mais muda.
 
 ---
 
+## A capa virou um hangar
+
+A entrada do jogo era uma coluna de caixas sobre um degradê azul. Agora é um
+hangar aberto ao pôr do sol (arte do ChatGPT do dono, `capa-hangar-caca.webp`,
+165 KB), com o caça parado à direita e o cartão em vidro escuro sobre a parede
+vazia da esquerda. Foi mostrado em foto, em cima da capa de verdade, antes de
+entrar.
+
+- **Saiu da frente:** o parágrafo de apresentação, o "esta é a tela do jogo",
+  a caixa de batalha aérea (continua no botão "Sala · QR e batalha aérea") e o
+  aviso de onde se escolhe a missão.
+- **Ficou:** QR e código na TV, pista/ar, caça/dragão, os dois botões de jogar,
+  o teste do tremor e a ajuda do teclado (rolando dentro do cartão).
+- **O dragão:** a capa ganha a classe `dragao`. Quando existir
+  `capa-hangar-dragao.webp`, o `montar.py` escreve a regra que troca a arte;
+  sem ela, o dragão fica no hangar do caça.
+- **Onde mora:** o bloco `A CAPA NO HANGAR` no fim do `<style>` de
+  `aviao3d.modelo.html`, a linha do `$('capa').classList.toggle('dragao', …)`
+  na escolha do avião, e `regra_hangar_dragao()` no `montar.py`.
+- **Para desfazer:** apagar o bloco de CSS e rodar `montar.py`.
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".

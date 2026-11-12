@@ -28,6 +28,14 @@ def imagem(nome):
     dados = base64.b64encode(open(cam, 'rb').read()).decode('ascii')
     return 'data:image/webp;base64,' + dados
 
+def regra_hangar_dragao():
+    """A capa do hangar troca de arte quando o dragão é escolhido. Sem a arte
+    dele, a regra não é escrita — `url()` vazio é CSS válido e apagaria o
+    fundo — e o dragão fica no hangar do caça."""
+    if not os.path.exists(os.path.join(AQUI, 'capa-hangar-dragao.webp')):
+        return '/* (sem capa-hangar-dragao.webp: o dragão usa o hangar do caça) */'
+    return '#capa.dragao{--hangar:url(%s)}' % imagem('capa-hangar-dragao.webp')
+
 AQUI = os.path.dirname(os.path.abspath(__file__))
 os.chdir(AQUI)
 
@@ -84,6 +92,8 @@ if os.path.exists(tres_cam):
             .replace('__CABINE_LUCAS_MANCHE__', imagem('cabine-lucas-manche.webp'))
             .replace('__CABINE_LUCAS_MANETES__', imagem('cabine-lucas-manetes.webp'))
             .replace('__CABINE_LUCAS_FLAPE__', imagem('cabine-lucas-flape.webp'))
+            .replace('__CAPA_HANGAR_CACA__', imagem('capa-hangar-caca.webp'))
+            .replace('/*__REGRA_HANGAR_DRAGAO__*/', regra_hangar_dragao())
             .replace('__CABINE_CACA__', imagem('cabine-caca.webp'))
             .replace('__CABINE_CACA_TREM__', imagem('cabine-caca-trem.webp'))
             .replace('__CABINE_CACA_MANETE_A__', imagem('cabine-caca-manete-a.webp'))
