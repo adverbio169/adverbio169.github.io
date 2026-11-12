@@ -1474,6 +1474,26 @@ function avenidaPerto(x, z){
   for (const a of AVENIDAS) if (naPistaLocal(a, x, z, 0, 0)) return a;
   return null;
 }
+/* A CAIXA DE UM PRÉDIO INVADE ALGUMA AVENIDA? "Nenhum prédio nasce em cima
+   delas" era verdade só para o CENTRO do prédio: `naRua` olhava o meio da
+   célula, e o prédio ainda anda até 160 para o lado e tem até 280 de meia
+   largura. Em PORTO ALTO, de grade reta, isso quase nunca passava da calçada;
+   em NOVA ORLA, de grade torta (35°), a caixa — que é sempre alinhada aos
+   eixos do mundo, no desenho e na colisão — atravessa a avenida pela quina.
+   Medido em oito partidas: de 4 a 10 prédios sobre o eixo de cada avenida de
+   NOVA ORLA, todas as vezes. Pousar ali (o CORREIO pede PARAR lá) era bater.
+   A conta é a de `naPistaLocal` com a caixa projetada na normal da avenida,
+   mais os 260 da folga da colisão em `atualiza`. */
+function invadeAvenida(x, z, w, d){
+  for (const a of AVENIDAS){
+    const dx = x - a.cx, dz = z - a.cz;
+    const c = Math.cos(a.rumo), sn = Math.sin(a.rumo);
+    const ext = (w/2 + 260)*Math.abs(c) + (d/2 + 260)*Math.abs(sn);     // na normal
+    const extL = (w/2 + 260)*Math.abs(sn) + (d/2 + 260)*Math.abs(c);    // ao longo
+    if (Math.abs(dx*c - dz*sn) < a.meia + ext && Math.abs(dx*sn + dz*c) < a.meiaC + extL) return true;
+  }
+  return false;
+}
 function ehCidade(x, z){ return campoCidade(x, z) > 0.62; }
 function baralha(a,b){ return Math.abs(Math.sin(a*127.1 + b*311.7) * 43758.5453) % 1; }
 
@@ -1816,8 +1836,11 @@ function montaMapa(){
       const centro = Math.max(0, Math.min(1, (campoCidade(xx, zz) - 0.62)/1.5));
       const alt = 220 + Math.random()*Math.random()*(700 + centro*centro*3400);
       const larg = (420 + Math.random()*520) * (1 - centro*0.35);
-      predios.push({ x:xx + (Math.random()-0.5)*300, z:zz + (Math.random()-0.5)*300,
-                     w: larg, d: larg*(0.7 + Math.random()*0.6),
+      const gx = xx + (Math.random()-0.5)*300, gz = zz + (Math.random()-0.5)*300;
+      const gd = larg*(0.7 + Math.random()*0.6);
+      if (invadeAvenida(gx, gz, larg, gd)) continue;     // ver `invadeAvenida`
+      predios.push({ x: gx, z: gz,
+                     w: larg, d: gd,
                      h: alt, tom: Math.random(), centro, vivo:true });
     }
 
@@ -1888,8 +1911,11 @@ function montaMapa(){
           continue;
         }
         const centro = Math.max(0, Math.min(1, 1 - d/(c.raio*0.55)));
+        const fundo = larg*(0.7 + Math.random()*0.6);
+        /* o prédio inteiro fora da avenida, e não só o meio da célula */
+        if (invadeAvenida(px, pz, larg, fundo)) continue;
         predios.push({ x: px, z: pz,
-                       w: larg, d: larg*(0.7 + Math.random()*0.6),
+                       w: larg, d: fundo,
                        h: alt, tom: Math.random(), centro, zona: Z.nome, vivo:true });
       }
   }
