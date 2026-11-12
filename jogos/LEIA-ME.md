@@ -1023,9 +1023,20 @@ entrar.
   aviso de onde se escolhe a missão.
 - **Ficou:** QR e código na TV, pista/ar, caça/dragão, os dois botões de jogar,
   o teste do tremor e a ajuda do teclado (rolando dentro do cartão).
-- **O dragão:** a capa ganha a classe `dragao`. Quando existir
-  `capa-hangar-dragao.webp`, o `montar.py` escreve a regra que troca a arte;
-  sem ela, o dragão fica no hangar do caça.
+- **Cada avião tem o seu hangar:** o mesmo cenário com o avião escolhido
+  parado nele (`capa-hangar-caca.webp`, `capa-hangar-terceiro.webp`,
+  `capa-hangar-dragao.webp`, todas do ChatGPT do dono, ~170 KB cada). A escolha
+  do avião põe a classe `terceiro` ou `dragao` na capa; o `montar.py`
+  (`regras_da_capa()`) escreve a regra que troca `--hangar` só quando a arte
+  existe. Sem a arte, o avião fica no hangar do AD-02.
+- **A vitória tem foto própria:** o hangar fechado da Lotus
+  (`capa-vitoria.webp`). O nariz ali está à esquerda, então na vitória o
+  cartão vai para a direita (`#capa.vitoria`). Derrota volta ao hangar do avião.
+- **No celular deitado** a foto encosta na direita em vez de ser cortada, para
+  o focinho do dragão e o nariz do Caça novo não ficarem atrás do cartão. Na
+  TV o cartão ficou mais estreito (390 px, 34% da largura) pelo mesmo motivo.
+- **Teste:** `capa-tres-teste.js` (três botões, três hangares diferentes;
+  vitória; volta na derrota).
 - **Onde mora:** o bloco `A CAPA NO HANGAR` no fim do `<style>` de
   `aviao3d.modelo.html`, a linha do `$('capa').classList.toggle('dragao', …)`
   na escolha do avião, e `regra_hangar_dragao()` no `montar.py`.
@@ -1148,9 +1159,11 @@ sortidas que pousam em avenida foram cumpridas.
   uma leva e a próxima é de 15 s, e o conserto pede o céu vazio e 4 s parado
   na pista. O piloto de teste abateu a 1ª leva e foi direto pousar: levou
   53 e 55 s até parar, a 2ª leva já estava no ar (2 caças) e não houve
-  conserto. Só rearma quem já está na final quando o último cai. O lema
-  promete outra coisa — é decisão de projeto (respiro maior, ou a leva
-  esperar quem está parado na pista).
+  conserto. Só rearma quem já está na final quando o último cai.
+  **Mudado depois da verificação:** o respiro virou campo da sortida
+  (`caca.respiro`, 15 s por padrão) e o ALERTA usa 70 s — dá para pousar,
+  parar 4 s e decolar antes da leva seguinte. Para desfazer, tirar
+  `respiro:70` da linha `caca:` do ALERTA.
 - **O caça ainda pode ser abalroado por quem o persegue.** Sem o jogador
   atacando, nenhuma batida; mas no combate de verdade o piloto de teste bateu
   3 vezes em umas 25 tentativas. A caixa-preta de uma delas: o caça estava em

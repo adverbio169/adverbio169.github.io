@@ -414,19 +414,27 @@
      controle. A ajuda de teclado e o teste do tremor continuam no cartão, rolando.
 
      A imagem entra embutida pelo montar.py. No modelo, o marcador não carrega e
-     sobra o degradê de sempre por baixo. Escolhendo o dragão, a classe `dragao`
-     troca a arte (`--hangar`); enquanto não houver `capa-hangar-dragao.webp`,
-     o montar.py não escreve a regra dele e o hangar do caça continua.
+     sobra o degradê de sempre por baixo.
+
+     CADA AVIÃO TEM O SEU HANGAR: o mesmo cenário, com o avião escolhido
+     parado nele (`capa-hangar-caca/terceiro/dragao.webp`). A escolha do
+     avião põe a classe `terceiro` ou `dragao` na capa, e a regra que troca
+     `--hangar` é ESCRITA pelo montar.py só quando a arte existe — sem ela, o
+     avião fica no hangar do AD-02.
+
+     A VITÓRIA tem foto própria: o hangar fechado da Lotus (`capa-vitoria.webp`).
+     Nela o nariz do avião está à esquerda, então o cartão passa para a direita
+     (`#capa.vitoria`, também escrita pelo montar.py).
 
      PARA DESFAZER: apagar este bloco (até o fim do `@media` dele). */
-  #capa{--hangar:url(__CAPA_HANGAR_CACA__);justify-content:flex-start;align-items:center;padding:3vh 3.2vw;
+  #capa{--hangar:url(__CAPA_HANGAR_CACA__);justify-content:flex-start;align-items:center;padding:3vh 2vw;
     background:linear-gradient(90deg,rgba(4,8,16,.72) 0,rgba(4,8,16,.45) 30%,rgba(4,8,16,0) 46%),
                var(--hangar) 62% 50%/cover no-repeat,
                radial-gradient(1200px 700px at 50% -10%,#16224a,#0b1020 60%)}
-  /* a regra do dragão é ESCRITA pelo montar.py só quando a arte dele existe:
-     uma regra com `url()` vazio é válida e apagaria o hangar */
-  /*__REGRA_HANGAR_DRAGAO__*/
-  #capa .cartao{margin:0;max-width:none;width:min(430px,38vw);align-items:stretch;text-align:left;gap:12px;
+  /* escritas pelo montar.py só quando a arte existe: uma regra com `url()`
+     vazio é válida e apagaria o fundo */
+  /*__REGRAS_DA_CAPA__*/
+  #capa .cartao{margin:0;max-width:none;width:min(390px,34vw);align-items:stretch;text-align:left;gap:12px;
     background:rgba(8,14,28,.58);-webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
     border:1px solid rgba(110,200,255,.20);border-radius:18px;padding:20px 22px;max-height:94vh;overflow:auto;
     box-shadow:0 18px 50px rgba(0,0,0,.45)}
@@ -454,6 +462,12 @@
     #capa #sala{display:none}
     /* três aviões na mesma linha: sem isto "Caça AD-02" quebrava em duas */
     #capa #ondeComeca .op{white-space:nowrap;font-size:13px;padding:9px 4px}
+    /* no celular deitado a tela é mais larga que a foto: em vez de cortar em
+       cima e embaixo, a foto encosta na direita (o focinho do dragão e o
+       nariz do Caça novo saem de baixo do cartão) e a parede escura da
+       esquerda continua no degradê de fundo */
+    #capa{background-size:auto,auto 100%,auto;background-position:0 0,right center,0 0}
+    #capa.vitoria{background-position:0 0,left center,0 0}
   }
 </style>
 </head>
@@ -15818,7 +15832,7 @@ const SORTIDAS = [
        + 'Parar na pista entre as levas conserta e rearma.',
     objs:[['abater',6],'voltar'],
     par: 420,
-    caca:{ max:3, levas:[1,2,3], espera:30, gatilho:'tempo', aviso:
+    caca:{ max:3, levas:[1,2,3], espera:30, respiro:70, gatilho:'tempo', aviso:
            'decole já: a primeira leva está chegando' },
     relogio(){ return Sortida.fase === 'solo' || Sortida.fase === 'transito' ? 30 - Sortida.tSolo : null; },
     relogioTxt:'ELES CHEGAM EM' },
@@ -16003,8 +16017,13 @@ const Sortida = {
       /* as LEVAS: a seguinte só é chamada quando o céu esvazia, e avisa antes */
       if (this.temMaisLeva() && Inimigos.cota === 0 && Inimigos.quantos() === 0){
         if (this.tLeva <= 0){
-          this.tLeva = 15;
-          mostraAviso('LEVA ' + (this.leva + 2) + ' EM 15 s', '#ffc046', 2600);
+          /* o RESPIRO entre levas é da sortida (`caca.respiro`). Os 15 s de
+             sempre não davam tempo de fazer o que o lema do ALERTA promete:
+             medido, o pouso até parar na pista levou 53 e 55 s, e o conserto
+             ainda pede 4 s parado com o céu vazio. */
+          const resp = c.respiro || 15;
+          this.tLeva = resp;
+          mostraAviso('LEVA ' + (this.leva + 2) + ' EM ' + resp + ' s', '#ffc046', 2600);
         } else {
           this.tLeva -= dt;
           if (this.tLeva <= 0){
@@ -17311,6 +17330,7 @@ function comeca(){
 }
 function fim(){
   jogando = false;
+  $('capa').classList.toggle('vitoria', !!venceu);   // a foto da Lotus, com o cartão à direita
   Relatorio.noFim();         // o relatório da sortida entra em #placar
   TelaAcesa.solta();         // acabou: a tela pode dormir como qualquer outra
   /* O laço para aqui, e com ele os `passo()` que desligariam o tom sozinhos:
@@ -17462,7 +17482,8 @@ $('btToque').onclick = () => { ligaAudio(); Controle.modo = 'toque'; usandoToque
   const pinta = () => { bd.classList.toggle('ligado', tipoDeAviao === 'dragao');
                         bc.classList.toggle('ligado', tipoDeAviao === 'caca');
                         bt.classList.toggle('ligado', tipoDeAviao === 'terceiro');
-                        $('capa').classList.toggle('dragao', tipoDeAviao === 'dragao'); };
+                        $('capa').classList.toggle('dragao', tipoDeAviao === 'dragao');
+                        $('capa').classList.toggle('terceiro', tipoDeAviao === 'terceiro'); };
   const poe = t => {
     if (t === tipoDeAviao) return;
     tipoDeAviao = t;
