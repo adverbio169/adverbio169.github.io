@@ -3127,7 +3127,161 @@ function pecaDaCabine(nome, c, transforma){
    Quando o caça tiver a arte dele, é só escolher a imagem pelo `tipoDeAviao`
    aqui dentro. */
 function usaCabinePintada(){
-  return !!(cockpit && cabinePintada());
+  return !!(cockpit && arteDaCabine());
+}
+/* =============================================================================
+   A CABINE DO CAÇA — a arte dele chegou
+
+   O caça voava sentado na cabine azul e amarela do dragão, que é do Lucas. A
+   arte própria veio num KIT: a cabine vazia sobre magenta, as cinco peças já
+   recortadas na mesma luz e no mesmo ângulo, e uma máscara para cada tela.
+   Isso mudou três coisas em relação à do dragão, e as três estão aqui:
+
+   1. AS PEÇAS SENTAM POR PIXEL. Cada recorte foi procurado na versão montada
+      que veio junto e bateu com erro ZERO; `x`,`y` abaixo são esse lugar, na
+      régua da arte (1672 x 941). Nada de caixa no olhômetro. `px`,`py` é o pé
+      da peça dentro do recorte: é em volta dele que ela articula.
+   2. AS TELAS SÃO FURO. Na do dragão o instrumento é pintado POR CIMA de um
+      retângulo preto da arte. Aqui as telas laterais são tortas (o painel
+      está em perspectiva), então a arte tem um buraco no lugar de cada uma:
+      o instrumento é desenhado por baixo, inclinado junto, e a moldura vem
+      depois e esconde a sobra. `telas` são os quatro cantos de cada furo.
+   3. O ENQUADRAMENTO DEPENDE DA TELA. A arte é 16:9 e o painel ocupa dois
+      terços dela. Na TV cabe inteira. No celular deitado, inteira, sobraria
+      um terço da tela de céu — então ali ela é APROXIMADA: o topo do painel
+      fica a 46% da altura e as alavancas aparecem pela ponta. Foi escolhido
+      vendo as duas fotos lado a lado.
+
+   As três luzes do para-sol são o TREM: apagadas com ele recolhido, piscando
+   em trânsito, verdes com ele baixado e travado — os "três verdes" de sempre.
+
+   PARA DESFAZER: em `arteDaCabine()`, devolver sempre `lucas`. O caça volta à
+   cabine do dragão e nada mais muda. */
+const CAB_CACA = {
+  src: '__CABINE_CACA__', L: 1672, A: 941,
+  topo: 340/941,                       // onde o para-sol começa, no meio
+  telas: [
+    { tl: [439, 470],  tr: [595, 460],  br: [605, 615],  bl: [450, 627] },
+    { tl: [645, 422],  tr: [1029, 422], br: [1029, 640], bl: [644, 640] },
+    { tl: [1083, 461], tr: [1236, 472], br: [1226, 627], bl: [1069, 616] }
+  ],
+  luzes: [ [746, 361, 50, 25], [809, 359, 54, 27], [877, 361, 51, 25] ],
+  pecas: {
+    trem:    { arq: '__CABINE_CACA_TREM__',     x: 306,  y: 499, px: 19, py: 133 },
+    maneteA: { arq: '__CABINE_CACA_MANETE_A__', x: 314,  y: 670, px: 25, py: 188 },
+    maneteB: { arq: '__CABINE_CACA_MANETE_B__', x: 223,  y: 668, px: 24, py: 190 },
+    flape:   { arq: '__CABINE_CACA_FLAPE__',    x: 1334, y: 702, px: 98, py: 162 },
+    manche:  { arq: '__CABINE_CACA_MANCHE__',   x: 773,  y: 674, px: 78, py: 199 }
+  },
+  /* a caixa das duas manetes, em fração da arte: é em cima dela que o
+     acelerador de dedo vai morar (`aceleradorNaManete`) */
+  manetes: { x: 223/1672, y: 668/941, w: 187/1672, h: 193/941 }
+};
+let _cabCaca = null, _cabCacaOk = false;
+const _cabCacaPeca = {};
+function cabineCaca(){
+  if (!CABINE_PINTADA) return null;
+  if (!_cabCaca){
+    _cabCaca = new Image();
+    _cabCaca.onload = () => { _cabCacaOk = _cabCaca.naturalWidth > 0; };
+    _cabCaca.src = CAB_CACA.src;        // no modelo é um marcador: não carrega
+    for (const k of Object.keys(CAB_CACA.pecas)){
+      const im = new Image(); im.src = CAB_CACA.pecas[k].arq;
+      _cabCacaPeca[k] = im;
+    }
+  }
+  return _cabCacaOk ? _cabCaca : null;
+}
+/* A ARTE QUE ESTÁ NO AR. As duas são pedidas sempre, para a troca de avião na
+   capa não esperar carregamento; e se a do caça não vier, ele continua na do
+   dragão, que é o que já acontecia. */
+function arteDaCabine(){
+  const lucas = cabinePintada(), caca = cabineCaca();
+  return (tipoDeAviao === 'caca' && caca) ? caca : lucas;
+}
+/* o topo do painel (fração da altura da arte) e as telas tocáveis (caixas, em
+   fração) — as duas perguntas que o resto do jogo faz sem querer saber qual
+   arte é */
+function topoDaCabine(img){
+  return (img && img === _cabCaca) ? CAB_CACA.topo : CAB_PINT_TOPO;
+}
+let _cabCacaCaixas = null;
+function telasDaCabine(img){
+  if (!(img && img === _cabCaca)) return CAB_PINT_TELAS;
+  if (!_cabCacaCaixas) _cabCacaCaixas = CAB_CACA.telas.map(q => {
+    const x0 = Math.min(q.tl[0], q.bl[0]), x1 = Math.max(q.tr[0], q.br[0]);
+    const y0 = Math.min(q.tl[1], q.tr[1]), y1 = Math.max(q.bl[1], q.br[1]);
+    return { x: x0/CAB_CACA.L, y: y0/CAB_CACA.A, w: (x1 - x0)/CAB_CACA.L, h: (y1 - y0)/CAB_CACA.A };
+  });
+  return _cabCacaCaixas;
+}
+function desenhaCabineCaca(img, c){
+  const k = c.l/CAB_CACA.L;
+  const X = x => c.x + x*k, Y = y => c.y + y*k;
+  /* AS TELAS, POR BAIXO DA MOLDURA. O fundo preto vai sempre — sem ele o furo
+     mostraria o céu na tela de fim. O instrumento entra inclinado junto com o
+     furo: as laterais sobem 6% para um lado e deitam 7% para o outro, e um
+     retângulo reto ali deixava uma cunha de vidro em cada canto. */
+  const vivo = jogando && !caindo;
+  const escAntes = _mfdEscala, fisAntes = _mfdFisico, mudoAntes = _mfdMudo;
+  _mfdEscala = 1.15; _mfdFisico = true; _mfdMudo = true;
+  for (let i = 0; i < CAB_CACA.telas.length; i++){
+    const q = CAB_CACA.telas[i];
+    h2.fillStyle = '#04070b'; h2.beginPath();
+    h2.moveTo(X(q.tl[0] - 6), Y(q.tl[1] - 6)); h2.lineTo(X(q.tr[0] + 6), Y(q.tr[1] - 6));
+    h2.lineTo(X(q.br[0] + 6), Y(q.br[1] + 6)); h2.lineTo(X(q.bl[0] - 6), Y(q.bl[1] + 6));
+    h2.fill();
+    if (!vivo) continue;
+    const w = ((q.tr[0] - q.tl[0]) + (q.br[0] - q.bl[0]))/2;
+    const h = ((q.bl[1] - q.tl[1]) + (q.br[1] - q.tr[1]))/2;
+    const sobe  = ((q.tr[1] - q.tl[1]) + (q.br[1] - q.bl[1]))/2/w;
+    const deita = ((q.bl[0] - q.tl[0]) + (q.br[0] - q.tr[0]))/2/h;
+    h2.save();
+    h2.translate(X(q.tl[0]), Y(q.tl[1])); h2.transform(1, sobe, deita, 1, 0, 0);
+    try { desenhaMFDEm({ x: 0, y: 0, w: w*k, h: h*k, k: i }, i, true, true); } catch(e){}
+    h2.restore();
+  }
+  _mfdEscala = escAntes; _mfdFisico = fisAntes; _mfdMudo = mudoAntes;
+  h2.drawImage(img, c.x, c.y, c.l, c.a);
+  /* --- OS TRÊS VERDES ---------------------------------------------------- */
+  const tA = tremAnim || 0;
+  const acesa = tA > 0.97 ? 'rgba(70,255,130,.92)'
+              : (tA > 0.03 && (performance.now() % 500) < 280) ? 'rgba(255,150,54,.95)' : null;
+  if (acesa && vivo){
+    h2.save();
+    h2.shadowColor = acesa; h2.shadowBlur = 14*k; h2.fillStyle = acesa;
+    for (const [x, y, w, h] of CAB_CACA.luzes) h2.fillRect(X(x + 4), Y(y + 4), (w - 8)*k, (h - 8)*k);
+    h2.restore();
+  }
+  /* --- AS PEÇAS ---------------------------------------------------------- */
+  const e = vivo ? eixos() : { lat: 0, ver: 0 };
+  const peca = (nome, tf) => {
+    const im = _cabCacaPeca[nome];
+    if (!im || !im.naturalWidth) return;
+    const a = CAB_CACA.pecas[nome];
+    h2.save();
+    h2.translate(X(a.x + a.px), Y(a.y + a.py)); tf();
+    /* a sombra é o que tira a cara de figurinha colada: a peça passa a
+       encostar no console em vez de flutuar um dedo acima dele */
+    h2.shadowColor = 'rgba(0,0,0,.5)'; h2.shadowBlur = 9*k; h2.shadowOffsetY = 4*k;
+    h2.drawImage(im, -a.px*k, -a.py*k, im.naturalWidth*k, im.naturalHeight*k);
+    h2.restore();
+  };
+  /* a alavanca do trem tomba para a esquerda quando ele desce */
+  peca('trem', () => h2.rotate(-1.30*tA));
+  /* as manetes correm pelo trilho, e o trilho foge para cima e para a direita
+     (medido na arte: 100 px de lado para 120 de altura). Indo para a frente
+     elas se afastam do olho, e por isso encolhem um pouco. */
+  const pot = Math.min(1.12, (motor || 0) + (turbinando ? 0.12 : 0));
+  const corre = () => { h2.translate((-10 + 58*pot)*k, (12 - 68*pot)*k);
+                        h2.scale(1 - 0.07*pot, 1 - 0.07*pot); };
+  peca('maneteA', corre); peca('maneteB', corre);
+  /* o flape: recolhido é a alavanca lá na frente; cada dente a traz para trás,
+     e a posição desenhada na arte é a de flape todo baixado */
+  const fl = 1 - Math.min(2, Math.max(0, flapAnim || 0))/2;
+  peca('flape', () => { h2.translate(-52*fl*k, -56*fl*k); h2.scale(1 - 0.07*fl, 1 - 0.07*fl); });
+  /* o manche, com o mesmo curso do da outra cabine */
+  peca('manche', () => { h2.rotate(-(e.lat || 0)*0.40); h2.scale(1, 1 - (e.ver || 0)*0.20); });
 }
 /* "cobrir": a arte é 2,17:1 e a tela do celular deitado é 2,16 — encaixa
    quase exata. Em monitor, que é mais quadrado, sobra largura e ela é
@@ -3141,6 +3295,17 @@ function usaCabinePintada(){
    opaca: nada do HUD pode ser desenhado atrás. */
 const CAB_PINT_TOPO = 0.449;
 function caixaCabinePintada(img){
+  if (img && img === _cabCaca){
+    const cobre = Math.max(W/CAB_CACA.L, H/CAB_CACA.A)*1.06;
+    if (W/H >= 1.95){
+      /* celular deitado: aproximada, presa pelo alto. `mg` é a folga do
+         tremor em cima; embaixo sobra arte de sobra. */
+      const mg = 0.012*H, e = Math.max(cobre, (0.46*H + mg)/(CAB_CACA.topo*CAB_CACA.A));
+      return { x: (W - CAB_CACA.L*e)/2, y: -mg, l: CAB_CACA.L*e, a: CAB_CACA.A*e };
+    }
+    const l = CAB_CACA.L*cobre, a = CAB_CACA.A*cobre;
+    return { x: (W - l)/2, y: (H - a)/2, l: l, a: a };
+  }
   const e = Math.max(W/img.naturalWidth, H/img.naturalHeight)*1.06;
   const l = img.naturalWidth*e, a = img.naturalHeight*e;
   return { x: (W - l)/2, y: (H - a)/2, l: l, a: a };
@@ -3206,7 +3371,7 @@ function cabinePintadaOpacidade(){
   return 1 - (a - 26)/16;
 }
 function desenhaCabinePintada(){
-  const img = usaCabinePintada() ? cabinePintada() : null;
+  const img = usaCabinePintada() ? arteDaCabine() : null;
   const op = img ? cabinePintadaOpacidade() : 0;
   /* a arrumação do acelerador vem ANTES de qualquer saída: sem isto, trocar
      para a vista de fora deixava a zona invisível pregada em cima do nada e
@@ -3218,6 +3383,7 @@ function desenhaCabinePintada(){
   const c = caixaCabinePintada(img), tre = tremorDaCabine(c);
   c.x += tre.x + hudDX; c.y += tre.y + hudDY;   // presa no avião, como o HUD
   h2.globalAlpha = op;
+  if (img === _cabCaca){ desenhaCabineCaca(img, c); h2.globalAlpha = 1; return; }
   h2.drawImage(img, c.x, c.y, c.l, c.a);
 
   /* AS TELAS VÊM ANTES DAS PEÇAS, e a ordem não é gosto: o manche fica NA
@@ -3311,7 +3477,7 @@ function aceleradorNaManete(c, op){
     }
     return;
   }
-  const a = CAB_PINT_PECAS.manetes;
+  const a = (arteDaCabine() === _cabCaca && _cabCaca) ? CAB_CACA.manetes : CAB_PINT_PECAS.manetes;
   /* O RESPIRO É DESIGUAL DE PROPÓSITO, e isso vem de um teste que reprovou.
      `valorDoDedo` decide pela FORMA DA CAIXA se o arrasto é vertical ou
      horizontal (`r.height >= r.width`). A caixa da manete, com respiro igual
@@ -13292,10 +13458,10 @@ function calculaVidroHUD(){
      pintura, que é opaca. A caixa sobe até a base encostar no topo da chapa. */
   let yTopo = (y0 + y1)/2 - a/2;
   if (usaCabinePintada()){
-    const img = cabinePintada();
+    const img = arteDaCabine();
     if (img){
       const cx = caixaCabinePintada(img);
-      const base = cx.y + hudDY + (CAB_PINT_TOPO - 0.006)*cx.a;
+      const base = cx.y + hudDY + (topoDaCabine(img) - 0.006)*cx.a;
       if (yTopo + a > base) yTopo = Math.max(4, base - a);
     }
   }
@@ -14130,12 +14296,12 @@ function desenhaHUD(){
      a fita da bússola e a escada de altura apareciam por cima da chapa. */
   desenhaCabinePintada();
   if (usaCabinePintada()){
-    const img = cabinePintada();
+    const img = arteDaCabine();
     if (img && cabinePintadaOpacidade() > 0.5){
       const c = caixaCabinePintada(img);
       presoNaTela();
       const alt = Math.max(16, Math.min(Math.max(20, H*0.052), 0.056*c.a));
-      tarjaDoAlarme(W/2 + hudDX, c.y + hudDY + (CAB_PINT_TOPO + 0.036)*c.a, alt);
+      tarjaDoAlarme(W/2 + hudDX, c.y + hudDY + (topoDaCabine(img) + 0.036)*c.a, alt);
     }
   }
 }
@@ -15471,10 +15637,10 @@ function mfdPega(px, py){
      quando se puxava a manete. Com o painel de verdade à vista, quem responde
      são as três telas PINTADAS, e só a um gesto: arrastar de lado rola a fita. */
   if (mostraPainelDeVerdade()){
-    const img = usaCabinePintada() ? cabinePintada() : null;
+    const img = usaCabinePintada() ? arteDaCabine() : null;
     if (!img) return false;
     const c = caixaCabinePintada(img);
-    for (const t of CAB_PINT_TELAS){
+    for (const t of telasDaCabine(img)){
       const x = c.x + hudDX + t.x*c.l, y = c.y + hudDY + t.y*c.a, w = t.w*c.l, h = t.h*c.a;
       if (px < x || px > x + w || py < y || py > y + h) continue;
       mfdGesto = { k: 0, o: { x, y, w, h }, x0: px, y0: py, usou: false, mexeu: false, pintada: true };

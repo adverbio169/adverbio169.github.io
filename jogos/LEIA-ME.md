@@ -848,6 +848,65 @@ telas pintadas (visto na captura).
 
 ---
 
+## A cabine do caça ganhou a arte dele
+
+O caça voava sentado na cabine azul e amarela do dragão. A arte própria veio
+do ChatGPT do dono, em forma de kit: a cabine vazia sobre magenta, cinco peças
+já recortadas (manche, duas manetes, alavanca de flape, alavanca do trem) e
+uma máscara para cada tela e cada luz. Duas montagens anteriores, feitas aqui
+com peças desenhadas em outro ângulo, foram recusadas ("as peças coladas").
+Desta vez as peças são recortes da própria cabine montada: cada uma foi
+procurada na imagem montada e bateu com erro zero.
+
+**Antes de entrar no jogo, foi mostrada.** A arte foi injetada na página do
+jogo aberta num navegador de teste, sem gravar nada, e o dono escolheu por
+foto: cabine inteira na TV, aproximada no celular, só no caça.
+
+### O que entrou
+
+- **Só o caça usa.** O dragão continua na cabine do Lucas, sem mudança
+  (o teste mede o enquadramento dele antes e depois).
+- **Enquadramento por tela.** A arte é 16:9 e o painel ocupa dois terços dela.
+  Em TV e monitor entra inteira. Em tela deitada com proporção de 1,95 para
+  cima (celular), é aproximada e presa pelo alto: o topo do painel fica a 46%
+  da altura e manche, manetes e flape aparecem pela ponta.
+- **As telas são furos.** As laterais são tortas, em perspectiva. O
+  instrumento é desenhado por baixo, inclinado junto, e a moldura vem por cima.
+- **As peças mexem.** O manche inclina e encurta; as manetes correm pelo
+  trilho; o flape vem para trás um dente por posição; a alavanca do trem tomba
+  para a esquerda quando ele desce.
+- **As três luzes do para-sol são o trem.** Apagadas recolhido, âmbar piscando
+  em trânsito, verdes baixado e travado.
+- **O acelerador de dedo** mora em cima das duas manetes, como já morava na
+  outra cabine.
+
+### Onde mora
+
+- `aviao3d.modelo.html`: o bloco `A CABINE DO CAÇA` (`CAB_CACA`, `cabineCaca`,
+  `arteDaCabine`, `topoDaCabine`, `telasDaCabine`, `desenhaCabineCaca`) e o
+  ramo do caça em `caixaCabinePintada`. HUD, tarja de alarme e toque nas telas
+  agora perguntam a `arteDaCabine()` em vez de assumir a arte do Lucas.
+- `montar.py`: seis marcadores `__CABINE_CACA…__`.
+- Arte: `cabine-caca.webp` e `cabine-caca-{manche,manete-a,manete-b,flape,trem}.webp`
+  (128 KB somados).
+
+### Para desfazer
+
+Em `arteDaCabine()`, devolver sempre `lucas`, e rodar `montar.py`. O caça volta
+para a cabine do dragão e nada mais muda.
+
+### O que ficou em aberto nela
+
+- A alavanca do trem é só desenho: tocar nela não baixa o trem (o botão
+  invisível do trem continua onde estava).
+- No celular, com flape todo baixado, a alavanca de flape quase sai da tela.
+- A tarja de alarme é desenhada em cima das três luzes; enquanto ela aparece,
+  as luzes do trem ficam tapadas.
+- O kit original (PNG sobre magenta e máscaras) não está no repositório; as
+  medidas tiradas dele estão em `CAB_CACA`.
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
