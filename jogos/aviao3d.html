@@ -9457,12 +9457,13 @@ const MEDIDAS_CACA = {
        fogo, pivô, ponta, marcaDeriva;
      · no DESENHO (só o montador lê): canopia, que é a da cabine copiada.
    As contas: comprimento 500 no desenho × 0,64 = 320 (16,0 m); envergadura
-   aberta 381 × 0,64 = 244 (12,2 m); altura 152 × 0,64 = 97 (4,8 m). */
+   aberta 381 × 0,64 = 244 (12,2 m); altura 150 × 0,64 = 96 (4,8 m), do
+   chão (-72) à ponta das derivas (+78). */
 const ESC_T = 0.64;
 const MEDIDAS_TERCEIRO = {
   nome: 'CAÇA NOVO',
   escala: ESC_T,
-  roda: 82*ESC_T,                         // a roda toca em -82 no desenho
+  roda: 72*ESC_T,                         // a roda toca em -72 no desenho
   /* o olho do piloto é o do AD-02 encolhido junto com a cabine */
   cabine: { frente: 118*ESC_T, cima: 50*ESC_T },
   canopia: { x: 23, y: 29, z: 54, cy: 30, cz: 122, arco: 143 },   // DESENHO
@@ -9481,7 +9482,7 @@ const MEDIDAS_TERCEIRO = {
   asaVarre: 0.8,
   /* a faixa da cor do jogador nos aviões da rede, no meio de cada deriva
      inclinada (ver `poe` da Batalha), já na escala do jogo */
-  marcaDeriva: { x: 45.5*ESC_T, y: 39.6*ESC_T, z: -143*ESC_T, inc: 0.30, esp: 7, alt: 22, comp: 20 },
+  marcaDeriva: { x: 45.8*ESC_T, y: 40.5*ESC_T, z: -143*ESC_T, inc: 0.30, esp: 7, alt: 22, comp: 20 },
   /* a câmera de perseguição chega mais perto: o avião tem 65% do tamanho do
      AD-02, e na distância dele virava um avião de brinquedo lá na frente */
   camera: 0.78
@@ -13098,12 +13099,12 @@ const TERCEIRO = {
   ],
   /* AS DUAS DERIVAS, desenhadas deitadas e postas em pé sobre as naceles,
      abertas 17° para fora, como na ficha. A altura total da ficha (4,8 m, do
-     chão à ponta da deriva) é o que manda nelas: 64 de envergadura no
-     desenho, com o trem que a ficha pede, fecha os 96 do jogo. */
+     chão à ponta da deriva) é o que manda nelas: 66 de envergadura no
+     desenho, com o trem curto que a ficha pede, fecha os 96 do jogo. */
   deriva: [
-    { x:   0, zLE:  -84, corda: 128, y: 0, tt: 0.06 },
-    { x:  34, zLE: -116, corda:  94, y: 0, tt: 0.055 },
-    { x:  64, zLE: -146, corda:  58, y: 0, tt: 0.05 }
+    { x:   0, zLE:  -82, corda: 130, y: 0, tt: 0.06 },
+    { x:  35, zLE: -116, corda:  95, y: 0, tt: 0.055 },
+    { x:  66, zLE: -148, corda:  58, y: 0, tt: 0.05 }
   ],
   DERIVA: { x: 36, y: 9, cant: 0.30 },
   /* --- A FUSELAGEM DO MEIO: nariz, cabine e a espinha ---------------------
@@ -13138,8 +13139,8 @@ const TERCEIRO = {
      limite) e o bocal fica perto. É o desenho do F-15 e do Su-27, e é o que
      dá ao avião visto de cima a cintura entre o nariz e a cauda. */
   nacele: [
-    { z:  84, xc: 57,   w: 21.5, hCima: 25,   hBaixo: 24,   yc: -13,  n: 5.0, rk: 0.30 },
-    { z:  50, xc: 55,   w: 21.5, hCima: 25,   hBaixo: 23,   yc: -12,  n: 4.2 },
+    { z:  84, xc: 55,   w: 19.5, hCima: 22.5, hBaixo: 21.5, yc: -12,  n: 5.0, rk: 0.30 },
+    { z:  50, xc: 53,   w: 20.5, hCima: 24,   hBaixo: 22,   yc: -11.5, n: 4.2 },
     { z: -20, xc: 48,   w: 21,   hCima: 23,   hBaixo: 21,   yc: -10,  n: 3.4 },
     { z:-100, xc: 41,   w: 20.5, hCima: 21,   hBaixo: 19.5, yc: -9,   n: 2.8 },
     { z:-170, xc: 36,   w: 19.5, hCima: 19.5, hBaixo: 19,   yc: -8,   n: 2.4 },
@@ -13147,13 +13148,17 @@ const TERCEIRO = {
     { z:-212, xc: 34,   w: 16.5, hCima: 16.5, hBaixo: 16.5, yc: -8,   n: 2.0 }
   ],
   /* a boca da tomada: z do lábio, e a meia-largura e meia-altura de DENTRO */
-  TOMADA: { z: 100, w: 17.5, hCima: 21, hBaixo: 20, fundo: 68 },
+  TOMADA: { z: 100, w: 15.5, hCima: 18.5, hBaixo: 17.5, fundo: 68 },
   MOTOR_X: 34, MOTOR_Y: -8, BOCAL_Z: -210, BOCAL_R: 17.5,
   PIVO: { x: 80, z: -30 },
-  FLAP: [0.02, 0.46], AIL: [0.54, 0.96], CORDA_MOVEL: 0.70,
+  /* flape e aileron mais curtos que os do AD-02, para abrir entre eles a
+     banda amarela da ficha (ver BANDA em montaTerceiro); o aileron para
+     antes da ponta amarela */
+  FLAP: [0.02, 0.42], AIL: [0.56, 0.86], CORDA_MOVEL: 0.70,
   /* o trem: a ficha pede o avião baixo (4,8 m de altura total), então as
-     pernas são mais curtas que as do AD-02 — a roda toca em -82 no desenho */
-  TREM: { dianteira: { z: 150, curso: 43, raio: 17 }, principal: { x: 50, z: -44, curso: 38, raio: 22 } }
+     pernas e as rodas são menores que as do AD-02 — a roda toca em -72 no
+     desenho. Pernas presas em y=-22: centro da roda em -22-curso. */
+  TREM: { dianteira: { z: 150, curso: 35, raio: 15 }, principal: { x: 50, z: -44, curso: 31, raio: 19 } }
 };
 
 function montaTerceiro(corCorpo, corDetalhe, corVidro, simples){
@@ -13381,12 +13386,20 @@ function montaTerceiro(corCorpo, corDetalhe, corVidro, simples){
     const dentro = new THREE.Group();
     dentro.scale.x = lado;
     const CM = M.CORDA_MOVEL;
-    for (const p of comFaixa(M.asa, 0, PONTA, CM, tinta('painel'), 6)) dentro.add(p);
+    /* A FAIXA TRANSVERSAL da ficha: uma banda amarela atravessando o painel
+       de bordo a bordo no meio da envergadura. Ela mora exatamente no vão
+       entre o flape e o aileron (`M.FLAP[1]` a `M.AIL[0]`), que é a única
+       fatia do painel em que a corda inteira é fixa — assim a banda não é
+       cortada pela linha da dobradiça. */
+    const BANDA = [M.FLAP[1], M.AIL[0]];
+    for (const p of comFaixa(M.asa, 0, BANDA[0], CM, tinta('painel'), 4)) dentro.add(p);
+    dentro.add(pedacoDeAsa(M.asa, BANDA[0], BANDA[1], 0, CM, mAmarelo, 2, 10));
+    for (const p of comFaixa(M.asa, BANDA[1], PONTA, CM, tinta('painel'), 3)) dentro.add(p);
     dentro.add(pedacoDeAsa(M.asa, PONTA, 1, 0, CM, tinta('ponta'), 2, 10, true));
     /* O QUE SOBRA ATRÁS DA LINHA DA DOBRADIÇA e não é aba: o pedacinho antes
-       do flape, o vão entre flape e aileron e a ponta. Eram buracos — de
-       cima se via o céu por três dentes no bordo de fuga. */
-    for (const [t0, t1, mat, pt] of [[0, M.FLAP[0], tinta('painel')], [M.FLAP[1], M.AIL[0], tinta('painel')],
+       do flape, o vão entre flape e aileron (a banda amarela) e a ponta.
+       Eram buracos — de cima se via o céu por três dentes no bordo de fuga. */
+    for (const [t0, t1, mat, pt] of [[0, M.FLAP[0], tinta('painel')], [M.FLAP[1], M.AIL[0], mAmarelo],
                                      [M.AIL[1], PONTA, tinta('painel')], [PONTA, 1, tinta('ponta'), true]])
       dentro.add(pedacoDeAsa(M.asa, t0, t1, CM - 0.005, 1, mat, 2, 5, pt));
     /* A RAIZ GROSSA DO PAINEL: o painel entra por dentro da luva com o mesmo
@@ -13946,7 +13959,7 @@ function montaTerceiro(corCorpo, corDetalhe, corVidro, simples){
       /* a bequilha e as duas principais, estas saindo da barriga das
          NACELES (x=±50), que é onde o trem mora num bimotor de naceles
          afastadas. As pernas são as da ficha: curtas, o avião baixo. A roda
-         toca em -82 no desenho (`roda` em MEDIDAS_TERCEIRO, já na escala). */
+         toca em -72 no desenho (`roda` em MEDIDAS_TERCEIRO, já na escala). */
       const TD = M.TREM.dianteira, TP = M.TREM.principal;
       trem.add(perna({ x: 0, z: TD.z, curso: TD.curso, raio: TD.raio, gemeas: 8.5, dianteira: true }));
       trem.add(perna({ x: -TP.x, z: TP.z, curso: TP.curso, raio: TP.raio }));
