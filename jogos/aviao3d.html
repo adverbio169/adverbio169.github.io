@@ -15383,8 +15383,12 @@ function poeCamera(dt){
        A do capacete sai do mesmo ponto e recua, que é como a câmera de verdade
        fica: atrás e acima da cabeça. */
     const olho = MEDIDAS.cabine;
-    const fr = olho.frente - (vAtual.tras || 0);
-    const ci = olho.cima + (vAtual.cima || 0);
+    /* o recuo da câmera do capacete é medido na cabine do AD-02: na cabine
+       encolhida do terceiro avião ele encolhe junto, senão a câmera sai
+       por cima da capota e o piloto vê o vidro por fora */
+    const eC = MEDIDAS.escala || 1;
+    const fr = olho.frente - (vAtual.tras || 0)*eC;
+    const ci = olho.cima + (vAtual.cima || 0)*eC;
     camPos.set(aviaoX + eixoF.x*fr + eixoC.x*ci,
                aviaoY + eixoF.y*fr + eixoC.y*ci,
                aviaoZ + eixoF.z*fr + eixoC.z*ci);
@@ -15503,7 +15507,10 @@ function poeCamera(dt){
      e por isso ele NÃO desce nas outras duas: a de fora não precisa, e a do
      capacete tem o apoio de cabeça em cima da lente — é justamente o corte em
      40 que a limpa. */
-  const perto = VISTAS[nVista].perto || CAM_PERTO;
+  /* o corte de perto das vistas de dentro é medido na cabine do AD-02; o
+     terceiro avião tem a mesma cabine encolhida (`MEDIDAS.escala`), e o
+     corte encolhe junto — senão ele come o painel. Sem escala, é 1. */
+  const pv = VISTAS[nVista].perto, perto = pv ? pv*(MEDIDAS.escala || 1) : CAM_PERTO;
   if (cam.near !== perto){ cam.near = perto; cam.updateProjectionMatrix(); }
   cam.up.set(vista.C.x, vista.C.y, vista.C.z);
   cam.lookAt(camPos.x + vista.F.x*1000, camPos.y + vista.F.y*1000, camPos.z + vista.F.z*1000);

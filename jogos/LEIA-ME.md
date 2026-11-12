@@ -907,6 +907,90 @@ para a cabine do dragão e nada mais muda.
 
 ---
 
+## O terceiro avião: o "Caça novo" (nome provisório)
+
+O dono adorou o caça azul e amarelo de uma ilustração do ChatGPT (o caça
+parado no hangar) e mandou a ficha técnica dele. Primeiro o AD-02 foi
+redesenhado por ela; depois veio a decisão: **o AD-02 não muda**, o desenho
+novo vira um **terceiro avião** na garagem, ao lado do AD-02 e do dragão.
+
+### O que ele é
+
+- **Cotas da ficha** (20 unidades = 1 m): 16,0 m de comprimento (320),
+  12,2 m de envergadura aberta (244), 4,8 m de altura do chão à ponta das
+  derivas (96). Medido no modelo montado: 320 x 248 (com as luzes) x 97.
+- **Nariz** em cone amarelo pontudo com *chines* (aresta viva lateral) e uma
+  faixa amarela correndo pelo vinco até a tomada.
+- **Cabine** em bolha, vidro escuro e moldura escura. É a cabine do AD-02,
+  copiada, com o avião inteiro encolhido (ver "escala" abaixo).
+- **Duas tomadas** laterais grandes, quase retangulares, inclinadas, com a
+  borda amarela; duas naceles até dois bocais grandes (os mesmos bocais
+  variáveis e vetorados do AD-02).
+- **Duas derivas** inclinadas 17° para fora, azuis com faixa e ponta
+  amarelas, **cada uma com o seu leme**; os dois giram juntos.
+- **Asa variável de 18°, 38° e 58°**, como na ficha: desenhada aberta a 18°,
+  com curso de 0,8 do curso do jogo (`asaVarre`), nasce de um LERX amarelo;
+  faixa amarela atrás do bordo de ataque, banda amarela transversal no meio
+  do painel e ponta amarela. Estabilizadores com ponta amarela.
+- **Trem** com bequilha de rodas gêmeas e duas pernas principais saindo das
+  naceles, mais curto que o do AD-02 (o avião é baixo).
+- **Os inimigos não mudam**: com o terceiro na garagem, eles continuam sendo
+  o AD-02. Os outros jogadores na rede aparecem com o avião escolhido.
+- **Cabine pintada**: ele usa a arte de cabine do AD-02 (`arteDaCabine`
+  agora pergunta `tipoDeAviao !== 'dragao'`).
+
+### A escala
+
+A cabine do AD-02 tem 108 de comprimento e centenas de números próprios
+(banco, painel, pernas, HUD). Em vez de redesenhá-la para um avião de 320, o
+terceiro é **desenhado na escala da cabine (500 de comprimento) e encolhido
+por 0,64** no fim de `montaTerceiro` — a escala vai para cada filho (o
+`poeMalha` reescreve a matriz do avião e jogaria fora uma escala no grupo).
+Tudo o que o jogo lê sai em `MEDIDAS_TERCEIRO` já na escala do jogo: roda,
+olho do piloto, fogo, pivô e ponta da asa, marca das derivas. O vidro do HUD
+(`combinador`) é encolhido em número. Duas coisas do jogo passaram a ler a
+escala, e valem 1 para os outros dois aviões: o recuo da câmera do capacete
+e o corte de perto das vistas de dentro. E a câmera de perseguição chega
+mais perto dele (`MEDIDAS.camera` = 0,78).
+
+### Onde mora
+
+Tudo em `jogos/aviao3d.modelo.html` (rodar `montar.py` depois):
+
+- `MEDIDAS_TERCEIRO` (logo depois de `MEDIDAS_CACA`);
+- o bloco `O TERCEIRO AVIÃO` antes de `fazForma`: `anelDeSecao3`,
+  `pontoNoCasco3`, `secaoEm3`, `fuselagem3`, `faixaNoCasco3`,
+  `convesDaCabine3` (cópias das do AD-02 com a quina dos chines), a tabela
+  `TERCEIRO` e `montaTerceiro`;
+- `montaDragao(..., tipo)` despacha `'terceiro'`; a capa tem o botão
+  `btTerceiro` ("✈ Caça novo"); o `localStorage` aceita `'terceiro'`;
+- `giroDaAsa` (curso da asa por avião), o laço dos lemes em `arruma`
+  (`comandos.lemes`), `montaDragao` soltando os dois lemes, a marca das
+  derivas na rede (`marcaDeriva`), `MEDIDAS.camera` e `MEDIDAS.escala`.
+
+O AD-02 ficou **idêntico** ao commit `b12704b`: `montaAD02`, a tabela `AD02`,
+`MEDIDAS_CACA` e todas as funções que ele usa batem byte a byte, e as fotos
+do modelo montado saem pixel a pixel iguais.
+
+### Para desfazer
+
+Tirar o botão `btTerceiro` da capa e o `'terceiro'` da validação do
+`localStorage` basta para ninguém chegar nele. Para apagar de vez: o bloco
+`O TERCEIRO AVIÃO`, `MEDIDAS_TERCEIRO` e o ramo `'terceiro'` de `montaDragao`
+e de `montaGaragem`; o resto (`giroDaAsa`, `lemes`, `camera`, `escala`) é
+neutro para os outros aviões e pode ficar.
+
+### O que ficou diferente da ficha
+
+- A cabine é a do AD-02 encolhida: a bolha sai maior e o corpo embaixo dela
+  mais fundo que na ficha, onde o caça é mais esguio. Com isso as derivas
+  ficaram mais baixas do que a ficha mostra, para caber nos 4,8 m.
+- Sem armamento, sem as inscrições e sem o logotipo da ficha.
+- Ao fechar a asa a 58°, a raiz do painel mostra um dentinho na quina da
+  luva, visível só de cima e de perto.
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
