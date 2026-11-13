@@ -1246,6 +1246,68 @@ antiga de `mCab`, a aba e o trilho escuros, e as peças novas não nascem.
 
 ---
 
+## A vista do capacete ganhou a pintura dela
+
+**O que mudou.** No caça e no terceiro, a vista do CAPACETE (a terceira do
+botão de vista) deixou de mostrar o avião 3D e passou a mostrar a arte 2D
+feita para ela: o arco inteiro da canópia, o painel com três telas e três
+luzes, as manetes, o manche, o flape, a alavanca do trem e o encosto do
+banco. Ela faz o que a pintura da CABINE já fazia:
+
+- as três telas são **furo** e o instrumento vivo é desenhado por baixo,
+  inclinado junto com a moldura;
+- as três luzes do topo são o **trem**: apagadas recolhido, âmbar piscando em
+  trânsito, verdes baixado;
+- as **peças mexem**: o manche inclina ±0,40 rad e encurta 20% puxado (em
+  volta do colarinho, para não sair de cima da coifa); as manetes correm pelo
+  trilho com a potência (a arte as mostra no meio, que é a potência 0,5); o
+  flape anda um dente por posição; o trem tomba e desce quando baixa;
+- o **HUD** termina acima da chapa, a **tarja de alarme** vai por cima da
+  caixa das luzes (nunca atrás da pintura), tocar numa tela pintada **pega a
+  tela**, o **acelerador de dedo** mora em cima das manetes, a pintura
+  **treme** com o avião e **esmaece** quando se vira a cabeça;
+- **enquadramento**: na TV a arte entra inteira, com o arco da canópia
+  cabendo; no celular deitado ela é aproximada — painel a 44% da altura e as
+  placas das alavancas no rodapé — e o arco e o banco saem pelas bordas.
+
+O dragão não mudou: o capacete dele continua em 3D. Se a arte não carregar,
+volta o painel 3D da seção anterior (`PAINEL_ARTE`), que ficou como estava.
+
+**Como a arte foi montada (e por que assim).** Peças geradas em separado e
+coladas por cima "parecem coladas" — já foi recusado. Então a **base é a
+própria arte montada**, e cada peça que mexe é um **recorte dela** (só a
+parte que anda: a alavanca, nunca a placa do trilho), por polígono medido
+numa grade por cima da arte. Parada, base + peça é a arte original. O buraco
+que a peça deixa ao andar foi tapado, só ali dentro, com a versão **vazia**
+da mesma arte, deslocada de 0 a 3 px para casar com a montada em volta de
+cada peça (as duas não são iguais pixel a pixel). As peças soltas grandes não
+foram usadas. Tudo isso está no scratchpad (`capacete2/gera.js` e
+`capacete2/pecas.js`, com os polígonos).
+
+**Onde mora.** `jogos/capacete-caca.webp` (a base: magenta transparente e as
+telas furadas, 98 KB) e `jogos/capacete-caca-{trem,manetes,flape,manche}.webp`
+(as peças, 13 KB juntas), embutidas pelo `montar.py`. No
+`aviao3d.modelo.html`, a seção "O CAPACETE PINTADO" (logo depois de
+`telasDaCabine`): `CAPACETE_PINTADO`, `CAP_CACA` (telas, luzes, peças, caixa
+das manetes, lugar da tarja), `capaceteCaca`, `vistaDoCapacete` e
+`kitDaArte`, que diz qual kit é a arte e deixa `topoDaCabine`,
+`telasDaCabine`, `desenhaCabineCaca` e `aceleradorNaManete` servirem às duas
+pinturas. As peças mexem em `pecasDoCapacete`; o enquadramento está no
+começo de `caixaCabinePintada`. `usaCabinePintada` e `arteDaCabine`
+passaram a responder também na vista do capacete — é por isso que o HUD, a
+tarja, o toque, o acelerador, o tremor e o esmaecer vieram de graça.
+
+**Ficou diferente da arte.** Movida, cada peça deixa à mostra o desenho da
+arte vazia, que não é o mesmo da montada: atrás da alavanca do trem aparece
+uma placa de ponta (a da arte vazia), e as fendas das manetes têm um degrau
+miúdo onde as duas artes se encontram. A tarja de alarme tapa as luzes do
+trem enquanto apita. No celular o arco da canópia não aparece inteiro.
+
+**Para desfazer:** `const CAPACETE_PINTADO = false;` — a vista do capacete
+volta a ser 3D em todos os aviões, e a cabine não muda nada.
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
