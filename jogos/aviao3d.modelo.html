@@ -3444,6 +3444,23 @@ function capaceteCaca(){
 function vistaDoCapacete(){
   return !cockpit && !!VISTAS[nVista].preso;
 }
+/* AS TRÊS LUZES DO PARA-SOL, uma por função. Valem para as duas pinturas
+   (cabine e capacete) e para o painel 3D (`acendeLuzesTrem`):
+   - TREM:  apagada recolhido, âmbar piscando em trânsito, verde baixado;
+   - FLAPE: apagada recolhido, âmbar piscando enquanto anda, verde baixado;
+   - PÓS:   verde com a pós-combustão acesa, âmbar piscando quando a carga
+            do nitro está acabando (abaixo de 20%), apagada no resto.
+   Para voltar aos "três verdes" do trem: devolver sempre o trem nas três. */
+const LUZES_NOMES = ['TREM', 'FLAPE', 'PÓS'];
+function estadoDasLuzes(){
+  const pisca = (performance.now() % 500) < 280;
+  const tA = tremAnim || 0;
+  const trem = tA > 0.97 ? 'verde' : (tA > 0.03 && pisca) ? 'ambar' : null;
+  const fA = flapAnim || 0, fAlvo = flap || 0;
+  const flape = Math.abs(fA - fAlvo) > 0.03 ? (pisca ? 'ambar' : null) : (fAlvo > 0 ? 'verde' : null);
+  const pos = turbinando ? 'verde' : (nitroCarga < 20 && pisca ? 'ambar' : null);
+  return [trem, flape, pos];
+}
 function desenhaCabineCaca(img, c){
   const K = kitDaArte(img) || CAB_CACA;
   const PECA = K === CAP_CACA ? _capCacaPeca : _cabCacaPeca;
@@ -3474,17 +3491,26 @@ function desenhaCabineCaca(img, c){
   }
   _mfdEscala = escAntes; _mfdFisico = fisAntes; _mfdMudo = mudoAntes;
   h2.drawImage(img, c.x, c.y, c.l, c.a);
-  /* --- OS TRÊS VERDES ---------------------------------------------------- */
-  const tA = tremAnim || 0;
-  const acesa = tA > 0.97 ? 'rgba(70,255,130,.92)'
-              : (tA > 0.03 && (performance.now() % 500) < 280) ? 'rgba(255,150,54,.95)' : null;
-  if (acesa && vivo){
+  /* --- AS TRÊS LUZES: TREM, FLAPE, PÓS -------------------------------------
+     Uma luz por função (pedido do dono), cada uma com o nome embaixo. */
+  if (vivo){
+    const est = estadoDasLuzes();
     h2.save();
-    h2.shadowColor = acesa; h2.shadowBlur = 14*k; h2.fillStyle = acesa;
-    for (const [x, y, w, h] of K.luzes) h2.fillRect(X(x + 4), Y(y + 4), (w - 8)*k, (h - 8)*k);
+    K.luzes.forEach(([x, y, w, h], i) => {
+      const cor = est[i] === 'verde' ? 'rgba(70,255,130,.92)' : est[i] === 'ambar' ? 'rgba(255,150,54,.95)' : null;
+      if (cor){ h2.shadowColor = cor; h2.shadowBlur = 14*k; h2.fillStyle = cor;
+                h2.fillRect(X(x + 4), Y(y + 4), (w - 8)*k, (h - 8)*k); }
+      /* o nome dentro da própria luz: escuro sobre a luz acesa, claro sobre a apagada */
+      h2.shadowBlur = 0;
+      h2.font = '700 ' + Math.max(6, 9.5*k).toFixed(1) + 'px ui-monospace, Menlo, Consolas, monospace';
+      h2.textAlign = 'center'; h2.textBaseline = 'middle';
+      h2.fillStyle = cor ? 'rgba(10,20,14,.85)' : 'rgba(255,214,190,.55)';
+      h2.fillText(LUZES_NOMES[i], X(x + w/2), Y(y + h/2 + 0.5));
+    });
     h2.restore();
   }
   /* --- AS PEÇAS ---------------------------------------------------------- */
+  const tA = tremAnim || 0;      // a alavanca do trem segue a animação dele
   const e = vivo ? eixos() : { lat: 0, ver: 0 };
   const peca = (nome, tf) => {
     const im = PECA[nome];
@@ -4189,9 +4215,12 @@ function vestePainelArte(g, mCab, mCabFio){
   /* o rebaixo escuro onde as luzes moram, e as luzes */
   g.add(luzNaCabine(naAba(new THREE.Mesh(new THREE.BoxGeometry(7.8, 0.78, 0.06), mCab),
                           0, -0.04, Z0 - 0.27), 0.22));
-  const mLuzTrem = new THREE.MeshBasicMaterial({ color: 0x381613 });
-  for (const x of [-2.55, 0, 2.55])
-    naAba(new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.56, 0.06), mLuzTrem), x, -0.04, Z0 - 0.31);
+  /* uma tinta por luz (TREM, FLAPE, PÓS): a fusão por cor agrupa pelo
+     OBJETO do material, então as três continuam separadas e cada uma acende
+     sozinha */
+  const mLuzTrem = [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ color: 0x381613 }));
+  [-2.55, 0, 2.55].forEach((x, i) =>
+    naAba(new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.56, 0.06), mLuzTrem[i]), x, -0.04, Z0 - 0.31));
   for (const x of [-4.9, 4.9])
     g.add(luzNaCabine(naAba(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.1), mCab), x, -0.2, Z0 - 0.27), 1.4));
 
@@ -4243,9 +4272,9 @@ function tinge(no, rgb){
    apagadas com ele recolhido, âmbar piscando em trânsito, verdes com ele
    baixado. É uma tinta só para as três, então mudar a cor dela é mudar as
    três sem tocar em malha. */
-function acendeLuzesTrem(m, tA){
-  m.color.setHex(tA > 0.97 ? 0x46ff82
-               : (tA > 0.03 && (performance.now() % 500) < 280) ? 0xff9636 : 0x381613);
+function acendeLuzesTrem(m){
+  const est = estadoDasLuzes();
+  [].concat(m).forEach((mat, i) => mat.color.setHex(est[i] === 'verde' ? 0x46ff82 : est[i] === 'ambar' ? 0xff9636 : 0x381613));
 }
 
 /* a lona dos CONSOLES: a face de cima das duas bancadas. Mesma ideia do
@@ -12687,7 +12716,7 @@ function arruma(){
     for (const r2 of aviao.userData.rotores) r2.rotation.z -= giro;
   }
   tremAnim += ((trem ? 1 : 0) - tremAnim) * 0.10;
-  if (aviao.userData.luzesTrem) acendeLuzesTrem(aviao.userData.luzesTrem, tremAnim);
+  if (aviao.userData.luzesTrem) acendeLuzesTrem(aviao.userData.luzesTrem);
   tremNo.visible = tremAnim > 0.02;
   if (tremNo.visible){
     tremNo.scale.set(1, Math.max(0.03, tremAnim), 1);   // recolhe encolhendo para dentro do poço

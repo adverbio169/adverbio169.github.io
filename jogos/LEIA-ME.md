@@ -1308,6 +1308,24 @@ volta a ser 3D em todos os aviões, e a cabine não muda nada.
 
 ---
 
+## As três luzes do painel: uma por função
+
+As três luzes do para-sol (na cabine pintada, na vista do capacete e no
+painel 3D) eram as três do trem. A pedido do dono, cada uma ganhou uma função
+e o nome escrito dentro dela:
+
+- **TREM:** apagada recolhido, âmbar piscando em trânsito, verde baixado.
+- **FLAPE:** apagada recolhido, âmbar piscando enquanto anda, verde baixado.
+- **PÓS:** verde com a pós-combustão acesa, âmbar piscando com o nitro abaixo
+  de 20%, apagada no resto.
+
+Onde mora: `estadoDasLuzes()` e `LUZES_NOMES`, logo antes de
+`desenhaCabineCaca`, usados pela pintura e por `acendeLuzesTrem` (o painel 3D
+ganhou uma tinta por luz). Teste: `luzes3.js`. Para desfazer: devolver o
+estado do trem nas três posições de `estadoDasLuzes()`.
+
+---
+
 ## O que está em aberto
 
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
