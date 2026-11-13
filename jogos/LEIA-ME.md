@@ -1326,8 +1326,56 @@ estado do trem nas três posições de `estadoDasLuzes()`.
 
 ---
 
+## O HUD sem a caixa das réguas, e dentro do vidro
+
+Pedido do dono: "essa barrinha tipo régua não tá legal" e, logo depois, "as
+informações da régua ficam, tira só o sombreado que faz a forma da régua". E:
+"o HUD tem que encaixar no vidro, o HUD da cabine tá passando".
+
+- **As réguas sem caixa.** A bússola (fita do rumo) e a fita da altitude
+  perderam só a tarja escura e o contorno verde. Riscos, NO/N/NE, o número do
+  rumo, os números da altitude, o variômetro, o ponteiro e as setas de alvos e
+  pistas com a distância continuam. Para ler contra nuvem, o texto ganhou um
+  contorno escuro fino (`textoNoCeu`) e os riscos uma sombra de 2 px.
+- **As três vistas iguais.** Mira, escada de arfagem e G passaram a existir
+  também na vista de fora e no capacete (eram só da cabine). A cruz do míssil e
+  da nuclear agora sai da projeção do cano, como a da metralhadora: no meio da
+  tela ela ficava atrás do painel desde que a câmera da cabine olha 7° para
+  baixo.
+- **O HUD cabe no vidro** (CABINE e CAPACETE do caça e do terceiro). Cada
+  kit de pintura ganhou `vidro` (o polígono do vidro em pixel da arte, entre as
+  colunas do arco e acima do painel, medido no magenta e encolhido 10 px) e
+  `hud` (a caixa dos números dentro dele). `calculaAreaVidro()` leva os dois
+  para a tela com a mesma conta da pintura (caixa, tremor do quadro,
+  `hudDX/hudDY`), e todo o HUD é desenhado com recorte nesse polígono
+  (`abreVidro`/`fechaVidro`). A escada fica mais estreita, os números se
+  arrumam na caixa, e a mira, quando o nariz cai atrás do painel, encosta na
+  borda de dentro com o anel tracejado (batente). Alarmes, tarja, avisos e as
+  janelas das telas ficam de fora do recorte. Com a cabeça virada (pintura
+  abaixo da metade) e no dragão, o HUD segue o vidro 3D de antes.
+
+Onde mora: `REGUA_COM_FUNDO`, `textoNoCeu`, `bussola`, `fitaAltura`;
+`CAB_CACA.vidro/hud`, `CAP_CACA.vidro/hud`; o bloco "O HUD CABE NO VIDRO"
+(`HUD_NO_VIDRO`, `calculaAreaVidro`, `abreVidro`, `cabeNoVidro`) logo depois de
+`calculaVidroHUD`; e `desenhaHUD`. Medida do vidro: `scratchpad/hud2/mede-vidro.js`.
+Teste: `scratchpad/hud2/teste.js` (pixels do HUD fora do vidro: 74.369 antes,
+0 depois).
+
+Para desfazer: `REGUA_COM_FUNDO = true` traz as caixas de volta;
+`HUD_NO_VIDRO = false` desliga o recorte e a caixa volta a ser a do
+combinador. A mira, a escada e o G nas três vistas voltam a ser só da cabine
+trocando `if (cockpit || (jogando && !caindo))` por `if (cockpit)` em
+`desenhaHUD`.
+
+---
+
 ## O que está em aberto
 
+- **A mira das vistas de dentro vive no batente.** Voando reto, o nariz cai na
+  borda do para-sol pintado (cabine) ou atrás dele (capacete), então o anel
+  fica quase sempre encostado na borda de baixo do vidro, tracejado. Só some
+  o batente mudando o enquadramento da câmera ou da pintura, que é decisão do
+  dono.
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
 - **A página APROX não baixa o trem.** Na final você está nela e precisa rolar
   até a SINÓT. O checklist TREM/FLAPE/VEL já está lá; falta deixar tocar.
