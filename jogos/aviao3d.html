@@ -154,7 +154,19 @@
                background-color:rgba(38,10,8,.78)}
   .dedoM{overflow:hidden;
          width:min(13vw,58px);height:min(56vh,200px);top:46%;transform:translateY(-50%)}
-  #dAcel{right:calc(8px + env(safe-area-inset-right))}
+  /* O ACELERADOR NA BORDA ESQUERDA, O NITRO NA DIREITA. "O controle do
+     celular e do cockpit têm que ter a mesma ordem. Exemplo: acelero na
+     direita e o manche mexe o da esquerda." Na cabine pintada as manetes
+     ficam à esquerda, e lá o acelerador já é a zona em cima delas
+     (`aceleradorNaManete`); fora da cabine a tira morava na borda direita, e
+     a mão trocava de lado ao trocar de vista. Agora as duas tiras só
+     trocaram de borda: têm a mesma largura (`.dedoM`), e o seletor de arma e
+     o FOGO já se afastam das bordas por essa largura, então nada passa a se
+     sobrepor. O seletor fica à esquerda, com o acelerador — o polegar da
+     manete é o que arrasta —, e o FOGO e a DEFESA à direita, com o nitro:
+     tudo que se APERTA mora no polegar direito. Para desfazer, troque `left`
+     e `right` destas duas regras (e da `#dNitro`, logo abaixo). */
+  #dAcel{left:calc(8px + env(safe-area-inset-left))}
   /* O ACELERADOR EM CIMA DA MANETE PINTADA. "O HUD do cockpit tava passando
      por cima do painel" — e era isto: a barra de potência cobria a cabine e
      dizia a mesma coisa que as manetes pintadas e a tela MOTOR já dizem.
@@ -185,7 +197,7 @@
     color:#dff1ff}
   #dedos.semCara > #dNitro.ligado > *, #dedos.semCara > #dChama:active > *,
   #dedos.semCara > #dArma.trocou > *{opacity:1}
-  #dNitro{left:calc(8px + env(safe-area-inset-left));display:flex;align-items:center;justify-content:center}
+  #dNitro{right:calc(8px + env(safe-area-inset-right));display:flex;align-items:center;justify-content:center}
   #dAcelBarra{position:absolute;left:0;right:0;bottom:0;height:70%;
               background:linear-gradient(0deg,rgba(94,255,154,.28),rgba(94,255,154,.52));
               border-top:2px solid #5eff9a}
@@ -9831,6 +9843,10 @@ function usaCabinePintada(){
       um terço da tela de céu — então ali ela é APROXIMADA: o topo do painel
       fica a 46% da altura e as alavancas aparecem pela ponta. Foi escolhido
       vendo as duas fotos lado a lado.
+      (Depois o dono achou que o painel "ocupa muito a tela", e o quadro
+      passou a ser escolhido pela altura do topo do painel, mais baixo, na TV
+      e no celular — ver "MAIS CÉU NA CABINE E NO CAPACETE PINTADOS". Os
+      números de cima continuam valendo com `ENQUADRA_PADRAO = 'HOJE'`.)
 
    As três luzes do para-sol são o TREM: apagadas com ele recolhido, piscando
    em trânsito, verdes com ele baixado e travado — os "três verdes" de sempre.
@@ -9856,6 +9872,13 @@ const CAB_CACA = {
   /* a caixa das duas manetes, em fração da arte: é em cima dela que o
      acelerador de dedo vai morar (`aceleradorNaManete`) */
   manetes: { x: 223/1672, y: 668/941, w: 187/1672, h: 193/941 },
+  /* O ARCO SAI POR CIMA DA FOLHA: as duas colunas da canópia batem na borda
+     de cima, e chegam lá deitando 1,2 px de lado por px de altura (medido na
+     arte: a coluna da esquerda vai de 214-336 na linha 0 a 195-306 na 20; a
+     da direita, espelhada). Com o quadro mais baixo (`ENQUADRAMENTOS`), é
+     esta inclinação que `prolongaArco` usa para continuar as colunas até o
+     alto da tela, e `calculaAreaVidro` para subir o vidro junto. */
+  arco: 1.2,
   /* O VIDRO, em pixel da arte: o magenta ligado ao meio do céu, entre as
      colunas do arco e acima do painel, encolhido 10 px para dentro da
      moldura e amostrado de 48 em 48 colunas (scratchpad/hud2/mede-vidro.js;
@@ -10057,6 +10080,7 @@ function desenhaCabineCaca(img, c){
   }
   _mfdEscala = escAntes; _mfdFisico = fisAntes; _mfdMudo = mudoAntes;
   h2.drawImage(img, c.x, c.y, c.l, c.a);
+  if (K.arco) prolongaArco(img, c, K);
   /* --- AS TRÊS LUZES: TREM, FLAPE, PÓS -------------------------------------
      Uma luz por função (pedido do dono), cada uma com o nome embaixo. */
   if (vivo){
@@ -10145,7 +10169,113 @@ function pecasDoCapacete(peca, e, tA, k){
    para-sol, medido nas três proporções de tela). Dali para baixo a pintura é
    opaca: nada do HUD pode ser desenhado atrás. */
 const CAB_PINT_TOPO = 0.449;
+/* =========================================================================
+   MAIS CÉU NA CABINE E NO CAPACETE PINTADOS
+
+   Dois pedidos do dono, que são o mesmo defeito visto de dois lados:
+     "Achei a visão do capacete muito embaixo."
+     "Acho que também o cockpit ocupa muito a tela."
+   Medido antes de mexer, em voo reto: o topo do painel (o para-sol, no meio)
+   ficava a 35% da altura na cabine da TV, 46% na do celular, 40% no
+   capacete da TV e 44% no do celular. Era painel em dois terços da tela, e a
+   mira — que marca para onde o nariz aponta, a 39% (cabine) e 47%
+   (capacete) da altura — caía ATRÁS do painel nas quatro: vivia encostada no
+   batente de baixo do vidro, tracejada.
+
+   AS DUAS HIPÓTESES FORAM TESTADAS (scratchpad/lados/).
+   1. Subir a câmera do capacete (`VISTAS`, `cima`). Não muda nada do que
+      incomoda: a pintura é um quadro colado na tela, fora da cena 3D, e a
+      câmera só mexe o mundo por TRÁS dela. O horizonte e a mira estão no
+      infinito, e subir a câmera uns metros não os desloca nem um pixel que
+      se veja. Ficou como estava (e o capacete 3D do dragão, que usa os
+      mesmos números, também).
+   2. Descer o quadro da pintura. É isto que "subir o olho" quer dizer numa
+      pintura: o painel desce na tela, o arco da canópia desce junto e o que
+      sobra em cima é céu. É o que está aqui.
+
+   COMO A CAIXA É ESCOLHIDA. Uma fração só manda: onde o topo do painel cai
+   na tela (`ENQUADRAMENTOS`). A escala é a MENOR que ainda cobre a largura
+   com 4% de folga para o tremor — diminuir mais abriria buraco nos lados,
+   onde a arte é console até a borda — e cresce só se o rodapé da tela
+   ficasse descoberto. Ancorada pelo topo do painel, centrada na largura.
+   Na TV (16:9, a proporção da arte) a escala é a de antes, quase inteira;
+   no celular deitado também — o que muda é só a altura.
+
+   O ALTO DA CABINE. No capacete o arco fecha dentro da folha, e acima dele a
+   arte é transparente: descer o quadro só mostra céu. Na CABINE o arco sai
+   por cima da folha — as duas colunas da canópia batem na borda de cima —,
+   e descer o quadro as cortaria no meio do céu. `prolongaArco` estica a
+   primeira linha da arte para cima, inclinada como as colunas chegam à
+   borda (uns 50°), e o vidro do HUD sobe junto (`vidroAteOTopo`).
+
+   AS DUAS VARIANTES, para o dono escolher olhando:
+     A (moderada)  — a mira sai do batente nas quatro telas, com folga;
+     B (mais céu)  — o painel bem mais baixo; no celular, a cabine fica com as
+                     manetes quase fora da tela (a zona do acelerador continua
+                     em cima de onde elas estão).
+   Para comparar sem mexer no código: `aviao3d.html?enquadra=B`.
+
+   PARA DESFAZER: `ENQUADRA_PADRAO = 'HOJE'` volta exatamente ao quadro de
+   antes (os ramos antigos ficaram em `caixaAntiga`). Para escolher B, é
+   trocar o 'A' por 'B'. */
+const ENQUADRA_PADRAO = 'A';
+const ENQUADRAMENTOS = {
+  /* fração da ALTURA da tela onde fica o topo do painel, no meio */
+  A: { cabine: { tv: 0.48, cel: 0.50 }, capacete: { tv: 0.54, cel: 0.56 } },
+  B: { cabine: { tv: 0.56, cel: 0.54 }, capacete: { tv: 0.62, cel: 0.62 } }
+};
+const ENQUADRA_CABINE = (function(){
+  let v = ENQUADRA_PADRAO;
+  try { const q = (new URLSearchParams(location.search).get('enquadra') || '').toUpperCase();
+        if (q === 'HOJE' || ENQUADRAMENTOS[q]) v = q; } catch(e){}
+  return v;
+})();
+/* a fração que vale para esta tela: "cel" é o celular deitado (mais de
+   1,95:1, o mesmo corte que o quadro antigo usava), "tv" é o resto */
+function fracaoDoTopo(qual){
+  const E = ENQUADRAMENTOS[ENQUADRA_CABINE];
+  if (!E) return null;
+  return E[qual][W/H >= 1.95 ? 'cel' : 'tv'];
+}
+function caixaPeloTopo(K, f){
+  const topo = K.topo*K.A;
+  const e = Math.max(W*1.04/K.L, (H*(1 - f) + 0.02*H)/(K.A - topo));
+  return { x: (W - K.L*e)/2, y: f*H - topo*e, l: K.L*e, a: K.A*e };
+}
+/* AS COLUNAS DA CANÓPIA ATÉ O ALTO DA TELA. Quando o quadro da cabine desce
+   (`ENQUADRAMENTOS`) a folha deixa de encostar no alto da tela, e as duas
+   colunas — que saem pela borda de cima da arte — ficariam cortadas reto no
+   meio do céu. A primeira linha da arte é esticada para cima, cisalhada na
+   inclinação com que cada coluna chega à borda (`K.arco`): a da esquerda
+   anda para a direita subindo, a da direita para a esquerda. A linha tem a
+   seção da coluna com a luz e a sombra dela, então o prolongamento sai com
+   o mesmo relevo. É reto, e o arco de verdade curvaria — mas são uns cem
+   pixels, e saindo pela borda da tela ninguém vê onde ele fecharia. Entre as
+   colunas a linha é vidro (transparente), e lá nada é desenhado. */
+function prolongaArco(img, c, K){
+  const g = c.y + 2;
+  if (g <= 2) return;
+  const meio = c.x + c.l/2;
+  for (const lado of [-1, 1]){
+    const s = -lado*K.arco;             // x' = x - s*(y - c.y)
+    h2.save();
+    h2.beginPath();
+    h2.rect(lado < 0 ? meio - W*4 : meio, c.y - g - 1, W*4, g + 1.5);
+    h2.clip();
+    h2.transform(1, 0, -s, 1, s*c.y, 0);
+    h2.drawImage(img, lado < 0 ? 0 : K.L/2, 1, K.L/2, 2,
+                 lado < 0 ? c.x : meio, c.y - g, c.l/2, g + 0.5);
+    h2.restore();
+  }
+}
 function caixaCabinePintada(img){
+  const qual = img && img === _capCaca ? 'capacete' : img && img === _cabCaca ? 'cabine' : null;
+  const f = qual ? fracaoDoTopo(qual) : null;
+  if (f) return caixaPeloTopo(qual === 'capacete' ? CAP_CACA : CAB_CACA, f);
+  return caixaAntiga(img);
+}
+/* o quadro de antes, inteiro, para `ENQUADRA_PADRAO = 'HOJE'` */
+function caixaAntiga(img){
   if (img && img === _capCaca){
     /* O CAPACETE. Na TV a arte é 16:9 como a tela: entra inteira, centrada,
        com 4% de folga para o tremor — e o arco da canópia, que encosta no alto
@@ -10210,7 +10340,13 @@ function tremorDaCabine(c){
   const px = (a/26)/(2*Math.tan(cam.fov*Math.PI/360))*H;
   let x = (Math.random()-0.5)*px, y = (Math.random()-0.5)*px;
   if (c){
-    const tx = Math.max(1, (c.l - W)/2 - 1), ty = Math.max(1, (c.a - H)/2 - 1);
+    /* `ty` também não passa da sobra de BAIXO: com o quadro ancorado pelo
+       topo do painel (`ENQUADRAMENTOS`) a arte não fica mais centrada, e a
+       metade da sobra total podia ser mais do que sobra embaixo. Em cima não
+       há o que descobrir: no capacete é céu, e na cabine as colunas são
+       prolongadas até o alto (`prolongaArco`). */
+    const tx = Math.max(1, (c.l - W)/2 - 1),
+          ty = Math.max(1, Math.min((c.a - H)/2, c.y + c.a - H) - 1);
     x = tx*Math.tanh(x/tx); y = ty*Math.tanh(y/ty);
   }
   return { x, y };
@@ -15615,6 +15751,12 @@ const VISTAS = [
      tinha deixado na variável. Agora que ela é escrita por todas, o valor
      precisa estar declarado, senão o capacete mudava de enquadramento sem
      ninguém ter pedido. */
+  /* "Achei a visão do capacete muito embaixo." SUBIR A CÂMERA FOI TESTADO
+     (cima 9 -> 24) e não muda nada que se veja no capacete PINTADO: a
+     pintura é um quadro colado na tela, e a câmera só move o mundo atrás
+     dela — horizonte e mira estão no infinito e não andam. O que resolve é
+     descer o quadro da pintura (`ENQUADRAMENTOS`). Os números ficaram, e o
+     capacete 3D do dragão, que também lê daqui, não mudou. */
   { nome:'CAPACETE', preso: true, tras: 8, cima: 9, fov: 92, perto: 10, incl: 3 }
 ];
 let nVista = 0;
@@ -21890,7 +22032,17 @@ function calculaAreaVidro(){
   const c = caixaCabinePintada(img), tre = tremorDoQuadro(c);
   const k = c.l/K.L, ox = c.x + tre.x + hudDX, oy = c.y + tre.y + hudDY;
   const b = K.hud;
-  areaVidro = { poli: K.vidro.map(([x, y]) => [ox + x*k, oy + y*k]),
+  /* O VIDRO SOBE COM AS COLUNAS. Com o quadro da cabine mais baixo, a folha
+     começa abaixo do alto da tela e as colunas são prolongadas até lá
+     (`prolongaArco`); o vidro tem de ir junto, senão o HUD é cortado numa
+     linha reta no meio do céu. Os dois vértices do alto da folha (y 0) sobem
+     até passar da tela, andando para dentro na inclinação das colunas. */
+  let poli = K.vidro;
+  if (K.arco && oy > 0){
+    const h = oy/k + 4;
+    poli = poli.map(([x, y]) => y > 0 ? [x, y] : [x + (x < K.L/2 ? 1 : -1)*K.arco*h, -h]);
+  }
+  areaVidro = { poli: poli.map(([x, y]) => [ox + x*k, oy + y*k]),
                 x: ox + b[0]*k, y: oy + b[1]*k, w: (b[2] - b[0])*k, h: (b[3] - b[1])*k };
   /* a caixa dos números PASSA A SER a do vidro: tudo o que já se posicionava
      por `vidroHUD` (rumo, altitude, G, a cruz da aproximação) vem junto sem
