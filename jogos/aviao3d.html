@@ -9855,7 +9855,24 @@ const CAB_CACA = {
   },
   /* a caixa das duas manetes, em fração da arte: é em cima dela que o
      acelerador de dedo vai morar (`aceleradorNaManete`) */
-  manetes: { x: 223/1672, y: 668/941, w: 187/1672, h: 193/941 }
+  manetes: { x: 223/1672, y: 668/941, w: 187/1672, h: 193/941 },
+  /* O VIDRO, em pixel da arte: o magenta ligado ao meio do céu, entre as
+     colunas do arco e acima do painel, encolhido 10 px para dentro da
+     moldura e amostrado de 48 em 48 colunas (scratchpad/hud2/mede-vidro.js;
+     nenhum pixel do polígono cai fora do magenta). Aqui o arco sai por cima
+     da folha, então o topo é a própria borda dela. Todo o HUD da CABINE é
+     recortado aqui dentro — ver "O HUD CABE NO VIDRO". */
+  vidro: [[69,453],[117,324],[165,216],[213,129],[261,72],[309,31],[357,0],[1317,0],
+          [1365,34],[1413,76],[1461,135],[1509,223],[1557,337],[1602,453],[1602,474],
+          [1557,496],[1509,483],[1461,469],[1413,454],[1365,440],[1317,427],[1269,416],
+          [1221,405],[1173,391],[1125,378],[1077,372],[1029,362],[981,337],[933,329],
+          [741,329],[693,335],[645,360],[597,371],[549,376],[501,388],[453,402],
+          [405,414],[357,425],[309,438],[261,451],[213,466],[165,480],[117,494],[69,473]],
+  /* e a CAIXA DOS NÚMEROS dentro dele (x0, y0, x1, y1): centrada no nariz da
+     arte (x 836), com o pé 4 px acima do vidro no para-sol (329). O alto em
+     100 e não no topo da folha: com 60 a fita do rumo subia até a altura
+     dos botões do canto, longe do nariz que ela descreve. */
+  hud: [540, 100, 1132, 325]
 };
 let _cabCaca = null, _cabCacaOk = false;
 const _cabCacaPeca = {};
@@ -9960,7 +9977,19 @@ const CAP_CACA = {
   /* a sombra que a cabine põe em cada peça aqui SOBRARIA: o recorte já traz a
      dele, pintada junto, e parada ela apareceria dobrada */
   sombra: false,
-  manetes: { x: 449/1672, y: 600/941, w: 125/1672, h: 131/941 }
+  manetes: { x: 449/1672, y: 600/941, w: 125/1672, h: 131/941 },
+  /* O VIDRO de dentro do arco, medido como o da cabine (mede-vidro.js, 10 px
+     para dentro da moldura). Aqui o arco fecha dentro da folha, então o
+     polígono é fechado por ele em cima. */
+  vidro: [[344,474],[392,337],[440,247],[488,189],[536,151],[584,123],[632,104],[680,90],
+          [728,82],[776,77],[824,81],[872,81],[920,79],[968,86],[1016,97],[1064,114],
+          [1112,138],[1160,171],[1208,219],[1256,294],[1304,419],[1326,476],[1326,490],
+          [1304,496],[1256,475],[1208,456],[1160,438],[1112,422],[1064,408],[1016,396],
+          [968,389],[920,368],[872,365],[824,365],[776,366],[728,379],[680,391],[632,401],
+          [584,415],[536,429],[488,446],[440,465],[392,486],[344,491]],
+  /* a caixa dos números: os cantos de cima (590/1082, 125) ficam 2 a 4 px
+     abaixo do arco, e o pé 5 px acima do vidro no para-sol (365) */
+  hud: [590, 125, 1082, 360]
 };
 let _capCaca = null, _capCacaOk = false;
 const _capCacaPeca = {};
@@ -10223,7 +10252,8 @@ function desenhaCabinePintada(){
   aceleradorNaManete(img ? caixaCabinePintada(img) : null, op);
   if (!img || op <= 0.004) return;
   presoNaTela();
-  const c = caixaCabinePintada(img), tre = tremorDaCabine(c);
+  /* o tremor DESTE quadro, o mesmo que o vidro do HUD usou (`tremorDoQuadro`) */
+  const c = caixaCabinePintada(img), tre = tremorDoQuadro(c);
   c.x += tre.x + hudDX; c.y += tre.y + hudDY;   // presa no avião, como o HUD
   h2.globalAlpha = op;
   if (kitDaArte(img)){ desenhaCabineCaca(img, c); h2.globalAlpha = 1; return; }
@@ -19427,7 +19457,7 @@ function marcaBussola(cx, meia, y, o, cor, abaixo){
   if (vidroHUD && vidroHUD.apertado) return;
   h2.font = '700 ' + Math.max(9, hudH()*0.019).toFixed(0) + 'px ui-monospace, monospace';
   h2.textAlign = 'center';
-  h2.fillText(Math.round(longe(o.x,o.z)/METRO) + 'm', x, abaixo ? y + t*3 : y - t*1.4);
+  textoNoCeu(Math.round(longe(o.x,o.z)/METRO) + 'm', x, abaixo ? y + t*3 : y - t*1.4);
 }
 /* A ESPESSURA DAS FITAS, num lugar só.
    A bússola tinha `H*0.050` escrito aqui dentro e a fita da altura tinha
@@ -19449,6 +19479,34 @@ function grossuraFita(){ return Math.max(vidroHUD ? 10 : 26, hudH()*0.050); }
    terem contra o que se destacar. */
 function fundoDaFita(){ return vidroHUD ? 'rgba(9,15,25,.17)' : 'rgba(9,15,25,.5)'; }
 
+/* --- AS RÉGUAS SEM A CAIXA -----------------------------------------------------
+   "Essa barrinha tipo régua não tá legal." E, logo depois: "As informações da
+   régua ficam. Tira só o sombreado que faz a forma da régua."
+
+   O que o incomodava era a FORMA: a tarja escura e o contorno verde que
+   faziam da bússola e da fita da altitude duas réguas de plástico paradas no
+   céu. Os riscos, os nomes, os números, o ponteiro e as setas continuam todos
+   — é o que um HUD de verdade desenha, luz sobre o vidro, sem placa por
+   trás.
+
+   Sem a tarja, o texto não tem mais contra o que se destacar numa nuvem
+   branca. Ele ganha um contorno escuro fino (`textoNoCeu`, 1,5 px de cada
+   lado) e os riscos uma sombra de 2 px: é o que mantém a leitura sem trazer
+   a caixa de volta.
+
+   PARA DESFAZER: `REGUA_COM_FUNDO = true`, e as duas caixas voltam como eram. */
+const REGUA_COM_FUNDO = false;
+function textoNoCeu(txt, x, y){
+  h2.save();
+  h2.shadowColor = 'transparent';
+  h2.lineJoin = 'round'; h2.lineWidth = 3; h2.strokeStyle = 'rgba(3,10,18,.6)';
+  h2.strokeText(txt, x, y);
+  h2.restore();
+  h2.fillText(txt, x, y);
+}
+/* a sombra dos riscos, ligada dentro do save() de cada régua */
+function sombraDosRiscos(){ h2.shadowColor = 'rgba(0,10,18,.55)'; h2.shadowBlur = 2; }
+
 /* A BÚSSOLA RECEBE ONDE ELA MORA. Até aqui o meio e a meia-largura estavam
    escritos aqui dentro (`W/2` e `min(W*0.27, H*0.55)`), porque ela só sabia
    nascer atravessada na tela. Separados, a mesma fita serve para a tela e
@@ -19458,12 +19516,15 @@ function bussola(y, cxDado, meiaDada){
   const meia = meiaDada || Math.min(W*0.27, H*0.55);
   const cx = cxDado === undefined ? W/2 : cxDado, esp = grossuraFita();
   h2.save(); h2.textAlign = 'center';
-  h2.fillStyle = fundoDaFita();
-  h2.beginPath();
-  if (h2.roundRect) h2.roundRect(cx-meia, y-hudH()*0.028, meia*2, esp, 4);
-  else h2.rect(cx-meia, y-hudH()*0.028, meia*2, esp);
-  h2.fill();
-  h2.strokeStyle = 'rgba(120,255,170,.3)'; h2.lineWidth = 1; h2.stroke();
+  if (REGUA_COM_FUNDO){
+    h2.fillStyle = fundoDaFita();
+    h2.beginPath();
+    if (h2.roundRect) h2.roundRect(cx-meia, y-hudH()*0.028, meia*2, esp, 4);
+    else h2.rect(cx-meia, y-hudH()*0.028, meia*2, esp);
+    h2.fill();
+    h2.strokeStyle = 'rgba(120,255,170,.3)'; h2.lineWidth = 1; h2.stroke();
+  }
+  sombraDosRiscos();
   const g = rumoVisto()*180/Math.PI, base = Math.round(g/15)*15;
   for (let k = -6; k <= 6; k++){
     const abs = base + k*15, dl = anguloCurto((abs - g)*Math.PI/180);
@@ -19481,7 +19542,7 @@ function bussola(y, cxDado, meiaDada){
     if (eC){
       h2.fillStyle = card % 90 === 0 ? 'rgba(190,255,215,1)' : 'rgba(140,255,190,.75)';
       h2.font = '800 ' + Math.max(9, H*(card%90===0?0.022:0.018)).toFixed(0) + 'px system-ui, sans-serif';
-      h2.fillText(NOMES_RUMO[card/45], x, y + hudH()*0.006);
+      textoNoCeu(NOMES_RUMO[card/45], x, y + hudH()*0.006);
     }
   }
   /* O ALVO DESIGNADO vem ANTES de todos, e em magenta: é o único que o piloto
@@ -19520,7 +19581,7 @@ function bussola(y, cxDado, meiaDada){
   h2.beginPath(); h2.moveTo(cx, y-hudH()*0.030); h2.lineTo(cx-6, y-hudH()*0.044); h2.lineTo(cx+6, y-hudH()*0.044);
   h2.closePath(); h2.fill();
   h2.font = '800 ' + Math.max(10, hudH()*0.021).toFixed(0) + 'px ui-monospace, monospace';
-  h2.fillText(((Math.round(g)+360)%360).toString().padStart(3,'0') + '°', cx, y - hudH()*0.050);
+  textoNoCeu(((Math.round(g)+360)%360).toString().padStart(3,'0') + '°', cx, y - hudH()*0.050);
   h2.restore(); h2.textAlign = 'left';
 }
 
@@ -19558,6 +19619,14 @@ function fitaAlturaOnde(){
      continua a mesma — fita de altura serve para ver a altura MUDANDO, e
      isso é escala, não alcance. */
   const larg = grossuraFita();
+  /* no vidro pintado a caixa é mais alta que a do combinador, e a fita desce
+     um pouco: assim o alto dela fica abaixo das setas da bússola, que agora
+     correm soltas por baixo dos nomes */
+  if (areaVidro){
+    const folga = larg*0.5 + Math.max(26, hudH()*0.034);
+    return { cx: vidroHUD.x + vidroHUD.w - folga, cy: vidroHUD.y + vidroHUD.h*0.62,
+             meia: Math.min(vidroHUD.h*0.26, H*0.19), larg };
+  }
   if (vidroHUD){
     const folga = larg*0.5 + Math.max(26, hudH()*0.034);
     return { cx: vidroHUD.x + vidroHUD.w - folga, cy: vidroHUD.y + vidroHUD.h*0.52,
@@ -19574,13 +19643,17 @@ function fitaAltura(){
   const alt = (aviaoY - CHAO) / METRO;
 
   h2.save();
-  h2.fillStyle = fundoDaFita();
   h2.beginPath();
   if (h2.roundRect) h2.roundRect(cx - larg/2, cy - meia, larg, meia*2, 4);
   else h2.rect(cx - larg/2, cy - meia, larg, meia*2);
-  h2.fill();
-  h2.strokeStyle = 'rgba(120,255,170,.3)'; h2.lineWidth = 1; h2.stroke();
+  /* a caixa só é PINTADA com `REGUA_COM_FUNDO`; sem ela o retângulo continua
+     servindo de janela: é ele que corta os riscos nas pontas da fita */
+  if (REGUA_COM_FUNDO){
+    h2.fillStyle = fundoDaFita(); h2.fill();
+    h2.strokeStyle = 'rgba(120,255,170,.3)'; h2.lineWidth = 1; h2.stroke();
+  }
   h2.clip();
+  sombraDosRiscos();
 
   const base = Math.round(alt/10)*10;
   const rotulos = [];
@@ -19611,7 +19684,7 @@ function fitaAltura(){
   h2.font = '800 ' + Math.max(9, hudH()*0.016).toFixed(0) + 'px system-ui, sans-serif';
   for (const [v, y, chao] of rotulos){
     h2.fillStyle = chao ? 'rgba(255,200,170,1)' : 'rgba(140,255,190,.8)';
-    h2.fillText(String(v), cx + larg/2 + 5, y + 4);
+    textoNoCeu(String(v), cx + larg/2 + 5, y + 4);
   }
   h2.restore();
 
@@ -19625,13 +19698,13 @@ function fitaAltura(){
   h2.font = '800 ' + Math.max(10, hudH()*0.021).toFixed(0) + 'px ui-monospace, monospace';
   const m = Math.max(0, Math.round(alt));
   h2.fillStyle = m < 25 ? 'rgba(255,150,120,1)' : 'rgba(230,245,255,.95)';
-  h2.fillText(m + 'm', cx - larg/2 - 17, cy + 5);
+  textoNoCeu(m + 'm', cx - larg/2 - 17, cy + 5);
   // e a razão de subida, embaixo da fita: é o que diz se o chão está chegando
   const vsi = Math.round(subida / METRO);
   h2.textAlign = 'center';
   h2.font = '700 ' + Math.max(9, hudH()*0.016).toFixed(0) + 'px ui-monospace, monospace';
   h2.fillStyle = 'rgba(140,255,190,.85)';
-  h2.fillText((vsi >= 0 ? '+' : '') + vsi + ' m/s', cx, cy + meia + Math.max(13, hudH()*0.028));
+  textoNoCeu((vsi >= 0 ? '+' : '') + vsi + ' m/s', cx, cy + meia + Math.max(13, hudH()*0.028));
   h2.restore(); h2.textAlign = 'left';
 }
 
@@ -21765,6 +21838,105 @@ function calculaVidroHUD(){
                apertado: (x1 - x0) < l - 1 };
 }
 function presoNoVidro(){ if (vidroHUD) presoNaTela(); else presoNoAviao(); }
+
+/* =============================================================================
+   O HUD CABE NO VIDRO
+
+   "O HUD tem que encaixar no vidro. O HUD da cabine tá passando."
+
+   Passava porque o HUD não sabia onde o vidro estava. A caixa dele saía do
+   combinador da cabine de MALHA — invisível com a pintura na tela — e só
+   tinha uma regra: acabar acima da chapa. A escada de arfagem nem caixa
+   tinha: ia de 6% a 78% da tela, e no celular subia até debaixo dos botões
+   e descia para trás do painel. A pintura, desenhada por último, tapava o
+   que caía na chapa; o que caía na moldura e nas colunas ficava por cima,
+   flutuando fora do avião.
+
+   Agora cada pintura diz onde está o vidro dela (`vidro`, no kit, em pixel
+   da arte) e onde ficam os números (`hud`, uma caixa dentro dele). Isso é
+   levado para a tela com a MESMA conta da pintura — a caixa dela, o tremor
+   deste quadro e o deslocamento da cabeça (`hudDX`, `hudDY`) —, então o
+   vidro anda e treme junto com a moldura em qualquer tela. E todo o HUD das
+   vistas de dentro é desenhado com recorte nele (`abreVidro`): o que é
+   posicionado pela caixa já nasce dentro, e o que vem da projeção (escada,
+   mira, marcas de alvo) é cortado na borda de dentro da moldura.
+
+   Fica de fora do recorte, de propósito: alarmes, tarja, avisos e as
+   janelas das telas — eles não são o HUD, e alarme que some atrás de uma
+   coluna é alarme que não avisa.
+
+   Com a cabeça virada a pintura esmaece; passando da metade não há moldura
+   para respeitar, e o HUD volta ao vidro 3D de sempre (`calculaVidroHUD`).
+   O dragão não tem cabine pintada e segue no vidro 3D também.
+
+   PARA DESFAZER: `HUD_NO_VIDRO = false`. A caixa volta a ser a do combinador
+   e nada é recortado.
+   ========================================================================== */
+const HUD_NO_VIDRO = true;
+let areaVidro = null;
+/* O TREMOR É UM SÓ POR QUADRO. `tremorDaCabine` sorteia a cada chamada; se o
+   vidro sorteasse um e a pintura outro, o recorte e a moldura sacudiriam
+   cada um para um lado. */
+let _tremorDoQuadro = null;
+function tremorDoQuadro(c){
+  if (!_tremorDoQuadro) _tremorDoQuadro = tremorDaCabine(c);
+  return _tremorDoQuadro;
+}
+function calculaAreaVidro(){
+  areaVidro = null;
+  if (!HUD_NO_VIDRO || !usaCabinePintada()) return;
+  const img = arteDaCabine(), K = kitDaArte(img);
+  if (!K || !K.vidro || cabinePintadaOpacidade() <= 0.5) return;
+  const c = caixaCabinePintada(img), tre = tremorDoQuadro(c);
+  const k = c.l/K.L, ox = c.x + tre.x + hudDX, oy = c.y + tre.y + hudDY;
+  const b = K.hud;
+  areaVidro = { poli: K.vidro.map(([x, y]) => [ox + x*k, oy + y*k]),
+                x: ox + b[0]*k, y: oy + b[1]*k, w: (b[2] - b[0])*k, h: (b[3] - b[1])*k };
+  /* a caixa dos números PASSA A SER a do vidro: tudo o que já se posicionava
+     por `vidroHUD` (rumo, altitude, G, a cruz da aproximação) vem junto sem
+     uma linha a mais. `apertado` é o celular: a caixa do capacete lá tem 258
+     de largura, e as distâncias das setas se empilhariam. */
+  vidroHUD = { x: areaVidro.x, y: areaVidro.y, w: areaVidro.w, h: areaVidro.h,
+               vidroL: areaVidro.w, vidroA: areaVidro.h, apertado: areaVidro.w < 280 };
+}
+/* liga e desliga o recorte. Devolve se ligou, para o par fechar certo. */
+function abreVidro(){
+  if (!areaVidro) return false;
+  h2.save(); presoNaTela();
+  h2.beginPath();
+  areaVidro.poli.forEach(([x, y], i) => i ? h2.lineTo(x, y) : h2.moveTo(x, y));
+  h2.closePath(); h2.clip();
+  return true;
+}
+function fechaVidro(aberto){ if (aberto) h2.restore(); }
+/* UMA MARCA QUE TEM DE CABER INTEIRA (a mira): se o círculo de raio `r` em
+   volta de (x, y) não cabe no vidro, ela é trazida para dentro, na direção
+   do meio da caixa, até caber — e volta `preso`, que é para quem desenha
+   mostrar que ali é o batente e não o ponto de verdade. Fora do vidro
+   pintado ela passa como veio. */
+function cabeNoVidro(x, y, r){
+  if (!areaVidro) return { x, y, preso: false };
+  const P = areaVidro.poli;
+  const cabe = (px, py) => {
+    let dentro = false;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++){
+      const [xi, yi] = P[i], [xj, yj] = P[j];
+      if ((yi > py) !== (yj > py) && px < (xj - xi)*(py - yi)/(yj - yi) + xi) dentro = !dentro;
+      const dx = xj - xi, dy = yj - yi, L = dx*dx + dy*dy || 1;
+      const t = Math.max(0, Math.min(1, ((px - xi)*dx + (py - yi)*dy)/L));
+      if (Math.hypot(px - xi - t*dx, py - yi - t*dy) < r) return false;
+    }
+    return dentro;
+  };
+  if (cabe(x, y)) return { x, y, preso: false };
+  const mx = areaVidro.x + areaVidro.w/2, my = areaVidro.y + areaVidro.h/2;
+  let a = 0, b = 1;                       // a cabe (o meio), b não cabe
+  for (let i = 0; i < 18; i++){
+    const m = (a + b)/2;
+    if (cabe(mx + (x - mx)*m, my + (y - my)*m)) a = m; else b = m;
+  }
+  return { x: mx + (x - mx)*a, y: my + (y - my)*a, preso: true };
+}
 /* A TARJA DO ALARME. O som diz o que é; a tarja diz onde olhar. O vermelho
    (pull up, stall, overspeed) pisca; o âmbar não. Virou função porque tem dois
    lugares: embaixo, na vista de fora, e em cima do para-sol na cabine pintada
@@ -21792,7 +21964,9 @@ function desenhaHUD(){
   presoNaTela();
   h2.clearRect(0,0,W,H);
   calculaDeslocHUD();
+  _tremorDoQuadro = null;          // um sorteio novo de tremor por quadro
   calculaVidroHUD();
+  calculaAreaVidro();              // na cabine pintada, a caixa vira a do vidro
   vidroDaCabine();
   if (clarao > 0){
     h2.fillStyle = 'rgba(255,250,235,' + Math.min(0.92, clarao).toFixed(3) + ')';
@@ -21813,8 +21987,19 @@ function desenhaHUD(){
   }
   // um degrau mais abaixo: com a fita mais alta, o número do rumo ficava
   // escondido atrás da caixa do combustível
+  /* daqui até a mira da metralhadora, tudo é HUD: na cabine pintada, recortado
+     no vidro (ver "O HUD CABE NO VIDRO"). Os avisos de borda que moram no meio
+     do caminho fecham e reabrem o recorte. */
+  let noVidro = abreVidro();
   presoNoVidro();
-  if (vidroHUD){
+  if (areaVidro){
+    /* NO VIDRO PINTADO a caixa é maior que o combinador (480 de largura na
+       TV, contra 200), e a fita do rumo encolhe para 66% dela: a de 92%
+       passava por cima da fita da altitude, que mora no canto direito, e as
+       setas presas na ponta dela encostavam nos números da altitude. */
+    bussola(vidroHUD.y + hudH()*0.066, vidroHUD.x + vidroHUD.w/2,
+            Math.min(vidroHUD.w*0.33, W*0.27));
+  } else if (vidroHUD){
     /* A FITA DO RUMO FICA NO ALTO DO VIDRO, que é onde ela está em todo caça
        — e é o único lugar onde ela não briga com a escada de arfagem, que
        mora no meio. O `y` que a bússola recebe é a linha dos NOMES; a caixa
@@ -21830,7 +22015,12 @@ function desenhaHUD(){
   if (jogando && !caindo) fitaAltura();
   presoNaTela();
 
-  if (cockpit){
+  /* --- A MIRA, A ESCADA E O G NAS TRÊS VISTAS ------------------------------
+     Eram só da CABINE: o capacete tinha a bússola e a fita e mais nada, e a
+     vista de fora só a mira da metralhadora. O dono pediu as três iguais —
+     é o mesmo avião e o mesmo HUD, a vista é que muda. Fora da cabine eles
+     aparecem jogando; na cabine continua como era. */
+  if (cockpit || (jogando && !caindo)){
     /* A CRUZ DO CANHÃO é o único desenho deste bloco que não vem da projeção:
        ela mora no meio da tela porque marca para onde o NARIZ aponta. Então
        ela é do vidro, e sai de cena com ele quando a cabeça vira — senão fica
@@ -21857,17 +22047,32 @@ function desenhaHUD(){
        Então com a metralhadora na mão só existe o anel. Com o míssil e com a
        nuclear, que não têm anel, a cruz continua: é ela que diz onde é o
        meio. */
-    if (arma !== 'metralha'){
-      presoNoAviao();
-      const cx = W/2, cy = H/2;
-      h2.strokeStyle = 'rgba(120,255,170,.8)'; h2.lineWidth = 2.2;
-      h2.beginPath();
-      h2.moveTo(cx - W*0.030, cy); h2.lineTo(cx - W*0.010, cy);
-      h2.moveTo(cx + W*0.010, cy); h2.lineTo(cx + W*0.030, cy);
-      h2.moveTo(cx, cy - H*0.026); h2.lineTo(cx, cy - H*0.009);
-      h2.stroke();
-      h2.beginPath(); h2.arc(cx, cy, Math.max(4, H*0.010), 0, 7); h2.stroke();
-      presoNaTela();
+    /* --- E ELA VEM DA PROJEÇÃO, não do meio da tela ----------------------
+       Ela era desenhada em W/2, H/2 deslocado do nariz, e isso só era o
+       nariz enquanto a câmera da cabine olhava reto. Desde que ela olha 7°
+       para baixo (`incl: 7`), o nariz cai a 35% da altura, e a cruz ficava a
+       meia tela dele — atrás do painel. Agora ela sai do mesmo ponto que a
+       cruz interna da metralhadora (o cano, no alcance da bala), o que vale
+       igual para as três vistas. No vidro pintado, se o cano cai atrás do
+       painel, ela encosta na borda de dentro e fica tracejada: é o batente,
+       como o anel da metralhadora. */
+    if (arma !== 'metralha' && jogando && !caindo){
+      const T = direcaoDaMira(), al = alcanceBala();
+      const v0 = new THREE.Vector3(aviaoX + T.x*al, aviaoY + T.y*al, aviaoZ + T.z*al).project(cam);
+      if (v0.z < 1){
+        const fx = areaVidro ? Math.min(W*0.030, areaVidro.w*0.06) : W*0.030;
+        const m = cabeNoVidro((v0.x*0.5+0.5)*W, (-v0.y*0.5+0.5)*H, fx + 4);
+        const cx = m.x, cy = m.y, fy = fx*0.87;
+        h2.strokeStyle = 'rgba(120,255,170,.8)'; h2.lineWidth = 2.2;
+        if (m.preso) h2.setLineDash([4, 3]);
+        h2.beginPath();
+        h2.moveTo(cx - fx, cy); h2.lineTo(cx - fx/3, cy);
+        h2.moveTo(cx + fx/3, cy); h2.lineTo(cx + fx, cy);
+        h2.moveTo(cx, cy - fy); h2.lineTo(cx, cy - fy*0.35);
+        h2.stroke();
+        h2.beginPath(); h2.arc(cx, cy, Math.max(4, H*0.010), 0, 7); h2.stroke();
+        h2.setLineDash([]);
+      }
     }
     /* ---------------------------------------------------------------------
        A ESCADA DE ARFAGEM tem de ficar PARALELA AO HORIZONTE.
@@ -21892,11 +22097,26 @@ function desenhaHUD(){
       v.set(Math.sin(az)*c, Math.sin(r), Math.cos(az)*c).add(cam.position).project(cam);
       return { x:(v.x*0.5+0.5)*W, y:(-v.y*0.5+0.5)*H, atras: v.z > 1 };
     };
-    h2.font = '700 ' + Math.max(8, H*0.019).toFixed(0) + 'px ui-monospace, monospace';
+    /* NO VIDRO PINTADO a escada é medida pela caixa do HUD, não pela tela:
+       com W*0,17 o degrau do horizonte tinha 435 px na TV e passava das
+       colunas do arco. E os degraus valem enquanto o meio deles estiver no
+       vidro — o recorte corta o resto na moldura. */
+    /* E NA ALTURA ela vai do alto da caixa do HUD até o pé do vidro: acima da
+       caixa o degrau subia até debaixo dos botões do celular. */
+    /* NA VISTA DE FORA ela para acima do avião (58% da altura): os degraus
+       de baixo do horizonte atravessavam a fuselagem e a pista. */
+    const AV = areaVidro;
+    let topoE = H*0.06, peE = cockpit ? H*0.78 : H*0.58;
+    if (AV){ topoE = AV.y; peE = -Infinity;
+             for (const [, y] of AV.poli) peE = Math.max(peE, y); }
+    h2.font = '700 ' + Math.max(8, AV ? hudH()*0.016 : H*0.019).toFixed(0) + 'px ui-monospace, monospace';
     h2.fillStyle = 'rgba(120,255,170,.9)';
+    /* a tinta dos degraus é dita aqui: ela vinha emprestada da cruz, e com a
+       metralhadora (que não desenha a cruz) saía da cor que sobrou */
+    h2.strokeStyle = 'rgba(120,255,170,.8)';
     for (let a = -60; a <= 60; a += 10){
       const c = naTela(rumo, a);
-      if (c.atras || c.y < H*0.06 || c.y > H*0.78) continue;
+      if (c.atras || c.y < topoE || c.y > peE) continue;
       // azimute MENOR anda para -x, e -x é a DIREITA da tela: o segundo ponto
       // dá o sentido "para a direita ao longo do degrau"
       const d2 = naTela(rumo - 0.16, a);
@@ -21905,8 +22125,9 @@ function desenhaHUD(){
       if (!isFinite(n) || n < 0.5 || d2.atras){ ux = 1; uy = 0; } else { ux /= n; uy /= n; }
       // o "para cima" do degrau, para as farpas apontarem para o horizonte
       const cx2 = uy, cy2 = -ux;
-      const meio = W*0.05, fora = a === 0 ? W*0.17 : W*0.11;
-      const farpa = a === 0 ? 0 : H*0.014 * (a > 0 ? -1 : 1);
+      const meio = AV ? AV.w*0.07 : W*0.05,
+            fora = a === 0 ? (AV ? AV.w*0.30 : W*0.17) : (AV ? AV.w*0.19 : W*0.11);
+      const farpa = a === 0 ? 0 : (AV ? Math.min(H*0.014, AV.h*0.04) : H*0.014) * (a > 0 ? -1 : 1);
       h2.setLineDash(a < 0 ? [6,5] : []);
       h2.lineWidth = a === 0 ? 2.4 : 1.6;
       h2.beginPath();
@@ -21956,14 +22177,16 @@ function desenhaHUD(){
       h2.font = '800 ' + fG.toFixed(1) + 'px ui-monospace, monospace';
       h2.fillStyle = gq > 7.5 ? 'rgba(255,110,90,.95)'
                    : gq > 5.5 ? 'rgba(255,196,90,.95)' : 'rgba(150,255,190,.95)';
-      h2.fillText(cargaG.toFixed(1), gx, gy);
+      /* o contorno fino das réguas vale aqui também: sem caixa nenhuma, o G
+         some contra prédio claro na vista de fora */
+      textoNoCeu(cargaG.toFixed(1), gx, gy);
       h2.font = '700 ' + (fG*0.42).toFixed(1) + 'px ui-monospace, monospace';
       h2.fillStyle = 'rgba(150,255,190,.75)';
-      h2.fillText('G', gx + fG*2.1, gy);
+      textoNoCeu('G', gx + fG*2.1, gy);
       /* o PICO é informação de depois do voo, não de durante: na caixa
          apertada ele cede o lugar para o algarismo que importa */
       if (!(vidroHUD && vidroHUD.apertado))
-        h2.fillText('MAX ' + gMax.toFixed(1), gx, gy + fG*0.60);
+        textoNoCeu('MAX ' + gMax.toFixed(1), gx, gy + fG*0.60);
     }
     presoNaTela();      // fecha o vidro AQUI: o que vem depois já vem projetado
 
@@ -22098,7 +22321,12 @@ function desenhaHUD(){
            moram lá, e duas coisas magenta por cima de um número não são duas
            informações, são um borrão */
         const s2 = r.desvio > 0 ? 1 : -1;
-        const x = W/2 + s2*W*0.32, y = H*0.60, t = Math.max(9, H*0.018);
+        /* no vidro pintado, a 60% da altura ela caía atrás do painel: vai
+           para a borda de dentro da caixa do HUD, do lado certo */
+        const AV = areaVidro, t = Math.max(9, H*0.018);
+        const x = AV ? AV.x + AV.w/2 + s2*(AV.w/2 - t*2.2) : W/2 + s2*W*0.32,
+              y = AV ? AV.y + AV.h*0.62 : H*0.60;
+        if (AV) h2.textAlign = s2 > 0 ? 'right' : 'left';
         h2.beginPath();
         h2.moveTo(x + s2*t*1.6, y); h2.lineTo(x - s2*t*0.4, y - t); h2.lineTo(x - s2*t*0.4, y + t);
         h2.closePath(); h2.fill();
@@ -22182,6 +22410,7 @@ function desenhaHUD(){
     }
   }
 
+  fechaVidro(noVidro);       // as faixas de aviso são da tela inteira
   /* O AVISO ANTES: uma faixa amarela nas bordas, que aperta conforme a asa
      reclama. Quando ela vira vermelha e pulsa, já é estol. */
   if (estresse > 0.02 && !estolando && jogando && !caindo){
@@ -22225,6 +22454,7 @@ function desenhaHUD(){
     h2.fillStyle = g4; h2.fillRect(W-esp,0,esp,H);
   }
 
+  noVidro = abreVidro();     // e o HUD volta: a marca da nuclear e a mira
   /* --- A MARCA DO IMPACTO NUCLEAR ---------------------------------------------
      "Nem vejo onde ela cai." O míssil resolve metade — dá para segui-lo com os
      olhos —, mas segui-lo é justamente o que se não pode fazer enquanto se
@@ -22397,6 +22627,23 @@ function desenhaHUD(){
     }
 
     let anel = null;                     // onde o anel ficou, para o ATIRE não bater nele
+    /* NO VIDRO PINTADO o anel encolhe para a caixa e tem de caber inteiro.
+       Na cabine o nariz cai bem na borda do para-sol, e no capacete atrás
+       dele: desenhado onde a conta manda, o anel seria cortado ao meio pelo
+       painel ou sumiria. Então a mira inteira (cano, rastro e anel) é trazida
+       para dentro junto, sem mudar o desenho entre as marcas, e o anel fica
+       tracejado — é o aviso de batente que HUD de verdade dá quando o ponto
+       sai do campo do vidro: "a mira está mais para lá". */
+    const rAnel = areaVidro ? Math.max(10, Math.min(H*0.05, areaVidro.h*0.11)) : Math.max(13, H*0.05);
+    let limitado = false;
+    if (areaVidro && curva.length >= 2){
+      const f0 = curva[curva.length-1], m = cabeNoVidro(f0.x, f0.y, rAnel + 4);
+      if (m.preso){
+        limitado = true;
+        const dx = m.x - f0.x, dy = m.y - f0.y;
+        curva = curva.map(q => ({ ...q, x: q.x + dx, y: q.y + dy }));
+      }
+    }
     if (curva.length >= 2){
       const dentro = curva[0], fora = curva[curva.length-1];
       const afastou = Math.hypot(fora.x-dentro.x, fora.y-dentro.y);
@@ -22424,7 +22671,7 @@ function desenhaHUD(){
       h2.beginPath(); h2.arc(c.x, c.y, Math.max(2, H*0.004), 0, 7); h2.stroke();
 
       /* --- O ANEL EXTERNO: onde está o rastro ----------------------------- */
-      const f2 = fora, r = Math.max(13, H*0.05);
+      const f2 = fora, r = rAnel;
       anel = { x:f2.x, y:f2.y, r };
       /* Uma cor só, do começo ao fim: o mesmo verde do resto do HUD. O que
          muda entre travado, solto e no batente é a GROSSURA e o desenho — o
@@ -22433,11 +22680,13 @@ function desenhaHUD(){
          muda é cor que quer dizer alguma coisa, e essas não queriam. */
       h2.strokeStyle = 'rgba(120,255,170,' + (preso ? .95 : noBatente ? .6 : .7) + ')';
       h2.lineWidth = preso ? 2.6 : 1.8;
+      if (limitado) h2.setLineDash([4, 4]);
       for (let i = 0; i < 4; i++){
         h2.beginPath();
         h2.arc(f2.x, f2.y, r, i*Math.PI/2 + 0.16, (i+1)*Math.PI/2 - 0.16);
         h2.stroke();
       }
+      h2.setLineDash([]);
       h2.strokeStyle = 'rgba(120,255,170,.85)'; h2.lineWidth = 2;
       for (const a of (noBatente ? [] : [0, Math.PI/2, Math.PI, -Math.PI/2])){
         const cx2 = Math.cos(a), sy2 = Math.sin(a);
@@ -22451,8 +22700,11 @@ function desenhaHUD(){
       h2.textAlign = 'center';
       h2.font = '700 ' + Math.max(8, H*0.014).toFixed(0) + 'px ui-monospace, monospace';
       h2.fillStyle = 'rgba(120,255,170,.75)';
-      if (!sol || Math.hypot(sol.x-f2.x, sol.y-f2.y) > r*1.6)
-        h2.fillText(Math.round(ate/METRO) + 'm', f2.x, f2.y + r + Math.max(14, H*0.028));
+      /* no vidro o alcance vai AO LADO do anel: embaixo ele caía no para-sol */
+      if (!sol || Math.hypot(sol.x-f2.x, sol.y-f2.y) > r*1.6){
+        if (areaVidro){ h2.textAlign = 'left'; h2.fillText(Math.round(ate/METRO) + 'm', f2.x + r + 5, f2.y + 4); }
+        else h2.fillText(Math.round(ate/METRO) + 'm', f2.x, f2.y + r + Math.max(14, H*0.028));
+      }
       h2.textAlign = 'left';
     }
 
@@ -22482,6 +22734,7 @@ function desenhaHUD(){
     }
   }
 
+  fechaVidro(noVidro);       // fim do HUD: daqui para baixo são avisos e telas
   /* --- ONDE ESTÁ O NARIZ, QUANDO A CABEÇA VIROU -----------------------------
      Com a vista torta, a coisa mais fácil do mundo é esquecer para onde o
      AVIÃO está apontado — e num caça isso é a diferença entre uma curva e um
