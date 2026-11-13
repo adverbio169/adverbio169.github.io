@@ -106,7 +106,14 @@ if os.path.exists(tres_cam):
             .replace('__CABINE_CACA_MANETE_A__', imagem('cabine-caca-manete-a.webp'))
             .replace('__CABINE_CACA_MANETE_B__', imagem('cabine-caca-manete-b.webp'))
             .replace('__CABINE_CACA_FLAPE__', imagem('cabine-caca-flape.webp'))
-            .replace('__CABINE_CACA_MANCHE__', imagem('cabine-caca-manche.webp')))
+            .replace('__CABINE_CACA_MANCHE__', imagem('cabine-caca-manche.webp'))
+            # a vista do CAPACETE pintada: a base (arte montada, magenta
+            # transparente, telas furadas) e as quatro peças recortadas dela
+            .replace('__CAPACETE_CACA_TREM__', imagem('capacete-caca-trem.webp'))
+            .replace('__CAPACETE_CACA_MANETES__', imagem('capacete-caca-manetes.webp'))
+            .replace('__CAPACETE_CACA_FLAPE__', imagem('capacete-caca-flape.webp'))
+            .replace('__CAPACETE_CACA_MANCHE__', imagem('capacete-caca-manche.webp'))
+            .replace('__CAPACETE_CACA__', imagem('capacete-caca.webp')))
     open('aviao3d.html', 'w', encoding='utf-8').write(t3)
     print('aviao3d.html: %d KB   (three.js embutido: %d KB)' % (len(t3)//1024, len(tres)//1024))
 else:
