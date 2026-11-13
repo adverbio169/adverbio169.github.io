@@ -1369,13 +1369,76 @@ trocando `if (cockpit || (jogando && !caindo))` por `if (cockpit)` em
 
 ---
 
+## Os lados do celular e mais céu na cabine
+
+Três pedidos do dono, juntos.
+
+**1. "O controle do celular e do cockpit têm que ter a mesma ordem."** Na
+cabine pintada as manetes ficam à esquerda; no celular o acelerador estava na
+borda direita. Mudou o celular:
+
+- **Celular como controle da TV** (`controle.modelo.html`): o acelerador foi
+  para a borda ESQUERDA e o nitro para a DIREITA, ao lado do FOGO. As duas
+  colunas têm a mesma largura, então só trocaram de borda em
+  `Painel.regioes()`; o seletor de arma ficou à esquerda (com o polegar da
+  manete, que arrasta) e o FOGO e a DEFESA à direita (com o nitro: tudo que se
+  aperta). De quebra, o painel **em pé** (página girada por CSS, "preso
+  deitado") saía com a forma trocada — lona de 390x844 dentro de uma página
+  de 844x390, alavancas viradas em faixas e os botões de cima empilhados.
+  Agora a lona mede pelo leiaute (`clientWidth`), o painel é 100% do pai
+  girado, a fila de botões anda pelo `left` que ela mesma escreveu, e o toque
+  nas janelas converte a coordenada da tela para a da página (`local()` em
+  `gestoDoPainel`). O aviso "preso deitado" sai voando (volta na engrenagem).
+- **Celular jogando direto** (`aviao3d.modelo.html`, modo de dedo): fora da
+  cabine, a barra do acelerador (`#dAcel`) foi para a borda esquerda e o nitro
+  (`#dNitro`) para a direita. Na cabine e no capacete o acelerador continua
+  sendo a zona invisível em cima das manetes pintadas (`aceleradorNaManete`).
+
+Para desfazer: trocar `pot` e `nitro` de borda em `Painel.regioes()`
+(controle) e o `left`/`right` de `#dAcel` e `#dNitro` (jogo).
+
+**2 e 3. "A visão do capacete muito embaixo" e "o cockpit ocupa muito a
+tela".** O topo do painel pintado estava a 35% da altura (cabine, TV), 46%
+(cabine, celular), 40% (capacete, TV) e 44% (capacete, celular), e a mira caía
+atrás do painel nas quatro, sempre no batente. Testadas as duas hipóteses:
+subir a câmera do capacete (`VISTAS`, `cima` 9 -> 24) não muda nada que se
+veja, porque a pintura é um quadro colado na tela e o horizonte e a mira estão
+no infinito; descer o quadro da pintura resolve. O quadro agora é escolhido
+pela fração da altura onde cai o topo do painel, com a menor escala que cobre
+a largura (4% de folga para o tremor), ancorado nesse topo:
+
+| variante | cabine TV | cabine celular | capacete TV | capacete celular |
+|---|---|---|---|---|
+| hoje (antes) | 0,35 | 0,46 | 0,40 | 0,44 |
+| **A (no ar)** | 0,48 | 0,50 | 0,54 | 0,56 |
+| B (mais céu) | 0,56 | 0,54 | 0,62 | 0,62 |
+
+Com A e com B a mira sai do batente nas quatro telas. Na cabine as colunas da
+canópia saem pela borda de cima da arte; com o quadro mais baixo elas são
+prolongadas até o alto da tela (`prolongaArco`, inclinação `CAB_CACA.arco`) e
+o vidro do HUD sobe junto (`calculaAreaVidro`). No capacete o arco fecha
+dentro da folha e acima dele é céu. Em B, no celular, a cabine fica com as
+manetes quase fora da tela (a zona do acelerador continua lá). O capacete 3D
+do dragão não mudou.
+
+Onde mora: bloco "MAIS CÉU NA CABINE E NO CAPACETE PINTADOS", logo antes de
+`caixaCabinePintada` (`ENQUADRA_PADRAO`, `ENQUADRAMENTOS`, `caixaPeloTopo`,
+`prolongaArco`; o quadro antigo inteiro em `caixaAntiga`). O tremor passou a
+não sacudir além da sobra de baixo. Para comparar sem mexer no código:
+`aviao3d.html?enquadra=B` (ou `=HOJE`). Para escolher B:
+`ENQUADRA_PADRAO = 'B'`. Para desfazer: `ENQUADRA_PADRAO = 'HOJE'`.
+
+Testes: `scratchpad/lados/teste.js` (lados, sobreposição, arrasto do
+acelerador, topo do painel em cada vista, tela e variante, cobertura, mira,
+colunas, telas tocáveis). Fotos: `scratchpad/lados/`.
+
+---
+
 ## O que está em aberto
 
-- **A mira das vistas de dentro vive no batente.** Voando reto, o nariz cai na
-  borda do para-sol pintado (cabine) ou atrás dele (capacete), então o anel
-  fica quase sempre encostado na borda de baixo do vidro, tracejado. Só some
-  o batente mudando o enquadramento da câmera ou da pintura, que é decisão do
-  dono.
+- **A ou B?** O enquadramento da cabine e do capacete pintados tem duas
+  variantes (ver "Os lados do celular e mais céu na cabine"); está no ar a A.
+  O dono escolhe olhando `aviao3d.html?enquadra=B`.
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
 - **A página APROX não baixa o trem.** Na final você está nela e precisa rolar
   até a SINÓT. O checklist TREM/FLAPE/VEL já está lá; falta deixar tocar.
