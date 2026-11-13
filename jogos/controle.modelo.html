@@ -70,6 +70,10 @@
   /* o aviso também gira, senão fica atravessado no meio do resto */
   body.deitar #giroAviso{left:auto;right:10px;bottom:50%;
                          transform:translateY(50%) rotate(90deg);transform-origin:center}
+  /* VOANDO, O AVISO SAI. Ele cai no meio da página deitada, por cima da
+     janela grande, e o recado ("está preso deitado") já foi dado ao entrar;
+     a engrenagem o traz de volta junto com os outros ajustes. */
+  body.deitar.voando:not(.ajustes) #giroAviso{display:none}
   #giroAviso{display:none;position:fixed;z-index:60;left:50%;bottom:14px;transform:translateX(-50%);
              background:rgba(8,12,26,.8);border:1px solid rgba(255,255,255,.16);border-radius:99px;
              padding:7px 14px;font-size:11.5px;color:#9fb4d8;letter-spacing:.5px;align-items:center;gap:8px}
@@ -269,6 +273,16 @@
      debaixo do polegar, e o resto do controle escorrega para dentro para
      abrir espaço.
 
+     OS LADOS TROCARAM DEPOIS, e por um bom motivo. Pedido seguinte: "o
+     controle do celular e do cockpit têm que ter a mesma ordem. Exemplo:
+     acelero na direita e o manche mexe o da esquerda." Na cabine pintada as
+     manetes estão à ESQUERDA (é assim em quase todo caça: mão esquerda na
+     manete, direita no manche), e o modo de dedo já põe o acelerador em cima
+     delas. Mudar a pintura não dava; mudou o celular. Agora o ACELERADOR mora
+     na borda ESQUERDA e o NITRO na DIREITA, ao lado do FOGO. Quem decide é
+     `Painel.regioes()` — para desfazer, é trocar `pot` e `nitro` de borda
+     lá, e só lá.
+
      O acelerador é uma alavanca de verdade: o dedo pousa na altura que quer
      e a potência vai junto. A cada 10% ele dá um toque no vibrador, para
      ajustar a potência de olho na tela grande, sem olhar o celular.
@@ -416,6 +430,17 @@ body.paisagem #controle.ver,
   /* nada de recolher: recolher existia para revelar o jogo atrás do painel, e
      no controle não há jogo atrás — há o próprio painel. */
   body.paisagem #painelTela.encolhido{top:0;bottom:auto;height:100vh;height:100dvh}
+  /* EM PÉ, PRESO DEITADO PELO GIRO DE CSS, `100vw x 100vh` é a tela ERRADA: o
+     navegador continua medindo o aparelho em pé (390 de largura, 844 de
+     altura) e o painel saía com a forma trocada, desenhado para um retângulo
+     alto dentro de uma página deitada — as alavancas viravam faixas, a bola
+     caía no meio e metade do vidro ficava fora. Dentro do pai girado, o
+     `fixed` se mede pelo pai (um ancestral com `transform` vira o bloco de
+     contenção), e o pai já tem o tamanho deitado certo; então é 100% dele.
+     Apareceu ao fotografar o controle em pé para a troca de lado do
+     acelerador. */
+  body.deitar.paisagem #painelTela,
+  body.deitar.paisagem #painelTela.encolhido{width:100%;height:100%}
   /* OS POÇOS. O elemento não desenha mais moldura nenhuma: a moldura é do
      vidro, desenhada na lona, e o HTML só carrega o conteúdo. */
   body.paisagem #horizonte, body.paisagem .armas, body.paisagem #nitro,
@@ -1628,7 +1653,8 @@ const Painel = {
      põe os elementos de HTML nos mesmos números. Tudo em pixels de tela.
 
      A ordem das colunas não é arbitrária: as duas alavancas nas bordas,
-     porque é onde os polegares alcançam sem soltar o aparelho; a bola do
+     porque é onde os polegares alcançam sem soltar o aparelho — o acelerador
+     na esquerda, como as manetes da cabine, e o nitro na direita; a bola do
      horizonte à esquerda, que é onde o olho procura atitude; o gatilho à
      direita, sob o polegar direito; e as páginas no meio, que é o que se LÊ
      e não o que se aperta. A fita de abas atravessa o rodapé inteiro — antes
@@ -1702,10 +1728,19 @@ const Painel = {
     const wAlav = Math.max(34, Math.min(W*0.062, 52));
     const wEsq  = Math.max(104, Math.min(W*0.205, 178));
     const wFogo = Math.max(88, Math.min(W*0.158, 124));
+    /* ACELERADOR NA ESQUERDA, NITRO NA DIREITA — a mesma mão da cabine. Na
+       pintura do cockpit as manetes ficam à esquerda do piloto e o manche no
+       meio-direita; o controle tinha o acelerador na borda direita, e quem
+       passava do celular para a vista de cabine via a mão trocar de lado. As
+       duas colunas só trocaram de borda: têm a mesma largura e a mesma altura,
+       então nada do miolo se mexe e nada passa a se sobrepor. O FOGO continua
+       na coluna da direita, agora vizinho do nitro: os dois são o polegar
+       direito, e os dois se APERTAM — já o acelerador e o seletor de arma, à
+       esquerda, se ARRASTAM, que é o trabalho do polegar que segura a manete. */
     let x = m;
-    const nitro = { x, y: y0, w: wAlav, h: alt }; x += wAlav + m;
+    const pot = { x, y: y0, w: wAlav, h: alt }; x += wAlav + m;
     const colE = x; x += wEsq + m;
-    const xDir = W - m - wAlav, pot = { x: xDir, y: y0, w: wAlav, h: alt };
+    const xDir = W - m - wAlav, nitro = { x: xDir, y: y0, w: wAlav, h: alt };
     const colD = xDir - m - wFogo;
     const pag = { x, y: y0, w: Math.max(80, colD - m - x), h: alt };
 
@@ -1804,10 +1839,15 @@ const Painel = {
     const bts = ['btVisao', 'btQual', 'btOlho']
       .map(id => document.getElementById(id))
       .filter(e => e && getComputedStyle(e).display !== 'none');
+    /* a borda direita de cada um sai do `left` que EU escrevi mais a largura
+       de leiaute — não de `getBoundingClientRect`, que com a página girada
+       (em pé, preso deitado) devolve a caixa já virada, e a fila andava no
+       eixo errado, empilhando os botões uns sobre os outros. */
+    const fimDe = u => u ? (parseFloat(u.style.left) || 0) + u.offsetWidth : xe;
     const poeFila = () => {
       let u = li;
       for (const e of bts){
-        const lr = u ? u.getBoundingClientRect() : { right: xe };
+        const lr = { right: fimDe(u) };
         e.style.left = (lr.right + 5) + 'px'; e.style.top = yb + 'px';
         e.style.height = hb + 'px'; e.style.right = 'auto'; e.style.bottom = 'auto';
         u = e;
@@ -1816,14 +1856,14 @@ const Painel = {
     };
     bts.forEach(e => { const r2 = e.querySelector('b'); if (r2) r2.style.display = ''; });
     let ult = poeFila();
-    if (ult && ult !== li && ult.getBoundingClientRect().right > limite){
+    if (ult && ult !== li && fimDe(ult) > limite){
       bts.forEach(e => { const r2 = e.querySelector('b'); if (r2) r2.style.display = 'none'; });
       ult = poeFila();
     }
     const bv = ult;
     const gl = document.getElementById('giroLinha');
     if (gl && getComputedStyle(gl).display !== 'none'){
-      const lr = (bv || li) ? (bv || li).getBoundingClientRect() : { right: xe };
+      const lr = { right: fimDe(bv || li) };
       gl.style.left = (lr.right + 6) + 'px'; gl.style.top = yb + 'px';
       gl.style.height = hb + 'px';
       gl.querySelectorAll('button').forEach(b => { b.style.height = hb + 'px'; });
@@ -1852,8 +1892,11 @@ const Painel = {
       c.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;touch-action:none';
       el.appendChild(c); this.lona = c; this.cx = c.getContext('2d');
     }
-    const q = this.lona.getBoundingClientRect();
-    const w = Math.max(80, Math.round(q.width)), h = Math.max(60, Math.round(q.height));
+    /* o tamanho de LEIAUTE (`client*`), não a caixa na tela: com a página
+       girada por CSS a caixa vem em pé (390x844) e o painel seria calculado
+       para a forma errada. `clientWidth` ignora o giro e dá a lona deitada. */
+    const w = Math.max(80, Math.round(this.lona.clientWidth)),
+          h = Math.max(60, Math.round(this.lona.clientHeight));
     const r = Math.min(window.devicePixelRatio || 1, 2);
     if (this.w !== w || this.h !== h || this.lona.width !== Math.round(w*r)){
       this.w = w; this.h = h;
@@ -2947,6 +2990,13 @@ const Painel = {
      Agora: o eixo é decidido pelo TOTAL do gesto, na hora de soltar; o
      limiar é 12% da largura com mínimo de 28 px; e o mesmo laço atende
      `touch` e `pointer`. Para baixo, encolhe; para cima, abre. */
+  /* AS REGIÕES ESTÃO NO SISTEMA DA PÁGINA DEITADA, e o dedo chega no da tela.
+     Com a página girada por CSS (em pé, preso deitado: `rotate(90deg)
+     translateY(-largura)`), o x da página é o y da tela e o y da página é a
+     largura menos o x. Sem isto, tocar numa janela ou numa aba em pé acertava
+     outra coisa. */
+  const local = (x, y) => document.body.classList.contains('deitar')
+    ? { x: y, y: window.innerWidth - x } : { x, y };
   const dentro = (r, x, y) => !!r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
   let x0 = null, y0 = null, usou = false, movi = false, id = null;
   const limH = () => Math.max(28, Math.min(el.clientWidth*0.12, 70));
@@ -2956,6 +3006,7 @@ const Painel = {
      cima da bola do horizonte para virar a fita seria um comando escondido
      onde ninguém procura, e pior, num lugar onde o dedo passa sem querer. */
   function pega(x, y){
+    ({ x, y } = local(x, y));
     const R = Painel.R;
     if (Painel.telaCheia() && R){
       /* arrastar numa janela passa o formato DELA, e dá foco a ela de
@@ -2969,6 +3020,7 @@ const Painel = {
   }
   function anda(x, y, e){
     if (x0 === null || usou) return;
+    ({ x, y } = local(x, y));
     const dx = x - x0, dy = y - y0;
     if (Math.abs(dx) > 6 || Math.abs(dy) > 6) movi = true;
     if (e && e.cancelable) e.preventDefault();
@@ -2982,6 +3034,7 @@ const Painel = {
     }
   }
   function solta(x, y){
+    if (x !== undefined) ({ x, y } = local(x, y));
     if (x0 !== null && !usou && x !== undefined){
       /* o resto do gesto: soltar antes do limiar ainda conta, se passou de
          metade dele. Sem isto, um arrasto curto não faz NADA e parece que a
@@ -3036,19 +3089,20 @@ const Painel = {
     const R = Painel.R;
     if (Painel.telaCheia() && R){
       const F = Painel.formatos();
-      if (dentro(R.abas, e.clientX, e.clientY)){
+      const p = local(e.clientX, e.clientY), ex = p.x, ey = p.y;
+      if (dentro(R.abas, ex, ey)){
         /* a fita manda na janela EM FOCO: escolhe-se o display e depois o
            formato, que é a ordem de qualquer cabine de vidro */
-        const i = Math.floor((e.clientX - R.abas.x)/(R.abas.w/F.length));
+        const i = Math.floor((ex - R.abas.x)/(R.abas.w/F.length));
         Painel.poeFormato(Painel.foco, F[Math.max(0, Math.min(F.length - 1, i))]);
-      } else if (dentro(R.adi, e.clientX, e.clientY)){
+      } else if (dentro(R.adi, ex, ey)){
         if (Painel.foco !== 0){ Painel.foco = 0; Painel.pinta();
           try { navigator.vibrate && navigator.vibrate(8); } catch(x){} }
-        else Painel.tocaJanela(0, e.clientX - R.adi.x, e.clientY - R.adi.y);
-      } else if (dentro(R.pag, e.clientX, e.clientY)){
+        else Painel.tocaJanela(0, ex - R.adi.x, ey - R.adi.y);
+      } else if (dentro(R.pag, ex, ey)){
         if (Painel.foco !== 1){ Painel.foco = 1; Painel.pinta();
           try { navigator.vibrate && navigator.vibrate(8); } catch(x){} }
-        else Painel.tocaJanela(1, e.clientX - R.pag.x, e.clientY - R.pag.y);
+        else Painel.tocaJanela(1, ex - R.pag.x, ey - R.pag.y);
       }
       return;
     }
@@ -3377,7 +3431,10 @@ function enviaCtl(o){ if (conn && conn.open) conn.send(o); }
 
 /* --- ACELERADOR e NITRO -----------------------------------------------------
    Pedido: "um acelerador no lado direito do controle, e no lado esquerdo o
-   botão do nitro".
+   botão do nitro". Depois os lados TROCARAM, para o celular ter a mesma
+   ordem da cabine pintada (manetes à esquerda): acelerador na borda
+   esquerda, nitro na direita. O lugar é de `Painel.regioes()`; aqui é só o
+   comportamento, que não depende do lado.
 
    O ACELERADOR é uma alavanca, não um botão: o dedo pousa na altura que quer
    e a potência salta para lá — em cima é tudo, embaixo é marcha lenta. A cada
@@ -3406,7 +3463,10 @@ const Motor = (function(){
     v = Math.max(0, Math.min(1, v));
     M.potencia = v;
     const pct = (v*100).toFixed(1) + '%';
-    const r = elAcel.getBoundingClientRect();
+    /* a forma da tira pelo LEIAUTE (`offset*`): com a página girada por CSS
+       a caixa na tela vem virada, e a barra enchia de lado numa coluna de pé.
+       O dedo, lá embaixo, continua lendo a caixa na tela — ali é o certo. */
+    const r = { width: elAcel.offsetWidth, height: elAcel.offsetHeight };
     if (r.height >= r.width){                 // tira de pé: a barra sobe
       elBarra.style.width = '100%';  elBarra.style.height = pct;
       elBarra.style.borderTop = '2px solid #5eff9a'; elBarra.style.borderRight = '0';
