@@ -1436,9 +1436,9 @@ colunas, telas tocáveis). Fotos: `scratchpad/lados/`.
 
 ## O que está em aberto
 
-- **A ou B?** O enquadramento da cabine e do capacete pintados tem duas
-  variantes (ver "Os lados do celular e mais céu na cabine"); está no ar a A.
-  O dono escolhe olhando `aviao3d.html?enquadra=B`.
+- **No celular, com o enquadramento B, as manetes da cabine ficam quase fora
+  da tela.** O dono escolheu B ("mais céu") vendo A e B lado a lado; a zona do
+  acelerador continua em cima delas. A moderada segue em `?enquadra=A`.
 - **O jogo não tem nome.** A capa de compartilhamento ainda diz "Avião 3D".
 - **A página APROX não baixa o trem.** Na final você está nela e precisa rolar
   até a SINÓT. O checklist TREM/FLAPE/VEL já está lá; falta deixar tocar.
